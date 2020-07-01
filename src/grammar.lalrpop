@@ -3,14 +3,21 @@ use minis::util::concat;
 
 grammar;
 
-pub Expr: Expr = {
-  //Var,
+pub Program: Expr = <s:(<Stmt> ";")*> <r:Expr> => Expr::Block(s, r.into());
+
+// XXX can the ';' be optional?
+Block: Expr = "{" <s:(<Stmt> ";")*> <r:Expr> "}" => Expr::Block(s, r.into());
+
+Stmt: Expr = {
+  <Assign>,
+  <FnDef>,
+};
+
+Expr: Expr = {
+  Value,
   FnCall,
-  FnDef,
-  Assign,
   And,
   Or,
-  Value,
   Block,
 };
 
@@ -30,9 +37,6 @@ FnDef: Expr = {
 // TODO make the () optional
 Or: Expr = "(" <ListM<Expr, "||">> ")" => Expr::Or(<>);
 And: Expr = "(" <ListM<Expr, "&&">> ")" => Expr::Or(<>);
-
-// XXX can the ';' be optional?
-Block: Expr = "{" <l:List<Expr, ";">> "}" => Expr::Block(l);
 
 // A `S`-separated list of *one* or more `T` values, *with* an optional suffix separator
 List<T, S>: Vec<T> = <l:(<T> S)*> <t:T> S? => concat(l, t);
