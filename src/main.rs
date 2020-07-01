@@ -7,8 +7,8 @@ fn main(){}
 
 #[test]
 fn test() {
-  let parser = grammar::ProgramParser::new();
-  println!("{:#?}", parser.parse("let $foo = (bar || baz); $foo").unwrap());
-  println!("{:#?}", parser.parse("fn foo($bar) = qux($bar); foo(3)").unwrap());
-  println!("{:#?}", parser.parse("fn foo($bar) { let $bar = taz(1); qux($bar) }; foo(6)").unwrap());
+  let parser = grammar::ExprParser::new();
+  println!("{:#?}", parser.parse("let $foo = (bar || baz)").unwrap());
+  println!("{:#?}", parser.parse("fn foo($bar,) = qux($bar)").unwrap());
+  println!("{:#?}", parser.parse("fn foo($bar) { taz(1); qux($bar) }").unwrap());
 }
