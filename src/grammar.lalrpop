@@ -1,51 +1,53 @@
-use minis::ast::{Expr, self};
+use minis::ast::{Expr, Stmt, self};
 use minis::util::concat;
 
 grammar;
 
-pub Expr: Expr = {
-  //Var,
-  FnCall,
+pub Program: ast::Block = Block;
+
+// XXX can the ';' be optional?
+Block: ast::Block = <stmts:(<Stmt> ";")*> <return_value:Expr> =>
+  ast::Block { stmts,  return_value: return_value.into() };
+
+Stmt: Stmt = {
   FnDef,
   Assign,
+}
+
+Expr: Expr = {
+  FnCall,
   And,
   Or,
   Value,
-  Block,
+  BlockExpr,
 };
+
 
 Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
 
 Value: Expr = Ident => ast::Value(<>.into()).into();
 
-Assign: Expr = "let" <name:Ident> "=" <value:Expr> =>
+Assign: Stmt = "let" <name:Ident> "=" <value:Expr> =>
     ast::Assign { name, value: value.into() }.into();
+
+FnDef: Stmt = {
+    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" "=" <body:Expr> =>
+        ast::FnDef { name, args, body: body.into() }.into(),
+    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" "{" <body:Block> "}" =>
+        ast::FnDef { name, args, body: body }.into(),
+};
 
 FnCall: Expr = <name:Ident> "(" <args:List<Expr, ",">> ")" =>
     ast::FnCall { name, args }.into();
-
-FnDef: Expr = {
-    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" "=" <body:Expr> =>
-        ast::FnDef { name, args, body: body.into() }.into(),
-    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" <body:Block> =>
-        ast::FnDef { name, args, body: body.into() }.into(),
-};
 
 // TODO make the () optional
 Or: Expr = "(" <ListM<Expr, "||">> ")" => ast::Or(<>).into();
 And: Expr = "(" <ListM<Expr, "&&">> ")" => ast::And(<>).into();
 
-// XXX can the ';' be optional?
-Block: Expr = "{" <List<Expr, ";">> "}" => ast::Block(<>).into();
+BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
 // A `S`-separated list of *one* or more `T` values, *with* an optional suffix separator
 List<T, S>: Vec<T> = <l:(<T> S)*> <t:T> S? => concat(l, t);
 
 // A `S`-separated list of *two* or more `T` values, *without* an optional suffix separator
 ListM<T, S>: Vec<T> = <l:(<T> S)+> <t:T> => concat(l, t);
-
-
-
-
-//Value: Expr = <s:r"\w+"> => Expr::Value(<>.into());
-//Var: Expr = Ident => Expr::Var(<>.into());
