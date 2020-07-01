@@ -1,4 +1,4 @@
-use minis::ast::Expr;
+use minis::ast::{Expr, self};
 use minis::util::concat;
 
 grammar;
@@ -16,23 +16,27 @@ pub Expr: Expr = {
 
 Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
 
-Value: Expr = Ident => Expr::Value(<>.into());
+Value: Expr = Ident => ast::Value(<>.into()).into();
 
-Assign: Expr = "let" <name:Ident> "=" <val:Expr> => Expr::Assign(name, val.into());
+Assign: Expr = "let" <name:Ident> "=" <value:Expr> =>
+    ast::Assign { name, value: value.into() }.into();
 
-FnCall: Expr = <name:Ident> "(" <args:List<Expr, ",">> ")" => Expr::FnCall(name, args);
+FnCall: Expr = <name:Ident> "(" <args:List<Expr, ",">> ")" =>
+    ast::FnCall { name, args }.into();
 
 FnDef: Expr = {
-  "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" "=" <body:Expr> => Expr::FnDef(name, args, body.into()),
-  "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" <body:Block> => Expr::FnDef(name, args, body.into()),
+    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" "=" <body:Expr> =>
+        ast::FnDef { name, args, body: body.into() }.into(),
+    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" <body:Block> =>
+        ast::FnDef { name, args, body: body.into() }.into(),
 };
 
 // TODO make the () optional
-Or: Expr = "(" <ListM<Expr, "||">> ")" => Expr::Or(<>);
-And: Expr = "(" <ListM<Expr, "&&">> ")" => Expr::Or(<>);
+Or: Expr = "(" <ListM<Expr, "||">> ")" => ast::Or(<>).into();
+And: Expr = "(" <ListM<Expr, "&&">> ")" => ast::And(<>).into();
 
 // XXX can the ';' be optional?
-Block: Expr = "{" <l:List<Expr, ";">> "}" => Expr::Block(l);
+Block: Expr = "{" <List<Expr, ";">> "}" => ast::Block(<>).into();
 
 // A `S`-separated list of *one* or more `T` values, *with* an optional suffix separator
 List<T, S>: Vec<T> = <l:(<T> S)*> <t:T> S? => concat(l, t);
