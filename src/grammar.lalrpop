@@ -1,0 +1,47 @@
+use minis::ast::Expr;
+use minis::util::concat;
+
+grammar;
+
+pub Expr: Expr = {
+  //Var,
+  FnCall,
+  FnDef,
+  Assign,
+  And,
+  Or,
+  Value,
+  Block,
+};
+
+Identifier: String = <s:r"[\w$]+"> => (<>).to_owned();
+
+Value: Expr = Identifier => Expr::Value(<>.into());
+
+Assign: Expr = "let" <name:Identifier> "=" <val:Expr> => Expr::Assign(name, val.into());
+
+FnCall: Expr = <name:Identifier> "(" <args:List<Expr, ",">> ")" => Expr::FnCall(name, args);
+
+FnDef: Expr = {
+  "fn" <name:Identifier> "(" <args:List<Identifier, ",">> ")" "=" <body:Expr> => Expr::FnDef(name, args, body.into()),
+  "fn" <name:Identifier> "(" <args:List<Identifier, ",">> ")" <body:Block> => Expr::FnDef(name, args, body.into()),
+};
+
+// TODO make the () optional
+Or: Expr = "(" <ListM<Expr, "||">> ")" => Expr::Or(<>);
+And: Expr = "(" <ListM<Expr, "&&">> ")" => Expr::Or(<>);
+
+// XXX can the ';' be optional?
+Block: Expr = "{" <l:List<Expr, ";">> "}" => Expr::Block(l);
+
+// A `S`-separated list of *one* or more `T` values, *with* an optional suffix separator
+List<T, S>: Vec<T> = <l:(<T> S)*> <t:T> S? => concat(l, t);
+
+// A `S`-separated list of *two* or more `T` values, *without* an optional suffix separator
+ListM<T, S>: Vec<T> = <l:(<T> S)+> <t:T> => concat(l, t);
+
+
+
+
+//Value: Expr = <s:r"\w+"> => Expr::Value(<>.into());
+//Var: Expr = Identifier => Expr::Var(<>.into());
