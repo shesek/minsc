@@ -29,7 +29,7 @@ impl Scope {
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
-    pub fn set<T: Into<Expr>>(&mut self, key: Ident, value: Expr) -> Result<(), Error> {
+    pub fn set(&mut self, key: Ident, value: Expr) -> Result<(), Error> {
         if self.local.contains_key(&key) {
             // cannot be set if already exists in this scope, but could shadow over a definition from a parent scope
             Err(Error::AssignedVariableExists(key))
