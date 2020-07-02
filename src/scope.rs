@@ -1,26 +1,28 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
-use crate::ast::{Expr, Ident};
+use crate::ast::{self, Expr, Ident};
 use crate::Error;
 
 #[derive(Default, Debug)]
-pub struct Scope {
-    parent: Option<Rc<Scope>>,
+pub struct Scope<'a> {
+    parent: Option<&'a Scope<'a>>,
     local: HashMap<Ident, Expr>,
 }
 
-impl Scope {
-    pub fn new() -> Rc<Self> {
-        Self::default().into()
+impl<'a> Scope<'a> {
+    pub fn root() -> Self {
+        let mut scope = Self::default();
+        scope
+            .set("sha256".into(), ast::FnNative("sha256".into()).into())
+            .unwrap();
+        scope
     }
 
-    pub fn derive(parent: Rc<Scope>) -> Rc<Self> {
+    pub fn derive(parent: &'a Scope) -> Self {
         Scope {
             parent: Some(parent),
             local: HashMap::new(),
         }
-        .into()
     }
 
     pub fn get(&self, key: &Ident) -> Option<&Expr> {
@@ -36,6 +38,13 @@ impl Scope {
         } else {
             self.local.insert(key, value);
             Ok(())
+        }
+    }
+
+    pub fn child(&'a self) -> Self {
+        Scope {
+            parent: Some(&self),
+            local: HashMap::new(),
         }
     }
 }

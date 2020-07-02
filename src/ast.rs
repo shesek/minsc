@@ -22,7 +22,13 @@ pub enum Expr {
     And(And),
     Block(Block),
     Value(Value),
+    FnNative(FnNative),
 }
+
+// A native Miniscript policy function. This is used to initialize the root
+// scope and cannot be parsed from AST.
+#[derive(Debug, Clone)]
+pub struct FnNative(pub Ident);
 
 /// A function call (expression)
 #[derive(Debug, Clone)]
@@ -75,3 +81,4 @@ impl_from!(And, Expr);
 impl_from!(Block, Expr);
 impl_from!(Value, Expr);
 impl_from!(FnDef, Expr);
+impl_from!(FnNative, Expr);
