@@ -66,10 +66,11 @@ impl From<Expr> for Block {
     }
 }
 
-impl_from!(FnDef, Stmt);
-impl_from!(Assign, Stmt);
-impl_from!(FnCall, Expr);
-impl_from!(Or, Expr);
-impl_from!(And, Expr);
-impl_from!(Block, Expr);
-impl_from!(TermWord, Expr);
+impl_from_variant!(FnDef, Stmt);
+impl_from_variant!(Assign, Stmt);
+
+impl_from_variant!(FnCall, Expr);
+impl_from_variant!(Or, Expr);
+impl_from_variant!(And, Expr);
+impl_from_variant!(Block, Expr);
+impl_from_variant!(TermWord, Expr);

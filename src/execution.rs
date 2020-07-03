@@ -16,8 +16,8 @@ pub enum Value {
     FnNative(Ident),
 }
 
-impl_from!(Policy, Value);
-impl_from!(FnDef, Value);
+impl_from_variant!(Policy, Value);
+impl_from_variant!(FnDef, Value);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
