@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-use minis::execution::{Evaluate, Transpile};
+use minis::execution::Evaluate;
 use minis::Scope;
 
 lalrpop_mod!(pub grammar);
@@ -33,6 +33,6 @@ fn try_minis(s: &str) {
     let res = ast.eval(&scope).unwrap();
     println!("eval: {:#?}", res);
 
-    let res = res.transpile();
+    let res = res.into_policy().unwrap();
     println!("policy: {:#?}", res);
 }

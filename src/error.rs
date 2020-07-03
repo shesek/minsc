@@ -13,4 +13,7 @@ pub enum Error {
 
     #[error("Function {0} expected {1} arguments, not {2}")]
     ArgumentMismatch(Ident, usize, usize),
+
+    #[error("Value cannot be represented as Miniscript policy")]
+    NotMiniscriptRepresentable,
 }

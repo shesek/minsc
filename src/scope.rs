@@ -1,20 +1,20 @@
 use std::collections::HashMap;
 
-use crate::ast::{self, Expr, Ident};
+use crate::ast::Ident;
+use crate::execution::Value;
+use crate::miniscript::BUILTINS;
 use crate::Error;
 
 #[derive(Default, Debug)]
 pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
-    local: HashMap<Ident, Expr>,
+    local: HashMap<Ident, Value>,
 }
 
 impl<'a> Scope<'a> {
     pub fn root() -> Self {
         let mut scope = Self::default();
-        scope
-            .set("sha256".into(), ast::FnNative("sha256".into()).into())
-            .unwrap();
+        attach_builtins(&mut scope);
         scope
     }
 
@@ -25,13 +25,13 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn get(&self, key: &Ident) -> Option<&Expr> {
+    pub fn get(&self, key: &Ident) -> Option<&Value> {
         self.local
             .get(key)
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
-    pub fn set(&mut self, key: Ident, value: Expr) -> Result<(), Error> {
+    pub fn set(&mut self, key: Ident, value: Value) -> Result<(), Error> {
         if self.local.contains_key(&key) {
             // cannot be set if already exists in this scope, but could shadow over a definition from a parent scope
             Err(Error::AssignedVariableExists(key))
@@ -46,5 +46,14 @@ impl<'a> Scope<'a> {
             parent: Some(&self),
             local: HashMap::new(),
         }
+    }
+}
+
+fn attach_builtins(scope: &mut Scope) {
+    for name in BUILTINS {
+        let name = *name;
+        scope
+            .set(name.into(), Value::FnNative(name.into()))
+            .unwrap();
     }
 }
