@@ -20,7 +20,7 @@ pub enum Expr {
     Or(Or),
     And(And),
     Block(Block),
-    Value(Value),
+    TermWord(TermWord),
 }
 
 /// A function call (expression)
@@ -53,9 +53,9 @@ pub struct Or(pub Vec<Expr>);
 #[derive(Debug, Clone)]
 pub struct And(pub Vec<Expr>);
 
-// A plain value (hex pubkeys, xpubs, locktimes, etc) or a variable name
+/// A terminal word. This can either be a variable name or a plain value passed-through to miniscript.
 #[derive(Debug, Clone)]
-pub struct Value(pub String);
+pub struct TermWord(pub String);
 
 impl From<Expr> for Block {
     fn from(return_value: Expr) -> Self {
@@ -72,4 +72,4 @@ impl_from!(FnCall, Expr);
 impl_from!(Or, Expr);
 impl_from!(And, Expr);
 impl_from!(Block, Expr);
-impl_from!(Value, Expr);
+impl_from!(TermWord, Expr);

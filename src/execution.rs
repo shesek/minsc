@@ -87,7 +87,7 @@ impl Evaluate for ast::And {
     }
 }
 
-impl Evaluate for ast::Value {
+impl Evaluate for ast::TermWord {
     fn eval(&self, scope: &Scope) -> Result<Value, Error> {
         Ok(match scope.get(&self.0) {
             Some(binding) => binding.clone(),
@@ -132,7 +132,7 @@ impl Evaluate for Expr {
             Expr::Or(x) => x.eval(scope),
             Expr::And(x) => x.eval(scope),
             Expr::Block(x) => x.eval(scope),
-            Expr::Value(x) => x.eval(scope),
+            Expr::TermWord(x) => x.eval(scope),
         }
     }
 }

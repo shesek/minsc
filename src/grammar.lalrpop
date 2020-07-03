@@ -18,14 +18,14 @@ Expr: Expr = {
   FnCall,
   And,
   Or,
-  Value,
+  TermWord,
   BlockExpr,
 };
 
 
 Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
 
-Value: Expr = Ident => ast::Value(<>.into()).into();
+TermWord: Expr = Ident => ast::TermWord(<>.into()).into();
 
 Assign: Stmt = "let" <name:Ident> "=" <value:Expr> =>
     ast::Assign { name, value: value.into() }.into();
