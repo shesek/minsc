@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::ast::Ident;
+use crate::error::{Error, Result};
 use crate::execution::Value;
 use crate::miniscript::BUILTINS;
-use crate::Error;
 
 #[derive(Default, Debug)]
 pub struct Scope<'a> {
@@ -31,7 +31,7 @@ impl<'a> Scope<'a> {
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
-    pub fn set(&mut self, key: Ident, value: Value) -> Result<(), Error> {
+    pub fn set(&mut self, key: Ident, value: Value) -> Result<()> {
         if self.local.contains_key(&key) {
             // cannot be set if already exists in this scope, but could shadow over a definition from a parent scope
             Err(Error::AssignedVariableExists(key))

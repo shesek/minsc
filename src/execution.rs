@@ -1,8 +1,9 @@
 use std::ops::Deref;
 
 use crate::ast::{self, Expr, FnDef, Ident, Stmt};
+use crate::error::{Error, Result};
 use crate::miniscript::{self, Policy};
-use crate::{Error, Scope};
+use crate::scope::Scope;
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -20,29 +21,29 @@ impl_from!(FnDef, Value);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
-    fn eval(&self, scope: &Scope) -> Result<Value, Error>;
+    fn eval(&self, scope: &Scope) -> Result<Value>;
 }
 
 /// Run a statement. Statements have side-effects and don't have a return value.
 pub trait Run {
-    fn run(&self, scope: &mut Scope) -> Result<(), Error>;
+    fn run(&self, scope: &mut Scope) -> Result<()>;
 }
 
 impl Run for ast::Assign {
-    fn run(&self, scope: &mut Scope) -> Result<(), Error> {
+    fn run(&self, scope: &mut Scope) -> Result<()> {
         let value = self.value.deref().eval(scope)?;
         scope.set(self.name.clone(), value)
     }
 }
 
 impl Run for ast::FnDef {
-    fn run(&self, scope: &mut Scope) -> Result<(), Error> {
+    fn run(&self, scope: &mut Scope) -> Result<()> {
         scope.set(self.name.clone(), self.clone().into())
     }
 }
 
 impl Run for Stmt {
-    fn run(&self, scope: &mut Scope) -> Result<(), Error> {
+    fn run(&self, scope: &mut Scope) -> Result<()> {
         match self {
             Stmt::FnDef(x) => x.run(scope),
             Stmt::Assign(x) => x.run(scope),
@@ -51,7 +52,7 @@ impl Run for Stmt {
 }
 
 impl Evaluate for ast::FnCall {
-    fn eval(&self, scope: &Scope) -> Result<Value, Error> {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
         let func = scope
             .get(&self.name)
             .ok_or_else(|| Error::FnNotFound(self.name.clone()))?;
@@ -68,7 +69,7 @@ impl Evaluate for ast::FnCall {
 }
 
 impl Evaluate for ast::Or {
-    fn eval(&self, scope: &Scope) -> Result<Value, Error> {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
         ast::FnCall {
             name: "or".into(),
             args: self.0.clone(),
@@ -78,7 +79,7 @@ impl Evaluate for ast::Or {
 }
 
 impl Evaluate for ast::And {
-    fn eval(&self, scope: &Scope) -> Result<Value, Error> {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
         ast::FnCall {
             name: "and".into(),
             args: self.0.clone(),
@@ -88,7 +89,7 @@ impl Evaluate for ast::And {
 }
 
 impl Evaluate for ast::TermWord {
-    fn eval(&self, scope: &Scope) -> Result<Value, Error> {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
         Ok(match scope.get(&self.0) {
             Some(binding) => binding.clone(),
             None => miniscript::Policy::Value(self.0.clone()).into(),
@@ -98,7 +99,7 @@ impl Evaluate for ast::TermWord {
 }
 
 impl Evaluate for ast::Block {
-    fn eval(&self, scope: &Scope) -> Result<Value, Error> {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut scope = Scope::derive(scope);
         for stmt in &self.stmts {
             stmt.run(&mut scope)?;
@@ -108,7 +109,7 @@ impl Evaluate for ast::Block {
 }
 
 impl ast::FnDef {
-    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value, Error> {
+    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
         if self.args.len() != args.len() {
             return Err(Error::ArgumentMismatch(
                 self.name.clone(),
@@ -126,7 +127,7 @@ impl ast::FnDef {
 }
 
 impl Evaluate for Expr {
-    fn eval(&self, scope: &Scope) -> Result<Value, Error> {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
         match self {
             Expr::FnCall(x) => x.eval(scope),
             Expr::Or(x) => x.eval(scope),
@@ -139,7 +140,7 @@ impl Evaluate for Expr {
 
 impl std::convert::TryFrom<Value> for miniscript::Policy {
     type Error = Error;
-    fn try_from(value: Value) -> Result<Self, Error> {
+    fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
             _ => Err(Error::NotMiniscriptRepresentable),
@@ -148,15 +149,15 @@ impl std::convert::TryFrom<Value> for miniscript::Policy {
 }
 
 impl Value {
-    pub fn into_policy(self) -> Result<miniscript::Policy, Error> {
+    pub fn into_policy(self) -> Result<miniscript::Policy> {
         std::convert::TryInto::try_into(self)
     }
 }
 
-fn eval_exprs(scope: &Scope, list: &Vec<Expr>) -> Result<Vec<Value>, Error> {
+fn eval_exprs(scope: &Scope, list: &Vec<Expr>) -> Result<Vec<Value>> {
     list.iter().map(|arg| arg.eval(scope)).collect()
 }
 
-fn map_policy(list: Vec<Value>) -> Result<Vec<Policy>, Error> {
+fn map_policy(list: Vec<Value>) -> Result<Vec<Policy>> {
     list.into_iter().map(Value::into_policy).collect()
 }
