@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::convert::TryFrom;
 
 use crate::ast::{self, Expr, FnDef, Ident, Stmt};
 use crate::error::{Error, Result};
@@ -31,7 +31,7 @@ pub trait Run {
 
 impl Run for ast::Assign {
     fn run(&self, scope: &mut Scope) -> Result<()> {
-        let value = self.value.deref().eval(scope)?;
+        let value = self.value.eval(scope)?;
         scope.set(self.name.clone(), value)
     }
 }
@@ -138,7 +138,7 @@ impl Evaluate for Expr {
     }
 }
 
-impl std::convert::TryFrom<Value> for miniscript::Policy {
+impl TryFrom<Value> for miniscript::Policy {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
@@ -150,7 +150,7 @@ impl std::convert::TryFrom<Value> for miniscript::Policy {
 
 impl Value {
     pub fn into_policy(self) -> Result<miniscript::Policy> {
-        std::convert::TryInto::try_into(self)
+        TryFrom::try_from(self)
     }
 }
 

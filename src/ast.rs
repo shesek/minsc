@@ -35,14 +35,14 @@ pub struct FnCall {
 pub struct FnDef {
     pub name: Ident,
     pub args: Vec<Ident>,
-    pub body: Block,
+    pub body: Expr,
 }
 
 /// An assignment (statement)
 #[derive(Debug, Clone)]
 pub struct Assign {
     pub name: Ident,
-    pub value: Box<Expr>,
+    pub value: Expr,
 }
 
 /// Logical OR
@@ -56,15 +56,6 @@ pub struct And(pub Vec<Expr>);
 /// A terminal word. This can either be a variable name or a plain value passed-through to miniscript.
 #[derive(Debug, Clone)]
 pub struct TermWord(pub String);
-
-impl From<Expr> for Block {
-    fn from(return_value: Expr) -> Self {
-        Block {
-            stmts: Vec::new(),
-            return_value: return_value.into(),
-        }
-    }
-}
 
 impl_from_variant!(FnDef, Stmt);
 impl_from_variant!(Assign, Stmt);
