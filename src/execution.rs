@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use crate::ast::{self, Expr, FnDef, Ident, Stmt};
+use crate::ast::{self, Expr, Ident, Stmt};
 use crate::error::{Error, Result};
 use crate::miniscript::{self, Policy};
 use crate::scope::Scope;
@@ -11,13 +11,13 @@ use crate::scope::Scope;
 /// This can either be an evaluated miniscript `Policy` or a function.
 #[derive(Debug, Clone)]
 pub enum Value {
-    Policy(miniscript::Policy),
+    Policy(Policy),
     FnDef(ast::FnDef),
     FnNative(Ident),
 }
 
 impl_from_variant!(Policy, Value);
-impl_from_variant!(FnDef, Value);
+impl_from_variant!(ast::FnDef, Value, FnDef);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
