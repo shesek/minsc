@@ -1,8 +1,7 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-use minis::execution::Evaluate;
-use minis::Scope;
+use minis::{Evaluate, Scope};
 
 lalrpop_mod!(pub grammar);
 
@@ -22,6 +21,7 @@ fn test() {
 
     //try_minis("fn foo($bar) { let $t = taz(1); $t }; foo(abc)");
     try_minis("fn foo($bar) { let $t = sha256($bar); $t }; foo(abc)");
+    try_minis("fn foo($bar, $fn) { let $t = $fn($bar); $t }; foo(abc, hash160)");
 }
 
 fn try_minis(s: &str) {

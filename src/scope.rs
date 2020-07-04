@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::ast::Ident;
 use crate::error::{Error, Result};
-use crate::execution::Value;
 use crate::miniscript::BUILTINS;
+use crate::runtime::Value;
 
 #[derive(Default, Debug)]
 pub struct Scope<'a> {

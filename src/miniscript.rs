@@ -1,8 +1,8 @@
-/// A simplified crude description of the Miniscript policy language
+/// A simplified, crude description of the Miniscript policy language syntax
 #[derive(Debug, Clone)]
 pub enum Policy {
-    FnCall(String, Vec<Policy>),
-    Value(String),
+    Fragment(String, Vec<Policy>),
+    TermWord(String),
 }
 
 pub const BUILTINS: &'static [&'static str] = &[

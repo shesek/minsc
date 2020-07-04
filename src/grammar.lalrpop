@@ -15,7 +15,7 @@ Stmt: Stmt = {
 }
 
 Expr: Expr = {
-  FnCall,
+  Call,
   And,
   Or,
   TermWord,
@@ -27,18 +27,18 @@ Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
 
 TermWord: Expr = Ident => ast::TermWord(<>.into()).into();
 
-Assign: Stmt = "let" <name:Ident> "=" <value:Expr> =>
-    ast::Assign { name, value }.into();
+Assign: Stmt = "let" <lhs:Ident> "=" <rhs:Expr> =>
+    ast::Assign { lhs, rhs }.into();
 
 FnDef: Stmt = {
-    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" "=" <body:Expr> =>
-        ast::FnDef { name, args, body }.into(),
-    "fn" <name:Ident> "(" <args:List<Ident, ",">> ")" "{" <body:Block> "}" =>
-        ast::FnDef { name, args, body }.into(),
+    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "=" <body:Expr> =>
+        ast::FnDef { ident, signature, body }.into(),
+    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "{" <body:Block> "}" =>
+        ast::FnDef { ident, signature, body }.into(),
 };
 
-FnCall: Expr = <name:Ident> "(" <args:List<Expr, ",">> ")" =>
-    ast::FnCall { name, args }.into();
+Call: Expr = <ident:Ident> "(" <args:List<Expr, ",">> ")" =>
+    ast::Call { ident, args }.into();
 
 // TODO make the () optional
 Or: Expr = "(" <ListM<Expr, "||">> ")" => ast::Or(<>).into();

@@ -16,7 +16,7 @@ pub enum Stmt {
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    FnCall(FnCall),
+    Call(Call),
     Or(Or),
     And(And),
     Block(Block),
@@ -25,24 +25,24 @@ pub enum Expr {
 
 /// A function call (expression)
 #[derive(Debug, Clone)]
-pub struct FnCall {
-    pub name: Ident,
+pub struct Call {
+    pub ident: Ident,
     pub args: Vec<Expr>,
 }
 
 /// A function definition (statement or expression)
 #[derive(Debug, Clone)]
 pub struct FnDef {
-    pub name: Ident,
-    pub args: Vec<Ident>,
+    pub ident: Ident,
+    pub signature: Vec<Ident>,
     pub body: Expr,
 }
 
 /// An assignment (statement)
 #[derive(Debug, Clone)]
 pub struct Assign {
-    pub name: Ident,
-    pub value: Expr,
+    pub lhs: Ident,
+    pub rhs: Expr,
 }
 
 /// Logical OR
@@ -60,7 +60,7 @@ pub struct TermWord(pub String);
 impl_from_variant!(FnDef, Stmt);
 impl_from_variant!(Assign, Stmt);
 
-impl_from_variant!(FnCall, Expr);
+impl_from_variant!(Call, Expr);
 impl_from_variant!(Or, Expr);
 impl_from_variant!(And, Expr);
 impl_from_variant!(Block, Expr);
