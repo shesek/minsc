@@ -1,9 +1,4 @@
-#[macro_use]
-extern crate lalrpop_util;
-
-use minis::{Evaluate, Scope};
-
-lalrpop_mod!(pub grammar);
+use minis::{parse, run};
 
 fn main() {}
 
@@ -25,14 +20,13 @@ fn test() {
 }
 
 fn try_minis(s: &str) {
-    let parser = grammar::ProgramParser::new();
-    let ast = parser.parse(s).unwrap();
+    let ast = parse(s).unwrap();
     println!("AST: {:#?}", ast);
 
-    let scope = Scope::root();
-    let res = ast.eval(&scope).unwrap();
-    println!("eval: {:#?}", res);
+    let res = run(ast).unwrap();
+    println!("result: {:#?}", res);
 
-    let res = res.into_policy().unwrap();
-    println!("policy: {:#?}", res);
+    let policy = res.into_policy().unwrap();
+    println!("policy: {:#?}", policy);
+    println!("policy str: {}", policy);
 }

@@ -1,3 +1,6 @@
+use std::fmt;
+use lalrpop_util::ParseError;
+
 use crate::Ident;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -18,4 +21,18 @@ pub enum Error {
 
     #[error("Value cannot be represented as Miniscript policy")]
     NotMiniscriptRepresentable,
+
+    #[error("Parser error: {0}")]
+    ParseError(String),
+}
+
+impl<L, T, E> From<ParseError<L, T, E>> for Error
+where
+    L: fmt::Display,
+    T: fmt::Display,
+    E: fmt::Display,
+{
+    fn from(err: ParseError<L, T, E>) -> Self {
+        Error::ParseError(err.to_string())
+    }
 }
