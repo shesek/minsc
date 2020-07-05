@@ -27,7 +27,7 @@ Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
 
 TermWord: Expr = Ident => ast::TermWord(<>.into()).into();
 
-Assign: Stmt = "let" <lhs:Ident> "=" <rhs:Expr> =>
+Assign: Stmt = "let"? <lhs:Ident> "=" <rhs:Expr> =>
     ast::Assign { lhs, rhs }.into();
 
 FnDef: Stmt = {
