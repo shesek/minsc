@@ -59,7 +59,7 @@ impl Evaluate for ast::Call {
 
         let args = eval_exprs(scope, &self.args)?;
         Ok(match val {
-            Value::Function(func) => func.call(args, scope)?,
+            Value::Function(fn_def) => call(fn_def, args, scope)?,
             Value::FnNative(ident) => Policy::Fragment(ident.clone(), map_policy(args)?).into(),
             _ => return Err(Error::NotFn(self.ident.clone())),
         })
@@ -106,24 +106,6 @@ impl Evaluate for ast::Block {
     }
 }
 
-impl ast::FnDef {
-    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        if self.signature.len() != args.len() {
-            return Err(Error::ArgumentMismatch(
-                self.ident.clone(),
-                self.signature.len(),
-                args.len(),
-            ));
-        }
-        let mut scope = scope.child();
-        for (index, value) in args.into_iter().enumerate() {
-            let ident = self.signature.get(index).unwrap();
-            scope.set(ident.clone(), value)?;
-        }
-        self.body.eval(&scope)
-    }
-}
-
 impl Evaluate for Expr {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         match self {
@@ -134,6 +116,22 @@ impl Evaluate for Expr {
             Expr::TermWord(x) => x.eval(scope),
         }
     }
+}
+
+fn call(fn_def: &ast::FnDef, args: Vec<Value>, scope: &Scope) -> Result<Value> {
+    if fn_def.signature.len() != args.len() {
+        return Err(Error::ArgumentMismatch(
+            fn_def.ident.clone(),
+            fn_def.signature.len(),
+            args.len(),
+        ));
+    }
+    let mut scope = scope.child();
+    for (index, value) in args.into_iter().enumerate() {
+        let ident = fn_def.signature.get(index).unwrap();
+        scope.set(ident.clone(), value)?;
+    }
+    fn_def.body.eval(&scope)
 }
 
 impl convert::TryFrom<Value> for Policy {

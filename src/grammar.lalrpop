@@ -1,18 +1,12 @@
-use minis::ast::{Expr, Stmt, self};
-use minis::util::concat;
+use crate::ast::{Expr, Stmt, self};
+use crate::util::concat;
 
 grammar;
 
 pub Program: Expr = Block;
 
-// XXX can the ';' be optional?
-Block: Expr = <stmts:(<Stmt> ";")*> <return_value:Expr> =>
-  ast::Block { stmts,  return_value: return_value.into() }.into();
-
-Stmt: Stmt = {
-  FnDef,
-  Assign,
-}
+Block: Expr = <stmts:(<Stmt> ";")*> <ret:Expr> =>
+  ast::Block { stmts,  return_value: ret.into() }.into();
 
 Expr: Expr = {
   Call,
@@ -20,22 +14,16 @@ Expr: Expr = {
   Or,
   TermWord,
   BlockExpr,
-};
+}
 
+Stmt: Stmt = {
+  FnDef,
+  Assign,
+}
 
-Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
+// Expressions
 
 TermWord: Expr = Ident => ast::TermWord(<>.into()).into();
-
-Assign: Stmt = "let"? <lhs:Ident> "=" <rhs:Expr> =>
-    ast::Assign { lhs, rhs }.into();
-
-FnDef: Stmt = {
-    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "=" <body:Expr> =>
-        ast::FnDef { ident, signature, body }.into(),
-    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "{" <body:Block> "}" =>
-        ast::FnDef { ident, signature, body }.into(),
-};
 
 Call: Expr = <ident:Ident> "(" <args:List<Expr, ",">> ")" =>
     ast::Call { ident, args }.into();
@@ -45,6 +33,21 @@ Or: Expr = "(" <ListM<Expr, "||">> ")" => ast::Or(<>).into();
 And: Expr = "(" <ListM<Expr, "&&">> ")" => ast::And(<>).into();
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
+
+// Statements
+
+Assign: Stmt = "let"? <lhs:Ident> "=" <rhs:Expr> =>
+    ast::Assign { lhs, rhs }.into();
+
+FnDef: Stmt = {
+    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "=" <body:Expr> =>
+        ast::FnDef { ident, signature, body }.into(),
+    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "{" <body:Block> "}" =>
+        ast::FnDef { ident, signature, body }.into(),
+}
+
+
+Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
 
 // A `S`-separated list of *zero* or more `T` values
 List<T, S>: Vec<T> = <l:(<T> S)*> <t:T?> => concat(l, t);
