@@ -46,8 +46,8 @@ And: Expr = "(" <ListM<Expr, "&&">> ")" => ast::And(<>).into();
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
-// A `S`-separated list of *one* or more `T` values, *with* an optional suffix separator
-List<T, S>: Vec<T> = <l:(<T> S)*> <t:T> S? => concat(l, t);
+// A `S`-separated list of *zero* or more `T` values
+List<T, S>: Vec<T> = <l:(<T> S)*> <t:T?> => concat(l, t);
 
-// A `S`-separated list of *two* or more `T` values, *without* an optional suffix separator
-ListM<T, S>: Vec<T> = <l:(<T> S)+> <t:T> => concat(l, t);
+// A `S`-separated list of *two* or more `T` values
+ListM<T, S>: Vec<T> = <l:(<T> S)+> <t:T> => concat(l, Some(t));
