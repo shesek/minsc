@@ -1,3 +1,5 @@
+use std::fmt;
+
 /// A simplified, crude description of the Miniscript policy language syntax
 #[derive(Debug, Clone)]
 pub enum Policy {
@@ -17,3 +19,21 @@ pub const BUILTINS: &'static [&'static str] = &[
     "or",
     "thresh",
 ];
+
+impl fmt::Display for Policy {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Policy::Fragment(name, args) => {
+                write!(f, "{}(", name)?;
+                for (i, policy) in args.iter().enumerate() {
+                    policy.fmt(f)?;
+                    if i < args.len() - 1 {
+                        write!(f, ",")?;
+                    }
+                }
+                write!(f, ")")
+            }
+            Policy::TermWord(term) => write!(f, "{}", term),
+        }
+    }
+}
