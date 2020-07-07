@@ -5,7 +5,7 @@ grammar;
 
 pub Program: Expr = Block;
 
-Block: Expr = <stmts:(<Stmt> ";")*> <ret:Expr> =>
+Block: Expr = <stmts:Stmt*> <ret:Expr> =>
   ast::Block { stmts,  return_value: ret.into() }.into();
 
 Expr: Expr = {
@@ -36,13 +36,13 @@ BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
 // Statements
 
-Assign: Stmt = "let"? <lhs:Ident> "=" <rhs:Expr> =>
+Assign: Stmt = "let"? <lhs:Ident> "=" <rhs:Expr> ";" =>
     ast::Assign { lhs, rhs }.into();
 
 FnDef: Stmt = {
-    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "=" <body:Expr> =>
+    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "=" <body:Expr> ";" =>
         ast::FnDef { ident, signature, body }.into(),
-    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "{" <body:Block> "}" =>
+    "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "{" <body:Block> "}" ";"? =>
         ast::FnDef { ident, signature, body }.into(),
 }
 
