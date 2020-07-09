@@ -31,8 +31,11 @@ pub trait Execute {
 
 impl Execute for ast::Assign {
     fn exec(&self, scope: &mut Scope) -> Result<()> {
-        let value = self.rhs.eval(scope)?;
-        scope.set(self.lhs.clone(), value)
+        for assignment in &self.0 {
+            let value = assignment.rhs.eval(scope)?;
+            scope.set(assignment.lhs.clone(), value)?;
+        }
+        Ok(())
     }
 }
 

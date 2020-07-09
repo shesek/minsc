@@ -69,8 +69,11 @@ impl_from_variant!(FnDef, Stmt);
 
 /// An assignment statement
 #[derive(Debug, Clone)]
-pub struct Assign {
+pub struct Assign(pub Vec<Assignment>);
+impl_from_variant!(Assign, Stmt);
+
+#[derive(Debug, Clone)]
+pub struct Assignment {
     pub lhs: Ident,
     pub rhs: Expr,
 }
-impl_from_variant!(Assign, Stmt);
