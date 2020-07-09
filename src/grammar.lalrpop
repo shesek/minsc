@@ -3,6 +3,13 @@ use crate::util::concat;
 
 grammar;
 
+// Enable `//` comments
+match {
+    r"\s*" => { },
+    r"//[^\n\r]*[\n\r]*" => { },
+    _,
+}
+
 pub Program: Expr = Block;
 
 Block: Expr = <stmts:Stmt*> <ret:Expr> =>
