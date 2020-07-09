@@ -71,19 +71,29 @@ impl Evaluate for ast::Call {
 
 impl Evaluate for ast::Or {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        ast::Call {
-            ident: "or".into(),
-            args: self.0.clone(),
-        }
-        .eval(scope)
+        eval_andor("or", 1, self.0.clone(), scope)
     }
 }
 
 impl Evaluate for ast::And {
     fn eval(&self, scope: &Scope) -> Result<Value> {
+        eval_andor("and", self.0.len(), self.0.clone(), scope)
+    }
+}
+
+// convert and/or calls with more than two args into thresh()
+fn eval_andor(frag: &str, n: usize, mut args: Vec<Expr>, scope: &Scope) -> Result<Value> {
+    if args.len() == 2 {
         ast::Call {
-            ident: "and".into(),
-            args: self.0.clone(),
+            ident: frag.into(),
+            args,
+        }
+        .eval(scope)
+    } else {
+        args.insert(0, ast::TermWord(n.to_string()).into());
+        ast::Call {
+            ident: "thresh".into(),
+            args,
         }
         .eval(scope)
     }
