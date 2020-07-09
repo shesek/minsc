@@ -14,6 +14,7 @@ Expr: Expr = {
   Or,
   TermWord,
   BlockExpr,
+  WithProb,
 }
 
 Stmt: Stmt = {
@@ -34,6 +35,9 @@ And: Expr = "(" <ListM<Expr, "&&">> ")" => ast::And(<>).into();
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
+WithProb: Expr = <prob:TermWord> "@" <expr:Expr> =>
+    ast::WithProb { prob: prob.into(), expr: expr.into() }.into();
+
 // Statements
 
 Assign: Stmt = "let"? <lhs:Ident> "=" <rhs:Expr> ";" =>
@@ -45,7 +49,6 @@ FnDef: Stmt = {
     "fn" <ident:Ident> "(" <signature:List<Ident, ",">> ")" "{" <body:Block> "}" ";"? =>
         ast::FnDef { ident, signature, body }.into(),
 }
-
 
 Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
 

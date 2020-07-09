@@ -8,6 +8,7 @@ pub enum Expr {
     Or(Or),
     And(And),
     TermWord(TermWord),
+    WithProb(WithProb),
 }
 
 /// Statements have side-effects and don't produce a value
@@ -48,6 +49,14 @@ impl_from_variant!(And, Expr);
 #[derive(Debug, Clone)]
 pub struct TermWord(pub String);
 impl_from_variant!(TermWord, Expr);
+
+/// An expression with a probability. Valid as an argument to or().
+#[derive(Debug, Clone)]
+pub struct WithProb {
+    pub prob: Box<Expr>,
+    pub expr: Box<Expr>,
+}
+impl_from_variant!(WithProb, Expr);
 
 /// A function definition statement
 #[derive(Debug, Clone)]

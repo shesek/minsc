@@ -96,6 +96,18 @@ impl Evaluate for ast::TermWord {
     }
 }
 
+impl Evaluate for ast::WithProb {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let prob = self.prob.eval(scope)?.into_policy()?;
+        let prob = match prob {
+            Policy::TermWord(n) => n.parse().map_err(|_| Error::InvalidProb(n)),
+            _ => Err(Error::InvalidProb(format!("{:?}", prob))),
+        }?;
+        let policy = self.expr.eval(scope)?.into_policy()?;
+        Ok(Policy::WithProb(prob, policy.into()).into())
+    }
+}
+
 impl Evaluate for ast::Block {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut scope = Scope::derive(scope);
@@ -114,6 +126,7 @@ impl Evaluate for Expr {
             Expr::And(x) => x.eval(scope),
             Expr::Block(x) => x.eval(scope),
             Expr::TermWord(x) => x.eval(scope),
+            Expr::WithProb(x) => x.eval(scope),
         }
     }
 }

@@ -16,6 +16,9 @@ pub enum Error {
     #[error("Not a function: {0}")]
     NotFn(Ident),
 
+    #[error("Invalid probability: {0}")]
+    InvalidProb(String),
+
     #[error("Function {0} expected {1} arguments, not {2}")]
     ArgumentMismatch(Ident, usize, usize),
 

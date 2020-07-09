@@ -5,6 +5,7 @@ use std::fmt;
 pub enum Policy {
     Fragment(String, Vec<Policy>),
     TermWord(String),
+    WithProb(usize, Box<Policy>),
 }
 
 pub const BUILTINS: &'static [&'static str] = &[
@@ -26,14 +27,13 @@ impl fmt::Display for Policy {
             Policy::Fragment(name, args) => {
                 write!(f, "{}(", name)?;
                 for (i, policy) in args.iter().enumerate() {
-                    policy.fmt(f)?;
-                    if i < args.len() - 1 {
-                        write!(f, ",")?;
-                    }
+                    let comma = if i < args.len() - 1 { "," } else { "" };
+                    write!(f, "{}{}", policy, comma)?;
                 }
                 write!(f, ")")
             }
             Policy::TermWord(term) => write!(f, "{}", term),
+            Policy::WithProb(prob, policy) => write!(f, "{}@{}", prob, policy),
         }
     }
 }
