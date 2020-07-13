@@ -55,8 +55,11 @@ WithProb: Expr = <prob:TermWord> "@" <expr:SimpleExpr> =>
 
 // Statements
 
-Assign: Stmt = "let"? <assigns:List1<(<Ident> "=" <Expr>), ",">> ";" =>
-    ast::Assign(assigns.into_iter().map(|a| ast::Assignment { lhs: a.0, rhs: a.1 }).collect()).into();
+Assign: Stmt = "let"? <assigns:List1<Assignment, ",">> ";" =>
+    ast::Assign(assigns).into();
+
+Assignment: ast::Assignment = <lhs:Ident> "=" <rhs:Expr> =>
+    ast::Assignment { lhs, rhs };
 
 FnDef: Stmt = {
     "fn" <ident:Ident> "(" <signature:List0<Ident, ",">> ")" "=" <body:Expr> ";" =>
