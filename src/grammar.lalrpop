@@ -24,6 +24,7 @@ Expr: Expr = {
   SimpleExpr,
   And,
   Or,
+  ArrayAccess,
 };
 
 SimpleExpr: Expr = {
@@ -32,8 +33,10 @@ SimpleExpr: Expr = {
   Thresh,
   BlockExpr,
   WithProb,
+  Array,
   Paren<And>,
   Paren<Or>,
+  Paren<ArrayAccess>,
   Paren<SimpleExpr>,
 };
 
@@ -56,6 +59,12 @@ BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
 WithProb: Expr = <prob:TermWord> "@" <expr:SimpleExpr> =>
     ast::WithProb { prob: prob.into(), expr: expr.into() }.into();
+
+Array: Expr = "[" <List0<Expr, ",">> "]" =>
+  ast::Array(<>).into();
+
+ArrayAccess: Expr = <array:Expr> "." <index:TermWord> =>
+  ast::ArrayAccess { array: array.into(), index: index.into() }.into();
 
 // Statements
 

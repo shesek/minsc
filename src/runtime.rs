@@ -9,16 +9,21 @@ use crate::scope::Scope;
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
 ///
-/// This can either be an evaluated miniscript `Policy` or a function.
+/// This can either be an evaluated miniscript `Policy`, a function or an array.
 #[derive(Debug, Clone)]
 pub enum Value {
     Policy(Policy),
     Function(ast::FnDef),
     FnNative(Ident),
+    Array(Array),
 }
 
 impl_from_variant!(Policy, Value);
 impl_from_variant!(ast::FnDef, Value, Function);
+
+#[derive(Debug, Clone)]
+pub struct Array(pub Vec<Value>);
+impl_from_variant!(Array, Value);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -122,6 +127,31 @@ impl Evaluate for ast::TermWord {
     }
 }
 
+impl Evaluate for ast::Array {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let elements = eval_exprs(scope, &self.0)?;
+        Ok(Array(elements).into())
+    }
+}
+
+impl Evaluate for ast::ArrayAccess {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let elements = match self.array.eval(scope)? {
+            Value::Array(Array(elements)) => Ok(elements),
+            v => Err(Error::NotArray(v.clone())),
+        }?;
+        // XXX supports literal indexes only
+        let index: usize = match &*self.index {
+            Expr::TermWord(ast::TermWord(w)) => w.parse().map_err(|_| Error::InvalidArrayIndex),
+            _ => Err(Error::InvalidArrayIndex),
+        }?;
+        elements
+            .get(index)
+            .cloned()
+            .ok_or_else(|| Error::ArrayIndexOutOfRange)
+    }
+}
+
 impl Evaluate for ast::WithProb {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let prob = self.prob.eval(scope)?.into_policy()?;
@@ -154,6 +184,8 @@ impl Evaluate for Expr {
             Expr::Block(x) => x.eval(scope),
             Expr::TermWord(x) => x.eval(scope),
             Expr::WithProb(x) => x.eval(scope),
+            Expr::Array(x) => x.eval(scope),
+            Expr::ArrayAccess(x) => x.eval(scope),
         }
     }
 }

@@ -2,6 +2,7 @@ use std::fmt;
 use lalrpop_util::ParseError;
 
 use crate::Ident;
+use crate::runtime::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -16,8 +17,17 @@ pub enum Error {
     #[error("Not a function: {0}")]
     NotFn(Ident),
 
+    #[error("Not an array: {0:?}")]
+    NotArray(Value),
+
     #[error("Invalid probability: {0}")]
     InvalidProb(String),
+
+    #[error("Invalid array index, not a number")]
+    InvalidArrayIndex,
+
+    #[error("Array index out of range")]
+    ArrayIndexOutOfRange,
 
     #[error("Function {0} expected {1} arguments, not {2}")]
     ArgumentMismatch(Ident, usize, usize),

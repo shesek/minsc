@@ -10,6 +10,8 @@ pub enum Expr {
     Thresh(Thresh),
     TermWord(TermWord),
     WithProb(WithProb),
+    Array(Array),
+    ArrayAccess(ArrayAccess),
 }
 
 /// Statements have side-effects and don't produce a value
@@ -66,6 +68,18 @@ pub struct WithProb {
     pub expr: Box<Expr>,
 }
 impl_from_variant!(WithProb, Expr);
+
+/// An array expression
+#[derive(Debug, Clone)]
+pub struct Array(pub Vec<Expr>);
+impl_from_variant!(Array, Expr);
+
+#[derive(Debug, Clone)]
+pub struct ArrayAccess {
+    pub array: Box<Expr>,
+    pub index: Box<Expr>,
+}
+impl_from_variant!(ArrayAccess, Expr);
 
 /// A function definition statement
 #[derive(Debug, Clone)]
