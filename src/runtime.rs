@@ -1,4 +1,5 @@
 use std::convert;
+use std::ops::Deref;
 
 use crate::ast::{self, Expr, Ident, Stmt};
 use crate::error::{Error, Result};
@@ -82,7 +83,7 @@ impl Evaluate for ast::And {
 }
 
 // convert and/or calls with more than two args into thresh()
-fn eval_andor(frag: &str, n: usize, mut args: Vec<Expr>, scope: &Scope) -> Result<Value> {
+fn eval_andor(frag: &str, n: usize, args: Vec<Expr>, scope: &Scope) -> Result<Value> {
     if args.len() == 2 {
         ast::Call {
             ident: frag.into(),
@@ -90,7 +91,19 @@ fn eval_andor(frag: &str, n: usize, mut args: Vec<Expr>, scope: &Scope) -> Resul
         }
         .eval(scope)
     } else {
-        args.insert(0, ast::TermWord(n.to_string()).into());
+        let thresh: Expr = ast::TermWord(n.to_string()).into();
+        ast::Thresh {
+            thresh: thresh.into(),
+            exprs: args,
+        }
+        .eval(scope)
+    }
+}
+
+impl Evaluate for ast::Thresh {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let mut args = self.exprs.clone();
+        args.insert(0, self.thresh.deref().clone());
         ast::Call {
             ident: "thresh".into(),
             args,
@@ -137,6 +150,7 @@ impl Evaluate for Expr {
             Expr::Call(x) => x.eval(scope),
             Expr::Or(x) => x.eval(scope),
             Expr::And(x) => x.eval(scope),
+            Expr::Thresh(x) => x.eval(scope),
             Expr::Block(x) => x.eval(scope),
             Expr::TermWord(x) => x.eval(scope),
             Expr::WithProb(x) => x.eval(scope),

@@ -29,6 +29,7 @@ Expr: Expr = {
 SimpleExpr: Expr = {
   TermWord,
   Call,
+  Thresh,
   BlockExpr,
   WithProb,
   Paren<And>,
@@ -47,6 +48,9 @@ Call: Expr = <ident:Ident> "(" <args:List0<Expr, ",">> ")" =>
 
 And: Expr = <List2<SimpleExpr, "&&">> => ast::And(<>).into();
 Or: Expr = <List2<SimpleExpr, "||">> => ast::Or(<>).into();
+
+Thresh: Expr = <thresh:TermWord> "of" <exprs:Paren<List2<Expr, ",">>> =>
+  ast::Thresh { thresh: thresh.into(), exprs }.into();
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
@@ -77,4 +81,4 @@ List1<T, S>: Vec<T> = <l:(<T> S)*> <t:T> => concat(l, Some(t));
 // A `S`-separated list of two or more `T` values
 List2<T, S>: Vec<T> = <l:(<T> S)+> <t:T> => concat(l, Some(t));
 
-Paren<T>: Expr = "(" <T> ")";
+Paren<T> = "(" <T> ")";

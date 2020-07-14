@@ -7,6 +7,7 @@ pub enum Expr {
     Call(Call),
     Or(Or),
     And(And),
+    Thresh(Thresh),
     TermWord(TermWord),
     WithProb(WithProb),
 }
@@ -44,6 +45,14 @@ impl_from_variant!(Or, Expr);
 #[derive(Debug, Clone)]
 pub struct And(pub Vec<Expr>);
 impl_from_variant!(And, Expr);
+
+/// Threshold expression
+#[derive(Debug, Clone)]
+pub struct Thresh {
+    pub thresh: Box<Expr>,
+    pub exprs: Vec<Expr>,
+}
+impl_from_variant!(Thresh, Expr);
 
 /// A terminal word expression. This can either be a variable name or a plain value passed-through to miniscript.
 #[derive(Debug, Clone)]
