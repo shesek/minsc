@@ -1,5 +1,9 @@
 use std::fmt;
 
+use crate::ast::Ident;
+use crate::function::{Function, MiniscriptFunction};
+use crate::scope::Scope;
+
 /// A simplified, crude description of the Miniscript policy language syntax
 #[derive(Debug, Clone)]
 pub enum Policy {
@@ -8,7 +12,7 @@ pub enum Policy {
     WithProb(usize, Box<Policy>),
 }
 
-pub const BUILTINS: &'static [&'static str] = &[
+const BUILTINS: [&str; 10] = [
     "pk",
     "after",
     "older",
@@ -20,6 +24,16 @@ pub const BUILTINS: &'static [&'static str] = &[
     "or",
     "thresh",
 ];
+
+pub fn attach_builtins(scope: &mut Scope) {
+    for name in &BUILTINS {
+        let ident: Ident = (*name).into();
+        let func = Function::from(MiniscriptFunction {
+            ident: ident.clone(),
+        });
+        scope.set(ident, func.into()).unwrap();
+    }
+}
 
 impl fmt::Display for Policy {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

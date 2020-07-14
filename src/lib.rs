@@ -7,6 +7,7 @@ lalrpop_mod!(grammar);
 mod macros;
 pub mod ast;
 pub mod error;
+pub mod function;
 pub mod miniscript;
 pub mod runtime;
 pub mod scope;
@@ -15,7 +16,7 @@ pub mod util;
 pub use ast::{Expr, Ident};
 pub use error::{Error, Result};
 pub use miniscript::Policy;
-pub use runtime::{Value, Evaluate};
+pub use runtime::{Evaluate, Value};
 pub use scope::Scope;
 
 pub fn parse(s: &str) -> Result<Expr> {

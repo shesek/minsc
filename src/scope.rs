@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::ast::Ident;
 use crate::error::{Error, Result};
-use crate::miniscript::BUILTINS;
+use crate::miniscript::attach_builtins;
 use crate::runtime::Value;
 
 #[derive(Default, Debug)]
@@ -25,9 +25,9 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn get(&self, key: &Ident) -> Option<&Value> {
+    pub fn get<T: AsRef<str>>(&self, key: T) -> Option<&Value> {
         self.local
-            .get(key)
+            .get(key.as_ref())
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
@@ -46,14 +46,5 @@ impl<'a> Scope<'a> {
             parent: Some(&self),
             local: HashMap::new(),
         }
-    }
-}
-
-fn attach_builtins(scope: &mut Scope) {
-    for name in BUILTINS {
-        let name = *name;
-        scope
-            .set(name.into(), Value::FnNative(name.into()))
-            .unwrap();
     }
 }

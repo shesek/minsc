@@ -1,7 +1,7 @@
-use std::fmt;
 use lalrpop_util::ParseError;
+use std::fmt;
 
-use crate::Ident;
+use crate::ast::Ident;
 use crate::runtime::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -14,8 +14,8 @@ pub enum Error {
     #[error("Missing function: {0}")]
     FnNotFound(Ident),
 
-    #[error("Not a function: {0}")]
-    NotFn(Ident),
+    #[error("Not a function: {0:?}")]
+    NotFn(Value),
 
     #[error("Not an array: {0:?}")]
     NotArray(Value),
@@ -32,8 +32,8 @@ pub enum Error {
     #[error("Function {0} expected {1} arguments, not {2}")]
     ArgumentMismatch(Ident, usize, usize),
 
-    #[error("Value cannot be represented as Miniscript policy")]
-    NotMiniscriptRepresentable,
+    #[error("Cannot represent as a Miniscript policy: {0:?}")]
+    NotMiniscriptRepresentable(Value),
 
     #[error("Parser error: {0}")]
     ParseError(String),
