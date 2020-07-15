@@ -52,7 +52,7 @@ impl_from_variant!(And, Expr);
 #[derive(Debug, Clone)]
 pub struct Thresh {
     pub thresh: Box<Expr>,
-    pub exprs: Vec<Expr>,
+    pub policies: Box<Expr>,
 }
 impl_from_variant!(Thresh, Expr);
 

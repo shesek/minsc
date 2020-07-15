@@ -52,8 +52,8 @@ Call: Expr = <ident:Ident> "(" <args:List0<Expr, ",">> ")" =>
 And: Expr = <List2<SimpleExpr, "&&">> => ast::And(<>).into();
 Or: Expr = <List2<SimpleExpr, "||">> => ast::Or(<>).into();
 
-Thresh: Expr = <thresh:TermWord> "of" <exprs:Paren<List2<Expr, ",">>> =>
-  ast::Thresh { thresh: thresh.into(), exprs }.into();
+Thresh: Expr = <thresh:TermWord> "of" <policies:SimpleExpr> =>
+  ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
 

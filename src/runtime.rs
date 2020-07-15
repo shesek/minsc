@@ -1,5 +1,4 @@
 use std::convert::{TryFrom, TryInto};
-use std::ops::Deref;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::error::{Error, Result};
@@ -74,43 +73,38 @@ impl Evaluate for ast::Call {
 
 impl Evaluate for ast::Or {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor("or", 1, self.0.clone(), scope)
+        eval_andor("or", 1, &self.0, scope)
     }
 }
 
 impl Evaluate for ast::And {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor("and", self.0.len(), self.0.clone(), scope)
+        eval_andor("and", self.0.len(), &self.0, scope)
     }
 }
 
 // convert and/or calls with more than two args into thresh()
-fn eval_andor(frag: &str, n: usize, args: Vec<Expr>, scope: &Scope) -> Result<Value> {
+fn eval_andor(frag: &str, n: usize, args: &Vec<Expr>, scope: &Scope) -> Result<Value> {
+    let mut args = eval_exprs(scope, args)?;
+
     if args.len() == 2 {
-        ast::Call {
-            ident: frag.into(),
-            args,
-        }
-        .eval(scope)
+        // delegate to or()/and() when there are exactly 2 subpolicies
+        let func = scope.get(frag).unwrap();
+        func.call(args, scope)
     } else {
-        let thresh: Expr = ast::TermWord(n.to_string()).into();
-        ast::Thresh {
-            thresh: thresh.into(),
-            exprs: args,
-        }
-        .eval(scope)
+        // delegate to thresh()
+        let func = scope.get("thresh").unwrap();
+        args.insert(0, Policy::TermWord(n.to_string()).into());
+        func.call(args, scope)
     }
 }
 
 impl Evaluate for ast::Thresh {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let mut args = self.exprs.clone();
-        args.insert(0, self.thresh.deref().clone());
-        ast::Call {
-            ident: "thresh".into(),
-            args,
-        }
-        .eval(scope)
+        let func = scope.get("thresh").unwrap();
+        let thresh_n = self.thresh.eval(scope)?;
+        let policies = self.policies.eval(scope)?; // an array of policies
+        func.call(vec![thresh_n, policies], scope)
     }
 }
 
