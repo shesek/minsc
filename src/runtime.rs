@@ -92,7 +92,7 @@ fn eval_andor(frag: &str, n: usize, args: &Vec<Expr>, scope: &Scope) -> Result<V
         let func = scope.get(frag).unwrap();
         func.call(args, scope)
     } else {
-        // delegate to thresh()
+        // delegate to thresh() when there are more
         let func = scope.get("thresh").unwrap();
         args.insert(0, Policy::TermWord(n.to_string()).into());
         func.call(args, scope)
@@ -131,11 +131,7 @@ impl Evaluate for ast::ArrayAccess {
             Value::Array(Array(elements)) => Ok(elements),
             v => Err(Error::NotArray(v.clone())),
         }?;
-        // XXX supports literal indexes only
-        let index: usize = match &*self.index {
-            Expr::TermWord(ast::TermWord(w)) => w.parse().map_err(|_| Error::InvalidArrayIndex),
-            _ => Err(Error::InvalidArrayIndex),
-        }?;
+        let index = self.index.eval(scope)?.into_usize()?;
         elements
             .get(index)
             .cloned()
@@ -145,11 +141,7 @@ impl Evaluate for ast::ArrayAccess {
 
 impl Evaluate for ast::WithProb {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let prob = self.prob.eval(scope)?.into_policy()?;
-        let prob = match prob {
-            Policy::TermWord(n) => n.parse().map_err(|_| Error::InvalidProb(n)),
-            _ => Err(Error::InvalidProb(format!("{:?}", prob))),
-        }?;
+        let prob = self.prob.eval(scope)?.into_usize()?;
         let policy = self.expr.eval(scope)?.into_policy()?;
         Ok(Policy::WithProb(prob, policy.into()).into())
     }
@@ -191,8 +183,24 @@ impl TryFrom<Value> for Policy {
     }
 }
 
+impl TryFrom<Value> for usize {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match &value {
+            Value::Policy(Policy::TermWord(n)) => {
+                n.parse().map_err(|_| Error::NotNumber(value.clone()))
+            }
+            v => Err(Error::NotNumber(v.clone())),
+        }
+        // TODO add a real Value::Number type?
+    }
+}
+
 impl Value {
     pub fn into_policy(self) -> Result<Policy> {
+        self.try_into()
+    }
+    pub fn into_usize(self) -> Result<usize> {
         self.try_into()
     }
 }

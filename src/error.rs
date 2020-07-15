@@ -20,6 +20,9 @@ pub enum Error {
     #[error("Not an array: {0:?}")]
     NotArray(Value),
 
+    #[error("Not a number: {0:?}")]
+    NotNumber(Value),
+
     #[error("Invalid probability: {0}")]
     InvalidProb(String),
 
