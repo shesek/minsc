@@ -1,14 +1,12 @@
 use crate::ast::{self, Expr, Ident};
 use crate::error::{Error, Result};
-use crate::miniscript::Policy;
-use crate::runtime::{Array, Evaluate, Value};
+use crate::runtime::{Evaluate, Value};
 use crate::scope::Scope;
 
 #[derive(Debug, Clone)]
 pub enum Function {
     User(UserFunction),
     Native(NativeFunction),
-    Miniscript(MiniscriptFunction),
 }
 
 /// A user-defined function implemented in Minis
@@ -23,17 +21,9 @@ impl_from_variant!(UserFunction, Function, User);
 /// A native function implemented in Rust
 #[derive(Debug, Clone)]
 pub struct NativeFunction {
-    pub ident: Ident,
     pub body: fn(Vec<Value>) -> Result<Value>,
 }
 impl_from_variant!(NativeFunction, Function, Native);
-
-/// A function that yields Miniscript Policy fragments
-#[derive(Debug, Clone)]
-pub struct MiniscriptFunction {
-    pub ident: Ident,
-}
-impl_from_variant!(MiniscriptFunction, Function, Miniscript);
 
 pub trait Call {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value>;
@@ -44,7 +34,6 @@ impl Call for Function {
         match self {
             Function::User(x) => x.call(args, scope),
             Function::Native(x) => x.call(args, scope),
-            Function::Miniscript(x) => x.call(args, scope),
         }
     }
 }
@@ -73,17 +62,6 @@ impl Call for NativeFunction {
     }
 }
 
-impl Call for MiniscriptFunction {
-    fn call(&self, args: Vec<Value>, _scope: &Scope) -> Result<Value> {
-        let args = flatten(args)
-            .into_iter()
-            .map(Value::into_policy)
-            .collect::<Result<_>>()?;
-        let frag = Policy::Fragment(self.ident.clone(), args);
-        Ok(frag.into())
-    }
-}
-
 impl Call for Value {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
         match self {
@@ -91,16 +69,6 @@ impl Call for Value {
             v => Err(Error::NotFn(v.clone())),
         }
     }
-}
-
-fn flatten(values: Vec<Value>) -> Vec<Value> {
-    values
-        .into_iter()
-        .flat_map(|val| match val {
-            Value::Array(Array(elements)) => elements,
-            val => vec![val],
-        })
-        .collect()
 }
 
 impl From<ast::FnDef> for Function {

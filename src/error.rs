@@ -2,6 +2,7 @@ use lalrpop_util::ParseError;
 use std::fmt;
 
 use crate::ast::Ident;
+use crate::miniscript;
 use crate::runtime::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -40,6 +41,9 @@ pub enum Error {
 
     #[error("Parser error: {0}")]
     ParseError(String),
+
+    #[error("Invalid miniscript: {0}")]
+    InvalidMiniscript(miniscript::Error),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -52,3 +56,5 @@ where
         Error::ParseError(err.to_string())
     }
 }
+
+impl_from_variant!(miniscript::Error, Error, InvalidMiniscript);

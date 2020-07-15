@@ -10,3 +10,11 @@ macro_rules! impl_from_variant {
         }
     };
 }
+
+macro_rules! ensure {
+    ($cond:expr, $e:expr) => {
+        if !($cond) {
+            return Err($e.into());
+        }
+    };
+}

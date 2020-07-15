@@ -18,20 +18,14 @@ impl<'a> Scope<'a> {
         scope
     }
 
-    pub fn derive(parent: &'a Scope) -> Self {
-        Scope {
-            parent: Some(parent),
-            local: HashMap::new(),
-        }
-    }
-
     pub fn get<T: AsRef<str>>(&self, key: T) -> Option<&Value> {
         self.local
             .get(key.as_ref())
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
-    pub fn set(&mut self, key: Ident, value: Value) -> Result<()> {
+    pub fn set<T: Into<Ident>>(&mut self, key: T, value: Value) -> Result<()> {
+        let key = key.into();
         if self.local.contains_key(&key) {
             // cannot be set if already exists in this scope, but could shadow over a definition from a parent scope
             Err(Error::AssignedVariableExists(key))
