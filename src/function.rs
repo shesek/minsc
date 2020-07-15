@@ -1,7 +1,7 @@
 use crate::ast::{self, Expr, Ident};
 use crate::error::{Error, Result};
 use crate::miniscript::Policy;
-use crate::runtime::{Evaluate, Value};
+use crate::runtime::{Array, Evaluate, Value};
 use crate::scope::Scope;
 
 #[derive(Debug, Clone)]
@@ -75,7 +75,7 @@ impl Call for NativeFunction {
 
 impl Call for MiniscriptFunction {
     fn call(&self, args: Vec<Value>, _scope: &Scope) -> Result<Value> {
-        let args = args
+        let args = flatten(args)
             .into_iter()
             .map(Value::into_policy)
             .collect::<Result<_>>()?;
@@ -91,6 +91,16 @@ impl Call for Value {
             v => Err(Error::NotFn(v.clone())),
         }
     }
+}
+
+fn flatten(values: Vec<Value>) -> Vec<Value> {
+    values
+        .into_iter()
+        .flat_map(|val| match val {
+            Value::Array(Array(elements)) => elements,
+            val => vec![val],
+        })
+        .collect()
 }
 
 impl From<ast::FnDef> for Function {
