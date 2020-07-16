@@ -44,6 +44,9 @@ pub enum Error {
 
     #[error("Invalid miniscript: {0}")]
     InvalidMiniscript(miniscript::Error),
+
+    #[error("IO error: {0:?}")]
+    Io(std::io::Error),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -58,3 +61,4 @@ where
 }
 
 impl_from_variant!(miniscript::Error, Error, InvalidMiniscript);
+impl_from_variant!(std::io::Error, Error, Io);
