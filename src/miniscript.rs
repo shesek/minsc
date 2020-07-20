@@ -115,12 +115,13 @@ pub fn attach_builtins(scope: &mut Scope) {
 
     // Functions accepting a single terminal word argument
     attach_builtin(scope, "pk", |args| word_fn("pk", args));
-    attach_builtin(scope, "sha256", |args| word_fn("sha256", args));
-    attach_builtin(scope, "hash256", |args| word_fn("hash256", args));
-    attach_builtin(scope, "ripemd160", |args| word_fn("ripemd160", args));
-    attach_builtin(scope, "hash160", |args| word_fn("hash160", args));
     attach_builtin(scope, "older", |args| word_fn("older", args));
     attach_builtin(scope, "after", |args| word_fn("after", args));
+    // Hash function
+    attach_builtin(scope, "sha256", |args| hash_fn("sha256", args));
+    attach_builtin(scope, "hash256", |args| hash_fn("hash256", args));
+    attach_builtin(scope, "ripemd160", |args| hash_fn("ripemd160", args));
+    attach_builtin(scope, "hash160", |args| hash_fn("hash160", args));
 }
 
 fn word_fn(name: &str, args: Vec<Value>) -> Result<Value> {
@@ -130,6 +131,14 @@ fn word_fn(name: &str, args: Vec<Value>) -> Result<Value> {
         Error::InvalidWordArgument(name.into())
     );
     Ok(Policy::frag(name, policies).into())
+}
+
+fn hash_fn(name: &str, args: Vec<Value>) -> Result<Value> {
+    // Verify that this was properly invoked as a word_fn, but discard the arg
+    // and always compile to `hash_fn(H)`, as `H` is the only argument that
+    // the Miniscript Policy language accepts.
+    word_fn(name, args)?;
+    Ok(Policy::frag(name, vec![Policy::word("H")]).into())
 }
 
 // Map the values into policies
