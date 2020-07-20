@@ -103,8 +103,8 @@ impl Evaluate for ast::TermWord {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         Ok(match scope.get(&self.0) {
             Some(binding) => binding.clone(),
-            None => Policy::word(&self.0).into(),
-            // TODO error if a $ binding is passed through
+            None if !self.0.starts_with('$') => Policy::word(&self.0).into(),
+            None => bail!(Error::VarNotFound(self.0.clone())),
         })
     }
 }

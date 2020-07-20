@@ -12,8 +12,11 @@ pub enum Error {
     #[error("Assigned variable name already exists: {0}")]
     AssignedVariableExists(Ident),
 
-    #[error("Missing function: {0}")]
+    #[error("Undefined function: {0}")]
     FnNotFound(Ident),
+
+    #[error("Undefined variable: {0}")]
+    VarNotFound(Ident),
 
     #[error("Not a function: {0:?}")]
     NotFn(Value),

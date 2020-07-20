@@ -18,3 +18,9 @@ macro_rules! ensure {
         }
     };
 }
+
+macro_rules! bail {
+    ($e:expr) => {
+        return Err($e.into());
+    };
+}
