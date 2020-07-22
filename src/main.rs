@@ -1,8 +1,11 @@
-use minis::{compile, parse, run, Result};
+use minis::{compile, parse, Result};
 use std::{env, fs, io};
 
 fn main() -> Result<()> {
-    let input = env::args().nth(1).unwrap_or("-".into());
+    let mut args = env::args();
+    let input = args.nth(1).unwrap_or("-".into());
+    let print_ast = args.nth(2) == Some("--ast".into());
+
     let mut reader: Box<dyn io::Read> = match &*input {
         "-" => Box::new(io::stdin()),
         _ => Box::new(fs::File::open(input)?),
@@ -11,9 +14,11 @@ fn main() -> Result<()> {
     let mut code = String::new();
     reader.read_to_string(&mut code)?;
 
-    let policy = compile(&code)?;
-
-    println!("{}", policy);
+    if print_ast {
+        println!("{:#?}", parse(&code)?);
+    } else {
+        println!("{}", compile(&code)?);
+    }
 
     Ok(())
 }
