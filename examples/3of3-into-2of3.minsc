@@ -1,0 +1,2 @@
+// A 3-of-3 that turns into 2-of-3 after a timeout
+3 of [ pk(A), pk(B), pk(C), older(1 month 2 weeks) ]

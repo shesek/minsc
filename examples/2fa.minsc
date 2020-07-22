@@ -1,0 +1,12 @@
+// Two factor authentication with a timeout recovery clause
+
+fn two_factor($user, $provider, $delay) = 
+  $user && (9@$provider || older($delay));
+
+// Simple 2FA: two_factor(pk(user), pk(provider), 90 days)
+
+// 2FA where the user has a 2-of-2 setup and the provider is a 3-of-4 a federation
+$user = pk(user_desktop) && pk(user_mobile);
+$providers = [ pk(P1), pk(P2), pk(P3), pk(P4) ];
+
+two_factor($user, 3 of $providers, 3 months)

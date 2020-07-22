@@ -1,0 +1,10 @@
+// The BOLT #3 received HTLC policy
+
+fn bolt3_htlc_received($revoke_pk, $local_pk, $remote_pk, $secret, $delay) {
+  $success = pk($local_pk) && hash160($secret);
+  $timeout = older($delay);
+
+  pk($revoke_pk) || (pk($remote_pk) && ($success || $timeout))
+}
+
+bolt3_htlc_received(A, B, C, H, 2 hours)
