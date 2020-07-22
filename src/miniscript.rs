@@ -109,7 +109,10 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach_builtin(scope, "prob", |args| {
         let mut args = flatten(args);
         ensure!(args.len() == 2, Error::InvalidProbArguments);
-        let prob_n = args.swap_remove(0).into_usize()?;
+        let prob_n = match args.swap_remove(0) {
+            Value::Policy(Policy::TermWord(w)) if w == "likely" => 10,
+            v => v.into_usize()?,
+        };
         let policy = args.swap_remove(0).into_policy()?;
         Ok(Policy::prob(prob_n, policy).into())
     });
