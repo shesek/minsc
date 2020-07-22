@@ -33,6 +33,8 @@ pub fn compile(s: &str) -> Result<Policy> {
     run(parse(s)?)?.into_policy()
 }
 
+// WASM
+
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wee_alloc")]
@@ -41,9 +43,6 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
 pub fn compile_js(s: &str) -> std::result::Result<String, JsValue> {
-    #[cfg(debug_assertions)]
-    console_error_panic_hook::set_once();
-
     let policy = compile(s).map_err(|e| e.to_string())?;
 
     Ok(policy.to_string())

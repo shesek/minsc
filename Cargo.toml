@@ -31,6 +31,3 @@ crate-type = ["cdylib", "lib"]
 
 [profile.release]
 lto = true
-
-[target."cfg(debug_assertions)".dependencies]
-console_error_panic_hook = "0.1.6"
