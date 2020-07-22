@@ -1,4 +1,4 @@
-use minis::{compile, parse, Result};
+use minsc::{compile, parse, Result};
 use std::{env, fs, io};
 
 fn main() -> Result<()> {

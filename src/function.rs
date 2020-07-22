@@ -9,7 +9,7 @@ pub enum Function {
     Native(NativeFunction),
 }
 
-/// A user-defined function implemented in Minis
+/// A user-defined function implemented in Minsc
 #[derive(Debug, Clone)]
 pub struct UserFunction {
     pub ident: Ident,
