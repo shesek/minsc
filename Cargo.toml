@@ -3,6 +3,13 @@ name = "minsc"
 version = "0.1.0"
 authors = ["Nadav Ivgi <nadav@shesek.info>"]
 edition = "2018"
+include = [ "src", "build.rs", "LICENSE" ]
+
+description = "A compile-to-Miniscript language for writing Bitcoin scripts"
+repository = "https://github.com/shesek/minsc"
+homepage = "https://github.com/shesek/minsc"
+license = "MIT"
+readme = "README.md"
 
 [build-dependencies]
 lalrpop = { version = "0.19.0", features = ["lexer"] }
