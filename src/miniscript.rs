@@ -134,30 +134,29 @@ pub fn attach_builtins(scope: &mut Scope) {
         Ok(Policy::frag("after", vec![value]).into())
     });
 
-    // Functions accepting a single terminal word argument
-    attach_builtin(scope, "pk", |args| word_fn("pk", args));
+    attach_builtin(scope, "pk", |args| {
+        let args = map_policy(args)?;
+        ensure!(
+            args.len() == 1 && args[0].is_word(),
+            Error::InvalidPkArguments
+        );
+        Ok(Policy::frag("pk", args).into())
+    });
 
-    // Hash function
     attach_builtin(scope, "sha256", |args| hash_fn("sha256", args));
     attach_builtin(scope, "hash256", |args| hash_fn("hash256", args));
     attach_builtin(scope, "ripemd160", |args| hash_fn("ripemd160", args));
     attach_builtin(scope, "hash160", |args| hash_fn("hash160", args));
 }
 
-fn word_fn(name: &str, args: Vec<Value>) -> Result<Value> {
-    let policies = map_policy(flatten(args))?;
-    ensure!(
-        policies.len() == 1 && policies[0].is_word(),
-        Error::InvalidWordArgument(name.into())
-    );
-    Ok(Policy::frag(name, policies).into())
-}
-
 fn hash_fn(name: &str, args: Vec<Value>) -> Result<Value> {
-    // Verify that this was properly invoked as a word_fn, but discard the arg
-    // and always compile to `hash_fn(H)`, as `H` is the only argument that
-    // the Miniscript Policy language accepts.
-    word_fn(name, args)?;
+    let args = map_policy(args)?;
+    ensure!(
+        args.len() == 1 && args[0].is_word(),
+        Error::InvalidHashArguments(name.into())
+    );
+
+    // Always compile as `hash_fn(H)` with a literla H, this is the only value supported by Miniscript policy
     Ok(Policy::frag(name, vec![Policy::word("H")]).into())
 }
 
@@ -194,6 +193,9 @@ pub enum Error {
     #[error("Invalid after() arguments, expected 1 argument with a number or duration")]
     InvalidAfterArguments,
 
-    #[error("Invalid {0}() arguments, expected a single terminal")]
-    InvalidWordArgument(String),
+    #[error("Invalid pk() arguments, expected a named identifier")]
+    InvalidPkArguments,
+
+    #[error("Invalid {0}() arguments, expected a named identifier")]
+    InvalidHashArguments(String),
 }
