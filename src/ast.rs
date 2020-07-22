@@ -12,6 +12,7 @@ pub enum Expr {
     WithProb(WithProb),
     Array(Array),
     ArrayAccess(ArrayAccess),
+    Duration(Duration),
 }
 
 /// Statements have side-effects and don't produce a value
@@ -80,6 +81,28 @@ pub struct ArrayAccess {
     pub index: Box<Expr>,
 }
 impl_from_variant!(ArrayAccess, Expr);
+
+// Duration (relative block height or time)
+#[derive(Debug, Clone)]
+pub enum Duration {
+    BlockHeight(usize),
+    BlockTime {
+        parts: Vec<DurationPart>,
+        blockwise: bool,
+    },
+}
+impl_from_variant!(Duration, Expr);
+
+#[derive(Debug, Clone)]
+pub enum DurationPart {
+    Years(f64),
+    Months(f64),
+    Weeks(f64),
+    Days(f64),
+    Hours(f64),
+    Minutes(f64),
+    Seconds(f64),
+}
 
 /// A function definition statement
 #[derive(Debug, Clone)]

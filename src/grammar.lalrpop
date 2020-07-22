@@ -1,5 +1,5 @@
 use crate::ast::{Expr, Stmt, self};
-use crate::util::concat;
+use crate::util::{concat, parse_str_prefix};
 
 grammar;
 
@@ -34,6 +34,7 @@ SimpleExpr: Expr = {
   WithProb,
   Array,
   ArrayAccess,
+  Duration,
   Paren<And>,
   Paren<Or>,
   Paren<SimpleExpr>,
@@ -87,6 +88,27 @@ FnDef: Stmt = {
     "fn" <ident:Ident> "(" <signature:List0<Ident, ",">> ")" "{" <body:Block> "}" ";"? =>
         ast::FnDef { ident, signature, body }.into(),
 }
+
+// Duration
+Duration = { DurationBlocks, DurationClock };
+
+DurationBlocks: Expr = r"\d+ blocks?" =>
+  ast::Duration::BlockHeight(parse_str_prefix(<>)).into();
+
+DurationClock: Expr = <blockwise:"blockwise"?> <parts:DurationClockPart+> =>
+  ast::Duration::BlockTime { parts, blockwise: blockwise.is_some() }.into();
+
+DurationClockPart: ast::DurationPart = {
+  r"(\d+(?:\.\d+)?) years?" => ast::DurationPart::Years(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?) months?" => ast::DurationPart::Months(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?) weeks?" => ast::DurationPart::Weeks(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?) days?" => ast::DurationPart::Days(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?) hours?" => ast::DurationPart::Hours(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?) min(ute)?s?" => ast::DurationPart::Minutes(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?) sec(ond)?s?" => ast::DurationPart::Seconds(parse_str_prefix(<>)),
+}
+
+// Helpers
 
 // A `S`-separated list of zero or more `T` values
 List0<T, S>: Vec<T> = <l:(<T> S)*> <t:T?> => concat(l, t);

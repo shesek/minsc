@@ -42,6 +42,15 @@ pub enum Error {
     #[error("Cannot represent as a Miniscript policy: {0:?}")]
     NotMiniscriptRepresentable(Value),
 
+    #[error("Blockwise duration must be divisible by 10 minutes")]
+    InvalidDurationBlockwise,
+
+    #[error("Relative by-blockheight timelocks are only supported for up to 65535 blocks (roughly 455 days)")]
+    InvalidDurationBlocksOutOfRange,
+
+    #[error("Relative by-blocktime timelocks are only supported for up to 33553920 seconds (roughly 1 year)")]
+    InvalidDurationTimeOutOfRange,
+
     #[error("Parser error: {0}")]
     ParseError(String),
 

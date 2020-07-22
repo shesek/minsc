@@ -4,6 +4,7 @@ use crate::error::Result;
 use crate::function::{Function, NativeFunction};
 use crate::runtime::{Array, Value};
 use crate::scope::Scope;
+use crate::time::duration_to_seq;
 
 /// A simplified, crude description of the Miniscript policy language syntax
 #[derive(Debug, Clone)]
@@ -113,9 +114,18 @@ pub fn attach_builtins(scope: &mut Scope) {
         Ok(Policy::prob(prob_n, policy).into())
     });
 
+    attach_builtin(scope, "older", |mut args| {
+        ensure!(args.len() == 1, Error::InvalidAfterArguments);
+        let value = match args.pop().unwrap() {
+            Value::Duration(dur) => Policy::word(duration_to_seq(&dur.0)?),
+            Value::Policy(policy) if policy.is_int() => policy,
+            _ => bail!(Error::InvalidAfterArguments),
+        };
+        Ok(Policy::frag("older", vec![value]).into())
+    });
+
     // Functions accepting a single terminal word argument
     attach_builtin(scope, "pk", |args| word_fn("pk", args));
-    attach_builtin(scope, "older", |args| word_fn("older", args));
     attach_builtin(scope, "after", |args| word_fn("after", args));
     // Hash function
     attach_builtin(scope, "sha256", |args| hash_fn("sha256", args));
@@ -170,6 +180,9 @@ pub enum Error {
 
     #[error("Invalid probability, expected a number and policy fragment")]
     InvalidProbArguments,
+
+    #[error("Invalid after() arguments, expected 1 argument with a number or duration")]
+    InvalidAfterArguments,
 
     #[error("Invalid {0}() arguments, expected a single terminal")]
     InvalidWordArgument(String),

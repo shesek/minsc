@@ -9,21 +9,24 @@ use crate::scope::Scope;
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
-///
-/// This can either be an evaluated miniscript `Policy`, a function or an array.
 #[derive(Debug, Clone)]
 pub enum Value {
     Policy(Policy),
     Function(Function),
     Array(Array),
+    Duration(Duration),
 }
 
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
+impl_from_variant!(Duration, Value);
 
 #[derive(Debug, Clone)]
 pub struct Array(pub Vec<Value>);
+
+#[derive(Debug, Clone)]
+pub struct Duration(pub ast::Duration);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -116,6 +119,12 @@ impl Evaluate for ast::Array {
     }
 }
 
+impl Evaluate for ast::Duration {
+    fn eval(&self, _scope: &Scope) -> Result<Value> {
+        Ok(Duration(self.clone()).into())
+    }
+}
+
 impl Evaluate for ast::ArrayAccess {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let elements = match self.array.eval(scope)? {
@@ -158,6 +167,7 @@ impl Evaluate for Expr {
             Expr::WithProb(x) => x.eval(scope),
             Expr::Array(x) => x.eval(scope),
             Expr::ArrayAccess(x) => x.eval(scope),
+            Expr::Duration(x) => x.eval(scope),
         }
     }
 }

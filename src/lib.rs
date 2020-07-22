@@ -11,6 +11,7 @@ pub mod function;
 pub mod miniscript;
 pub mod runtime;
 pub mod scope;
+pub mod time;
 pub mod util;
 
 pub use ast::{Expr, Ident};
