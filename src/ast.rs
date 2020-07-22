@@ -13,6 +13,7 @@ pub enum Expr {
     Array(Array),
     ArrayAccess(ArrayAccess),
     Duration(Duration),
+    DateTime(DateTime),
 }
 
 /// Statements have side-effects and don't produce a value
@@ -92,6 +93,11 @@ pub enum Duration {
     },
 }
 impl_from_variant!(Duration, Expr);
+
+// Datetime
+#[derive(Debug, Clone)]
+pub struct DateTime(pub String);
+impl_from_variant!(DateTime, Expr);
 
 #[derive(Debug, Clone)]
 pub enum DurationPart {

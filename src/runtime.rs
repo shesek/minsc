@@ -15,18 +15,23 @@ pub enum Value {
     Function(Function),
     Array(Array),
     Duration(Duration),
+    DateTime(DateTime),
 }
 
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
 impl_from_variant!(Duration, Value);
+impl_from_variant!(DateTime, Value);
 
 #[derive(Debug, Clone)]
 pub struct Array(pub Vec<Value>);
 
 #[derive(Debug, Clone)]
 pub struct Duration(pub ast::Duration);
+
+#[derive(Debug, Clone)]
+pub struct DateTime(pub String);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -125,6 +130,12 @@ impl Evaluate for ast::Duration {
     }
 }
 
+impl Evaluate for ast::DateTime {
+    fn eval(&self, _scope: &Scope) -> Result<Value> {
+        Ok(DateTime(self.0.clone()).into())
+    }
+}
+
 impl Evaluate for ast::ArrayAccess {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let elements = match self.array.eval(scope)? {
@@ -168,6 +179,7 @@ impl Evaluate for Expr {
             Expr::Array(x) => x.eval(scope),
             Expr::ArrayAccess(x) => x.eval(scope),
             Expr::Duration(x) => x.eval(scope),
+            Expr::DateTime(x) => x.eval(scope),
         }
     }
 }

@@ -1,3 +1,5 @@
+use chrono::{NaiveDate, NaiveDateTime};
+
 use crate::ast::{Duration, DurationPart};
 use crate::error::{Error, Result};
 
@@ -6,6 +8,8 @@ use crate::error::{Error, Result};
 const SEQUENCE_LOCKTIME_MASK: usize = 0x0000ffff;
 const SEQUENCE_LOCKTIME_GRANULARITY: usize = 9;
 const SEQUENCE_LOCKTIME_TYPE_FLAG: usize = 1 << 22;
+
+const LOCKTIME_THRESHOLD: usize = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 
 const BLOCKS_MAX: usize = SEQUENCE_LOCKTIME_MASK; // 65535
 const SECONDS_MAX: usize = SEQUENCE_LOCKTIME_MASK << SEQUENCE_LOCKTIME_GRANULARITY; // 33553920
@@ -52,4 +56,15 @@ fn rel_time_to_seq(parts: &[DurationPart], blockwise: bool) -> Result<usize> {
 
     let units = (seconds / SECONDS_MOD as f64).ceil() as usize;
     Ok(SEQUENCE_LOCKTIME_TYPE_FLAG | units)
+}
+
+pub fn parse_datetime(s: &str) -> Result<usize> {
+    let ts = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M")
+        .or_else(|_| Ok::<_, Error>(NaiveDate::parse_from_str(s, "%Y-%m-%d")?.and_hms(0, 0, 0)))?
+        .timestamp();
+    ensure!(
+        ts >= LOCKTIME_THRESHOLD as i64,
+        Error::InvalidDateTimeOutOfRange
+    );
+    Ok(ts as usize)
 }

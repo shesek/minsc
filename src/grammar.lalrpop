@@ -35,6 +35,7 @@ SimpleExpr: Expr = {
   Array,
   ArrayAccess,
   Duration,
+  DateTime,
   Paren<And>,
   Paren<Or>,
   Paren<SimpleExpr>,
@@ -89,7 +90,8 @@ FnDef: Stmt = {
         ast::FnDef { ident, signature, body }.into(),
 }
 
-// Duration
+// Duration and times
+
 Duration = { DurationBlocks, DurationClock };
 
 DurationBlocks: Expr = r"\d+ blocks?" =>
@@ -107,6 +109,9 @@ DurationClockPart: ast::DurationPart = {
   r"(\d+(?:\.\d+)?) min(ute)?s?" => ast::DurationPart::Minutes(parse_str_prefix(<>)),
   r"(\d+(?:\.\d+)?) sec(ond)?s?" => ast::DurationPart::Seconds(parse_str_prefix(<>)),
 }
+
+DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}( \d{1,2}:\d{1,2})?" =>
+  ast::DateTime(<>.into()).into();
 
 // Helpers
 

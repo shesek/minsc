@@ -4,7 +4,7 @@ use crate::error::Result;
 use crate::function::{Function, NativeFunction};
 use crate::runtime::{Array, Value};
 use crate::scope::Scope;
-use crate::time::duration_to_seq;
+use crate::time::{duration_to_seq, parse_datetime};
 
 /// A simplified, crude description of the Miniscript policy language syntax
 #[derive(Debug, Clone)]
@@ -124,9 +124,19 @@ pub fn attach_builtins(scope: &mut Scope) {
         Ok(Policy::frag("older", vec![value]).into())
     });
 
+    attach_builtin(scope, "after", |mut args| {
+        ensure!(args.len() == 1, Error::InvalidAfterArguments);
+        let value = match args.pop().unwrap() {
+            Value::DateTime(datetime) => Policy::word(parse_datetime(&datetime.0)?),
+            Value::Policy(policy) if policy.is_int() => policy,
+            _ => bail!(Error::InvalidAfterArguments),
+        };
+        Ok(Policy::frag("after", vec![value]).into())
+    });
+
     // Functions accepting a single terminal word argument
     attach_builtin(scope, "pk", |args| word_fn("pk", args));
-    attach_builtin(scope, "after", |args| word_fn("after", args));
+
     // Hash function
     attach_builtin(scope, "sha256", |args| hash_fn("sha256", args));
     attach_builtin(scope, "hash256", |args| hash_fn("hash256", args));

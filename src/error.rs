@@ -42,6 +42,12 @@ pub enum Error {
     #[error("Cannot represent as a Miniscript policy: {0:?}")]
     NotMiniscriptRepresentable(Value),
 
+    #[error("Invalid datetime string: {0}")]
+    InvalidDateTime(chrono::ParseError),
+
+    #[error("Absolute by-blockheight timelock out of range")]
+    InvalidDateTimeOutOfRange,
+
     #[error("Blockwise duration must be divisible by 10 minutes")]
     InvalidDurationBlockwise,
 
@@ -73,4 +79,5 @@ where
 }
 
 impl_from_variant!(miniscript::Error, Error, InvalidMiniscript);
+impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
