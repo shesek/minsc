@@ -89,7 +89,7 @@ pub enum Duration {
     BlockHeight(usize),
     BlockTime {
         parts: Vec<DurationPart>,
-        blockwise: bool,
+        heightwise: bool,
     },
 }
 impl_from_variant!(Duration, Expr);

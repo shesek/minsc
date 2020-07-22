@@ -18,7 +18,7 @@ const SECONDS_MOD: usize = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 pub fn duration_to_seq(duration: &Duration) -> Result<usize> {
     match duration {
         Duration::BlockHeight(num_blocks) => rel_height_to_seq(*num_blocks),
-        Duration::BlockTime { parts, blockwise } => rel_time_to_seq(parts, *blockwise),
+        Duration::BlockTime { parts, heightwise } => rel_time_to_seq(parts, *heightwise),
     }
 }
 
@@ -30,7 +30,7 @@ fn rel_height_to_seq(num_blocks: usize) -> Result<usize> {
     Ok(num_blocks)
 }
 
-fn rel_time_to_seq(parts: &[DurationPart], blockwise: bool) -> Result<usize> {
+fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<usize> {
     let seconds = parts
         .iter()
         .map(|p| match p {
@@ -44,7 +44,7 @@ fn rel_time_to_seq(parts: &[DurationPart], blockwise: bool) -> Result<usize> {
         })
         .sum::<f64>();
 
-    if blockwise {
+    if heightwise {
         ensure!(seconds % 600.0 == 0.0, Error::InvalidDurationBlockwise);
         return rel_height_to_seq((seconds / 600.0) as usize);
     }

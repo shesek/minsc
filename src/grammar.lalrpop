@@ -97,8 +97,8 @@ Duration = { DurationBlocks, DurationClock };
 DurationBlocks: Expr = r"\d+ blocks?" =>
   ast::Duration::BlockHeight(parse_str_prefix(<>)).into();
 
-DurationClock: Expr = <blockwise:"blockwise"?> <parts:DurationClockPart+> =>
-  ast::Duration::BlockTime { parts, blockwise: blockwise.is_some() }.into();
+DurationClock: Expr = <heightwise:"heightwise"?> <parts:DurationClockPart+> =>
+  ast::Duration::BlockTime { parts, heightwise: heightwise.is_some() }.into();
 
 DurationClockPart: ast::DurationPart = {
   r"(\d+(?:\.\d+)?) years?" => ast::DurationPart::Years(parse_str_prefix(<>)),
