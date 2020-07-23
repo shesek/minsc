@@ -224,6 +224,12 @@ impl TryFrom<Value> for usize {
 }
 
 impl Value {
+    pub fn is_array(&self) -> bool {
+        match self {
+            Value::Array(_) => true,
+            _ => false,
+        }
+    }
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
     }

@@ -80,7 +80,7 @@ fn attach_builtin(scope: &mut Scope, ident: &str, body: fn(Vec<Value>) -> Result
 
 pub fn attach_builtins(scope: &mut Scope) {
     attach_builtin(scope, "or", |args| {
-        let policies = map_policy(flatten(args))?;
+        let policies = map_policy(args)?;
         ensure!(
             policies.len() == 2 && policies.iter().all(|a| a.is_frag() || a.is_prob()),
             Error::InvalidOrArguments
@@ -89,7 +89,7 @@ pub fn attach_builtins(scope: &mut Scope) {
     });
 
     attach_builtin(scope, "and", |args| {
-        let policies = map_policy(flatten(args))?;
+        let policies = map_policy(args)?;
         ensure!(
             policies.len() == 2 && policies.iter().all(|a| a.is_frag()),
             Error::InvalidAndArguments
@@ -97,8 +97,16 @@ pub fn attach_builtins(scope: &mut Scope) {
         Ok(Policy::frag("and", policies).into())
     });
 
-    attach_builtin(scope, "thresh", |args| {
-        let args = map_policy(flatten(args))?;
+    attach_builtin(scope, "thresh", |mut args| {
+        let args = map_policy(if args.len() == 2 && args[1].is_array() {
+            // Expand thresh(n, $array) invocations into thresh(n, $array.0, $array.1, ...)
+            let thresh_n = args.remove(0);
+            let mut args = get_elements(args.remove(0));
+            args.insert(0, thresh_n);
+            args
+        } else {
+            args
+        })?;
         ensure!(
             args.len() >= 2 && args[0].is_int() && args.iter().skip(1).all(|a| a.is_frag()),
             Error::InvalidThreshArguments
@@ -168,15 +176,12 @@ fn map_policy(args: Vec<Value>) -> Result<Vec<Policy>> {
     args.into_iter().map(Value::into_policy).collect()
 }
 
-// Flatten the values to expand Array arguments into multiple arguments
-fn flatten(values: Vec<Value>) -> Vec<Value> {
-    values
-        .into_iter()
-        .flat_map(|val| match val {
-            Value::Array(Array(elements)) => flatten(elements),
-            val => vec![val],
-        })
-        .collect()
+// Extract elements from the known-to-be-an-array `val`
+fn get_elements(val: Value) -> Vec<Value> {
+    match val {
+        Value::Array(Array(elements)) => elements,
+        _ => unreachable!(),
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
