@@ -4,7 +4,7 @@ use std::convert::{TryFrom, TryInto};
 use crate::ast::{self, Expr, Stmt};
 use crate::error::{Error, Result};
 use crate::function::{Call, Function};
-use crate::miniscript::Policy;
+use crate::miniscript::{fns, Policy};
 use crate::scope::Scope;
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
@@ -205,6 +205,7 @@ impl TryFrom<Value> for Policy {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
+            arr @ Value::Array(Array(_)) => fns::all(vec![arr])?.try_into(),
             v => Err(Error::NotMiniscriptRepresentable(v)),
         }
     }
