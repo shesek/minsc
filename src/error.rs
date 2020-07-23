@@ -45,7 +45,7 @@ pub enum Error {
     #[error("Invalid datetime string: {0}")]
     InvalidDateTime(chrono::ParseError),
 
-    #[error("Absolute by-blockheight timelock out of range")]
+    #[error("Absolute by-blocktime timelock out of range")]
     InvalidDateTimeOutOfRange,
 
     #[error("Blockwise duration must be divisible by 10 minutes")]

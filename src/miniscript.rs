@@ -118,7 +118,7 @@ pub fn attach_builtins(scope: &mut Scope) {
     });
 
     attach_builtin(scope, "older", |mut args| {
-        ensure!(args.len() == 1, Error::InvalidAfterArguments);
+        ensure!(args.len() == 1, Error::InvalidOlderArguments);
         let value = match args.pop().unwrap() {
             Value::Duration(dur) => Policy::word(duration_to_seq(&dur.0)?),
             Value::Policy(policy) if policy.is_int() => policy,
@@ -193,7 +193,10 @@ pub enum Error {
     #[error("Invalid probability, expected a number and policy fragment")]
     InvalidProbArguments,
 
-    #[error("Invalid after() arguments, expected 1 argument with a number or duration")]
+    #[error("Invalid older() arguments, expected 1 argument with a number or duration")]
+    InvalidOlderArguments,
+
+    #[error("Invalid after() arguments, expected 1 argument with a number or datetime")]
     InvalidAfterArguments,
 
     #[error("Invalid pk() arguments, expected a named identifier")]
