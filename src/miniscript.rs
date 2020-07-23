@@ -89,7 +89,10 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("hash256", fns::hash256);
     attach("ripemd160", fns::ripemd160);
     attach("hash160", fns::hash160);
+
     attach("prob", fns::prob);
+    attach("all", fns::all);
+    attach("any", fns::any);
 }
 
 /// Miniscript Policy functions exposed in the Minsc runtime
@@ -186,6 +189,9 @@ pub mod fns {
         hash_fn("hash160", args)
     }
 
+    // Below are functions not natively available in Miniscript
+    // TODO move this elsewhere
+
     // A 'virtual' function to create probabilistic expressions, `prob(A, B)` -> `A@B`
     pub fn prob(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidProbArguments);
@@ -195,6 +201,28 @@ pub mod fns {
         };
         let policy = args.remove(0).into_policy()?;
         Ok(Policy::prob(prob_n, policy).into())
+    }
+
+    pub fn all(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(
+            args.len() == 1 && args[0].is_array(),
+            Error::InvalidAllArguments
+        );
+        let mut args = get_elements(args.remove(0));
+        let thresh_n = Policy::word(args.len());
+        args.insert(0, thresh_n.into());
+        thresh(args)
+    }
+
+    pub fn any(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(
+            args.len() == 1 && args[0].is_array(),
+            Error::InvalidAnyArguments
+        );
+        let mut args = get_elements(args.remove(0));
+        let thresh_n = Policy::word(1);
+        args.insert(0, thresh_n.into());
+        thresh(args)
     }
 }
 
@@ -235,4 +263,10 @@ pub enum Error {
 
     #[error("Invalid {0}() arguments, expected a named identifier")]
     InvalidHashArguments(String),
+
+    #[error("Invalid all() arguments, expected an array")]
+    InvalidAllArguments,
+
+    #[error("Invalid any() arguments, expected an array")]
+    InvalidAnyArguments,
 }
