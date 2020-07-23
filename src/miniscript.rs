@@ -73,33 +73,52 @@ impl fmt::Display for Policy {
     }
 }
 
-fn attach_builtin(scope: &mut Scope, ident: &str, body: fn(Vec<Value>) -> Result<Value>) {
-    let func = Function::from(NativeFunction { body });
-    scope.set(ident, func.into()).unwrap();
+pub fn attach_builtins(scope: &mut Scope) {
+    let mut attach = |ident, body| {
+        let func = Function::from(NativeFunction { body });
+        scope.set(ident, func.into()).unwrap();
+    };
+
+    attach("or", fns::or);
+    attach("and", fns::and);
+    attach("thresh", fns::thresh);
+    attach("older", fns::older);
+    attach("after", fns::after);
+    attach("pk", fns::pk);
+    attach("sha256", fns::sha256);
+    attach("hash256", fns::hash256);
+    attach("ripemd160", fns::ripemd160);
+    attach("hash160", fns::hash160);
+    attach("prob", fns::prob);
 }
 
-pub fn attach_builtins(scope: &mut Scope) {
-    attach_builtin(scope, "or", |args| {
+/// Miniscript Policy functions exposed in the Minsc runtime
+pub mod fns {
+    use super::*;
+
+    // Representation for functions natively available in the Miniscript Policy language
+
+    pub fn or(args: Vec<Value>) -> Result<Value> {
         let policies = map_policy(args)?;
         ensure!(
             policies.len() == 2 && policies.iter().all(|a| a.is_frag() || a.is_prob()),
             Error::InvalidOrArguments
         );
         Ok(Policy::frag("or", policies).into())
-    });
+    }
 
-    attach_builtin(scope, "and", |args| {
+    pub fn and(args: Vec<Value>) -> Result<Value> {
         let policies = map_policy(args)?;
         ensure!(
             policies.len() == 2 && policies.iter().all(|a| a.is_frag()),
             Error::InvalidAndArguments
         );
         Ok(Policy::frag("and", policies).into())
-    });
+    }
 
-    attach_builtin(scope, "thresh", |mut args| {
+    pub fn thresh(mut args: Vec<Value>) -> Result<Value> {
+        // Expand thresh(n, $array) invocations into thresh(n, $array.0, $array.1, ...)
         let args = map_policy(if args.len() == 2 && args[1].is_array() {
-            // Expand thresh(n, $array) invocations into thresh(n, $array.0, $array.1, ...)
             let thresh_n = args.remove(0);
             let mut args = get_elements(args.remove(0));
             args.insert(0, thresh_n);
@@ -112,74 +131,81 @@ pub fn attach_builtins(scope: &mut Scope) {
             Error::InvalidThreshArguments
         );
         Ok(Policy::frag("thresh", args).into())
-    });
+    }
 
-    attach_builtin(scope, "prob", |args| {
-        let mut args = flatten(args);
-        ensure!(args.len() == 2, Error::InvalidProbArguments);
-        let prob_n = match args.swap_remove(0) {
-            Value::Policy(Policy::TermWord(w)) if w == "likely" => 10,
-            v => v.into_usize()?,
-        };
-        let policy = args.swap_remove(0).into_policy()?;
-        Ok(Policy::prob(prob_n, policy).into())
-    });
-
-    attach_builtin(scope, "older", |mut args| {
+    pub fn older(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidOlderArguments);
-        let value = match args.pop().unwrap() {
+        let value = match args.remove(0) {
             Value::Duration(dur) => Policy::word(duration_to_seq(&dur.0)?),
             Value::Policy(policy) if policy.is_int() => policy,
             _ => bail!(Error::InvalidAfterArguments),
         };
         Ok(Policy::frag("older", vec![value]).into())
-    });
+    }
 
-    attach_builtin(scope, "after", |mut args| {
+    pub fn after(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidAfterArguments);
-        let value = match args.pop().unwrap() {
+        let value = match args.remove(0) {
             Value::DateTime(datetime) => Policy::word(parse_datetime(&datetime.0)?),
             Value::Policy(policy) if policy.is_int() => policy,
             _ => bail!(Error::InvalidAfterArguments),
         };
         Ok(Policy::frag("after", vec![value]).into())
-    });
+    }
 
-    attach_builtin(scope, "pk", |args| {
+    pub fn pk(args: Vec<Value>) -> Result<Value> {
         let args = map_policy(args)?;
         ensure!(
             args.len() == 1 && args[0].is_word(),
             Error::InvalidPkArguments
         );
         Ok(Policy::frag("pk", args).into())
-    });
+    }
 
-    attach_builtin(scope, "sha256", |args| hash_fn("sha256", args));
-    attach_builtin(scope, "hash256", |args| hash_fn("hash256", args));
-    attach_builtin(scope, "ripemd160", |args| hash_fn("ripemd160", args));
-    attach_builtin(scope, "hash160", |args| hash_fn("hash160", args));
+    fn hash_fn(name: &str, args: Vec<Value>) -> Result<Value> {
+        let args = map_policy(args)?;
+        ensure!(
+            args.len() == 1 && args[0].is_word(),
+            Error::InvalidHashArguments(name.into())
+        );
+
+        // Always compile as `hash_fn(H)` with a literl H, this is the only value supported by Miniscript policy
+        Ok(Policy::frag(name, vec![Policy::word("H")]).into())
+    }
+
+    pub fn sha256(args: Vec<Value>) -> Result<Value> {
+        hash_fn("sha256", args)
+    }
+    pub fn hash256(args: Vec<Value>) -> Result<Value> {
+        hash_fn("hash256", args)
+    }
+    pub fn ripemd160(args: Vec<Value>) -> Result<Value> {
+        hash_fn("ripemd160", args)
+    }
+    pub fn hash160(args: Vec<Value>) -> Result<Value> {
+        hash_fn("hash160", args)
+    }
+
+    // A 'virtual' function to create probabilistic expressions, `prob(A, B)` -> `A@B`
+    pub fn prob(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 2, Error::InvalidProbArguments);
+        let prob_n = match args.remove(0) {
+            Value::Policy(Policy::TermWord(w)) if w == "likely" => 10,
+            v => v.into_usize()?,
+        };
+        let policy = args.remove(0).into_policy()?;
+        Ok(Policy::prob(prob_n, policy).into())
+    }
 }
 
-fn hash_fn(name: &str, args: Vec<Value>) -> Result<Value> {
-    let args = map_policy(args)?;
-    ensure!(
-        args.len() == 1 && args[0].is_word(),
-        Error::InvalidHashArguments(name.into())
-    );
-
-    // Always compile as `hash_fn(H)` with a literla H, this is the only value supported by Miniscript policy
-    Ok(Policy::frag(name, vec![Policy::word("H")]).into())
-}
-
-// Map the values into policies
 fn map_policy(args: Vec<Value>) -> Result<Vec<Policy>> {
     args.into_iter().map(Value::into_policy).collect()
 }
 
-// Extract elements from the known-to-be-an-array `val`
 fn get_elements(val: Value) -> Vec<Value> {
     match val {
         Value::Array(Array(elements)) => elements,
+        // assumes that `val` is already known to be an array
         _ => unreachable!(),
     }
 }
