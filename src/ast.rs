@@ -28,7 +28,7 @@ pub enum Stmt {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
-    pub return_value: Box<Expr>,
+    pub return_value: Option<Box<Expr>>,
 }
 impl_from_variant!(Block, Expr);
 

@@ -162,7 +162,16 @@ impl Evaluate for ast::Block {
         for stmt in &self.stmts {
             stmt.exec(&mut scope)?;
         }
-        self.return_value.eval(&scope)
+        if let Some(return_value) = &self.return_value {
+            // The return value is the final expression within the function body,
+            // optionally prefixed with the `return` keyword
+            return_value.eval(&scope)
+        } else if let Some(Value::Function(func)) = scope.get("main") {
+            // The return value is the evaluation of main()
+            func.call(vec![], &scope)
+        } else {
+            Err(Error::NoReturnValue)
+        }
     }
 }
 
