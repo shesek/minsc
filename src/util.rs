@@ -14,5 +14,5 @@ pub fn parse_str_prefix<T: FromStr>(s: &str) -> T
 where
     <T as FromStr>::Err: Debug,
 {
-    s.split(' ').next().unwrap().parse().unwrap()
+    s.split_ascii_whitespace().next().unwrap().parse().unwrap()
 }

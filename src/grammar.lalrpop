@@ -95,23 +95,23 @@ FnDef: Stmt = {
 
 Duration = { DurationBlocks, DurationClock };
 
-DurationBlocks: Expr = r"\d+ blocks?" =>
+DurationBlocks: Expr = r"\d+\s+blocks?" =>
   ast::Duration::BlockHeight(parse_str_prefix(<>)).into();
 
 DurationClock: Expr = <heightwise:"heightwise"?> <parts:DurationClockPart+> =>
   ast::Duration::BlockTime { parts, heightwise: heightwise.is_some() }.into();
 
 DurationClockPart: ast::DurationPart = {
-  r"(\d+(?:\.\d+)?) years?" => ast::DurationPart::Years(parse_str_prefix(<>)),
-  r"(\d+(?:\.\d+)?) months?" => ast::DurationPart::Months(parse_str_prefix(<>)),
-  r"(\d+(?:\.\d+)?) weeks?" => ast::DurationPart::Weeks(parse_str_prefix(<>)),
-  r"(\d+(?:\.\d+)?) days?" => ast::DurationPart::Days(parse_str_prefix(<>)),
-  r"(\d+(?:\.\d+)?) hours?" => ast::DurationPart::Hours(parse_str_prefix(<>)),
-  r"(\d+(?:\.\d+)?) min(ute)?s?" => ast::DurationPart::Minutes(parse_str_prefix(<>)),
-  r"(\d+(?:\.\d+)?) sec(ond)?s?" => ast::DurationPart::Seconds(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?)\s+years?" => ast::DurationPart::Years(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?)\s+months?" => ast::DurationPart::Months(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?)\s+weeks?" => ast::DurationPart::Weeks(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?)\s+days?" => ast::DurationPart::Days(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?)\s+hours?" => ast::DurationPart::Hours(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?)\s+min(ute)?s?" => ast::DurationPart::Minutes(parse_str_prefix(<>)),
+  r"(\d+(?:\.\d+)?)\s+sec(ond)?s?" => ast::DurationPart::Seconds(parse_str_prefix(<>)),
 }
 
-DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}( \d{1,2}:\d{1,2})?" =>
+DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
   ast::DateTime(<>.into()).into();
 
 // Helpers
