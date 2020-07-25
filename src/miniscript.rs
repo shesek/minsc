@@ -54,6 +54,11 @@ impl Policy {
             _ => false,
         }
     }
+
+    pub fn as_top_level(self) -> Result<Policy> {
+        ensure!(self.is_frag(), Error::InvalidTopLevel);
+        Ok(self)
+    }
 }
 
 impl fmt::Display for Policy {
@@ -204,6 +209,7 @@ pub mod fns {
             v => v.into_usize()?,
         };
         let policy = args.remove(0).into_policy()?;
+        ensure!(policy.is_frag(), Error::InvalidProbArguments);
         Ok(Policy::prob(prob_n, policy).into())
     }
 
@@ -278,4 +284,7 @@ pub enum Error {
 
     #[error("Invalid any() arguments, expected an array")]
     InvalidAnyArguments,
+
+    #[error("Invalid top-level, expecting a policy fragment")]
+    InvalidTopLevel,
 }
