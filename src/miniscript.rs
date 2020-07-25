@@ -91,6 +91,7 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("hash160", fns::hash160);
 
     attach("prob", fns::prob);
+    attach("likely", fns::likely);
     attach("all", fns::all);
     attach("any", fns::any);
 }
@@ -98,6 +99,8 @@ pub fn attach_builtins(scope: &mut Scope) {
 /// Miniscript Policy functions exposed in the Minsc runtime
 pub mod fns {
     use super::*;
+
+    const LIKELY_PROB: usize = 10;
 
     // Representation for functions natively available in the Miniscript Policy language
 
@@ -196,11 +199,17 @@ pub mod fns {
     pub fn prob(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidProbArguments);
         let prob_n = match args.remove(0) {
-            Value::Policy(Policy::TermWord(w)) if w == "likely" => 10,
+            // support the `likely@X` syntax as an alternative to the `likely(X)` function invocation
+            Value::Function(Function::Native(f)) if f.body == fns::likely => LIKELY_PROB,
             v => v.into_usize()?,
         };
         let policy = args.remove(0).into_policy()?;
         Ok(Policy::prob(prob_n, policy).into())
+    }
+
+    pub fn likely(mut args: Vec<Value>) -> Result<Value> {
+        args.insert(0, Policy::word(LIKELY_PROB).into());
+        prob(args)
     }
 
     pub fn all(mut args: Vec<Value>) -> Result<Value> {
