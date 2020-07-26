@@ -42,8 +42,8 @@ use wasm_bindgen::prelude::*;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-#[wasm_bindgen]
-pub fn compile_js(s: &str) -> std::result::Result<String, JsValue> {
+#[wasm_bindgen(js_name = compile)]
+pub fn js_compile(s: &str) -> std::result::Result<String, JsValue> {
     let policy = compile(s).map_err(|e| e.to_string())?;
 
     Ok(policy.to_string())
