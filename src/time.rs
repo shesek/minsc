@@ -5,24 +5,24 @@ use crate::error::{Error, Result};
 
 // Based on https://github.com/bitcoinjs/bip68, thanks bitcoinjs-lib folks!
 
-const SEQUENCE_LOCKTIME_MASK: usize = 0x0000ffff;
-const SEQUENCE_LOCKTIME_GRANULARITY: usize = 9;
-const SEQUENCE_LOCKTIME_TYPE_FLAG: usize = 1 << 22;
+const SEQUENCE_LOCKTIME_MASK: u32 = 0x0000ffff;
+const SEQUENCE_LOCKTIME_GRANULARITY: u32 = 9;
+const SEQUENCE_LOCKTIME_TYPE_FLAG: u32 = 1 << 22;
 
-const LOCKTIME_THRESHOLD: usize = 500000000; // Tue Nov  5 00:53:20 1985 UTC
+const LOCKTIME_THRESHOLD: u32 = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 
-const BLOCKS_MAX: usize = SEQUENCE_LOCKTIME_MASK; // 65535
-const SECONDS_MAX: usize = SEQUENCE_LOCKTIME_MASK << SEQUENCE_LOCKTIME_GRANULARITY; // 33553920
-const SECONDS_MOD: usize = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
+const BLOCKS_MAX: u32 = SEQUENCE_LOCKTIME_MASK; // 65535
+const SECONDS_MAX: u32 = SEQUENCE_LOCKTIME_MASK << SEQUENCE_LOCKTIME_GRANULARITY; // 33553920
+const SECONDS_MOD: u32 = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 
-pub fn duration_to_seq(duration: &Duration) -> Result<usize> {
+pub fn duration_to_seq(duration: &Duration) -> Result<u32> {
     match duration {
         Duration::BlockHeight(num_blocks) => rel_height_to_seq(*num_blocks),
         Duration::BlockTime { parts, heightwise } => rel_time_to_seq(parts, *heightwise),
     }
 }
 
-fn rel_height_to_seq(num_blocks: usize) -> Result<usize> {
+fn rel_height_to_seq(num_blocks: u32) -> Result<u32> {
     ensure!(
         num_blocks > 0 && num_blocks <= BLOCKS_MAX,
         Error::InvalidDurationBlocksOutOfRange
@@ -30,7 +30,7 @@ fn rel_height_to_seq(num_blocks: usize) -> Result<usize> {
     Ok(num_blocks)
 }
 
-fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<usize> {
+fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<u32> {
     let seconds = parts
         .iter()
         .map(|p| match p {
@@ -45,8 +45,8 @@ fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<usize> {
         .sum::<f64>();
 
     if heightwise {
-        ensure!(seconds % 600.0 == 0.0, Error::InvalidDurationBlockwise);
-        return rel_height_to_seq((seconds / 600.0) as usize);
+        ensure!(seconds % 600.0 == 0.0, Error::InvalidDurationHeightwise);
+        return rel_height_to_seq((seconds / 600.0) as u32);
     }
 
     ensure!(
@@ -54,17 +54,17 @@ fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<usize> {
         Error::InvalidDurationTimeOutOfRange
     );
 
-    let units = (seconds / SECONDS_MOD as f64).ceil() as usize;
+    let units = (seconds / SECONDS_MOD as f64).ceil() as u32;
     Ok(SEQUENCE_LOCKTIME_TYPE_FLAG | units)
 }
 
-pub fn parse_datetime(s: &str) -> Result<usize> {
+pub fn parse_datetime(s: &str) -> Result<u32> {
     let ts = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M")
         .or_else(|_| Ok::<_, Error>(NaiveDate::parse_from_str(s, "%Y-%m-%d")?.and_hms(0, 0, 0)))?
         .timestamp();
     ensure!(
-        ts >= LOCKTIME_THRESHOLD as i64,
+        ts >= LOCKTIME_THRESHOLD as i64 && ts <= u32::max_value() as i64,
         Error::InvalidDateTimeOutOfRange
     );
-    Ok(ts as usize)
+    Ok(ts as u32)
 }

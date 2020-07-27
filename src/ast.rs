@@ -86,7 +86,7 @@ impl_from_variant!(ArrayAccess, Expr);
 // Duration (relative block height or time)
 #[derive(Debug, Clone)]
 pub enum Duration {
-    BlockHeight(usize),
+    BlockHeight(u32),
     BlockTime {
         parts: Vec<DurationPart>,
         heightwise: bool,

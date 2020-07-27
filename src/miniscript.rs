@@ -48,9 +48,9 @@ impl Policy {
         }
     }
 
-    pub fn is_int(&self) -> bool {
+    pub fn is_u32(&self) -> bool {
         match self {
-            Policy::TermWord(word) => word.parse::<usize>().is_ok(),
+            Policy::TermWord(word) => word.parse::<u32>().is_ok(),
             _ => false,
         }
     }
@@ -133,7 +133,7 @@ pub mod fns {
             args
         })?;
         ensure!(
-            args.len() >= 2 && args[0].is_int() && args.iter().skip(1).all(|a| a.is_frag()),
+            args.len() >= 2 && args[0].is_u32() && args.iter().skip(1).all(|a| a.is_frag()),
             Error::InvalidThreshArguments
         );
         Ok(Policy::frag("thresh", args).into())
@@ -143,8 +143,8 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidOlderArguments);
         let value = match args.remove(0) {
             Value::Duration(dur) => Policy::word(duration_to_seq(&dur.0)?),
-            Value::Policy(policy) if policy.is_int() => policy,
-            _ => bail!(Error::InvalidAfterArguments),
+            Value::Policy(policy) if policy.is_u32() => policy,
+            _ => bail!(Error::InvalidOlderArguments),
         };
         Ok(Policy::frag("older", vec![value]).into())
     }
@@ -153,7 +153,7 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidAfterArguments);
         let value = match args.remove(0) {
             Value::DateTime(datetime) => Policy::word(parse_datetime(&datetime.0)?),
-            Value::Policy(policy) if policy.is_int() => policy,
+            Value::Policy(policy) if policy.is_u32() => policy,
             _ => bail!(Error::InvalidAfterArguments),
         };
         Ok(Policy::frag("after", vec![value]).into())
