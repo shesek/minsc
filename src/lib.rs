@@ -31,7 +31,8 @@ pub fn run(expr: Expr) -> Result<Value> {
 
 pub fn compile(s: &str) -> Result<Policy> {
     let policy = run(parse(s)?)?.into_policy()?;
-    policy.as_top_level()
+    ensure!(policy.is_frag(), Error::InvalidTopLevel);
+    Ok(policy)
 }
 
 // WASM

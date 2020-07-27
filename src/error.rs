@@ -15,6 +15,9 @@ pub enum Error {
     #[error("Missing expected return value, set a final expression or a main() function")]
     NoReturnValue,
 
+    #[error("Invalid main expression, expecting a policy fragment")]
+    InvalidTopLevel,
+
     #[error("Undefined function: {0}")]
     FnNotFound(Ident),
 

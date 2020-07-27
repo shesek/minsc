@@ -27,37 +27,32 @@ impl Policy {
         Policy::WithProb(prob, policy.into())
     }
 
-    fn is_word(&self) -> bool {
+    pub fn is_word(&self) -> bool {
         match self {
             Policy::TermWord(..) => true,
             _ => false,
         }
     }
 
-    fn is_frag(&self) -> bool {
+    pub fn is_frag(&self) -> bool {
         match self {
             Policy::Fragment(..) => true,
             _ => false,
         }
     }
 
-    fn is_prob(&self) -> bool {
+    pub fn is_prob(&self) -> bool {
         match self {
             Policy::WithProb(..) => true,
             _ => false,
         }
     }
 
-    fn is_int(&self) -> bool {
+    pub fn is_int(&self) -> bool {
         match self {
             Policy::TermWord(word) => word.parse::<usize>().is_ok(),
             _ => false,
         }
-    }
-
-    pub fn as_top_level(self) -> Result<Policy> {
-        ensure!(self.is_frag(), Error::InvalidTopLevel);
-        Ok(self)
     }
 }
 
@@ -284,7 +279,4 @@ pub enum Error {
 
     #[error("Invalid any() arguments, expected an array")]
     InvalidAnyArguments,
-
-    #[error("Invalid top-level, expecting a policy fragment")]
-    InvalidTopLevel,
 }
