@@ -3,7 +3,7 @@ name = "minsc"
 version = "0.1.0"
 authors = ["Nadav Ivgi <nadav@shesek.info>"]
 edition = "2018"
-include = [ "src", "build.rs", "LICENSE" ]
+include = [ "/src", "/build.rs", "/LICENSE" ]
 
 description = " A Miniscript-based high-level scripting language for Bitcoin contracts"
 repository = "https://github.com/shesek/minsc"
