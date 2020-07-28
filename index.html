@@ -1,0 +1,135 @@
+<!DOCTYPE html><head><title>Minsc</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="A Miniscript-based scripting language for Bitcoin contracts"><meta property="og:title" content="Minsc"><meta property="og:description" content="A Miniscript-based scripting language for Bitcoin contracts"><meta property="og:image" content="https://min.sc/img/social.png"><meta name="twitter:card" content="summary_large_image"><link rel="stylesheet" href="bootstrap.min.css"><link rel="stylesheet" href="style.css"></head><body><div class="container mt-5" id="content"><div id="intro"><h1>Minsc</h1>
+<h4>A Miniscript-based scripting language for Bitcoin contracts</h4>
+<p>Minsc is a high-level scripting language for expressing Bitcoin Script spending conditions.
+It is based on the <a href="http://bitcoin.sipa.be/miniscript/">Miniscript</a> Policy language,
+with additional features and syntactic sugar sprinkled on top, including variables, functions, infix notation, and more.</p>
+<p>Implemented in Rust with LALRPOP. Source code is available <a href="https://github.com/shesek/minsc">on GitHub</a>, released under the MIT license.</p>
+</div><div id="live-head"></div><h4 class="mt-5">Live <em>Minsc-to-Policy-to-Miniscript-to-Script</em> compiler</h4><div class="row"><div class="col-md-6 col-lg-7"><div class="card border-secondary mb-2"><h5 class="card-header d-flex justify-content-between">Minsc</h5><div class="card-text"><div id="editor"></div></div></div><div class="mb-4 d-flex justify-content-end"><input class="form-control form-control-sm bg-dark text-muted d-none" id="share-box" readonly><a class="btn btn-sm btn-secondary" id="share" href="#"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg> Share URL</a></div><div class="alert alert-warning" id="error"></div></div><div class="col-md-6 col-lg-5"><h5 class="font-italic text-center" id="loading">Loading WASM...</h5><div id="outputs"><div class="card border-secondary collapsible collapsed mb-3"><h5 class="card-header d-flex justify-content-between">Policy<svg class="bi icon-arrows-expand" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#arrows-expand"></use></svg><svg class="bi icon-arrows-collapse" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#arrows-collapse"></use></svg></h5><div class="card-text"><div id="output-policy"></div></div></div><div class="card border-secondary collapsible mb-3"><h5 class="card-header d-flex justify-content-between">Miniscript<svg class="bi icon-arrows-expand" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#arrows-expand"></use></svg><svg class="bi icon-arrows-collapse" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#arrows-collapse"></use></svg></h5><div class="card-text"><div id="output-miniscript"></div></div></div><div class="card border-secondary collapsible"><h5 class="card-header d-flex justify-content-between">Bitcoin Script<svg class="bi icon-arrows-expand" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#arrows-expand"></use></svg><svg class="bi icon-arrows-collapse" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#arrows-collapse"></use></svg></h5><div class="card-text"><div id="output-script"></div></div></div></div></div></div><div class="mt-4" id="ref"><h2 id="reference"><a class="anchor" href="#reference"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Reference</span></h2><div class="lead"><p>Minsc is using the <a href="http://bitcoin.sipa.be/miniscript/">sipa implementation</a> of Miniscript.</p>
+<p>Any valid Miniscript Policy is also a valid Minsc expression.</p>
+<p>Jump to:
+<a href="#infix-logical-operators">Logical Operators</a> ·
+<a href="#threshold-operator">Threshold Operator</a> ·
+<a href="#execution-probabilities">Execution Probabilities</a> ·
+<a href="#time-durations">Time &amp; Durations</a> ·
+<a href="#variables">Variables</a> ·
+<a href="#arrays">Arrays</a> ·
+<a href="#functions">Functions</a></p>
+</div><div class="row"><div class="col-lg-9 col-xl-7"><h3 id="infix-logical-operators"><a class="anchor" href="#infix-logical-operators"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Infix Logical Operators</span></h3><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// One of two keys
+pk(A) || pk(B)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Traditional preimage-based HTLC
+(pk(A) && sha256(H)) || (pk(B) && older(10))
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>Supports &gt;2 branches by compiling to <code>thresh(N, ...)</code> or <code>thresh(1, ...)</code>.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// All of four keys
+pk(A) && pk(B) && pk(C) && pk(C)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><h3 id="threshold-operator"><a class="anchor" href="#threshold-operator"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Threshold Operator</span></h3><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// 2-of-3 escrow contract
+2 of [ pk(buyer), pk(seller), pk(arbiter) ]
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><h3 id="execution-probabilities"><a class="anchor" href="#execution-probabilities"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Execution Probabilities</span></h3><p>You can indicate which of the <code>or</code> branches is more likely to be executed with <code>@</code>.
+Miniscript uses this information to optimize for lower spending costs.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// One of two keys, A 10x more likely than B
+10@pk(A) || pk(B)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>You may use the <code>likely</code> keyword as an alias for <code>10</code>.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>likely@pk(A) || pk(B)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>Probabilities are only supported with two branches, but you can do something like:</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// One of four keys, A more likely
+likely@pk(A) || (pk(B) || pk(C) || pk(C))
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>Can alternatively be used as functions: <code>likely(policy)</code> and <code>prob(n, policy)</code>.</p>
+<h3 id="time-durations"><a class="anchor" href="#time-durations"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Time &amp; Durations</span></h3><p><code>after()</code> accepts dates formatted as <code>YYYY-MM-DD</code>, optionally with <code>HH:MM</code>.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Lock some coins until 2030
+pk(A) && after(2030-01-01)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p><code>older()</code> accepts time durations with years, months, weeks, days, hours, minutes and seconds.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// A user and a 2FA service need to sign off, but after 90 days the user alone is enough
+pk(user_pk) && (9@pk(service_pk) || older(90 days))
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// A 3-of-3 that turns into 2-of-3 after a timeout
+3 of [ pk(A), pk(B), pk(C), older(1 month 2 weeks) ]
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>The <code>heightwise</code> keyword can be used to produce block-height-wise durations.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Lock some coins for 6 blocks (approx 1 hour)
+pk(A) && older(heightwise 1 hour)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>The <code>blocks</code> keyword can optionally be specified for block count durations.
+This typically simply compiles to the number, but also verifies that it is within the allowed range and may be more readable.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Fails compilation, BIP 68 only supports up to 65535 blocks
+pk(A) && older(65536 blocks)
+
+// older(65536) compiles, but doesn't work as can be expected!
+// 🛑 🦶 🔫
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="note"><p>Note that time durations are encoded in granularity of 512 seconds and are rounded up (i.e. 513 seconds becomes 1024 seconds).</p>
+</div><h3 id="variables"><a class="anchor" href="#variables"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Variables</span></h3><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Traditional preimage-based HTLC
+
+$redeem = pk(A) && sha256(H);
+$refund = pk(B) && older(10);
+
+likely@$redeem || $refund
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Liquid-like federated pegin, with emergency recovery keys
+
+$federation = 4 of [ pk(A), pk(B), pk(C), pk(D), pk(E) ];
+$recovery = 2 of [ pk(F), pk(G), pk(H) ];
+$timeout = older(heightwise 3 months);
+
+likely@$federation || ($timeout && $recovery)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="note"><p>Variables are immutable, but can be shadowed over in inner scopes.<br>
+Scoping is currently dynamic, expected to eventually be replaced with lexical scoping.</p>
+</div><h3 id="arrays"><a class="anchor" href="#arrays"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Arrays</span></h3><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// One of two keys
+$keys = [ pk(A), pk(B) ];
+$keys.0 || $keys.1
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p><code>any($arr)</code> can be used to require that one of the subpolicies is met.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// The CEO plus any of the directors are needed to sign off
+$directors = [ pk(A), pk(B), pk(C) ];
+pk(ceo) && any($directors) // thresh(1, $directors)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p><code>all($arr)</code> can be used to require that all of the subpolicies are met.</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// The CEO or all of the directors are needed to sign off
+$directors = [ pk(A), pk(B), pk(C) ];
+pk(ceo) || all($directors) // thresh(3, $directors)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>The last example could alternatively be written as <code>pk(ceo) || $directors</code>.</p>
+<h3 id="functions"><a class="anchor" href="#functions"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Functions</span></h3><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// The BOLT #3 received HTLC policy
+fn bolt3_htlc_received($revoke_pk, $local_pk, $remote_pk, $secret, $delay) {
+  $success = pk($local_pk) && hash160($secret);
+  $timeout = older($delay);
+
+  pk($revoke_pk) || (pk($remote_pk) && ($success || $timeout))
+}
+
+bolt3_htlc_received(A, B, C, H, 2 hours)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Two factor authentication with a timeout recovery clause
+fn two_factor($user, $provider, $delay) = 
+  $user && (likely@$provider || older($delay));
+
+// 2FA where the user has a 2-of-2 setup and the service provider is a 3-of-4 federation
+
+$user = pk(user_desktop) && pk(user_mobile);
+$providers = [ pk(P1), pk(P2), pk(P3), pk(P4) ];
+
+two_factor($user, 3 of $providers, 4 months)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>If you prefer to start with the high-level policy description first and then delve into the details, you can declare a <code>main()</code> function like so:</p>
+<div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Revault multi-party vault (github.com/re-vault)
+
+fn main() = $managers && (likely($timeout && $cosigners) || $non_managers);
+
+$timeout = older(100 blocks);
+$managers = [ pk(A), pk(B), pk(C) ];
+$non_managers = [ pk(D), pk(E), pk(F), pk(G) ];
+$cosigners = [ pk(H), pk(I), pk(J), pk(K) ];
+
+// main() is implicitly returned
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>Functions are first-class and can be of higher order (accept function arguments and return them).</p><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Traditional preimage-based HTLC, with a configurable hash function
+fn htlc($redeem_pk, $refund_pk, $hash, $expiry, $hash_fn) {
+    $redeem = pk($redeem_pk) && $hash_fn($hash);
+    $refund = pk($refund_pk) && older($expiry);
+    9@$redeem || $refund
+}
+
+htlc(A, B, H, 10 blocks, sha256)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Stuckless payments
+// See https://lists.linuxfoundation.org/pipermail/lightning-dev/2019-September/002152.html
+
+// The same HTLC function from the previous snippet (just more compact)
+fn htlc($redeem_pk, $refund_pk, $hash, $expiry, $hash_fn) = 9@(pk($redeem_pk) && $hash_fn($hash)) || (pk($refund_pk) && older($expiry));
+
+// Stuckless HTLC, implemented using htlc() with a custom hash function
+fn stuckless_hash($h) = hash160($h.0) && hash160($h.1);
+htlc(A, B, [ H1, H2 ], 6 hours, stuckless_hash)
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div></div></div></div></div><footer class="container border-top border-secondary my-4 pt-2"><p>by <a href="https://twitter.com/shesek">@shesek</a> ·
+cypherpunks write code.</p>
+<p><a href="https://blockstream.info/address/bc1q43zm3sdeuehzvpskt2m0gy96pwe7mldxh9d9ta">bc1q43zm3sdeuehzvpskt2m0gy96pwe7mldxh9d9ta</a></p>
+<script>(function(u, _paq) {
+  _paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);_paq.push(['setTrackerUrl', u+'t']);_paq.push(['setSiteId', '1']);
+  var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];g.type='text/javascript'; g.async=true; g.src=u+'j'; s.parentNode.insertBefore(g,s);
+})("//s.min.sc/", window._paq=[]);</script><noscript><img src="//s.min.sc/t?idsite=1&amp;rec=1" style="border:0;" alt=""></noscript></footer><script src="index.js"></script></body>
