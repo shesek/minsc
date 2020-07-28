@@ -1,0 +1,296 @@
+mixin box(title, collapsible=false, collapsed=false)
+  - klass = collapsible ? 'collapsible' + (collapsed ? ' collapsed' : '') : ''
+  .card.border-secondary&attributes(attributes)(class=klass)
+    h5.card-header.d-flex.justify-content-between
+      = title
+      if collapsible
+        +icon('arrows-expand')
+        +icon('arrows-collapse')
+    .card-text: block
+
+mixin snippet
+  .snippet.mb-3
+    .card.mb-1: .card-body
+      pre.mb-0: code: block
+    button.btn.btn-primary.btn-sm Try
+
+mixin icon(name)
+  svg.bi(fill='currentColor', style='height:1em;width:1em', class=`icon-${name}`): use(xlink:href="icons.svg#"+name)
+
+mixin h(n, title)
+  - tag = `h${n}`
+  - slug = title.toLowerCase().replace(/\W+/g, '-')
+  #{tag}(id=slug)&attributes(attributes)
+    a.anchor(href=`#${slug}`): +icon('link-45deg')
+    span.ttl= title
+
+doctype html
+
+head
+  title Minsc
+
+  meta(charset='utf-8')
+  meta(name='viewport', content='width=device-width, initial-scale=1')
+  meta(name='description', content='A Miniscript-based scripting language for Bitcoin contracts')
+
+  meta(property='og:title', content='Minsc')
+  meta(property='og:description', content='A Miniscript-based scripting language for Bitcoin contracts')
+  meta(property='og:image', content='https://min.sc/img/social.png')
+  meta(name='twitter:card', content='summary_large_image')
+
+  link(rel='stylesheet', href='bootstrap.min.css')
+  link(rel='stylesheet', href='style.css')
+
+body
+  #content.container.mt-5
+    #intro: :markdown-it
+      # Minsc
+      #### A Miniscript-based scripting language for Bitcoin contracts
+
+      Minsc is a high-level scripting language for expressing Bitcoin Script spending conditions.
+      It is based on the [Miniscript](http://bitcoin.sipa.be/miniscript/) Policy language,
+      with additional features and syntactic sugar sprinkled on top, including variables, functions, infix notation, and more.
+
+      Implemented in Rust with LALRPOP. Source code is available [on GitHub](https://github.com/shesek/minsc), released under the MIT license.
+
+    #live-head
+    h4.mt-5 Live #[em Minsc-to-Policy-to-Miniscript-to-Script] compiler
+    .row
+      .col-md-6.col-lg-7
+        +box('Minsc').mb-2: #editor
+
+        .mb-4.d-flex.justify-content-end
+          input#share-box.form-control.form-control-sm.bg-dark.text-muted.d-none(readonly)
+          a#share.btn.btn-sm.btn-secondary(href='#') #[+icon('link-45deg')] Share URL
+
+        #error.alert.alert-warning
+
+      .col-md-6.col-lg-5
+        h5#loading.font-italic.text-center Loading WASM...
+
+        #outputs
+          +box('Policy', true, true).mb-3: #output-policy
+          +box('Miniscript', true).mb-3: #output-miniscript
+          +box('Bitcoin Script', true): #output-script
+
+    #ref.mt-4
+      +h(2, 'Reference')
+
+      .lead: :markdown-it
+        Minsc is using the [sipa implementation](http://bitcoin.sipa.be/miniscript/) of Miniscript.
+
+        Any valid Miniscript Policy is also a valid Minsc expression.
+
+        Jump to:
+        [Logical Operators](#infix-logical-operators) &middot;
+        [Threshold Operator](#threshold-operator) &middot;
+        [Execution Probabilities](#execution-probabilities) &middot;
+        [Time & Durations](#time-durations) &middot;
+        [Variables](#variables) &middot;
+        [Arrays](#arrays) &middot;
+        [Functions](#functions)
+
+      .row: .col-lg-9.col-xl-7
+
+        +h(3, 'Infix Logical Operators')
+
+        +snippet.
+          // One of two keys
+          pk(A) || pk(B)
+
+        +snippet.
+          // Traditional preimage-based HTLC
+          (pk(A) && sha256(H)) || (pk(B) && older(10))
+
+        :markdown-it Supports >2 branches by compiling to `thresh(N, ...)` or `thresh(1, ...)`.
+
+        +snippet.
+          // All of four keys
+          pk(A) && pk(B) && pk(C) && pk(C)
+
+        +h(3, 'Threshold Operator')
+        +snippet.
+          // 2-of-3 escrow contract
+          2 of [ pk(buyer), pk(seller), pk(arbiter) ]
+
+        +h(3, 'Execution Probabilities')
+
+        :markdown-it
+          You can indicate which of the `or` branches is more likely to be executed with `@`.
+          Miniscript uses this information to optimize for lower spending costs.
+        +snippet.
+          // One of two keys, A 10x more likely than B
+          10@pk(A) || pk(B)
+
+        :markdown-it You may use the `likely` keyword as an alias for `10`.
+        +snippet.
+          likely@pk(A) || pk(B)
+
+        :markdown-it Probabilities are only supported with two branches, but you can do something like:
+        +snippet.
+          // One of four keys, A more likely
+          likely@pk(A) || (pk(B) || pk(C) || pk(C))
+
+        :markdown-it Can alternatively be used as functions: `likely(policy)` and `prob(n, policy)`.
+
+        +h(3, 'Time & Durations')
+
+        :markdown-it `after()` accepts dates formatted as `YYYY-MM-DD`, optionally with `HH:MM`.
+        +snippet.
+          // Lock some coins until 2030
+          pk(A) && after(2030-01-01)
+
+        :markdown-it `older()` accepts time durations with years, months, weeks, days, hours, minutes and seconds.
+        +snippet.
+          // A user and a 2FA service need to sign off, but after 90 days the user alone is enough
+          pk(user_pk) && (9@pk(service_pk) || older(90 days))
+
+        +snippet.
+          // A 3-of-3 that turns into 2-of-3 after a timeout
+          3 of [ pk(A), pk(B), pk(C), older(1 month 2 weeks) ]
+
+        :markdown-it The `heightwise` keyword can be used to produce block-height-wise durations.
+        +snippet.
+          // Lock some coins for 6 blocks (approx 1 hour)
+          pk(A) && older(heightwise 1 hour)
+
+        :markdown-it
+          The `blocks` keyword can optionally be specified for block count durations.
+          This typically simply compiles to the number, but also verifies that it is within the allowed range and may be more readable.
+        +snippet.
+          // Fails compilation, BIP 68 only supports up to 65535 blocks
+          pk(A) && older(65536 blocks)
+
+          // older(65536) compiles, but doesn't work as can be expected!
+          // 🛑 🦶 🔫
+
+        .note: :markdown-it Note that time durations are encoded in granularity of 512 seconds and are rounded up (i.e. 513 seconds becomes 1024 seconds).
+
+        +h(3, 'Variables')
+
+        +snippet.
+          // Traditional preimage-based HTLC
+
+          $redeem = pk(A) && sha256(H);
+          $refund = pk(B) && older(10);
+
+          likely@$redeem || $refund
+
+        +snippet.
+          // Liquid-like federated pegin, with emergency recovery keys
+
+          $federation = 4 of [ pk(A), pk(B), pk(C), pk(D), pk(E) ];
+          $recovery = 2 of [ pk(F), pk(G), pk(H) ];
+          $timeout = older(heightwise 3 months);
+
+          likely@$federation || ($timeout && $recovery)
+
+        .note: :markdown-it(html)
+          Variables are immutable, but can be shadowed over in inner scopes.<br>
+          Scoping is currently dynamic, expected to eventually be replaced with lexical scoping.
+        //- There's an optional explicit `let` keyword that you may use.<br>
+        //- The #[code $] variable prefix is optional, but without it unknown variable names will pass through to miniscript instead of erroring.
+
+        +h(3, 'Arrays')
+
+        +snippet.
+          // One of two keys
+          $keys = [ pk(A), pk(B) ];
+          $keys.0 || $keys.1
+
+        //-:markdown-it `thresh(N, $arr)` expands the array into multiple arguments.
+        //-+snippet.
+          $keys = [ pk(A), pk(B) ];
+          thresh(2, $keys) // thresh(2, $keys.0, $keys.1)
+
+        :markdown-it `any($arr)` can be used to require that one of the subpolicies is met.
+        +snippet.
+          // The CEO plus any of the directors are needed to sign off
+          $directors = [ pk(A), pk(B), pk(C) ];
+          pk(ceo) && any($directors) // thresh(1, $directors)
+
+        :markdown-it `all($arr)` can be used to require that all of the subpolicies are met.
+        +snippet.
+          // The CEO or all of the directors are needed to sign off
+          $directors = [ pk(A), pk(B), pk(C) ];
+          pk(ceo) || all($directors) // thresh(3, $directors)
+
+        :markdown-it The last example could alternatively be written as `pk(ceo) || $directors`.
+
+        +h(3, 'Functions')
+
+        +snippet.
+          // The BOLT #3 received HTLC policy
+          fn bolt3_htlc_received($revoke_pk, $local_pk, $remote_pk, $secret, $delay) {
+            $success = pk($local_pk) && hash160($secret);
+            $timeout = older($delay);
+
+            pk($revoke_pk) || (pk($remote_pk) && ($success || $timeout))
+          }
+
+          bolt3_htlc_received(A, B, C, H, 2 hours)
+
+        +snippet.
+          // Two factor authentication with a timeout recovery clause
+          fn two_factor($user, $provider, $delay) = 
+            $user && (likely@$provider || older($delay));
+
+          // 2FA where the user has a 2-of-2 setup and the service provider is a 3-of-4 federation
+
+          $user = pk(user_desktop) && pk(user_mobile);
+          $providers = [ pk(P1), pk(P2), pk(P3), pk(P4) ];
+
+          two_factor($user, 3 of $providers, 4 months)
+
+        :markdown-it If you prefer to start with the high-level policy description first and then delve into the details, you can declare a `main()` function like so:
+        +snippet.
+          // Revault multi-party vault (github.com/re-vault)
+
+          fn main() = $managers && (likely($timeout && $cosigners) || $non_managers);
+
+          $timeout = older(100 blocks);
+          $managers = [ pk(A), pk(B), pk(C) ];
+          $non_managers = [ pk(D), pk(E), pk(F), pk(G) ];
+          $cosigners = [ pk(H), pk(I), pk(J), pk(K) ];
+
+          // main() is implicitly returned
+
+        p Functions are first-class and can be of higher order (accept function arguments and return them).
+        +snippet.
+          // Traditional preimage-based HTLC, with a configurable hash function
+          fn htlc($redeem_pk, $refund_pk, $hash, $expiry, $hash_fn) {
+              $redeem = pk($redeem_pk) && $hash_fn($hash);
+              $refund = pk($refund_pk) && older($expiry);
+              9@$redeem || $refund
+          }
+
+          htlc(A, B, H, 10 blocks, sha256)
+
+        +snippet.
+          // Stuckless payments
+          // See https://lists.linuxfoundation.org/pipermail/lightning-dev/2019-September/002152.html
+
+          // The same HTLC function from the previous snippet (just more compact)
+          fn htlc($redeem_pk, $refund_pk, $hash, $expiry, $hash_fn) = 9@(pk($redeem_pk) && $hash_fn($hash)) || (pk($refund_pk) && older($expiry));
+
+          // Stuckless HTLC, implemented using htlc() with a custom hash function
+          fn stuckless_hash($h) = hash160($h.0) && hash160($h.1);
+          htlc(A, B, [ H1, H2 ], 6 hours, stuckless_hash)
+
+        //-.note: :markdown-it The final expression within the function is the return value. There's an optional explicit `return` keyword that you may use.
+
+  footer.container.border-top.border-secondary.my-4.pt-2
+    :markdown-it
+      by [@shesek](https://twitter.com/shesek) &middot;
+      cypherpunks write code.
+
+      [bc1q43zm3sdeuehzvpskt2m0gy96pwe7mldxh9d9ta](https://blockstream.info/address/bc1q43zm3sdeuehzvpskt2m0gy96pwe7mldxh9d9ta)
+
+    script.
+      (function(u, _paq) {
+        _paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);_paq.push(['setTrackerUrl', u+'t']);_paq.push(['setSiteId', '1']);
+        var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];g.type='text/javascript'; g.async=true; g.src=u+'j'; s.parentNode.insertBefore(g,s);
+      })("//s.min.sc/", window._paq=[]);
+    noscript: img(src='//s.min.sc/t?idsite=1&rec=1', style='border:0;', alt='')
+
+  script(src='index.js')

@@ -1,3 +1,6 @@
 node_modules
 dist
 pkg
+www/style.css
+www/index.html
+gh-pages
