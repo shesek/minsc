@@ -17,6 +17,7 @@ export function findErrorLines (code, errMessage) {
   if (!m) return null
 
   let [ , start_pos, end_pos ] = m.map(Number)
+  if (start_pos >= code.length) start_pos = code.length-1
   if (!end_pos) end_pos = start_pos+1
   const LoC = code.split('\n'), lines = []
 
@@ -24,7 +25,7 @@ export function findErrorLines (code, errMessage) {
   for (; pos <= start_pos; line_start=pos, pos+=LoC.shift().length+1, line++);
   const from = { line: line-1, ch: start_pos - line_start };
 
-  for (; pos <= end_pos; line_start=pos, pos += LoC.shift().length+1, line++);
+  for (; pos <= end_pos && LoC.length; line_start=pos, pos += LoC.shift().length+1, line++);
   const to = { line: line-1, ch: end_pos - line_start };
 
   return { from, to }

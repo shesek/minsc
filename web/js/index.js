@@ -54,12 +54,15 @@ function update(source) {
   if (code) worker.postMessage(code)
   else error_el.style.display = 'none'
 
-  if (source != 'init') stat[source]()
+  if (source != 'init') evt[source]()
 }
 
-const stat = source => _ => _paq.push(['trackEvent', 'compile', source, ''])
-stat.try = stat('try')
-stat.edit = debounce(stat('edit'), 10000)
+const evt = source => _ => {
+  _paq.push(['setCustomUrl', location.href])
+  _paq.push(['trackEvent', 'compile', source, ''])
+}
+evt.try = evt('try')
+evt.edit = debounce(evt('edit'), 10000)
 
 let error_marker
 function clearErrorMark() {
@@ -130,7 +133,9 @@ const editor = CodeMirror(document.querySelector('#editor'), {
   value: initial_code,
 })
 
-editor.on('change', debounce(_ => update('edit'), 200))
+editor.on('change', debounce((_, c) =>
+  c.origin != 'setValue' && update('edit')
+, 200))
 update('init')
 
 // Setup the 3 compile output editors (read only)
