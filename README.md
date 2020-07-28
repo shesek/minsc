@@ -1,3 +1,9 @@
+[![Build Status](https://travis-ci.org/shesek/minsc.svg?branch=master)](https://travis-ci.org/shesek/minsc)
+[![crates.io](https://img.shields.io/crates/v/minsc.svg)](https://crates.io/crates/minsc)
+[![npm](https://img.shields.io/npm/v/minsc.svg?color=blue)](https://www.npmjs.com/package/minsc)
+[![MIT license](https://img.shields.io/github/license/shesek/minsc.svg?color=yellow)](https://github.com/shesek/minsc/blob/master/LICENSE)
+![Pull Requests Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
 # Minsc
 
 ### A Miniscript-based scripting language for Bitcoin contracts

@@ -1,0 +1,14 @@
+language: rust
+rust:
+  - stable
+  - nightly
+cache: cargo
+before_script:
+  - rustup component add rustfmt
+  - rustup component add clippy
+script:
+  - cargo fmt -- --check
+  - cargo check
+  - ./scripts/check.sh
+  - cargo clippy --all-targets --all-features
+  - ./test/tests.sh
