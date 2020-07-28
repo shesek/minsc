@@ -203,6 +203,7 @@ pub mod fns {
     pub fn prob(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidProbArguments);
         let prob_n = match args.remove(0) {
+            #[allow(clippy::fn_address_comparisons)] // should be safe in this case
             // support the `likely@X` syntax as an alternative to the `likely(X)` function invocation
             Value::Function(Function::Native(f)) if f.body == fns::likely => LIKELY_PROB,
             v => v.into_usize()?,

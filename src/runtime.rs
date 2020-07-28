@@ -140,7 +140,7 @@ impl Evaluate for ast::ArrayAccess {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let elements = match self.array.eval(scope)? {
             Value::Array(Array(elements)) => Ok(elements),
-            v => Err(Error::NotArray(v.clone())),
+            v => Err(Error::NotArray(v)),
         }?;
         let index = self.index.eval(scope)?.into_usize()?;
         elements

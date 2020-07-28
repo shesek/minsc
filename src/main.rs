@@ -3,7 +3,7 @@ use std::{env, fs, io};
 
 fn main() -> Result<()> {
     let mut args = env::args();
-    let input = args.nth(1).unwrap_or("-".into());
+    let input = args.nth(1).unwrap_or_else(|| "-".into());
     let print_ast = args.nth(2) == Some("--ast".into());
 
     let mut reader: Box<dyn io::Read> = match &*input {

@@ -26,6 +26,8 @@ impl<'a> Scope<'a> {
 
     pub fn set<T: Into<Ident>>(&mut self, key: T, value: Value) -> Result<()> {
         let key = key.into();
+
+        #[allow(clippy::map_entry)]
         if self.local.contains_key(&key) {
             // cannot be set if already exists in this scope, but could shadow over a definition from a parent scope
             Err(Error::AssignedVariableExists(key))

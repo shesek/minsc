@@ -1,7 +1,10 @@
 #[macro_use]
 extern crate lalrpop_util;
 
-lalrpop_mod!(grammar);
+lalrpop_mod!(
+    #[allow(clippy::all)]
+    grammar
+);
 
 #[macro_use]
 mod macros;
