@@ -20,7 +20,7 @@ pk(A) || pk(B)
 (pk(A) && sha256(H)) || (pk(B) && older(10))
 </code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><p>Supports &gt;2 branches by compiling to <code>thresh(N, ...)</code> or <code>thresh(1, ...)</code>.</p>
 <div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// All of four keys
-pk(A) && pk(B) && pk(C) && pk(C)
+pk(A) && pk(B) && pk(C) && pk(D)
 </code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><h3 id="threshold-operator"><a class="anchor" href="#threshold-operator"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Threshold Operator</span></h3><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// 2-of-3 escrow contract
 2 of [ pk(buyer), pk(seller), pk(arbiter) ]
 </code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><h3 id="execution-probabilities"><a class="anchor" href="#execution-probabilities"><svg class="bi icon-link-45deg" fill="currentColor" style="height:1em;width:1em;"><use xlink:href="icons.svg#link-45deg"></use></svg></a><span class="ttl">Execution Probabilities</span></h3><p>You can indicate which of the <code>or</code> branches is more likely to be executed with <code>@</code>.
