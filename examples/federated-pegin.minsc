@@ -2,6 +2,6 @@
 
 $federation = 4 of [ pk(A), pk(B), pk(C), pk(D), pk(E) ];
 $recovery = 2 of [ pk(F), pk(G), pk(H) ];
-$delay = heightwise 3 months;
+$timeout = older(heightwise 3 months);
 
-9@$federation || ($recovery && older($delay))
+likely@$federation || ($timeout && $recovery)

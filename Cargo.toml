@@ -1,13 +1,13 @@
 [package]
 name = "minsc"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Nadav Ivgi <nadav@shesek.info>"]
 edition = "2018"
 include = [ "src", "build.rs", "LICENSE" ]
 
-description = "A compile-to-Miniscript language for writing Bitcoin scripts"
+description = " A Miniscript-based high-level scripting language for Bitcoin contracts"
 repository = "https://github.com/shesek/minsc"
-homepage = "https://github.com/shesek/minsc"
+homepage = "https://min.sc/"
 license = "MIT"
 readme = "README.md"
 

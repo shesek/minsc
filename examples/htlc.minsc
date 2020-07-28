@@ -1,6 +1,6 @@
 // Traditional preimage-based HTLC
 
 $redeem = pk(A) && sha256(H);
-$refund = pk(B) && older(6 blocks);
+$refund = pk(B) && older(10);
 
-9@$redeem || $refund
+likely@$redeem || $refund
