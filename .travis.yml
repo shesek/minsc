@@ -1,7 +1,7 @@
 language: rust
 rust:
   - stable
-  - nightly
+  # - nightly
 cache: cargo
 before_script:
   - rustup component add rustfmt
@@ -9,6 +9,5 @@ before_script:
 script:
   - cargo fmt -- --check
   - cargo check
-  - ./scripts/check.sh
   - cargo clippy --all-targets --all-features
-  - ./test/tests.sh
+  - cargo test
