@@ -1,6 +1,6 @@
 [package]
 name = "minsc"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Nadav Ivgi <nadav@shesek.info>"]
 edition = "2018"
 include = [ "src", "build.rs", "LICENSE" ]
