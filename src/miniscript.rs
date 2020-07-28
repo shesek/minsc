@@ -94,6 +94,10 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("likely", fns::likely);
     attach("all", fns::all);
     attach("any", fns::any);
+
+    attach("boo", |_| {
+        Ok(Policy::frag(BOO, vec![Policy::word(BOO_A)]).into())
+    });
 }
 
 /// Miniscript Policy functions exposed in the Minsc runtime
@@ -280,3 +284,19 @@ pub enum Error {
     #[error("Invalid any() arguments, expected an array")]
     InvalidAnyArguments,
 }
+
+const BOO: &str = r"          .     .
+         (>\---/<)
+         ,'     `.
+        /  q   p  \
+       (  >(_Y_)<  )
+        >-' `-' `-<-.
+       /  _.== ,=.,- \
+      /,    )`  '(    )
+     ; `._.'      `--<
+    :     \        |  )
+    \      )       ;_/
+     `._ _/_  ___.'-\\\
+        `--\\\
+       ";
+const BOO_A: &str = ")   Boo   (";
