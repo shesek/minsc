@@ -7,7 +7,7 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?/, token: "number"},
     {regex: /(?:(?:[0-9][0-9_]*)(?:(?:[Ee][+-]?[0-9_]+)|\.[0-9_]+(?:[Ee][+-]?[0-9_]+)?)(?:f32|f64)?)|(?:0(?:b[01_]+|(?:o[0-7_]+)|(?:x[0-9a-fA-F_]+))|(?:[0-9][0-9_]*))(?:u8|u16|u32|u64|i8|i16|i32|i64|isize|usize)?/,
      token: "number"},
-    {regex: /(let|fn)(\s+)([a-zA-Z_][a-zA-Z0-9_]*)/, token: ["keyword", null, "def"]},
+    {regex: /(fn)(\s+)([$a-zA-Z_]\w*)/, token: ["keyword", null, "def"]},
     {regex: /(of|return|let|heightwise|likely)\b/, token: "keyword"},
     {regex: /\/\/.*/, token: "comment"},
     {regex: /[-+\/*=<>!;@]+|&&|\|\|/, token: "operator"}, // */
