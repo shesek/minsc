@@ -14,7 +14,7 @@ with additional features and syntactic sugar sprinkled on top, including variabl
 
 Documentation & live playground are available on the website: https://min.sc
 
-Support development: ⛓️ [bc1q43zm3sdeuehzvpskt2m0gy96pwe7mldxh9d9ta](https://blockstream.info/address/bc1q43zm3sdeuehzvpskt2m0gy96pwe7mldxh9d9ta) ⚡ [tippin.me](https://tippin.me/@shesek)
+Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpay.shesek.info/)
 
 ## Examples
 
