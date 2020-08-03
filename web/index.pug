@@ -177,7 +177,8 @@ body
           likely@$redeem || $refund
 
         +snippet.
-          // Liquid-like federated pegin, with emergency recovery keys
+          // Liquid-like federated pegin with emergency recovery keys
+          // Funds are normally held by a 4-of-5 federation, but can be recovered by the emergency backup keys after 3 months of inactivity
 
           $federation = 4 of [ pk(A), pk(B), pk(C), pk(D), pk(E) ];
           $recovery = 2 of [ pk(F), pk(G), pk(H) ];
