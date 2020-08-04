@@ -58,7 +58,8 @@ $redeem = pk(A) && sha256(H);
 $refund = pk(B) && older(10);
 
 likely@$redeem || $refund
-</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Liquid-like federated pegin, with emergency recovery keys
+</code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div><div class="snippet mb-3"><div class="card mb-1"><div class="card-body"><pre class="mb-0"><code>// Liquid-like federated pegin with emergency recovery keys
+// Funds are normally held by a 4-of-5 federation, but can be recovered by the emergency backup keys after 3 months of inactivity
 
 $federation = 4 of [ pk(A), pk(B), pk(C), pk(D), pk(E) ];
 $recovery = 2 of [ pk(F), pk(G), pk(H) ];
@@ -128,7 +129,7 @@ fn stuckless_hash($h) = hash160($h.0) && hash160($h.1);
 htlc(A, B, [ H1, H2 ], 6 hours, stuckless_hash)
 </code></pre></div></div><button class="btn btn-primary btn-sm">Try</button></div></div></div></div></div><footer class="container border-top border-secondary my-4 pt-2"><p>by <a href="https://twitter.com/shesek">@shesek</a> ·
 cypherpunks write code.</p>
-<p><a href="https://btcpay.shesek.info/">tip – <em>⛓️</em> on-chain or <em>⚡</em> lightning</a></p>
+<p><a href="https://btcpay.shesek.info/">tip  <em>⛓️</em> on-chain or <em>⚡</em> lightning</a></p>
 <script>(function(u, _paq) {
   _paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);_paq.push(['setTrackerUrl', u+'t']);_paq.push(['setSiteId', '1']);
   var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];g.type='text/javascript'; g.async=true; g.src=u+'j'; s.parentNode.insertBefore(g,s);
