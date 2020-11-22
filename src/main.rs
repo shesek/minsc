@@ -17,7 +17,9 @@ fn main() -> Result<()> {
     if print_ast {
         println!("{:#?}", parse(&code)?);
     } else {
-        println!("{}", compile(&code)?);
+        let policy = compile(&code)?;
+        println!("{}", policy);
+        println!("{:#?}", policy);
     }
 
     Ok(())

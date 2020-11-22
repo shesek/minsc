@@ -18,9 +18,9 @@ impl<'a> Scope<'a> {
         scope
     }
 
-    pub fn get<T: AsRef<str>>(&self, key: T) -> Option<&Value> {
+    pub fn get(&self, key: &Ident) -> Option<&Value> {
         self.local
-            .get(key.as_ref())
+            .get(key.into())
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 

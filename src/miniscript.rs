@@ -77,7 +77,7 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidOlderArguments);
         let locktime = match args.remove(0) {
             Value::Duration(dur) => duration_to_seq(&dur.0)?,
-            // XXX Value::Policy(policy) if policy.is_u32() => policy.into_usize(),
+            Value::Number(num) => num as u32,
             _ => bail!(Error::InvalidOlderArguments),
         };
         Ok(Policy::Older(locktime).into())
@@ -87,7 +87,7 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidAfterArguments);
         let locktime = match args.remove(0) {
             Value::DateTime(datetime) => parse_datetime(&datetime.0)?,
-            // XXX Value::Policy(policy) if policy.is_u32() => policy.into_usize(),
+            Value::Number(num) => num as u32,
             _ => bail!(Error::InvalidAfterArguments),
         };
         Ok(Policy::After(locktime).into())

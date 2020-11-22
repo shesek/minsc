@@ -28,7 +28,8 @@ Expr: Expr = {
 };
 
 SimpleExpr: Expr = {
-  TermWord,
+  Number,
+  Ident,
   Call,
   Thresh,
   BlockExpr,
@@ -42,6 +43,13 @@ SimpleExpr: Expr = {
   Paren<SimpleExpr>,
 };
 
+SExpr: Expr = {
+  Number,
+  Ident,
+  Call,
+  BlockExpr,
+};
+
 Return: Expr = {
   Expr, // the preferred form
   "return" <Expr> ";"?,
@@ -49,45 +57,48 @@ Return: Expr = {
 
 // Expressions
 
-Ident: String = <s:r"[\w$]+"> => (<>).to_owned();
+Number: Expr = <s:r"\d+"> => ast::Expr::Number(<>.parse().unwrap()).into();
 
-TermWord: Expr = Ident => ast::TermWord(<>.into()).into();
+IdentTerm: ast::Ident = <s:r"[a-zA-Z_$][\w$]{0,34}"> => ast::Ident(<>.into());
+Ident: Expr = IdentTerm => <>.into();
 
-Call: Expr = <ident:Ident> "(" <args:List0<Expr, ",">> ")" =>
+//StrFrag: Expr = <s:r""> => ast::StrFrag(<>.into()).into();
+
+Call: Expr = <ident:IdentTerm> "(" <args:List0<Expr, ",">> ")" =>
     ast::Call { ident, args }.into();
 
 And: Expr = <List2<SimpleExpr, "&&">> => ast::And(<>).into();
 Or: Expr = <List2<SimpleExpr, "||">> => ast::Or(<>).into();
 
-Thresh: Expr = <thresh:TermWord> "of" <policies:SimpleExpr> =>
+Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
   ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
-WithProb: Expr = <prob:TermWord> "@" <expr:SimpleExpr> =>
+WithProb: Expr = <prob:SExpr> "@" <expr:SimpleExpr> =>
     ast::WithProb { prob: prob.into(), expr: expr.into() }.into();
 
 Array: Expr = "[" <List0<Expr, ",">> "]" =>
   ast::Array(<>).into();
 
-ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:TermWord> =>
+ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:Number> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
 
 // TODO support all Paren<Expr>
-ArrayAccessLHS = { TermWord, Call, Array, BlockExpr };
+ArrayAccessLHS = { Ident, Call, Array, BlockExpr };
 
 // Statements
 
 Assign: Stmt = "let"? <assigns:List1<Assignment, ",">> ";" =>
     ast::Assign(assigns).into();
 
-Assignment: ast::Assignment = <lhs:Ident> "=" <rhs:Expr> =>
+Assignment: ast::Assignment = <lhs:IdentTerm> "=" <rhs:Expr> =>
     ast::Assignment { lhs, rhs };
 
 FnDef: Stmt = {
-    "fn" <ident:Ident> "(" <signature:List0<Ident, ",">> ")" "=" <body:Expr> ";" =>
+    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "=" <body:Expr> ";" =>
         ast::FnDef { ident, signature, body }.into(),
-    "fn" <ident:Ident> "(" <signature:List0<Ident, ",">> ")" "{" <body:Block> "}" ";"? =>
+    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "{" <body:Block> "}" ";"? =>
         ast::FnDef { ident, signature, body }.into(),
 }
 

@@ -1,5 +1,3 @@
-pub type Ident = String;
-
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -8,7 +6,7 @@ pub enum Expr {
     Or(Or),
     And(And),
     Thresh(Thresh),
-    TermWord(TermWord),
+    Ident(Ident),
     WithProb(WithProb),
     Array(Array),
     ArrayAccess(ArrayAccess),
@@ -60,9 +58,15 @@ pub struct Thresh {
 impl_from_variant!(Thresh, Expr);
 
 /// A terminal word expression. This can either be a variable name or a plain value passed-through to miniscript.
-#[derive(Debug, Clone)]
-pub struct TermWord(pub String);
-impl_from_variant!(TermWord, Expr);
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct Ident(pub String);
+impl_from_variant!(Ident, Expr);
+display_like_debug!(Ident);
+impl From<&str> for Ident {
+    fn from(s: &str) -> Self {
+        Ident(s.into())
+    }
+}
 
 /// An expression with a probability. Valid as an argument to or().
 #[derive(Debug, Clone)]

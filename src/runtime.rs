@@ -96,32 +96,30 @@ impl Evaluate for ast::And {
 fn eval_andor(name: &str, thresh_n: usize, policies: &[Expr], scope: &Scope) -> Result<Value> {
     if policies.len() == 2 {
         // delegate to or()/and() when there are exactly 2 subpolicies
-        call(scope, name, policies)
+        call(scope, &name.into(), policies)
     } else {
         // delegate to thresh() when there are more
-        let thresh_n = ast::TermWord(thresh_n.to_string()).into();
+        let thresh_n = ast::Expr::Number(thresh_n).into();
         let mut args = vec![&thresh_n];
         args.extend(policies);
-        call(scope, "thresh", &args)
+        call(scope, &"thresh".into(), &args)
     }
 }
 
 impl Evaluate for ast::Thresh {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call(scope, "thresh", &[&*self.thresh, &*self.policies])
+        call(scope, &"thresh".into(), &[&*self.thresh, &*self.policies])
     }
 }
 
-impl Evaluate for ast::TermWord {
+impl Evaluate for ast::Ident {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        Ok(match scope.get(&self.0) {
+        Ok(match scope.get(&self) {
             Some(binding) => binding.clone(),
-            // FIXME None if !self.0.starts_with('$') => Policy::word(&self.0).into(),
-            None => bail!(Error::VarNotFound(self.0.clone())),
+            None => bail!(Error::VarNotFound(self.clone())),
         })
     }
 }
-
 impl Evaluate for ast::Array {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let elements = eval_exprs(scope, &self.0)?;
@@ -157,7 +155,7 @@ impl Evaluate for ast::ArrayAccess {
 
 impl Evaluate for ast::WithProb {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call(scope, "prob", &[&*self.prob, &*self.expr])
+        call(scope, &"prob".into(), &[&*self.prob, &*self.expr])
     }
 }
 
@@ -171,7 +169,7 @@ impl Evaluate for ast::Block {
             // The return value is the final expression within the function body,
             // optionally prefixed with the `return` keyword
             return_value.eval(&scope)
-        } else if let Some(Value::Function(func)) = scope.get("main") {
+        } else if let Some(Value::Function(func)) = scope.get(&"main".into()) {
             // The return value is the evaluation of main()
             func.call(vec![], &scope)
         } else {
@@ -183,12 +181,12 @@ impl Evaluate for ast::Block {
 impl Evaluate for Expr {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         match self {
+            Expr::Ident(x) => x.eval(scope),
             Expr::Call(x) => x.eval(scope),
             Expr::Or(x) => x.eval(scope),
             Expr::And(x) => x.eval(scope),
             Expr::Thresh(x) => x.eval(scope),
             Expr::Block(x) => x.eval(scope),
-            Expr::TermWord(x) => x.eval(scope),
             Expr::WithProb(x) => x.eval(scope),
             Expr::Array(x) => x.eval(scope),
             Expr::ArrayAccess(x) => x.eval(scope),
@@ -201,10 +199,10 @@ impl Evaluate for Expr {
 }
 
 /// Call the function with the given expressions evaluated into values
-fn call<T: Borrow<Expr>>(scope: &Scope, ident: &str, exprs: &[T]) -> Result<Value> {
+fn call<T: Borrow<Expr>>(scope: &Scope, ident: &ast::Ident, exprs: &[T]) -> Result<Value> {
     let func = scope
         .get(ident)
-        .ok_or_else(|| Error::FnNotFound(ident.into()))?;
+        .ok_or_else(|| Error::FnNotFound(ident.clone()))?;
 
     let args = eval_exprs(scope, exprs)?;
 
