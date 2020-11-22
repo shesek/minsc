@@ -5,10 +5,9 @@ use miniscript::bitcoin::hashes::{self, hex::FromHex, Hash};
 use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
-use crate::error::{Error, Result};
+use crate::builtins::fns;
 use crate::function::{Call, Function};
-use crate::miniscript::{fns, Policy};
-use crate::scope::Scope;
+use crate::{Error, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.

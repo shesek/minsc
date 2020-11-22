@@ -1,21 +1,19 @@
 use std::convert::TryInto;
 
-use miniscript::{descriptor, policy};
-
-use crate::error::Result;
 use crate::function::{Function, NativeFunction};
 use crate::runtime::{Array, Value};
-use crate::scope::Scope;
 use crate::time::{duration_to_seq, parse_datetime};
+use crate::{Policy, Result, Scope};
 
-pub type Policy = policy::concrete::Policy<descriptor::DescriptorPublicKey>;
-
+/// Attach built-in functions to the Minsc runtime envirnoment
 pub fn attach_builtins(scope: &mut Scope) {
     let mut attach = |ident, body| {
         let func = Function::from(NativeFunction { body });
         scope.set(ident, func.into()).unwrap();
     };
 
+    // Miniscript Policy functions exposed in the Minsc runtime
+    // Representation for functions natively available in the Miniscript Policy language
     attach("or", fns::or);
     attach("and", fns::and);
     attach("thresh", fns::thresh);
@@ -27,23 +25,16 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("ripemd160", fns::ripemd160);
     attach("hash160", fns::hash160);
 
+    // Minsc-only functions
     attach("prob", fns::prob);
     attach("likely", fns::likely);
     attach("all", fns::all);
     attach("any", fns::any);
-
-    /* FIXME attach("boo", |_| {
-        Ok(Policy::frag(BOO, vec![Policy::word(BOO_A)]).into())
-    });*/
 }
 
-/// Miniscript Policy functions exposed in the Minsc runtime
 pub mod fns {
     use super::*;
-
     const LIKELY_PROB: usize = 10;
-
-    // Representation for functions natively available in the Miniscript Policy language
 
     pub fn or(args: Vec<Value>) -> Result<Value> {
         let policies_with_probs = args
@@ -128,10 +119,7 @@ pub mod fns {
         Ok(Policy::Sha256(args.remove(0).try_into()?).into())
     }
 
-    // Below are functions not natively available in Miniscript
-    // TODO move this elsewhere
-
-    // A 'virtual' function to create probabilistic expressions, `prob(A, B)` -> `A@B`
+    // `prob(A, B)` -> `A@B`
     pub fn prob(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidProbArguments);
         let prob_n = match args.remove(0) {
@@ -183,10 +171,10 @@ fn get_elements(val: Value) -> Vec<Value> {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Invalid or() arguments, expected two policy fragments with optional probabilities")]
+    #[error("Invalid or() arguments, expected policy fragments with optional probabilities")]
     InvalidOrArguments,
 
-    #[error("Invalid and() arguments, expected two policy fragments without probabilities")]
+    #[error("Invalid and() arguments, expected policy fragments without probabilities")]
     InvalidAndArguments,
 
     #[error("Invalid thresh() arguments, expected a threshold number and a variable number of policy fragments (without probabilities)")]
@@ -201,31 +189,15 @@ pub enum Error {
     #[error("Invalid after() arguments, expected 1 argument with a number or datetime")]
     InvalidAfterArguments,
 
-    #[error("Invalid pk() arguments, expected a named identifier")]
+    #[error("Invalid pk() arguments")]
     InvalidPkArguments,
 
-    #[error("Invalid {0}() arguments, expected a named identifier")]
+    #[error("Invalid {0}() arguments")]
     InvalidHashArguments(String),
 
-    #[error("Invalid all() arguments, expected an array")]
+    #[error("Invalid all() arguments")]
     InvalidAllArguments,
 
-    #[error("Invalid any() arguments, expected an array")]
+    #[error("Invalid any() arguments")]
     InvalidAnyArguments,
 }
-
-const BOO: &str = r"          .     .
-         (>\---/<)
-         ,'     `.
-        /  q   p  \
-       (  >(_Y_)<  )
-        >-' `-' `-<-.
-       /  _.== ,=.,- \
-      /,    )`  '(    )
-     ; `._.'      `--<
-    :     \        |  )
-    \      )       ;_/
-     `._ _/_  ___.'-\\\
-        `--\\\
-       ";
-const BOO_A: &str = ")   Boo   (";

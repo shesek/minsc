@@ -9,9 +9,9 @@ lalrpop_mod!(
 #[macro_use]
 mod macros;
 pub mod ast;
+pub mod builtins;
 pub mod error;
 pub mod function;
-pub mod miniscript;
 pub mod runtime;
 pub mod scope;
 pub mod time;
@@ -20,11 +20,13 @@ pub mod util;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
-pub use crate::miniscript::Policy;
 pub use ast::{Expr, Ident};
 pub use error::{Error, Result};
 pub use runtime::{Evaluate, Value};
 pub use scope::Scope;
+
+pub use miniscript::{descriptor, policy};
+pub type Policy = policy::concrete::Policy<descriptor::DescriptorPublicKey>;
 
 pub fn parse(s: &str) -> Result<Expr> {
     let parser = grammar::ProgramParser::new();

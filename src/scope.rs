@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::ast::Ident;
+use crate::builtins::attach_builtins;
 use crate::error::{Error, Result};
-use crate::miniscript::attach_builtins;
 use crate::runtime::Value;
 
 #[derive(Default, Debug)]
