@@ -12,6 +12,7 @@ pub enum Expr {
     WithProb(WithProb),
     Array(Array),
     ArrayAccess(ArrayAccess),
+    Number(usize),
     Duration(Duration),
     DateTime(DateTime),
 }
@@ -82,6 +83,8 @@ pub struct ArrayAccess {
     pub index: Box<Expr>,
 }
 impl_from_variant!(ArrayAccess, Expr);
+
+impl_from_variant!(usize, Expr, Number);
 
 // Duration (relative block height or time)
 #[derive(Debug, Clone)]

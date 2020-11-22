@@ -17,9 +17,9 @@ pub mod scope;
 pub mod time;
 pub mod util;
 
+pub use crate::miniscript::Policy;
 pub use ast::{Expr, Ident};
 pub use error::{Error, Result};
-pub use miniscript::Policy;
 pub use runtime::{Evaluate, Value};
 pub use scope::Scope;
 
@@ -33,9 +33,7 @@ pub fn run(expr: Expr) -> Result<Value> {
 }
 
 pub fn compile(s: &str) -> Result<Policy> {
-    let policy = run(parse(s)?)?.into_policy()?;
-    ensure!(policy.is_frag(), Error::InvalidTopLevel);
-    Ok(policy)
+    run(parse(s)?)?.into_policy()
 }
 
 // WASM

@@ -1,6 +1,8 @@
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
+use miniscript::bitcoin::hashes;
+
 use crate::ast::{self, Expr, Stmt};
 use crate::error::{Error, Result};
 use crate::function::{Call, Function};
@@ -14,13 +16,16 @@ pub enum Value {
     Policy(Policy),
     Function(Function),
     Array(Array),
+    Number(usize),
     Duration(Duration),
     DateTime(DateTime),
+    WithProb(usize, Policy),
 }
 
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
+impl_from_variant!(usize, Value, Number);
 impl_from_variant!(Duration, Value);
 impl_from_variant!(DateTime, Value);
 
@@ -111,7 +116,7 @@ impl Evaluate for ast::TermWord {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         Ok(match scope.get(&self.0) {
             Some(binding) => binding.clone(),
-            None if !self.0.starts_with('$') => Policy::word(&self.0).into(),
+            // FIXME None if !self.0.starts_with('$') => Policy::word(&self.0).into(),
             None => bail!(Error::VarNotFound(self.0.clone())),
         })
     }
@@ -189,6 +194,8 @@ impl Evaluate for Expr {
             Expr::ArrayAccess(x) => x.eval(scope),
             Expr::Duration(x) => x.eval(scope),
             Expr::DateTime(x) => x.eval(scope),
+
+            Expr::Number(n) => Ok(Value::Number(*n)),
         }
     }
 }
@@ -223,13 +230,46 @@ impl TryFrom<Value> for Policy {
 impl TryFrom<Value> for usize {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        match &value {
-            Value::Policy(Policy::TermWord(n)) => {
-                n.parse().map_err(|_| Error::NotNumber(value.clone()))
-            }
+        match value {
+            Value::Number(n) => Ok(n),
             v => Err(Error::NotNumber(v.clone())),
         }
-        // TODO add a real Value::Number type?
+    }
+}
+
+impl TryFrom<Value> for hashes::sha256::Hash {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        // FIXME
+        Ok(Default::default())
+    }
+}
+impl TryFrom<Value> for hashes::sha256d::Hash {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        // FIXME
+        Ok(Default::default())
+    }
+}
+impl TryFrom<Value> for hashes::ripemd160::Hash {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        // FIXME
+        Ok(Default::default())
+    }
+}
+impl TryFrom<Value> for hashes::hash160::Hash {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        // FIXME
+        Ok(Default::default())
+    }
+}
+impl TryFrom<Value> for miniscript::descriptor::DescriptorPublicKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        // FIXME
+        Ok("tpubD6NzVbkrYhZ4Ya1aR2od7JTGK6b44cwKhWzrvrTeTWFrzGokdAGHrZLK6BdYwpx9K7EoY38LzHva3SWwF8yRrXM9x9DQ3jCGKZKt1nQEz7n/1".parse()?)
     }
 }
 

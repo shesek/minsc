@@ -1,6 +1,8 @@
 use lalrpop_util::ParseError;
 use std::fmt;
 
+use ::miniscript::descriptor::DescriptorKeyParseError;
+
 use crate::ast::Ident;
 use crate::miniscript;
 use crate::runtime::Value;
@@ -66,8 +68,11 @@ pub enum Error {
     #[error("Parser error: {0}")]
     ParseError(String),
 
-    #[error("Invalid miniscript: {0}")]
-    InvalidMiniscript(miniscript::Error),
+    #[error("Miniscript error: {0}")]
+    MiniscriptError(crate::miniscript::Error),
+
+    #[error("Descriptor key parse error: {0}")]
+    DescriptorKeyParseError(DescriptorKeyParseError),
 
     #[error("IO error: {0:?}")]
     Io(std::io::Error),
@@ -84,6 +89,7 @@ where
     }
 }
 
-impl_from_variant!(miniscript::Error, Error, InvalidMiniscript);
+impl_from_variant!(crate::miniscript::Error, Error, MiniscriptError);
+impl_from_variant!(DescriptorKeyParseError, Error);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
