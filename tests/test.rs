@@ -1,8 +1,8 @@
 use minsc::compile;
 
 fn test(minsc: &str, expected_policy: &str) {
-    let policy = compile(minsc).unwrap().to_string();
-    assert_eq!(policy, expected_policy);
+    let policy = compile(&replace_dummy(minsc)).unwrap().to_string();
+    assert_eq!(policy, replace_dummy(expected_policy));
 }
 
 #[test]
@@ -14,7 +14,7 @@ fn test_policy_is_valid_minsc() {
 
 #[test]
 fn test_infix_or() {
-    test("pk(A) || pk(B)", "or(pk(A),pk(B))");
+    test("pk(A) || pk(B)", "or(1@pk(A),1@pk(B))");
     test("pk(A) || pk(B) || pk(C)", "thresh(1,pk(A),pk(B),pk(C))");
 }
 
@@ -26,10 +26,10 @@ fn test_infix_and() {
 
 #[test]
 fn test_probs() {
-    test("10@pk(A) || pk(B)", "or(10@pk(A),pk(B))");
-    test("likely@pk(A) || pk(B)", "or(10@pk(A),pk(B))");
-    test("prob(10, pk(A)) || pk(B)", "or(10@pk(A),pk(B))");
-    test("likely(pk(A)) || pk(B)", "or(10@pk(A),pk(B))");
+    test("10@pk(A) || pk(B)", "or(10@pk(A),1@pk(B))");
+    test("likely@pk(A) || pk(B)", "or(10@pk(A),1@pk(B))");
+    test("prob(10, pk(A)) || pk(B)", "or(10@pk(A),1@pk(B))");
+    test("likely(pk(A)) || pk(B)", "or(10@pk(A),1@pk(B))");
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn test_variables() {
 
         likely@$redeem || $refund
         ",
-        "or(10@and(pk(A),sha256(H)),and(pk(B),older(10)))",
+        "or(10@and(pk(A),sha256(H)),1@and(pk(B),older(10)))",
     );
 }
 
@@ -65,11 +65,38 @@ fn test_functions() {
         fn two_factor($user, $provider, $delay) = 
           $user && (likely@$provider || older($delay));
 
-        $user = pk(user_desktop) && pk(user_mobile);
-        $providers = [ pk(P1), pk(P2), pk(P3), pk(P4) ];
+        $user = pk(A) && pk(B);
+        $providers = [ pk(C), pk(D), pk(E) ];
 
-        two_factor($user, 3 of $providers, 4 months)
+        two_factor($user, 2 of $providers, 4 months)
         ",
-        "and(and(pk(user_desktop),pk(user_mobile)),or(10@thresh(3,pk(P1),pk(P2),pk(P3),pk(P4)),older(4214850)))",
+        "and(and(pk(A),pk(B)),or(10@thresh(2,pk(C),pk(D),pk(E)),1@older(4214850)))",
     );
+}
+
+fn replace_dummy(s: &str) -> String {
+    s.replace(
+        "A",
+        "0381e3019c5861c2e0bd33604ec5c3e37cbb67dbbd7fadf9567232a30acfde204c",
+    )
+    .replace(
+        "B",
+        "0399e3019c5861c2e0bd33604ec5c3e37cbb67dbbd7fadf9567232a30acfde204c",
+    )
+    .replace(
+        "C",
+        "0377e3019c5861c2e0bd33604ec5c3e37cbb67dbbd7fadf9567232a30acfde204c",
+    )
+    .replace(
+        "D",
+        "0366e3019c5861c2e0bd33604ec5c3e37cbb67dbbd7fadf9567232a30acfde204c",
+    )
+    .replace(
+        "E",
+        "0355e3019c5861c2e0bd33604ec5c3e37cbb67dbbd7fadf9567232a30acfde204c",
+    )
+    .replace(
+        "H",
+        "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    )
 }

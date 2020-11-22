@@ -1,6 +1,7 @@
 use lalrpop_util::ParseError;
 use std::fmt;
 
+use ::miniscript::bitcoin::hashes;
 use ::miniscript::descriptor::DescriptorKeyParseError;
 
 use crate::ast::Ident;
@@ -69,10 +70,13 @@ pub enum Error {
     ParseError(String),
 
     #[error("Miniscript error: {0}")]
-    MiniscriptError(crate::miniscript::Error),
+    MiniscriptError(miniscript::Error),
 
     #[error("Descriptor key parse error: {0}")]
     DescriptorKeyParseError(DescriptorKeyParseError),
+
+    #[error("Invalid hex: {0}")]
+    HexError(hashes::hex::Error),
 
     #[error("IO error: {0:?}")]
     Io(std::io::Error),
@@ -89,7 +93,8 @@ where
     }
 }
 
-impl_from_variant!(crate::miniscript::Error, Error, MiniscriptError);
+impl_from_variant!(miniscript::Error, Error, MiniscriptError);
 impl_from_variant!(DescriptorKeyParseError, Error);
+impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);

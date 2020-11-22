@@ -13,6 +13,7 @@ pub enum Expr {
     Number(usize),
     Duration(Duration),
     DateTime(DateTime),
+    MiniscriptStrFrag(MiniscriptStrFrag),
 }
 
 /// Statements have side-effects and don't produce a value
@@ -136,3 +137,8 @@ pub struct Assignment {
     pub lhs: Ident,
     pub rhs: Expr,
 }
+
+/// An opaque miniscript string fragment, passed through as-is to rust-miniscript. Used for keys and hashes.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct MiniscriptStrFrag(pub String);
+impl_from_variant!(MiniscriptStrFrag, Expr);

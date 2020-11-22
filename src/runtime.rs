@@ -20,6 +20,7 @@ pub enum Value {
     Duration(Duration),
     DateTime(DateTime),
     WithProb(usize, Policy),
+    MiniscriptStrFrag(String),
 }
 
 impl_from_variant!(Policy, Value);
@@ -193,6 +194,7 @@ impl Evaluate for Expr {
             Expr::Duration(x) => x.eval(scope),
             Expr::DateTime(x) => x.eval(scope),
 
+            Expr::MiniscriptStrFrag(x) => Ok(Value::MiniscriptStrFrag(x.0.clone())),
             Expr::Number(n) => Ok(Value::Number(*n)),
         }
     }
@@ -235,41 +237,24 @@ impl TryFrom<Value> for usize {
     }
 }
 
-impl TryFrom<Value> for hashes::sha256::Hash {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        // FIXME
-        Ok(Default::default())
-    }
+macro_rules! impl_miniscript_frag {
+    ($name:path) => {
+        impl TryFrom<Value> for $name {
+            type Error = Error;
+            fn try_from(value: Value) -> Result<Self> {
+                match value {
+                    Value::MiniscriptStrFrag(s) => Ok(s.parse()?),
+                    v => Err(Error::NotMiniscriptRepresentable(v)),
+                }
+            }
+        }
+    };
 }
-impl TryFrom<Value> for hashes::sha256d::Hash {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        // FIXME
-        Ok(Default::default())
-    }
-}
-impl TryFrom<Value> for hashes::ripemd160::Hash {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        // FIXME
-        Ok(Default::default())
-    }
-}
-impl TryFrom<Value> for hashes::hash160::Hash {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        // FIXME
-        Ok(Default::default())
-    }
-}
-impl TryFrom<Value> for miniscript::descriptor::DescriptorPublicKey {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        // FIXME
-        Ok("tpubD6NzVbkrYhZ4Ya1aR2od7JTGK6b44cwKhWzrvrTeTWFrzGokdAGHrZLK6BdYwpx9K7EoY38LzHva3SWwF8yRrXM9x9DQ3jCGKZKt1nQEz7n/1".parse()?)
-    }
-}
+impl_miniscript_frag!(hashes::sha256::Hash);
+impl_miniscript_frag!(hashes::sha256d::Hash);
+impl_miniscript_frag!(hashes::ripemd160::Hash);
+impl_miniscript_frag!(hashes::hash160::Hash);
+impl_miniscript_frag!(miniscript::descriptor::DescriptorPublicKey);
 
 impl Value {
     pub fn is_array(&self) -> bool {
