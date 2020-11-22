@@ -5,7 +5,6 @@ use ::miniscript::bitcoin::hashes;
 use ::miniscript::descriptor::DescriptorKeyParseError;
 
 use crate::ast::Ident;
-use crate::builtins;
 use crate::runtime::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -75,8 +74,11 @@ pub enum Error {
     #[error("Parser error: {0}")]
     ParseError(String),
 
-    #[error("{0}")]
-    ArgError(builtins::Error),
+    #[error("Invalid arguments")]
+    InvalidArguments,
+
+    #[error("in {0}(): {1}")]
+    CallError(Ident, Box<Error>),
 
     #[error("Descriptor key parse error: {0}")]
     DescriptorKeyParseError(DescriptorKeyParseError),
@@ -107,4 +109,3 @@ impl_from_variant!(hashes::Error, Error, HashError);
 impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
-impl_from_variant!(builtins::Error, Error, ArgError);

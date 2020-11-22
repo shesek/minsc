@@ -194,6 +194,7 @@ fn call<T: Borrow<Expr>>(scope: &Scope, ident: &ast::Ident, exprs: &[T]) -> Resu
     let args = eval_exprs(scope, exprs)?;
 
     func.call(args, scope)
+        .map_err(|e| Error::CallError(ident.clone(), e.into()))
 }
 
 /// Evaluate a list of expressions to produce a list of values

@@ -65,10 +65,14 @@ impl_from_variant!(Thresh, Expr);
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Ident(pub String);
 impl_from_variant!(Ident, Expr);
-display_like_debug!(Ident);
 impl From<&str> for Ident {
     fn from(s: &str) -> Self {
         Ident(s.into())
+    }
+}
+impl std::fmt::Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

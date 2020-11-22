@@ -34,6 +34,7 @@ pub fn attach_builtins(scope: &mut Scope) {
 
 pub mod fns {
     use super::*;
+    use crate::Error;
     const LIKELY_PROB: usize = 10;
 
     pub fn or(args: Vec<Value>) -> Result<Value> {
@@ -42,7 +43,7 @@ pub mod fns {
             .map(|p| match p {
                 Value::WithProb(usize, policy) => Ok((usize, policy)),
                 Value::Policy(policy) => Ok((1, policy)),
-                _ => bail!(Error::InvalidOrArguments),
+                _ => bail!(Error::InvalidArguments),
             })
             .collect::<Result<Vec<(usize, Policy)>>>()?;
         Ok(Policy::Or(policies_with_probs).into())
@@ -65,63 +66,51 @@ pub mod fns {
     }
 
     pub fn older(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidOlderArguments);
+        ensure!(args.len() == 1, Error::InvalidArguments);
         let locktime = match args.remove(0) {
             Value::Duration(dur) => duration_to_seq(&dur)?,
             Value::Number(num) => num as u32,
-            _ => bail!(Error::InvalidOlderArguments),
+            _ => bail!(Error::InvalidArguments),
         };
         Ok(Policy::Older(locktime).into())
     }
 
     pub fn after(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidAfterArguments);
+        ensure!(args.len() == 1, Error::InvalidArguments);
         let locktime = match args.remove(0) {
             Value::DateTime(datetime) => parse_datetime(&datetime)?,
             Value::Number(num) => num as u32,
-            _ => bail!(Error::InvalidAfterArguments),
+            _ => bail!(Error::InvalidArguments),
         };
         Ok(Policy::After(locktime).into())
     }
 
     pub fn pk(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidPkArguments);
+        ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Policy::Key(args.remove(0).try_into()?).into())
     }
 
     pub fn sha256(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(
-            args.len() == 1,
-            Error::InvalidHashArguments("sha256".into())
-        );
+        ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Policy::Sha256(args.remove(0).try_into()?).into())
     }
     pub fn hash256(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(
-            args.len() == 1,
-            Error::InvalidHashArguments("hash256".into())
-        );
+        ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Policy::Sha256(args.remove(0).try_into()?).into())
     }
 
     pub fn ripemd160(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(
-            args.len() == 1,
-            Error::InvalidHashArguments("ripemd160".into())
-        );
+        ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Policy::Sha256(args.remove(0).try_into()?).into())
     }
     pub fn hash160(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(
-            args.len() == 1,
-            Error::InvalidHashArguments("hash160".into())
-        );
+        ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Policy::Sha256(args.remove(0).try_into()?).into())
     }
 
     // `prob(A, B)` -> `A@B`
     pub fn prob(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(args.len() == 2, Error::InvalidProbArguments);
+        ensure!(args.len() == 2, Error::InvalidArguments);
         let prob_n = match args.remove(0) {
             #[allow(clippy::fn_address_comparisons)] // should be safe in this case
             // support the `likely@X` syntax as an alternative to the `likely(X)` function invocation
@@ -134,14 +123,14 @@ pub mod fns {
 
     pub fn likely(mut args: Vec<Value>) -> Result<Value> {
         // XXX separate error
-        ensure!(args.len() == 1, Error::InvalidProbArguments);
+        ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Value::WithProb(LIKELY_PROB, args.remove(0).try_into()?))
     }
 
     pub fn all(mut args: Vec<Value>) -> Result<Value> {
         ensure!(
             args.len() == 1 && args[0].is_array(),
-            Error::InvalidAllArguments
+            Error::InvalidArguments
         );
         let policies = map_policy(get_elements(args.remove(0)))?;
         Ok(Policy::Threshold(policies.len(), policies).into())
@@ -150,7 +139,7 @@ pub mod fns {
     pub fn any(mut args: Vec<Value>) -> Result<Value> {
         ensure!(
             args.len() == 1 && args[0].is_array(),
-            Error::InvalidAnyArguments
+            Error::InvalidArguments
         );
         let policies = map_policy(get_elements(args.remove(0)))?;
         Ok(Policy::Threshold(1, policies).into())
@@ -167,37 +156,4 @@ fn get_elements(val: Value) -> Vec<Value> {
         // assumes that `val` is already known to be an array
         _ => unreachable!(),
     }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("Invalid or() arguments, expected policy fragments with optional probabilities")]
-    InvalidOrArguments,
-
-    #[error("Invalid and() arguments, expected policy fragments without probabilities")]
-    InvalidAndArguments,
-
-    #[error("Invalid thresh() arguments, expected a threshold number and a variable number of policy fragments (without probabilities)")]
-    InvalidThreshArguments,
-
-    #[error("Invalid probability, expected a number and policy fragment")]
-    InvalidProbArguments,
-
-    #[error("Invalid older() arguments, expected 1 argument with a number or duration")]
-    InvalidOlderArguments,
-
-    #[error("Invalid after() arguments, expected 1 argument with a number or datetime")]
-    InvalidAfterArguments,
-
-    #[error("Invalid pk() arguments")]
-    InvalidPkArguments,
-
-    #[error("Invalid {0}() arguments")]
-    InvalidHashArguments(String),
-
-    #[error("Invalid all() arguments")]
-    InvalidAllArguments,
-
-    #[error("Invalid any() arguments")]
-    InvalidAnyArguments,
 }
