@@ -12,8 +12,8 @@ pub enum Expr {
     ArrayAccess(ArrayAccess),
     Number(usize),
     Duration(Duration),
-    DateTime(DateTime),
-    MiniscriptStrFrag(MiniscriptStrFrag),
+    DateTime(String),
+    MiniscriptStrFrag(String),
 }
 
 /// Statements have side-effects and don't produce a value
@@ -102,11 +102,6 @@ pub enum Duration {
 }
 impl_from_variant!(Duration, Expr);
 
-// Datetime
-#[derive(Debug, Clone)]
-pub struct DateTime(pub String);
-impl_from_variant!(DateTime, Expr);
-
 #[derive(Debug, Clone)]
 pub enum DurationPart {
     Years(f64),
@@ -137,8 +132,3 @@ pub struct Assignment {
     pub lhs: Ident,
     pub rhs: Expr,
 }
-
-/// An opaque miniscript string fragment, passed through as-is to rust-miniscript. Used for keys and hashes.
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub struct MiniscriptStrFrag(pub String);
-impl_from_variant!(MiniscriptStrFrag, Expr);

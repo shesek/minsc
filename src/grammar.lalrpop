@@ -103,7 +103,7 @@ FnDef: Stmt = {
 
 // An opaque miniscript string fragment, passed through as-is to rust-miniscript. Used for keys and hashes.
 MiniscriptStrFrag: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{40,130}|([xt]pub[0-9a-zA-Z]{100,120}(/\d+['h]?)*(/\*)?))"> =>
-    ast::MiniscriptStrFrag(<>.into()).into();
+    Expr::MiniscriptStrFrag(<>.into());
 
 // Duration and times
 
@@ -126,7 +126,7 @@ DurationClockPart: ast::DurationPart = {
 }
 
 DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
-  ast::DateTime(<>.into()).into();
+  Expr::DateTime(<>.into());
 
 // Helpers
 

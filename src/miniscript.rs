@@ -76,7 +76,7 @@ pub mod fns {
     pub fn older(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidOlderArguments);
         let locktime = match args.remove(0) {
-            Value::Duration(dur) => duration_to_seq(&dur.0)?,
+            Value::Duration(dur) => duration_to_seq(&dur)?,
             Value::Number(num) => num as u32,
             _ => bail!(Error::InvalidOlderArguments),
         };
@@ -86,7 +86,7 @@ pub mod fns {
     pub fn after(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidAfterArguments);
         let locktime = match args.remove(0) {
-            Value::DateTime(datetime) => parse_datetime(&datetime.0)?,
+            Value::DateTime(datetime) => parse_datetime(&datetime)?,
             Value::Number(num) => num as u32,
             _ => bail!(Error::InvalidAfterArguments),
         };

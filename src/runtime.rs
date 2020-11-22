@@ -13,13 +13,16 @@ use crate::scope::Scope;
 /// and assigned to variables.
 #[derive(Debug, Clone)]
 pub enum Value {
+    Number(usize),
+    DateTime(String),
+    Duration(ast::Duration),
+
     Policy(Policy),
     Function(Function),
     Array(Array),
-    Number(usize),
-    Duration(Duration),
-    DateTime(DateTime),
     WithProb(usize, Policy),
+
+    /// An opaque miniscript string fragment, passed through to rust-miniscript's FromStr. Used for keys and hashes.
     MiniscriptStrFrag(String),
 }
 
@@ -27,17 +30,9 @@ impl_from_variant!(Policy, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
 impl_from_variant!(usize, Value, Number);
-impl_from_variant!(Duration, Value);
-impl_from_variant!(DateTime, Value);
 
 #[derive(Debug, Clone)]
 pub struct Array(pub Vec<Value>);
-
-#[derive(Debug, Clone)]
-pub struct Duration(pub ast::Duration);
-
-#[derive(Debug, Clone)]
-pub struct DateTime(pub String);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -128,18 +123,6 @@ impl Evaluate for ast::Array {
     }
 }
 
-impl Evaluate for ast::Duration {
-    fn eval(&self, _scope: &Scope) -> Result<Value> {
-        Ok(Duration(self.clone()).into())
-    }
-}
-
-impl Evaluate for ast::DateTime {
-    fn eval(&self, _scope: &Scope) -> Result<Value> {
-        Ok(DateTime(self.0.clone()).into())
-    }
-}
-
 impl Evaluate for ast::ArrayAccess {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let elements = match self.array.eval(scope)? {
@@ -181,22 +164,22 @@ impl Evaluate for ast::Block {
 
 impl Evaluate for Expr {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        match self {
-            Expr::Ident(x) => x.eval(scope),
-            Expr::Call(x) => x.eval(scope),
-            Expr::Or(x) => x.eval(scope),
-            Expr::And(x) => x.eval(scope),
-            Expr::Thresh(x) => x.eval(scope),
-            Expr::Block(x) => x.eval(scope),
-            Expr::WithProb(x) => x.eval(scope),
-            Expr::Array(x) => x.eval(scope),
-            Expr::ArrayAccess(x) => x.eval(scope),
-            Expr::Duration(x) => x.eval(scope),
-            Expr::DateTime(x) => x.eval(scope),
+        Ok(match self {
+            Expr::Ident(x) => x.eval(scope)?,
+            Expr::Call(x) => x.eval(scope)?,
+            Expr::Or(x) => x.eval(scope)?,
+            Expr::And(x) => x.eval(scope)?,
+            Expr::Thresh(x) => x.eval(scope)?,
+            Expr::Block(x) => x.eval(scope)?,
+            Expr::WithProb(x) => x.eval(scope)?,
+            Expr::Array(x) => x.eval(scope)?,
+            Expr::ArrayAccess(x) => x.eval(scope)?,
 
-            Expr::MiniscriptStrFrag(x) => Ok(Value::MiniscriptStrFrag(x.0.clone())),
-            Expr::Number(n) => Ok(Value::Number(*n)),
-        }
+            Expr::Number(x) => Value::Number(*x),
+            Expr::Duration(x) => Value::Duration(x.clone()),
+            Expr::DateTime(x) => Value::DateTime(x.clone()),
+            Expr::MiniscriptStrFrag(x) => Value::MiniscriptStrFrag(x.clone()),
+        })
     }
 }
 
