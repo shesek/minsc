@@ -20,7 +20,7 @@ CodeMirror.defineSimpleMode("miniscript",{
     },
     {
         token: 'number',
-        regex: /\d+/,
+        regex: /\b\d+\b/,
     },
     {
         token: 'variable-3',

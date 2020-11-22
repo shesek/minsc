@@ -5,6 +5,7 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /\d+(\.\d+)?\s+(years?|months?|weeks?|days?|hours?|min(?:ute)?s?|sec(ond)?s?)\b/, token: "number"},
     {regex: /\d+\s+blocks?\b/, token: "number"},
     {regex: /\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?/, token: "number"},
+    {regex: /[a-f0-9]{40,130}|([xt]pub[0-9a-zA-Z]{100,120}(\/\d+['h]?)*(\/\*)?)/, token: "number"},
     {regex: /(?:(?:[0-9][0-9_]*)(?:(?:[Ee][+-]?[0-9_]+)|\.[0-9_]+(?:[Ee][+-]?[0-9_]+)?)(?:f32|f64)?)|(?:0(?:b[01_]+|(?:o[0-7_]+)|(?:x[0-9a-fA-F_]+))|(?:[0-9][0-9_]*))(?:u8|u16|u32|u64|i8|i16|i32|i64|isize|usize)?/,
      token: "number"},
     {regex: /(fn)(\s+)([$a-zA-Z_]\w*)/, token: ["keyword", null, "def"]},

@@ -1,32 +1,26 @@
-import Promise from 'es6-promise'
-import * as ms from './miniscript'
+let minsc, pending
 
-let minsc, pending, ready
-
-Promise.all([
-  import('../pkg').then(module => minsc = module)
-, ms.ready
-]).then(_ => {
-  ready = true
+import('../pkg/index.js').then(module => {
+  minsc = module
+  debugger
   if (pending) {
     run(pending)
     pending = null
   }
 }).catch(console.error)
 
-addEventListener('message', ({ data: code }) => {
-  if (!ready) {
-    pending = code
+addEventListener('message', ({ data: req }) => {
+  if (!minsc) {
+    pending = req
   } else {
-    run(code)
+    run(req)
   }
 })
 
-function run(code) {
+function run({ code, desc_type, network, child_code }) {
   try {
-    const policy = minsc.compile(code)
-    const { miniscript, script, analysis } = ms.compile_policy(policy);
-    postMessage({ result: { policy, miniscript, script, analysis } })
+    const result = minsc.compile(code, desc_type, network, child_code)
+    postMessage({ result })
   } catch (err) {
     console.error(''+err, err.stack)
     postMessage({ error: err.toString(), input: code })

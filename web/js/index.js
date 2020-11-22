@@ -32,12 +32,13 @@ worker.addEventListener('message', ({ data }) => {
     error_el.style.display = 'block'
     markError(data.input, data.error)
   } else if (data.result) {
-    const { policy, miniscript, script, analysis } = data.result
-	  error_el.style.display = 'none'
+    const r = data.result
+    console.log(r)
+    error_el.style.display = 'none'
     outputs_el.style.display = 'block'
-    output_policy.setValue(policy)
-    output_miniscript.setValue(miniscript)
-    output_script.setValue(script)
+    output_policy.setValue(r.policy)
+    output_miniscript.setValue(r.miniscript)
+    output_script.setValue(r.script_asm)
   }
 })
 
@@ -45,13 +46,16 @@ function update(source) {
   clearErrorMark()
 
   const code = editor.getValue()
+      , desc_type = 'wsh'
+      , network = 'testnet'
+      , child_code = 0
 
   const share_uri = `#c=${encode(code)}`
   share_el.href = share_uri
   share_box.value = share_el.href
   if (source != 'init') location.hash = share_uri
 
-  if (code) worker.postMessage(code)
+  if (code) worker.postMessage({ code, desc_type, network, child_code })
   else error_el.style.display = 'none'
 
   if (source != 'init') evt[source]()
@@ -62,7 +66,7 @@ const evt = source => _ => {
   _paq.push(['trackEvent', 'compile', source, ''])
 }
 evt.try = evt('try')
-evt.edit = debounce(evt('edit'), 10000)
+evt.edit = debounce(evt('edit'), 5000)
 
 let error_marker
 function clearErrorMark() {

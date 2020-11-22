@@ -45,11 +45,11 @@ CodeMirror.defineSimpleMode("bitcoin",{
 		},
     {
         token: 'number',
-        regex: /\d+/,
+        regex: /\b\d+\b/,
     },
     {
         token: 'variable-3',
-        regex: /<[^>]+>/,
+        regex: /<[^>]+>|\b[a-f0-9]+\b/,
     },
     /*{
         token: 'operator',
