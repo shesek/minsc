@@ -1,7 +1,8 @@
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 
-use miniscript::bitcoin::hashes;
+use miniscript::bitcoin::hashes::{self, hex::FromHex, Hash};
+use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::error::{Error, Result};
@@ -13,17 +14,17 @@ use crate::scope::Scope;
 /// and assigned to variables.
 #[derive(Debug, Clone)]
 pub enum Value {
+    PubKey(DescriptorPublicKey),
+    Hash(Vec<u8>),
     Number(usize),
     DateTime(String),
     Duration(ast::Duration),
 
     Policy(Policy),
-    Function(Function),
-    Array(Array),
     WithProb(usize, Policy),
 
-    /// An opaque miniscript string fragment, passed through to rust-miniscript's FromStr. Used for keys and hashes.
-    MiniscriptStrFrag(String),
+    Function(Function),
+    Array(Array),
 }
 
 impl_from_variant!(Policy, Value);
@@ -175,10 +176,12 @@ impl Evaluate for Expr {
             Expr::Array(x) => x.eval(scope)?,
             Expr::ArrayAccess(x) => x.eval(scope)?,
 
+            // Atoms
+            Expr::PubKey(x) => Value::PubKey(x.parse()?),
+            Expr::Hash(x) => Value::Hash(Vec::from_hex(&x)?),
             Expr::Number(x) => Value::Number(*x),
             Expr::Duration(x) => Value::Duration(x.clone()),
             Expr::DateTime(x) => Value::DateTime(x.clone()),
-            Expr::MiniscriptStrFrag(x) => Value::MiniscriptStrFrag(x.clone()),
         })
     }
 }
@@ -215,29 +218,39 @@ impl TryFrom<Value> for usize {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Number(n) => Ok(n),
-            v => Err(Error::NotNumber(v.clone())),
+            v => Err(Error::NotNumber(v)),
         }
     }
 }
 
-macro_rules! impl_miniscript_frag {
+impl TryFrom<Value> for DescriptorPublicKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::PubKey(x) => Ok(x),
+            v => Err(Error::NotPubKey(v)),
+        }
+    }
+}
+
+macro_rules! impl_hash_conv {
     ($name:path) => {
         impl TryFrom<Value> for $name {
             type Error = Error;
             fn try_from(value: Value) -> Result<Self> {
                 match value {
-                    Value::MiniscriptStrFrag(s) => Ok(s.parse()?),
-                    v => Err(Error::NotMiniscriptRepresentable(v)),
+                    Value::Hash(h) => Ok(Self::from_slice(&h)?),
+                    v => Err(Error::NotHash(v)),
                 }
             }
         }
     };
 }
-impl_miniscript_frag!(hashes::sha256::Hash);
-impl_miniscript_frag!(hashes::sha256d::Hash);
-impl_miniscript_frag!(hashes::ripemd160::Hash);
-impl_miniscript_frag!(hashes::hash160::Hash);
-impl_miniscript_frag!(miniscript::descriptor::DescriptorPublicKey);
+
+impl_hash_conv!(hashes::sha256::Hash);
+impl_hash_conv!(hashes::sha256d::Hash);
+impl_hash_conv!(hashes::ripemd160::Hash);
+impl_hash_conv!(hashes::hash160::Hash);
 
 impl Value {
     pub fn is_array(&self) -> bool {

@@ -36,6 +36,12 @@ pub enum Error {
     #[error("Not a number: {0:?}")]
     NotNumber(Value),
 
+    #[error("Not a pubkey: {0:?}")]
+    NotPubKey(Value),
+
+    #[error("Not an hash: {0:?}")]
+    NotHash(Value),
+
     #[error("Invalid probability: {0}")]
     InvalidProb(String),
 
@@ -75,6 +81,9 @@ pub enum Error {
     #[error("Descriptor key parse error: {0}")]
     DescriptorKeyParseError(DescriptorKeyParseError),
 
+    #[error("Hash error: {0}")]
+    HashError(hashes::Error),
+
     #[error("Invalid hex: {0}")]
     HexError(hashes::hex::Error),
 
@@ -95,6 +104,7 @@ where
 
 impl_from_variant!(miniscript::Error, Error, MiniscriptError);
 impl_from_variant!(DescriptorKeyParseError, Error);
+impl_from_variant!(hashes::Error, Error, HashError);
 impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);

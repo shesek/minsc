@@ -10,10 +10,13 @@ pub enum Expr {
     WithProb(WithProb),
     Array(Array),
     ArrayAccess(ArrayAccess),
+
+    // Atoms
+    PubKey(String),
+    Hash(String),
     Number(usize),
     Duration(Duration),
     DateTime(String),
-    MiniscriptStrFrag(String),
 }
 
 /// Statements have side-effects and don't produce a value
