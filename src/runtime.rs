@@ -143,6 +143,23 @@ impl Evaluate for ast::WithProb {
     }
 }
 
+impl Evaluate for ast::KeyDerive {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let key = self.key.eval(scope)?.into_key()?;
+        let mut xpub = match key {
+            DescriptorPublicKey::XPub(xpub) => xpub,
+            DescriptorPublicKey::SinglePub(_) => bail!(Error::InvalidArguments),
+        };
+        for child in &self.path {
+            // TODO support harended child codes
+            let child = child.eval(scope)?.into_usize()? as u32;
+            xpub.derivation_path = xpub.derivation_path.into_child(child.into());
+        }
+        xpub.is_wildcard = self.is_wildcard;
+        Ok(Value::PubKey(DescriptorPublicKey::XPub(xpub)))
+    }
+}
+
 impl Evaluate for ast::Block {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut scope = scope.child();
@@ -174,6 +191,7 @@ impl Evaluate for Expr {
             Expr::WithProb(x) => x.eval(scope)?,
             Expr::Array(x) => x.eval(scope)?,
             Expr::ArrayAccess(x) => x.eval(scope)?,
+            Expr::KeyDerive(x) => x.eval(scope)?,
 
             // Atoms
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
@@ -263,6 +281,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_usize(self) -> Result<usize> {
+        self.try_into()
+    }
+    pub fn into_key(self) -> Result<DescriptorPublicKey> {
         self.try_into()
     }
 }

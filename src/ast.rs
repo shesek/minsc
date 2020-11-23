@@ -10,6 +10,7 @@ pub enum Expr {
     WithProb(WithProb),
     Array(Array),
     ArrayAccess(ArrayAccess),
+    KeyDerive(KeyDerive),
 
     // Atoms
     PubKey(String),
@@ -18,6 +19,8 @@ pub enum Expr {
     Duration(Duration),
     DateTime(String),
 }
+
+impl_from_variant!(usize, Expr, Number);
 
 /// Statements have side-effects and don't produce a value
 #[derive(Debug, Clone)]
@@ -96,7 +99,13 @@ pub struct ArrayAccess {
 }
 impl_from_variant!(ArrayAccess, Expr);
 
-impl_from_variant!(usize, Expr, Number);
+#[derive(Debug, Clone)]
+pub struct KeyDerive {
+    pub key: Box<Expr>,
+    pub path: Vec<Expr>,
+    pub is_wildcard: bool,
+}
+impl_from_variant!(KeyDerive, Expr);
 
 // Duration (relative block height or time)
 #[derive(Debug, Clone)]
