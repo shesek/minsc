@@ -104,10 +104,10 @@ FnDef: Stmt = {
 }
 
 // Compressed/uncompressed public key or an xpub, with optional bip32 origin
-PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{66}|[a-f0-9]{130}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
+PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{130}|[a-f0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
     Expr::PubKey(<>.into());
 
-Hash: Expr = <s:r"[a-f0-9]{40}|[a-f0-9]{64}"> =>
+Hash: Expr = <s:r"[a-f0-9]{64}|[a-f0-9]{40}"> =>
     Expr::Hash(<>.into());
 
 KeyDerive: Expr = <key:SimpleExpr> "/" <path:List1<SimpleExpr, "/">> <wildcard:"/*"?> =>
