@@ -18,6 +18,7 @@ pub struct JsResult {
     script_hex: String,
     script_asm: String,
     descriptor: String,
+    child_desc: String,
     spk: String,
     address: String,
 }
@@ -39,11 +40,12 @@ pub fn js_compile(
         "wsh" => Descriptor::Wsh(miniscript.clone()),
         "shwsh" => Descriptor::ShWsh(miniscript.clone()),
         _ => bail!("Unsupported descriptor type"),
-    }
-    .derive(child_code.into());
+    };
 
-    let spk = descriptor.script_pubkey();
-    let address = descriptor.address(network).unwrap();
+    let child_desc = descriptor.derive(child_code.into());
+
+    let spk = child_desc.script_pubkey();
+    let address = child_desc.address(network).unwrap();
 
     Ok(JsValue::from_serde(&JsResult {
         policy: policy.to_string(),
