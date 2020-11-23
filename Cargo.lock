@@ -382,6 +382,7 @@ dependencies = [
  "chrono",
  "lalrpop",
  "lalrpop-util",
+ "lazy_static",
  "miniscript",
  "regex",
  "serde",

@@ -181,7 +181,7 @@ body
           // Funds are normally held by a 4-of-5 federation, but can be recovered by the emergency backup keys after 3 months of inactivity
 
           $federation = 4 of [ pk(A), pk(B), pk(C), pk(D), pk(E) ];
-          $recovery = 2 of [ pk(F), pk(G), pk(H) ];
+          $recovery = 2 of [ pk(F), pk(G), pk(I) ];
           $timeout = older(heightwise 3 months);
 
           likely@$federation || ($timeout && $recovery)
@@ -229,7 +229,7 @@ body
             pk($revoke_pk) || (pk($remote_pk) && ($success || $timeout))
           }
 
-          bolt3_htlc_received(A, B, C, H, 2 hours)
+          bolt3_htlc_received(A, B, C, H1, 2 hours)
 
         +snippet.
           // Two factor authentication with a timeout recovery clause
@@ -252,7 +252,7 @@ body
           $timeout = older(100 blocks);
           $managers = [ pk(A), pk(B), pk(C) ];
           $non_managers = [ pk(D), pk(E), pk(F), pk(G) ];
-          $cosigners = [ pk(H), pk(I), pk(J), pk(K) ];
+          $cosigners = [ pk(I), pk(J), pk(K), pk(L) ];
 
           // main() is implicitly returned
 
