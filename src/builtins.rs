@@ -139,7 +139,7 @@ pub mod fns {
         Ok(match args.remove(0).try_into()? {
             Descriptor::Wsh(miniscript) => Descriptor::ShWsh(miniscript),
             Descriptor::Wpkh(key) => Descriptor::ShWpkh(key),
-            _ => bail!(Error::InvalidArguments),
+            _ => bail!(Error::InvalidShUse),
         }
         .into())
     }

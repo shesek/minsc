@@ -84,6 +84,9 @@ pub enum Error {
     #[error("Invalid arguments")]
     InvalidArguments,
 
+    #[error("sh() can only wrap wsh() or wpkh()")]
+    InvalidShUse,
+
     #[error("in {0}(): {1}")]
     CallError(Ident, Box<Error>),
 
