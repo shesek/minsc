@@ -263,6 +263,9 @@ impl TryFrom<Value> for Descriptor {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Descriptor(x) => Ok(x),
+            Value::Miniscript(x) => Ok(Descriptor::Wsh(x)),
+            Value::Policy(x) => Ok(Descriptor::Wsh(x.compile()?)),
+            Value::PubKey(x) => Ok(Descriptor::Wpkh(x)),
             v => Err(Error::NotDescriptor(v)),
         }
     }
