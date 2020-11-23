@@ -13,7 +13,7 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /\/\/.*/, token: "comment"},
     {regex: /[-+\/*=<>!;@]+|&&|\|\|/, token: "operator"}, // */
     {regex: /(or|and|thresh)\b/, token: "builtin"},
-    {regex: /(pk|older|after|(sha|hash)256|(ripemd|hash)160|any|all|prob)\b/, token: "builtin"},
+    {regex: /(pk|older|after|(sha|hash)256|(ripemd|hash)160|any|all|prob|wsh|wpkh|sh|miniscript|address)\b/, token: "builtin"},
     {regex: /([$a-zA-Z_]\w*)\s*(\()/, token: ["atom", null]},
     {regex: /[$a-zA-Z_]\w*/, token: "variable-3"},
     {regex: /\.\d+\b/, token: "property"},
