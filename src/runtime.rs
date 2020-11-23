@@ -3,6 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use miniscript::bitcoin::hashes::{self, hex::FromHex, hex::ToHex, Hash};
+use miniscript::bitcoin::Address;
 use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
@@ -25,6 +26,7 @@ pub enum Value {
 
     Miniscript(Miniscript),
     Descriptor(Descriptor),
+    Address(Address),
 
     Function(Function),
     Array(Array),
@@ -32,6 +34,7 @@ pub enum Value {
 
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
+impl_from_variant!(Address, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
 impl_from_variant!(usize, Value, Number);
@@ -308,6 +311,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_key(self) -> Result<DescriptorPublicKey> {
+        self.try_into()
+    }
+    pub fn into_desc(self) -> Result<Descriptor> {
         self.try_into()
     }
 }

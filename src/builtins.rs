@@ -1,5 +1,7 @@
 use std::convert::TryInto;
 
+use miniscript::bitcoin::Network;
+
 use crate::function::{Function, NativeFunction};
 use crate::runtime::{Array, Value};
 use crate::time::{duration_to_seq, parse_datetime};
@@ -24,15 +26,17 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("ripemd160", fns::ripemd160);
     attach("hash160", fns::hash160);
 
-    // Compile policy to miniscript
-    attach("miniscript", fns::miniscript);
-
     // Descriptor functions
     attach("wsh", fns::wsh);
     attach("wpkh", fns::wpkh);
     attach("sh", fns::wsh);
 
-    // Minsc-only functions
+    // Compile policy to miniscript
+    attach("miniscript", fns::miniscript);
+    // Address generation
+    attach("address", fns::address);
+
+    // Minsc functions
     attach("prob", fns::prob);
     attach("likely", fns::likely);
     attach("all", fns::all);
@@ -142,6 +146,18 @@ pub mod fns {
             _ => bail!(Error::InvalidShUse),
         }
         .into())
+    }
+
+    pub fn address(args: Vec<Value>) -> Result<Value> {
+        let mut args = args.into_iter();
+        let descriptor = args.next().ok_or(Error::InvalidArguments)?.into_desc()?;
+        let index = args.next().map_or(Ok(0), |arg| arg.into_usize())? as u32;
+        ensure!(args.next().is_none(), Error::InvalidArguments);
+
+        let descriptor = descriptor.derive(index.into());
+        // TODO configurable network
+        let address = descriptor.address(Network::Testnet).unwrap();
+        Ok(address.into())
     }
 
     // `prob(A, B)` -> `A@B`
