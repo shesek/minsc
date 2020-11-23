@@ -1,4 +1,4 @@
-use minsc::{parse, run, Result, Value};
+use minsc::{parse, run, Result};
 use std::{env, fs, io};
 
 fn main() -> Result<()> {
@@ -20,19 +20,8 @@ fn main() -> Result<()> {
         println!("{:#?}", ast);
     } else {
         let res = run(ast)?;
+        println!("{}\n", res);
         println!("{:#?}", res);
-        match res {
-            Value::Policy(policy) => {
-                println!("Policy: {}", policy);
-            }
-            Value::Descriptor(desc) => {
-                println!("Descriptor: {}", desc);
-            }
-            Value::Miniscript(ms) => {
-                println!("Miniscript: {}", ms);
-            }
-            _ => (),
-        }
     }
 
     Ok(())

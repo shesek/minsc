@@ -1,7 +1,8 @@
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
 
-use miniscript::bitcoin::hashes::{self, hex::FromHex, Hash};
+use miniscript::bitcoin::hashes::{self, hex::FromHex, hex::ToHex, Hash};
 use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
@@ -308,5 +309,33 @@ impl Value {
     }
     pub fn into_key(self) -> Result<DescriptorPublicKey> {
         self.try_into()
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::PubKey(x) => write!(f, "{}", x),
+            Value::Number(x) => write!(f, "{}", x),
+            Value::DateTime(x) => write!(f, "{:?}", x),
+            Value::Duration(x) => write!(f, "{:?}", x),
+            Value::Hash(x) => write!(f, "{}", x.to_hex()),
+            Value::Policy(x) => write!(f, "{}", x),
+            Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
+            Value::Miniscript(x) => write!(f, "{}", x),
+            Value::Descriptor(x) => write!(f, "{}", x),
+            Value::Address(x) => write!(f, "{}", x),
+            Value::Function(x) => write!(f, "{:?}", x),
+            Value::Array(Array(elements)) => {
+                write!(f, "[ ")?;
+                for (i, element) in elements.into_iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", element)?;
+                }
+                write!(f, " ]")
+            }
+        }
     }
 }
