@@ -10,7 +10,7 @@ pub enum Expr {
     WithProb(WithProb),
     Array(Array),
     ArrayAccess(ArrayAccess),
-    KeyDerive(KeyDerive),
+    ChildDerive(ChildDerive),
 
     // Atoms
     PubKey(String),
@@ -100,12 +100,12 @@ pub struct ArrayAccess {
 impl_from_variant!(ArrayAccess, Expr);
 
 #[derive(Debug, Clone)]
-pub struct KeyDerive {
-    pub key: Box<Expr>,
+pub struct ChildDerive {
+    pub parent: Box<Expr>,
     pub path: Vec<Expr>,
     pub is_wildcard: bool,
 }
-impl_from_variant!(KeyDerive, Expr);
+impl_from_variant!(ChildDerive, Expr);
 
 // Duration (relative block height or time)
 #[derive(Debug, Clone)]

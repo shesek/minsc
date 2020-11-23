@@ -34,6 +34,7 @@ pub enum Value {
 
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
+impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
@@ -151,20 +152,35 @@ impl Evaluate for ast::WithProb {
     }
 }
 
-impl Evaluate for ast::KeyDerive {
+impl Evaluate for ast::ChildDerive {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let key = self.key.eval(scope)?.into_key()?;
-        let mut xpub = match key {
-            DescriptorPublicKey::XPub(xpub) => xpub,
-            DescriptorPublicKey::SinglePub(_) => bail!(Error::InvalidArguments),
-        };
-        for child in &self.path {
-            // TODO support harended child codes
-            let child = child.eval(scope)?.into_usize()? as u32;
-            xpub.derivation_path = xpub.derivation_path.into_child(child.into());
+        let parent = self.parent.eval(scope)?;
+
+        // Derive xpubs children
+        if let Value::PubKey(key) = parent {
+            let mut xpub = match key {
+                DescriptorPublicKey::XPub(xpub) => xpub,
+                DescriptorPublicKey::SinglePub(_) => bail!(Error::InvalidArguments),
+            };
+            for child in &self.path {
+                let child = child.eval(scope)?.into_usize()? as u32;
+                xpub.derivation_path = xpub.derivation_path.into_child(child.into());
+            }
+            xpub.is_wildcard = self.is_wildcard;
+            Ok(DescriptorPublicKey::XPub(xpub).into())
         }
-        xpub.is_wildcard = self.is_wildcard;
-        Ok(Value::PubKey(DescriptorPublicKey::XPub(xpub)))
+        // Derive descriptor children
+        // Auto-casts policies and miniscripts into descriptors
+        else {
+            ensure!(!self.is_wildcard, Error::InvalidArguments);
+            let mut desc = parent.into_desc().map_err(|_| Error::InvalidArguments)?;
+            for child in &self.path {
+                let child = child.eval(scope)?.into_usize()? as u32;
+                desc = desc.derive(child.into());
+            }
+            Ok(desc.into())
+        }
+        // TODO support harended child codes
     }
 }
 
@@ -199,7 +215,7 @@ impl Evaluate for Expr {
             Expr::WithProb(x) => x.eval(scope)?,
             Expr::Array(x) => x.eval(scope)?,
             Expr::ArrayAccess(x) => x.eval(scope)?,
-            Expr::KeyDerive(x) => x.eval(scope)?,
+            Expr::ChildDerive(x) => x.eval(scope)?,
 
             // Atoms
             Expr::PubKey(x) => Value::PubKey(x.parse()?),

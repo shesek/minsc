@@ -148,13 +148,9 @@ pub mod fns {
         .into())
     }
 
-    pub fn address(args: Vec<Value>) -> Result<Value> {
-        let mut args = args.into_iter();
-        let descriptor = args.next().ok_or(Error::InvalidArguments)?.into_desc()?;
-        let index = args.next().map_or(Ok(0), |arg| arg.into_usize())? as u32;
-        ensure!(args.next().is_none(), Error::InvalidArguments);
-
-        let descriptor = descriptor.derive(index.into());
+    pub fn address(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let descriptor = args.remove(0).into_desc()?;
         // TODO configurable network
         let address = descriptor.address(Network::Testnet).unwrap();
         Ok(address.into())
