@@ -1,8 +1,9 @@
 use lalrpop_util::ParseError;
 use std::fmt;
 
-use ::miniscript::bitcoin::hashes;
-use ::miniscript::descriptor::DescriptorKeyParseError;
+use miniscript::bitcoin::hashes;
+use miniscript::descriptor::DescriptorKeyParseError;
+use miniscript::policy::compiler::CompilerError;
 
 use crate::ast::Ident;
 use crate::runtime::Value;
@@ -44,6 +45,12 @@ pub enum Error {
     #[error("Expected a policy, not {0:?}")]
     NotPolicy(Value),
 
+    #[error("Expected a miniscript, not {0:?}")]
+    NotMiniscript(Value),
+
+    #[error("Expected a descriptor, not {0:?}")]
+    NotDescriptor(Value),
+
     #[error("Invalid probability: {0}")]
     InvalidProb(String),
 
@@ -83,6 +90,9 @@ pub enum Error {
     #[error("Descriptor key parse error: {0}")]
     DescriptorKeyParseError(DescriptorKeyParseError),
 
+    #[error("Miniscript compiler error: {0}")]
+    MiniscriptCompilerError(CompilerError),
+
     #[error("Hash error: {0}")]
     HashError(hashes::Error),
 
@@ -105,6 +115,7 @@ where
 }
 
 impl_from_variant!(DescriptorKeyParseError, Error);
+impl_from_variant!(CompilerError, Error, MiniscriptCompilerError);
 impl_from_variant!(hashes::Error, Error, HashError);
 impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);

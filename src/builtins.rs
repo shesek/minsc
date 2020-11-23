@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use crate::function::{Function, NativeFunction};
 use crate::runtime::{Array, Value};
 use crate::time::{duration_to_seq, parse_datetime};
-use crate::{Policy, Result, Scope};
+use crate::{Descriptor, Policy, Result, Scope};
 
 /// Attach built-in functions to the Minsc runtime envirnoment
 pub fn attach_builtins(scope: &mut Scope) {
@@ -13,7 +13,6 @@ pub fn attach_builtins(scope: &mut Scope) {
     };
 
     // Miniscript Policy functions exposed in the Minsc runtime
-    // Representation for functions natively available in the Miniscript Policy language
     attach("or", fns::or);
     attach("and", fns::and);
     attach("thresh", fns::thresh);
@@ -24,6 +23,14 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("hash256", fns::hash256);
     attach("ripemd160", fns::ripemd160);
     attach("hash160", fns::hash160);
+
+    // Compile policy to miniscript
+    attach("miniscript", fns::miniscript);
+
+    // Descriptor functions
+    attach("wsh", fns::wsh);
+    attach("wpkh", fns::wpkh);
+    attach("sh", fns::wsh);
 
     // Minsc-only functions
     attach("prob", fns::prob);
@@ -106,6 +113,35 @@ pub mod fns {
     pub fn hash160(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Policy::Hash160(args.remove(0).try_into()?).into())
+    }
+
+    // Policy -> Miniscript
+    pub fn miniscript(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        Ok(Value::Miniscript(args.remove(0).try_into()?))
+    }
+
+    // Policy or Miniscript -> Descriptor::Wpkh
+    pub fn wpkh(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        Ok(Descriptor::Wpkh(args.remove(0).try_into()?).into())
+    }
+
+    // Policy or Miniscript -> Descriptor::Wsh
+    pub fn wsh(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        Ok(Descriptor::Wsh(args.remove(0).try_into()?).into())
+    }
+
+    // Descriptor::Wsh or Descriptor::Wpkh -> Descriptor::Sh*
+    pub fn sh(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        Ok(match args.remove(0).try_into()? {
+            Descriptor::Wsh(miniscript) => Descriptor::ShWsh(miniscript),
+            Descriptor::Wpkh(key) => Descriptor::ShWpkh(key),
+            _ => bail!(Error::InvalidArguments),
+        }
+        .into())
     }
 
     // `prob(A, B)` -> `A@B`

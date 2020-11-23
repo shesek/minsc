@@ -7,7 +7,7 @@ use miniscript::descriptor::DescriptorPublicKey;
 use crate::ast::{self, Expr, Stmt};
 use crate::builtins::fns;
 use crate::function::{Call, Function};
-use crate::{Error, Policy, Result, Scope};
+use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -22,11 +22,15 @@ pub enum Value {
     Policy(Policy),
     WithProb(usize, Policy),
 
+    Miniscript(Miniscript),
+    Descriptor(Descriptor),
+
     Function(Function),
     Array(Array),
 }
 
 impl_from_variant!(Policy, Value);
+impl_from_variant!(Descriptor, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
 impl_from_variant!(usize, Value, Number);
@@ -247,6 +251,25 @@ impl TryFrom<Value> for DescriptorPublicKey {
         match value {
             Value::PubKey(x) => Ok(x),
             v => Err(Error::NotPubKey(v)),
+        }
+    }
+}
+impl TryFrom<Value> for Descriptor {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Descriptor(x) => Ok(x),
+            v => Err(Error::NotDescriptor(v)),
+        }
+    }
+}
+impl TryFrom<Value> for Miniscript {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Miniscript(x) => Ok(x),
+            Value::Policy(x) => Ok(x.compile()?),
+            v => Err(Error::NotMiniscript(v)),
         }
     }
 }

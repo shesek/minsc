@@ -1,4 +1,4 @@
-use minsc::{compile, parse, Result};
+use minsc::{parse, run, Result, Value};
 use std::{env, fs, io};
 
 fn main() -> Result<()> {
@@ -14,12 +14,25 @@ fn main() -> Result<()> {
     let mut code = String::new();
     reader.read_to_string(&mut code)?;
 
+    let ast = parse(&code)?;
+
     if print_ast {
-        println!("{:#?}", parse(&code)?);
+        println!("{:#?}", ast);
     } else {
-        let policy = compile(&code)?;
-        println!("{}", policy);
-        println!("{:#?}", policy);
+        let res = run(ast)?;
+        println!("{:#?}", res);
+        match res {
+            Value::Policy(policy) => {
+                println!("Policy: {}", policy);
+            }
+            Value::Descriptor(desc) => {
+                println!("Descriptor: {}", desc);
+            }
+            Value::Miniscript(ms) => {
+                println!("Miniscript: {}", ms);
+            }
+            _ => (),
+        }
     }
 
     Ok(())

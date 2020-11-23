@@ -25,8 +25,11 @@ pub use error::{Error, Result};
 pub use runtime::{Evaluate, Value};
 pub use scope::Scope;
 
-pub use miniscript::{descriptor, policy};
+use miniscript::{descriptor, policy};
+
 pub type Policy = policy::concrete::Policy<descriptor::DescriptorPublicKey>;
+pub type Miniscript = miniscript::Miniscript<descriptor::DescriptorPublicKey, miniscript::Segwitv0>;
+pub type Descriptor = descriptor::Descriptor<descriptor::DescriptorPublicKey>;
 
 pub fn parse(s: &str) -> Result<Expr> {
     let parser = grammar::ProgramParser::new();
