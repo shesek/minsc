@@ -43,6 +43,7 @@ SimpleExpr: Expr = {
   PubKey,
   Paren<And>,
   Paren<Or>,
+  Paren<ChildDerive>,
   Paren<SimpleExpr>,
 };
 
