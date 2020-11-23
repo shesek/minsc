@@ -208,7 +208,7 @@ impl TryFrom<Value> for Policy {
         match value {
             Value::Policy(policy) => Ok(policy),
             arr @ Value::Array(Array(_)) => fns::all(vec![arr])?.try_into(),
-            v => Err(Error::NotMiniscriptRepresentable(v)),
+            v => Err(Error::NotPolicy(v)),
         }
     }
 }

@@ -26,20 +26,23 @@ pub enum Error {
     #[error("Undefined variable: {0}")]
     VarNotFound(Ident),
 
-    #[error("Not a function: {0:?}")]
+    #[error("Expected a function, not {0:?}")]
     NotFn(Value),
 
-    #[error("Not an array: {0:?}")]
+    #[error("Expected an array, not {0:?}")]
     NotArray(Value),
 
-    #[error("Not a number: {0:?}")]
+    #[error("Expected a number, not {0:?}")]
     NotNumber(Value),
 
-    #[error("Not a pubkey: {0:?}")]
+    #[error("Expected a pubkey, not {0:?}")]
     NotPubKey(Value),
 
-    #[error("Not an hash: {0:?}")]
+    #[error("Expected an hash, not {0:?}")]
     NotHash(Value),
+
+    #[error("Expected a policy, not {0:?}")]
+    NotPolicy(Value),
 
     #[error("Invalid probability: {0}")]
     InvalidProb(String),
@@ -52,9 +55,6 @@ pub enum Error {
 
     #[error("Function {0} expected {1} arguments, not {2}")]
     ArgumentMismatch(Ident, usize, usize),
-
-    #[error("Cannot represent as a Miniscript policy: {0:?}")]
-    NotMiniscriptRepresentable(Value),
 
     #[error("Invalid datetime string: {0}")]
     InvalidDateTime(chrono::ParseError),
