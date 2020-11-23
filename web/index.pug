@@ -69,9 +69,9 @@ body
         h5#loading.font-italic.text-center Loading WASM...
 
         #outputs
-          +box('Policy', true, true).mb-3: #output-policy
-          +box('Miniscript', true).mb-3: #output-miniscript
-          +box('Bitcoin Script', true): #output-script
+          +box('Policy', true, true).mb-3#output-policy: .codeview
+          +box('Miniscript', true).mb-3#output-miniscript: .codeview
+          +box('Bitcoin Script', true)#output-script: .codeview
 
     #ref.mt-4
       +h(2, 'Reference')

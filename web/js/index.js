@@ -18,6 +18,9 @@ const error_el = document.querySelector('#error')
     , outputs_el = document.querySelector('#outputs')
     , loading_el = document.querySelector('#loading')
     , share_el = document.querySelector('#share')
+    , output_el_policy = document.querySelector('#output-policy')
+    , output_el_miniscript = document.querySelector('#output-miniscript')
+    , output_el_script = document.querySelector('#output-script')
 
 const initial_code = location.hash.startsWith('#c=') && location.hash.length > 3
                      ? decodeURIComponent(location.hash.substr(3))
@@ -36,9 +39,14 @@ worker.addEventListener('message', ({ data }) => {
     console.log(r)
     error_el.style.display = 'none'
     outputs_el.style.display = 'block'
-    output_policy.setValue(r.policy)
-    output_miniscript.setValue(r.miniscript)
-    output_script.setValue(r.script_asm)
+
+    output_el_policy.style.display = r.policy ? 'block' : 'none'
+    output_el_miniscript.style.display = r.miniscript ? 'block' : 'none'
+    output_el_script.style.display = r.script_asm ? 'block' : 'none'
+
+    output_policy.setValue(r.policy || '')
+    output_miniscript.setValue(r.miniscript || '')
+    output_script.setValue(r.script_asm || '')
   }
 })
 
@@ -46,16 +54,14 @@ function update(source) {
   clearErrorMark()
 
   const code = editor.getValue()
-      , desc_type = 'wsh'
       , network = 'testnet'
-      , child_code = 0
 
   const share_uri = `#c=${encode(code)}`
   share_el.href = share_uri
   share_box.value = share_el.href
   if (source != 'init') location.hash = share_uri
 
-  if (code) worker.postMessage({ code, desc_type, network, child_code })
+  if (code) worker.postMessage({ code, network })
   else error_el.style.display = 'none'
 
   if (source != 'init') evt[source]()
@@ -143,21 +149,21 @@ editor.on('change', debounce((_, c) =>
 update('init')
 
 // Setup the 3 compile output editors (read only)
-const output_policy = CodeMirror(document.querySelector('#output-policy'), {
+const output_policy = CodeMirror(output_el_policy.querySelector('.codeview'), {
   mode: 'miniscript',
   readOnly: true,
   lineWrapping: true,
   matchBrackets: true,
   theme: 'darcula',
 })
-const output_miniscript = CodeMirror(document.querySelector('#output-miniscript'), {
+const output_miniscript = CodeMirror(output_el_miniscript.querySelector('.codeview'), {
   mode: 'miniscript',
   readOnly: true,
   lineWrapping: true,
   matchBrackets: true,
   theme: 'darcula',
 })
-const output_script = CodeMirror(document.querySelector('#output-script'), {
+const output_script = CodeMirror(output_el_script.querySelector('.codeview'), {
   mode: 'bitcoin',
   readOnly: true,
   lineWrapping: true,

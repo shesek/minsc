@@ -1,11 +1,11 @@
 use miniscript::bitcoin::hashes::hex::{FromHex, ToHex};
 use miniscript::bitcoin::{Network, Script};
-use miniscript::{descriptor::Descriptor, Miniscript, Segwitv0};
+use miniscript::descriptor::Descriptor;
 use serde::Serialize;
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
-use crate::{parse, Evaluate, Policy, Result, Scope, Value};
+use crate::{parse, Evaluate, Result, Scope, Value};
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
@@ -13,55 +13,55 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[derive(Serialize)]
 pub struct JsResult {
-    policy: String,
-    miniscript: String,
-    script_hex: String,
-    script_asm: String,
-    descriptor: String,
-    child_desc: String,
-    spk: String,
-    address: String,
+    policy: Option<String>,
+    miniscript: Option<String>,
+    script_hex: Option<String>,
+    script_asm: Option<String>,
+    descriptor: Option<String>,
+    address: Option<String>,
 }
 
 #[wasm_bindgen(js_name = compile)]
-pub fn js_compile(
-    code: &str,
-    desc_type: &str,
-    network: &str,
-    child_code: u32,
-) -> std::result::Result<JsValue, JsValue> {
+pub fn js_compile(code: &str, network: &str) -> std::result::Result<JsValue, JsValue> {
     let network = Network::from_str(network).map_err(|e| e.to_string())?;
 
-    let policy = compile(code).map_err(|e| e.to_string())?;
-    let miniscript: Miniscript<_, Segwitv0> = policy.compile().map_err(|e| e.to_string())?;
-    let script = miniscript.encode();
+    let value = run(code).map_err(|e| e.to_string())?;
 
-    let descriptor = match desc_type {
-        "wsh" => Descriptor::Wsh(miniscript.clone()),
-        "shwsh" => Descriptor::ShWsh(miniscript.clone()),
-        _ => bail!("Unsupported descriptor type"),
+    let (policy, miniscript, desc, addr) = match value {
+        Value::Policy(policy) => {
+            let miniscript = policy.compile().map_err(|e| e.to_string())?;
+            let desc = Descriptor::Wsh(miniscript.clone());
+            let addr = desc.address(network).unwrap();
+            (Some(policy), Some(miniscript), Some(desc), Some(addr))
+        }
+        Value::Miniscript(miniscript) => {
+            let desc = Descriptor::Wsh(miniscript.clone());
+            let addr = desc.address(network).unwrap();
+            (None, Some(miniscript), Some(desc), Some(addr))
+        }
+        Value::Descriptor(desc) => {
+            let addr = desc.address(network).unwrap();
+            (None, None, Some(desc), Some(addr))
+        }
+        Value::Address(addr) => (None, None, None, Some(addr)),
+        _ => bail!("Unsupported return type for web demo. Expecting policy, miniscript, descriptor or address."),
     };
 
-    let child_desc = descriptor.derive(child_code.into());
-
-    let spk = child_desc.script_pubkey();
-    let address = child_desc.address(network).unwrap();
+    let script = desc.as_ref().map(|d| d.witness_script());
 
     Ok(JsValue::from_serde(&JsResult {
-        policy: policy.to_string(),
-        miniscript: miniscript.to_string(),
-        script_hex: script.to_hex(),
-        script_asm: get_script_asm(&script),
-        descriptor: descriptor.to_string(),
-        child_desc: child_desc.to_string(),
-        spk: spk.to_string(),
-        address: address.to_string(),
+        policy: policy.map(|p| p.to_string()),
+        miniscript: miniscript.map(|m| m.to_string()),
+        descriptor: desc.map(|d| d.to_string()),
+        script_hex: script.as_ref().map(|s| s.to_hex()),
+        script_asm: script.as_ref().map(get_script_asm),
+        address: addr.map(|a| a.to_string()),
     })
     .unwrap())
 }
 
-fn compile(code: &str) -> Result<Policy> {
-    parse(code)?.eval(&DEMO_SCOPE)?.into_policy()
+fn run(code: &str) -> Result<Value> {
+    parse(code)?.eval(&DEMO_SCOPE)
 }
 
 fn get_script_asm(script: &Script) -> String {

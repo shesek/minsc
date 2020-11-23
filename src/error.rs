@@ -45,10 +45,10 @@ pub enum Error {
     #[error("Expected a policy, not {0:?}")]
     NotPolicy(Value),
 
-    #[error("Expected a miniscript, not {0:?}")]
+    #[error("Expected a miniscript or policy, not {0:?}")]
     NotMiniscript(Value),
 
-    #[error("Expected a descriptor, not {0:?}")]
+    #[error("Expected a descriptor. policy or miniscript, not {0:?}")]
     NotDescriptor(Value),
 
     #[error("Invalid probability: {0}")]
