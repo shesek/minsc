@@ -96,16 +96,16 @@ pub mod fns {
     }
     pub fn hash256(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Sha256(args.remove(0).try_into()?).into())
+        Ok(Policy::Hash256(args.remove(0).try_into()?).into())
     }
 
     pub fn ripemd160(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Sha256(args.remove(0).try_into()?).into())
+        Ok(Policy::Ripemd160(args.remove(0).try_into()?).into())
     }
     pub fn hash160(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Sha256(args.remove(0).try_into()?).into())
+        Ok(Policy::Hash160(args.remove(0).try_into()?).into())
     }
 
     // `prob(A, B)` -> `A@B`
