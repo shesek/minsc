@@ -354,7 +354,7 @@ impl fmt::Display for Value {
         match self {
             Value::PubKey(x) => write!(f, "{}", x),
             Value::Number(x) => write!(f, "{}", x),
-            Value::DateTime(x) => write!(f, "{:?}", x),
+            Value::DateTime(x) => write!(f, "{}", x),
             Value::Duration(x) => write!(f, "{:?}", x),
             Value::Hash(x) => write!(f, "{}", x.to_hex()),
             Value::Policy(x) => write!(f, "{}", x),
@@ -364,14 +364,14 @@ impl fmt::Display for Value {
             Value::Address(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{:?}", x),
             Value::Array(Array(elements)) => {
-                write!(f, "[ ")?;
+                write!(f, "[")?;
                 for (i, element) in elements.into_iter().enumerate() {
                     if i > 0 {
-                        write!(f, ", ")?;
+                        write!(f, ",")?;
                     }
-                    write!(f, "{}", element)?;
+                    write!(f, "\n  {}", element)?;
                 }
-                write!(f, " ]")
+                write!(f, "\n]")
             }
         }
     }
