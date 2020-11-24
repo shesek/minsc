@@ -51,12 +51,11 @@ pub mod fns {
     pub fn or(args: Vec<Value>) -> Result<Value> {
         let policies_with_probs = args
             .into_iter()
-            .map(|p| match p {
+            .map(|arg| match arg {
                 Value::WithProb(usize, policy) => Ok((usize, policy)),
-                Value::Policy(policy) => Ok((1, policy)),
-                _ => bail!(Error::InvalidArguments),
+                arg => Ok((1, arg.into_policy()?)),
             })
-            .collect::<Result<Vec<(usize, Policy)>>>()?;
+            .collect::<Result<_>>()?;
         Ok(Policy::Or(policies_with_probs).into())
     }
 
