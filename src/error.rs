@@ -18,9 +18,6 @@ pub enum Error {
     #[error("Missing expected return value, set a final expression or a main() function")]
     NoReturnValue,
 
-    #[error("Invalid main expression, expecting a policy fragment")]
-    InvalidTopLevel,
-
     #[error("Undefined function: {0}")]
     FnNotFound(Ident),
 
@@ -48,14 +45,8 @@ pub enum Error {
     #[error("Expected a miniscript or policy, not {0:?}")]
     NotMiniscript(Value),
 
-    #[error("Expected a descriptor. policy or miniscript, not {0:?}")]
+    #[error("Expected a descriptor, policy or miniscript, not {0:?}")]
     NotDescriptor(Value),
-
-    #[error("Invalid probability: {0}")]
-    InvalidProb(String),
-
-    #[error("Invalid array index, not a number")]
-    InvalidArrayIndex,
 
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,
