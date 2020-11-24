@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use miniscript::bitcoin::Network;
 
 use crate::function::{Function, NativeFunction};
-use crate::runtime::{Array, Value};
+use crate::runtime::Value;
 use crate::time::{duration_to_seq, parse_datetime};
 use crate::{Descriptor, Policy, Result, Scope};
 
@@ -31,16 +31,16 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("wpkh", fns::wpkh);
     attach("sh", fns::wsh);
 
-    // Compile policy to miniscript
-    attach("miniscript", fns::miniscript);
-    // Address generation
-    attach("address", fns::address);
-
-    // Minsc functions
+    // Minsc policy functions
     attach("prob", fns::prob);
     attach("likely", fns::likely);
     attach("all", fns::all);
     attach("any", fns::any);
+
+    // Compile policy to miniscript
+    attach("miniscript", fns::miniscript);
+    // Address generation
+    attach("address", fns::address);
 }
 
 pub mod fns {
@@ -68,11 +68,11 @@ pub mod fns {
     pub fn thresh(mut args: Vec<Value>) -> Result<Value> {
         let thresh_n = args.remove(0).into_usize()?;
         // Support thresh(n, $array) as well as thresh(n, pol1, pol2, ...) invocations
-        let policies = map_policy(if args.len() == 1 && args[0].is_array() {
-            get_elements(args.remove(0))
+        let policies = if args.len() == 1 && args[0].is_array() {
+            map_policy_array(args.remove(0))?
         } else {
-            args
-        })?;
+            map_policy(args)?
+        };
         Ok(Policy::Threshold(thresh_n, policies).into())
     }
 
@@ -137,7 +137,7 @@ pub mod fns {
         Ok(Descriptor::Wsh(args.remove(0).try_into()?).into())
     }
 
-    // Descriptor::Wsh or Descriptor::Wpkh -> Descriptor::Sh*
+    // Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
     pub fn sh(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(match args.remove(0).try_into()? {
@@ -172,24 +172,18 @@ pub mod fns {
     pub fn likely(mut args: Vec<Value>) -> Result<Value> {
         // XXX separate error
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Value::WithProb(LIKELY_PROB, args.remove(0).try_into()?))
+        Ok(Value::WithProb(LIKELY_PROB, args.remove(0).into_policy()?))
     }
 
     pub fn all(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(
-            args.len() == 1 && args[0].is_array(),
-            Error::InvalidArguments
-        );
-        let policies = map_policy(get_elements(args.remove(0)))?;
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let policies = map_policy_array(args.remove(0))?;
         Ok(Policy::Threshold(policies.len(), policies).into())
     }
 
     pub fn any(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(
-            args.len() == 1 && args[0].is_array(),
-            Error::InvalidArguments
-        );
-        let policies = map_policy(get_elements(args.remove(0)))?;
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let policies = map_policy_array(args.remove(0))?;
         Ok(Policy::Threshold(1, policies).into())
     }
 }
@@ -198,10 +192,6 @@ fn map_policy(args: Vec<Value>) -> Result<Vec<Policy>> {
     args.into_iter().map(Value::into_policy).collect()
 }
 
-fn get_elements(val: Value) -> Vec<Value> {
-    match val {
-        Value::Array(Array(elements)) => elements,
-        // assumes that `val` is already known to be an array
-        _ => unreachable!(),
-    }
+fn map_policy_array(array: Value) -> Result<Vec<Policy>> {
+    map_policy(array.into_array_elements()?)
 }

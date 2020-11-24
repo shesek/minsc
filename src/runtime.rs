@@ -296,6 +296,15 @@ impl TryFrom<Value> for Miniscript {
         }
     }
 }
+impl TryFrom<Value> for Vec<Value> {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Array(Array(values)) => Ok(values),
+            v => Err(Error::NotArray(v)),
+        }
+    }
+}
 
 macro_rules! impl_hash_conv {
     ($name:path) => {
@@ -333,6 +342,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_desc(self) -> Result<Descriptor> {
+        self.try_into()
+    }
+    pub fn into_array_elements(self) -> Result<Vec<Value>> {
         self.try_into()
     }
 }
