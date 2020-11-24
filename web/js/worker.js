@@ -2,7 +2,6 @@ let minsc, pending
 
 import('../pkg/index.js').then(module => {
   minsc = module
-  debugger
   if (pending) {
     run(pending)
     pending = null
