@@ -111,8 +111,12 @@ PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{130}|[a-f0-9]{66}|([
 Hash: Expr = <s:r"[a-f0-9]{64}|[a-f0-9]{40}"> =>
     Expr::Hash(<>.into());
 
-ChildDerive: Expr = <parent:SimpleExpr> "/" <path:List1<SimpleExpr, "/">> <wildcard:"/*"?> =>
-  ast::ChildDerive { parent: parent.into(), path, is_wildcard: wildcard.is_some() }.into();
+ChildDerive: Expr = {
+    <parent:SimpleExpr> "/" <path:List1<SimpleExpr, "/">> <wildcard:"/*"?> =>
+      ast::ChildDerive { parent: parent.into(), path, is_wildcard: wildcard.is_some() }.into(),
+    <parent:SimpleExpr> "/*" =>
+      ast::ChildDerive { parent: parent.into(), path: vec![], is_wildcard: true }.into(),
+};
 
 // Duration and times
 
