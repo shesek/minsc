@@ -135,15 +135,10 @@ impl Evaluate for ast::Array {
 
 impl Evaluate for ast::ArrayAccess {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let elements = match self.array.eval(scope)? {
-            Value::Array(Array(elements)) => Ok(elements),
-            v => Err(Error::NotArray(v)),
-        }?;
+        let mut elements = self.array.eval(scope)?.into_array_elements()?;
         let index = self.index.eval(scope)?.into_usize()?;
-        elements
-            .get(index)
-            .cloned()
-            .ok_or_else(|| Error::ArrayIndexOutOfRange)
+        ensure!(index < elements.len(), Error::ArrayIndexOutOfRange);
+        Ok(elements.remove(index))
     }
 }
 
@@ -297,11 +292,11 @@ impl TryFrom<Value> for Miniscript {
         }
     }
 }
-impl TryFrom<Value> for Vec<Value> {
+impl TryFrom<Value> for Array {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
-            Value::Array(Array(values)) => Ok(values),
+            Value::Array(array) => Ok(array),
             v => Err(Error::NotArray(v)),
         }
     }
@@ -349,7 +344,7 @@ impl Value {
         self.try_into()
     }
     pub fn into_array_elements(self) -> Result<Vec<Value>> {
-        self.try_into()
+        Ok(Array::try_from(self)?.0)
     }
 }
 
