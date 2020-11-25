@@ -152,7 +152,9 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let descriptor = args.remove(0).into_desc()?;
         // TODO configurable network
-        let address = descriptor.address(Network::Testnet).unwrap();
+        let address = descriptor
+            .address(Network::Testnet)
+            .expect("non-addressable descriptors cannot be constructed");
         Ok(address.into())
     }
 
@@ -170,7 +172,6 @@ pub mod fns {
     }
 
     pub fn likely(mut args: Vec<Value>) -> Result<Value> {
-        // XXX separate error
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(Value::WithProb(LIKELY_PROB, args.remove(0).into_policy()?))
     }
