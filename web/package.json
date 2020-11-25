@@ -22,5 +22,8 @@
     "webpack-cli": "^3.3.3",
     "webpack-dev-server": "^3.7.1",
     "worker-plugin": "^4.0.3"
+  },
+  "dependencies": {
+    "pug-cli": "^1.0.0-alpha6"
   }
 }
