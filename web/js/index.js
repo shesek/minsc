@@ -21,6 +21,8 @@ const error_el = document.querySelector('#error')
     , output_el_policy = document.querySelector('#output-policy')
     , output_el_miniscript = document.querySelector('#output-miniscript')
     , output_el_script = document.querySelector('#output-script')
+    , output_el_other = document.querySelector('#output-other')
+    , output_el_address = document.querySelector('#output-address')
 
 const initial_code = location.hash.startsWith('#c=') && location.hash.length > 3
                      ? decodeURIComponent(location.hash.substr(3))
@@ -41,12 +43,16 @@ worker.addEventListener('message', ({ data }) => {
     outputs_el.style.display = 'block'
 
     output_el_policy.style.display = r.policy ? 'block' : 'none'
-    output_el_miniscript.style.display = r.miniscript ? 'block' : 'none'
+    output_el_miniscript.style.display = r.miniscript || r.descriptor ? 'block' : 'none'
     output_el_script.style.display = r.script_asm ? 'block' : 'none'
+    output_el_address.style.display = r.address ? 'block' : 'none'
+    output_el_other.style.display = r.other ? 'block' : 'none'
 
     output_policy.setValue(r.policy || '')
-    output_miniscript.setValue(r.miniscript || '')
+    output_miniscript.setValue(r.descriptor || r.miniscript || '')
     output_script.setValue(r.script_asm || '')
+    output_other.setValue(r.other || '')
+    output_el_address.querySelector('p').innerText = r.address || ''
   }
 })
 
@@ -165,6 +171,13 @@ const output_miniscript = CodeMirror(output_el_miniscript.querySelector('.codevi
 })
 const output_script = CodeMirror(output_el_script.querySelector('.codeview'), {
   mode: 'bitcoin',
+  readOnly: true,
+  lineWrapping: true,
+  matchBrackets: true,
+  theme: 'darcula',
+})
+const output_other = CodeMirror(output_el_other.querySelector('.codeview'), {
+  mode: 'minsc',
   readOnly: true,
   lineWrapping: true,
   matchBrackets: true,

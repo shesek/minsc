@@ -70,8 +70,10 @@ body
 
         #outputs
           +box('Policy', true, true).mb-3#output-policy: .codeview
-          +box('Miniscript', true).mb-3#output-miniscript: .codeview
-          +box('Bitcoin Script', true)#output-script: .codeview
+          +box('Miniscript / Descriptor', true).mb-3#output-miniscript: .codeview
+          +box('Bitcoin Script', true).mb-3#output-script: .codeview
+          +box('Address', true, true)#output-address.mb-3: p.m-0.p-2
+          +box('Result', true, true)#output-other.mb-3: .codeview
 
     #ref.mt-4
       +h(2, 'Reference')
