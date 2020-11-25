@@ -39,14 +39,14 @@ pub enum Error {
     #[error("Expected an hash, not {0:?}")]
     NotHash(Value),
 
-    #[error("Expected a policy, not {0:?}")]
-    NotPolicy(Value),
+    #[error("Expected a policy or array of policies, not {0:?}")]
+    NotPolicyLike(Value),
 
     #[error("Expected a miniscript or policy, not {0:?}")]
-    NotMiniscript(Value),
+    NotMiniscriptLike(Value),
 
     #[error("Expected a descriptor, policy or miniscript, not {0:?}")]
-    NotDescriptor(Value),
+    NotDescriptorLike(Value),
 
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,

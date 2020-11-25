@@ -251,7 +251,7 @@ impl TryFrom<Value> for Policy {
         match value {
             Value::Policy(policy) => Ok(policy),
             arr @ Value::Array(Array(_)) => fns::all(vec![arr])?.try_into(),
-            v => Err(Error::NotPolicy(v)),
+            v => Err(Error::NotPolicyLike(v)),
         }
     }
 }
@@ -283,7 +283,7 @@ impl TryFrom<Value> for Descriptor {
             Value::Miniscript(x) => Ok(Descriptor::Wsh(x)),
             Value::Policy(x) => Ok(Descriptor::Wsh(x.compile()?)),
             Value::PubKey(x) => Ok(Descriptor::Wpkh(x)),
-            v => Err(Error::NotDescriptor(v)),
+            v => Err(Error::NotDescriptorLike(v)),
         }
     }
 }
@@ -293,7 +293,7 @@ impl TryFrom<Value> for Miniscript {
         match value {
             Value::Miniscript(x) => Ok(x),
             Value::Policy(x) => Ok(x.compile()?),
-            v => Err(Error::NotMiniscript(v)),
+            v => Err(Error::NotMiniscriptLike(v)),
         }
     }
 }
