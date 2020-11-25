@@ -104,8 +104,8 @@ FnDef: Stmt = {
         ast::FnDef { ident, signature, body }.into(),
 }
 
-// Compressed/uncompressed public key or an xpub, with optional bip32 origin
-PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{130}|[a-f0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
+// An xpub or compressed standalone public key (uncomporessed is unsupported), with optional bip32 origin
+PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
     Expr::PubKey(<>.into());
 
 Hash: Expr = <s:r"[a-f0-9]{64}|[a-f0-9]{40}"> =>
