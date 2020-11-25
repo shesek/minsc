@@ -29,7 +29,7 @@ pub fn attach_builtins(scope: &mut Scope) {
     // Descriptor functions
     attach("wsh", fns::wsh);
     attach("wpkh", fns::wpkh);
-    attach("sh", fns::wsh);
+    attach("sh", fns::sh);
 
     // Minsc policy functions
     attach("prob", fns::prob);
