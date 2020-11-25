@@ -343,7 +343,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "miniscript"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitcoin 0.25.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -357,7 +357,7 @@ dependencies = [
  "lalrpop 0.19.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lalrpop-util 0.19.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "miniscript 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "miniscript 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.117 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.22 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -759,7 +759,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum log 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)" = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 "checksum memchr 2.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
 "checksum memory_units 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
-"checksum miniscript 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c4f8542804cd816cad1aaea64e3e2e326e401269ad6dc6661d2f8be7b3f76e46"
+"checksum miniscript 4.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "352de731b9b53309c80dfe6f66b5c6b065b6d07f5528694a444ea7a982aec581"
 "checksum new_debug_unreachable 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 "checksum num-integer 0.1.44 (registry+https://github.com/rust-lang/crates.io-index)" = "d2cc698a63b549a70bc047073d2949cce27cd1c7b0a4a862d08a8031bc2801db"
 "checksum num-traits 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)" = "9a64b1ec5cda2586e284722486d802acf1f7dbdc623e2bfc57e65ca1cd099290"

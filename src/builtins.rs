@@ -5,6 +5,7 @@ use miniscript::bitcoin::Network;
 use crate::function::{Function, NativeFunction};
 use crate::runtime::Value;
 use crate::time::{duration_to_seq, parse_datetime};
+use crate::util::get_descriptor_ctx;
 use crate::{Descriptor, Policy, Result, Scope};
 
 /// Attach built-in functions to the Minsc runtime envirnoment
@@ -152,8 +153,9 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let descriptor = args.remove(0).into_desc()?;
         // TODO configurable network
+        // XXX support ctx child_code? already possible by deriving the descriptor, but using the ctx is cheaper
         let address = descriptor
-            .address(Network::Testnet)
+            .address(Network::Testnet, get_descriptor_ctx(0))
             .expect("non-addressable descriptors cannot be constructed");
         Ok(address.into())
     }
