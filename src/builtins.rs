@@ -97,7 +97,7 @@ pub mod fns {
 
     pub fn pk(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Key(args.remove(0).try_into()?).into())
+        Ok(Policy::Key(args.remove(0).into_key()?).into())
     }
 
     pub fn sha256(mut args: Vec<Value>) -> Result<Value> {
@@ -121,25 +121,25 @@ pub mod fns {
     // Policy -> Miniscript
     pub fn miniscript(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Value::Miniscript(args.remove(0).try_into()?))
+        Ok(args.remove(0).into_miniscript()?.into())
     }
 
-    // Policy or Miniscript -> Descriptor::Wpkh
+    // Key -> Descriptor::Wpkh
     pub fn wpkh(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Descriptor::Wpkh(args.remove(0).try_into()?).into())
+        Ok(Descriptor::Wpkh(args.remove(0).into_key()?).into())
     }
 
     // Policy or Miniscript -> Descriptor::Wsh
     pub fn wsh(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Descriptor::Wsh(args.remove(0).try_into()?).into())
+        Ok(Descriptor::Wsh(args.remove(0).into_miniscript()?).into())
     }
 
     // Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
     pub fn sh(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(match args.remove(0).try_into()? {
+        Ok(match args.remove(0).into_desc()? {
             Descriptor::Wsh(miniscript) => Descriptor::ShWsh(miniscript),
             Descriptor::Wpkh(key) => Descriptor::ShWpkh(key),
             _ => bail!(Error::InvalidShUse),
@@ -147,6 +147,7 @@ pub mod fns {
         .into())
     }
 
+    // Descriptor, Policy, Miniscript, or Key -> Address
     pub fn address(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let descriptor = args.remove(0).into_desc()?;

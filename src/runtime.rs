@@ -33,6 +33,7 @@ pub enum Value {
 }
 
 impl_from_variant!(Policy, Value);
+impl_from_variant!(Miniscript, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(Address, Value);
@@ -170,7 +171,7 @@ impl Evaluate for ast::ChildDerive {
             Ok(DescriptorPublicKey::XPub(xpub).into())
         }
         // Derive descriptor children
-        // Auto-casts policies and miniscripts into descriptors
+        // Policies and Miniscripts are implicitly coerced into descriptors
         else {
             ensure!(!self.is_wildcard, Error::InvalidArguments);
             let mut desc = parent.into_desc().map_err(|_| Error::InvalidArguments)?;
@@ -180,7 +181,7 @@ impl Evaluate for ast::ChildDerive {
             }
             Ok(desc.into())
         }
-        // TODO support harended child codes
+        // TODO support hardened child codes
     }
 }
 
@@ -339,6 +340,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_key(self) -> Result<DescriptorPublicKey> {
+        self.try_into()
+    }
+    pub fn into_miniscript(self) -> Result<Miniscript> {
         self.try_into()
     }
     pub fn into_desc(self) -> Result<Descriptor> {
