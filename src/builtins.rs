@@ -43,9 +43,15 @@ pub fn attach_builtins(scope: &mut Scope) {
     // Address generation
     attach("address", fns::address);
 
-    // Network types (mainnet is unsupported)
+    // Network types
     scope.set("testnet", Network::Testnet.into()).unwrap();
     scope.set("regtest", Network::Regtest.into()).unwrap();
+    scope
+        .set(
+            "_$$_RECKLESSLY_RISK_MY_BITCOINS_$$_",
+            Network::Bitcoin.into(),
+        )
+        .unwrap();
 }
 
 pub mod fns {
