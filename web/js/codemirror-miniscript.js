@@ -3,16 +3,12 @@ import CodeMirror from 'codemirror'
 CodeMirror.defineSimpleMode("miniscript",{
   start: [
     {
-        token: 'keyword',
-        regex: /[a-z]+:/,
+        regex: /\b([a-z:_]+)(\()/,
+        token: ['keyword', null]
     },
     {
         token: 'operator',
         regex: /[,@]/,
-    },
-    {
-        regex: /(and|and_[a-z]+|or|or_[a-z]+|thresh|multi)(\()/,
-        token: ['keyword', null]
     },
     {
         token: ['builtin', null],
@@ -21,6 +17,10 @@ CodeMirror.defineSimpleMode("miniscript",{
     {
         token: 'number',
         regex: /\b\d+\b/,
+    },
+    {
+        token: "number",
+        regex: /\b([a-f0-9]{8,}|[xt]pub[0-9a-zA-Z]{100,120})\b/,
     },
     {
         token: 'variable-3',
