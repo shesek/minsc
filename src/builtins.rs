@@ -42,6 +42,10 @@ pub fn attach_builtins(scope: &mut Scope) {
     attach("miniscript", fns::miniscript);
     // Address generation
     attach("address", fns::address);
+
+    // Network types (mainnet is unsupported)
+    scope.set("testnet", Network::Testnet.into()).unwrap();
+    scope.set("regtest", Network::Regtest.into()).unwrap();
 }
 
 pub mod fns {
@@ -150,14 +154,14 @@ pub mod fns {
 
     // Descriptor, Policy, Miniscript, or Key -> Address
     pub fn address(mut args: Vec<Value>) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
+        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
         let descriptor = args.remove(0).into_desc()?;
-        // TODO configurable network
-        // XXX support ctx child_code? already possible by deriving the descriptor, but using the ctx is cheaper
+        let network = args.pop().map_or(Ok(Network::Testnet), TryInto::try_into)?;
         let address = descriptor
-            .address(Network::Testnet, get_descriptor_ctx(0))
+            .address(network, get_descriptor_ctx(0))
             .expect("non-addressable descriptors cannot be constructed");
         Ok(address.into())
+        // XXX support ctx child_code? already possible by deriving the descriptor, but using the ctx is cheaper
     }
 
     // `prob(A, B)` -> `A@B`

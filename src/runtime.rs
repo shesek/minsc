@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use miniscript::bitcoin::hashes::{self, hex::FromHex, hex::ToHex, Hash};
-use miniscript::bitcoin::Address;
+use miniscript::bitcoin::{Address, Network};
 use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
@@ -30,6 +30,9 @@ pub enum Value {
 
     Function(Function),
     Array(Array),
+
+    // Exists in the runtime builtins but cannot be constructed
+    Network(Network),
 }
 
 impl_from_variant!(Policy, Value);
@@ -39,6 +42,7 @@ impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
+impl_from_variant!(Network, Value);
 impl_from_variant!(usize, Value, Number);
 
 #[derive(Debug, Clone)]
@@ -302,6 +306,15 @@ impl TryFrom<Value> for Array {
         }
     }
 }
+impl TryFrom<Value> for Network {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Network(array) => Ok(array),
+            v => Err(Error::NotNetwork(v)),
+        }
+    }
+}
 
 macro_rules! impl_hash_conv {
     ($name:path) => {
@@ -363,6 +376,7 @@ impl fmt::Display for Value {
             Value::Descriptor(x) => write!(f, "{}", x),
             Value::Address(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{:?}", x),
+            Value::Network(x) => write!(f, "{}", x),
             Value::Array(Array(elements)) => {
                 write!(f, "[")?;
                 for (i, element) in elements.into_iter().enumerate() {
