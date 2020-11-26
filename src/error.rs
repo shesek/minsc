@@ -39,6 +39,9 @@ pub enum Error {
     #[error("Expected an hash, not {0:?}")]
     NotHash(Value),
 
+    #[error("Expected a network type, not {0:?}")]
+    NotNetwork(Value),
+
     #[error("Expected a policy or array of policies, not {0:?}")]
     NotPolicyLike(Value),
 
