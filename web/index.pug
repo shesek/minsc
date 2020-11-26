@@ -166,7 +166,7 @@ body
           // older(65536) compiles, but doesn't work as can be expected!
           // 🛑 🦶 🔫
 
-        .note: :markdown-it Note that time durations are encoded in granularity of 512 seconds and are rounded up (i.e. 513 seconds becomes 1024 seconds).
+        :markdown-it > Note that time durations are encoded in granularity of 512 seconds and are rounded up (i.e. 513 seconds becomes 1024 seconds).
 
         +h(3, 'Variables')
 
@@ -188,11 +188,11 @@ body
 
           likely@$federation || ($timeout && $recovery)
 
-        .note: :markdown-it(html)
-          Variables are immutable, but can be shadowed over in inner scopes.<br>
-          Scoping is currently dynamic, expected to eventually be replaced with lexical scoping.
+        :markdown-it(html)
+          > The `$` variable prefix is optional.<br>
+          > Variables are immutable, but can be shadowed over in inner scopes.<br>
+          > Scoping is currently dynamic, expected to eventually be replaced with lexical scoping.
         //- There's an optional explicit `let` keyword that you may use.<br>
-        //- The #[code $] variable prefix is optional, but without it unknown variable names will pass through to miniscript instead of erroring.
 
         +h(3, 'Arrays')
 
@@ -280,7 +280,7 @@ body
           fn stuckless_hash($h) = hash160($h.0) && hash160($h.1);
           htlc(A, B, [ H1, H2 ], 6 hours, stuckless_hash)
 
-        //-.note: :markdown-it The final expression within the function is the return value. There's an optional explicit `return` keyword that you may use.
+        //- :markdown-it > The final expression within the function is the return value. There's an optional explicit `return` keyword that you may use.
 
   footer.container.border-top.border-secondary.my-4.pt-2
     :markdown-it
