@@ -75,6 +75,9 @@ pub enum Error {
     #[error("Invalid arguments")]
     InvalidArguments,
 
+    #[error("Descriptors can only be derived with a single child code and without '/*'")]
+    InvalidDescriptorDerivation,
+
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 

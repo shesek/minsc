@@ -168,12 +168,13 @@ impl Evaluate for ast::ChildDerive {
         // Derive descriptor children
         // Policies and Miniscripts are implicitly coerced into descriptors
         else {
-            ensure!(!self.is_wildcard, Error::InvalidArguments);
-            let mut desc = parent.into_desc().map_err(|_| Error::InvalidArguments)?;
-            for child in &self.path {
-                let child = child.eval(scope)?.into_usize()? as u32;
-                desc = desc.derive(child.into());
-            }
+            ensure!(
+                !self.is_wildcard && self.path.len() == 1,
+                Error::InvalidDescriptorDerivation
+            );
+            let desc = parent.into_desc().map_err(|_| Error::InvalidArguments)?;
+            let child = self.path[0].eval(scope)?.into_usize()? as u32;
+            let desc = desc.derive(child.into());
             Ok(desc.into())
         }
         // TODO support hardened child codes
