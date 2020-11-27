@@ -46,8 +46,13 @@ pub fn js_compile(code: &str, network: &str) -> std::result::Result<JsValue, JsV
             let addr = desc.address(network, ctx).unwrap();
             (None, None, Some(desc), Some(addr), None)
         }
+        Value::PubKey(key) => {
+            let desc = Descriptor::Wpkh(key.clone());
+            let addr = desc.address(network, ctx).unwrap();
+            (None, None, Some(desc), Some(addr), Some(key.into()))
+        }
         Value::Address(addr) => (None, None, None, Some(addr), None),
-        other => (None, None, None, None, Some(other.to_string())),
+        other => (None, None, None, None, Some(other)),
     };
 
     // XXX derive descriptor at some index?
@@ -61,7 +66,7 @@ pub fn js_compile(code: &str, network: &str) -> std::result::Result<JsValue, JsV
         //script_hex: script.as_ref().map(|s| s.to_hex()),
         script_asm: script.as_ref().map(get_script_asm),
         address: addr.map(|a| a.to_string()),
-        other,
+        other: other.map(|o| o.to_string()),
     })
     .unwrap())
 }
@@ -128,7 +133,6 @@ lazy_static! {
             "L",
             "029e5de3f2391700fdb5f45aa5db40b953de8bd4a147663b1cd89aa0703a0c2fcf",
         );
-
         add_key(
             "user_pk",
             "03c620141755e90c86ec35fe57594e0b4b1a32f09f15bc0a43b06f9feb71c1b06c",
@@ -138,16 +142,32 @@ lazy_static! {
             "02f8b2c15f9e301d7e46169a35088724cbcb264f678d628d615c38ee964f836245",
         );
         add_key(
-            "buyer",
+            "buyer_pk",
             "03829e91bb8d4df87fea147f98ef5d3e71c7c26204a5ed5de2d1d966938d017ac2",
         );
         add_key(
-            "seller",
+            "seller_pk",
             "0215152236dd9f518dd2bba50487857b98bdb4778c3618780a25a0cbc660092185",
         );
         add_key(
-            "arbiter",
+            "arbiter_pk",
             "0203bc5458e2b77b5f5a68a738a57bee0271a27e603100c4110533bf8811c19e2e",
+        );
+        add_key(
+            "ceo_pk",
+            "03e9035b99913ea072be74032489f7d20725ae496f8809b1c1924dbeacf590c5ed",
+        );
+        add_key(
+            "desktop_pk",
+            "02e0e913c8e67ee002ed4a877a54722b0483f999ad49111081318f204f1a470c58",
+        );
+        add_key(
+            "mobile_pk",
+            "02065bf89fb085e06188a885fc191e25469ebd2868b160bd525778eedbe2f987cf",
+        );
+        add_key(
+            "$alice",
+            "xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw/9/0",
         );
 
         let mut add_hash = |name, hash: &str| {
