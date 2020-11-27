@@ -14,12 +14,10 @@ fn main() -> Result<()> {
     let mut code = String::new();
     reader.read_to_string(&mut code)?;
 
-    let ast = parse(&code)?;
-
     if print_ast {
-        println!("{:#?}", ast);
+        println!("{:#?}", parse(&code));
     } else {
-        let res = run(ast)?;
+        let res = run(&code)?;
         println!("{}\n", res);
         println!("{:#?}", res);
     }
