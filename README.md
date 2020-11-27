@@ -41,7 +41,7 @@ Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpa
 
   likely@$federation || ($timeout && $recovery)
   ```
-  [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20Liquid-like%20federated%20pegin%2C%20with%20emergency%20recovery%20keys%0A%0A%24federation%20%3D%204%20of%20%5B%20pk%28A%29%2C%20pk%28B%29%2C%20pk%28C%29%2C%20pk%28D%29%2C%20pk%28E%29%20%5D%3B%20%0A%24recovery%20%3D%202%20of%20%5B%20pk%28F%29%2C%20pk%28G%29%2C%20pk%28H%29%20%5D%3B%0A%24timeout%20%3D%20older%283%20months%29%3B%0A%0Alikely%40%24federation%20%7C%7C%20%28%24timeout%20%26%26%20%24recovery%29)
+  [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20Liquid-like%20federated%20pegin%2C%20with%20emergency%20recovery%20keys%0A%0A%24federation%20%3D%204%20of%20%5B%20pk%28A%29%2C%20pk%28B%29%2C%20pk%28C%29%2C%20pk%28D%29%2C%20pk%28E%29%20%5D%3B%20%0A%24recovery%20%3D%202%20of%20%5B%20pk%28F%29%2C%20pk%28G%29%2C%20pk%28I%29%20%5D%3B%0A%24timeout%20%3D%20older%283%20months%29%3B%0A%0Alikely%40%24federation%20%7C%7C%20%28%24timeout%20%26%26%20%24recovery%29)
 
 - The BOLT #3 received HTLC policy
   ```hack
@@ -54,7 +54,7 @@ Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpa
 
   bolt3_htlc_received(A, B, C, H1, 2 hours)
   ```
-  [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20The%20BOLT%20%233%20received%20HTLC%20policy%0A%0Afn%20bolt3_htlc_received%28%24revoke_pk%2C%20%24local_pk%2C%20%24remote_pk%2C%20%24secret%2C%20%24delay%29%20%7B%0A%20%20%24success%20%3D%20pk%28%24local_pk%29%20%26%26%20hash160%28%24secret%29%3B%0A%20%20%24timeout%20%3D%20older%28%24delay%29%3B%0A%0A%20%20pk%28%24revoke_pk%29%20%7C%7C%20%28pk%28%24remote_pk%29%20%26%26%20%28%24success%20%7C%7C%20%24timeout%29%29%0A%7D%0A%0Abolt3_htlc_received%28A%2C%20B%2C%20C%2C%20H%2C%202%20hours%29)
+  [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20The%20BOLT%20%233%20received%20HTLC%20policy%0A%0Afn%20bolt3_htlc_received%28%24revoke_pk%2C%20%24local_pk%2C%20%24remote_pk%2C%20%24secret%2C%20%24delay%29%20%7B%0A%20%20%24success%20%3D%20pk%28%24local_pk%29%20%26%26%20hash160%28%24secret%29%3B%0A%20%20%24timeout%20%3D%20older%28%24delay%29%3B%0A%0A%20%20pk%28%24revoke_pk%29%20%7C%7C%20%28pk%28%24remote_pk%29%20%26%26%20%28%24success%20%7C%7C%20%24timeout%29%29%0A%7D%0A%0Abolt3_htlc_received%28A%2C%20B%2C%20C%2C%20H1%2C%202%20hours%29)
 
 - Advanced 2FA where the user has a 2-of-2 setup and the service provider is a 3-of-4 federation
   ```hack
@@ -66,7 +66,7 @@ Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpa
 
   two_factor($user, 3 of $providers, 4 months)
   ```
-  [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20Two%20factor%20authentication%20with%20a%20timeout%20recovery%20clause%0Afn%20two_factor%28%24user%2C%20%24provider%2C%20%24delay%29%20%3D%20%0A%20%20%24user%20%26%26%20%28likely%40%24provider%20%7C%7C%20older%28%24delay%29%29%3B%0A%0A%2F%2F%202FA%20where%20the%20user%20has%20a%202-of-2%20setup%20and%20the%20provider%20is%20a%203-of-4%20federation%0A%0A%24user%20%3D%20pk%28user_desktop%29%20%26%26%20pk%28user_mobile%29%3B%0A%24providers%20%3D%20%5B%20pk%28P1%29%2C%20pk%28P2%29%2C%20pk%28P3%29%2C%20pk%28P4%29%20%5D%3B%0A%0Atwo_factor%28%24user%2C%203%20of%20%24providers%2C%204%20months%29)
+  [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20Two%20factor%20authentication%20with%20a%20timeout%20recovery%20clause%0Afn%20two_factor%28%24user%2C%20%24provider%2C%20%24delay%29%20%3D%20%0A%20%20%24user%20%26%26%20%28likely%40%24provider%20%7C%7C%20older%28%24delay%29%29%3B%0A%0A%2F%2F%202FA%20where%20the%20user%20has%20a%202-of-2%20setup%20and%20the%20provider%20is%20a%203-of-4%20federation%0A%0A%24user%20%3D%20pk%28desktop_pk%29%20%26%26%20pk%28mobile_pk%29%3B%0A%24providers%20%3D%20%5B%20pk%28A%29%2C%20pk%28B%29%2C%20pk%28C%29%2C%20pk%28D%29%20%5D%3B%0A%0Atwo_factor%28%24user%2C%203%20of%20%24providers%2C%204%20months%29)
 
 More examples are available on https://min.sc.
 
@@ -89,16 +89,17 @@ $ minsc examples/htlc.minsc --ast
 
 Using the Rust API:
 ```rust
-use minsc::{parse, run};
+use minsc::{parse, run, eval};
 
 let code = "pk(A) && older(1 week)";
-let ast = parse(code).unwrap();
-let result = run(ast).unwrap();
+let ast = parse(&code).unwrap();
+let result = eval(ast).unwrap();
+// or parse+eval in one go with `run(&code)`
 
 let policy = result.into_policy().unwrap();
 println!("{}", policy);
 
-// Also available: into_miniscript() and into_desc()
+// also available: into_miniscript() and into_desc()
 ```
 
 Full documentation for the Rust API is [available here](https://docs.rs/minsc/).
