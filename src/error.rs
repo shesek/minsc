@@ -81,6 +81,9 @@ pub enum Error {
     #[error("Descriptors can only be derived with a single child code and without '/*'")]
     InvalidDescriptorDerivation,
 
+    #[error("Standalone single keys cannot be derived")]
+    InvalidSingleDerivation,
+
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 

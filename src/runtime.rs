@@ -160,7 +160,7 @@ impl Evaluate for ast::ChildDerive {
         if let Value::PubKey(key) = parent {
             let mut xpub = match key {
                 DescriptorPublicKey::XPub(xpub) => xpub,
-                DescriptorPublicKey::SinglePub(_) => bail!(Error::InvalidArguments),
+                DescriptorPublicKey::SinglePub(_) => bail!(Error::InvalidSingleDerivation),
             };
             for child in &self.path {
                 let child = child.eval(scope)?.into_usize()? as u32;
@@ -176,7 +176,7 @@ impl Evaluate for ast::ChildDerive {
                 !self.is_wildcard && self.path.len() == 1,
                 Error::InvalidDescriptorDerivation
             );
-            let desc = parent.into_desc().map_err(|_| Error::InvalidArguments)?;
+            let desc = parent.into_desc()?;
             let child = self.path[0].eval(scope)?.into_usize()? as u32;
             let desc = desc.derive(child.into());
             Ok(desc.into())
