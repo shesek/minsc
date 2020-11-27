@@ -36,7 +36,7 @@ Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpa
 - Liquid-like federated pegin, with emergency recovery keys that become active after a timeout
   ```hack
   $federation = 4 of [ pk(A), pk(B), pk(C), pk(D), pk(E) ];
-  $recovery = 2 of [ pk(F), pk(G), pk(H) ];
+  $recovery = 2 of [ pk(F), pk(G), pk(I) ];
   $timeout = older(3 months);
 
   likely@$federation || ($timeout && $recovery)
@@ -52,7 +52,7 @@ Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpa
     pk($revoke_pk) || (pk($remote_pk) && ($success || $timeout))
   }
 
-  bolt3_htlc_received(A, B, C, H, 2 hours)
+  bolt3_htlc_received(A, B, C, H1, 2 hours)
   ```
   [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20The%20BOLT%20%233%20received%20HTLC%20policy%0A%0Afn%20bolt3_htlc_received%28%24revoke_pk%2C%20%24local_pk%2C%20%24remote_pk%2C%20%24secret%2C%20%24delay%29%20%7B%0A%20%20%24success%20%3D%20pk%28%24local_pk%29%20%26%26%20hash160%28%24secret%29%3B%0A%20%20%24timeout%20%3D%20older%28%24delay%29%3B%0A%0A%20%20pk%28%24revoke_pk%29%20%7C%7C%20%28pk%28%24remote_pk%29%20%26%26%20%28%24success%20%7C%7C%20%24timeout%29%29%0A%7D%0A%0Abolt3_htlc_received%28A%2C%20B%2C%20C%2C%20H%2C%202%20hours%29)
 
@@ -61,8 +61,8 @@ Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpa
   fn two_factor($user, $provider, $delay) =
     $user && (likely@$provider || older($delay));
 
-  $user = pk(user_desktop) && pk(user_mobile);
-  $providers = [ pk(P1), pk(P2), pk(P3), pk(P4) ];
+  $user = pk(desktop_pk) && pk(mobile_pk);
+  $providers = [ pk(A), pk(B), pk(C), pk(D) ];
 
   two_factor($user, 3 of $providers, 4 months)
   ```
@@ -89,27 +89,34 @@ $ minsc examples/htlc.minsc --ast
 
 Using the Rust API:
 ```rust
-use minsc::{parse, run, compile};
+use minsc::{parse, run};
 
-let s = "pk(A) && older(1 week)";
+let code = "pk(A) && older(1 week)";
+let ast = parse(code).unwrap();
+let result = run(ast).unwrap();
 
-let ast = parse(s).unwrap();
-let policy = run(ast).unwrap().into_policy().unwrap();
+let policy = result.into_policy().unwrap();
 println!("{}", policy);
 
-// Or in one go
-let policy = compile(s).unwrap();
+// Also available: into_miniscript() and into_desc()
 ```
+
+Full documentation for the Rust API is [available here](https://docs.rs/minsc/).
 
 ## JavaScript WASM package
 
 Install with `npm install minsc` and:
 
 ```js
-import { compile } from 'minsc'
+import { run } from 'minsc'
 
-const policy = compile('pk(A) && older(1 week)')
-console.log(policy)
+const policy = run('pk(A) && older(1 week)')
+const miniscript = run('miniscript(pk(A) && older(1 week))')
+const descriptor = run('wsh(miniscript(pk(A) && older(1 week)))')
+const address = run('address(wsh(miniscript(pk(A) && older(1 week))))')
+const address2 = run('address(pk(A) && older(1 week))')
+
+console.log({ policy, miniscript, descriptor, address, address2 })
 ```
 
 
