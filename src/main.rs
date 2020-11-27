@@ -4,7 +4,10 @@ use std::{env, fs, io};
 fn main() -> Result<()> {
     let mut args = env::args();
     let input = args.nth(1).unwrap_or_else(|| "-".into());
-    let print_ast = args.next() == Some("--ast".into());
+
+    let arg = args.next();
+    let print_ast = arg == Some("--ast".into());
+    let debug = arg == Some("--debug".into());
 
     let mut reader: Box<dyn io::Read> = match &*input {
         "-" => Box::new(io::stdin()),
@@ -18,8 +21,10 @@ fn main() -> Result<()> {
         println!("{:#?}", parse(&code));
     } else {
         let res = run(&code)?;
-        println!("{}\n", res);
-        println!("{:#?}", res);
+        println!("{}", res);
+        if debug {
+            println!("\n\n{:#?}", res);
+        }
     }
 
     Ok(())
