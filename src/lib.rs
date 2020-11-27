@@ -20,6 +20,8 @@ pub mod scope;
 pub mod time;
 pub mod util;
 
+#[cfg(feature = "playground")]
+pub mod playground;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
