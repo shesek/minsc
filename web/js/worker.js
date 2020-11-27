@@ -18,7 +18,7 @@ addEventListener('message', ({ data: req }) => {
 
 function run({ code, network }) {
   try {
-    const result = minsc.compile(code, network)
+    const result = minsc.run_playground(code, network)
     postMessage({ result })
   } catch (err) {
     console.error(''+err, err.stack)
