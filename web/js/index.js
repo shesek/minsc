@@ -52,7 +52,7 @@ worker.addEventListener('message', ({ data }) => {
     output_miniscript.setValue(r.descriptor || r.miniscript || '')
     output_script.setValue(r.script_asm || '')
     output_other.setValue(r.other || '')
-    output_el_address.querySelector('p').innerText = r.address || ''
+    output_el_address.querySelector('span').innerText = r.address || ''
   }
 })
 
@@ -122,6 +122,7 @@ document.querySelectorAll('.card.collapsible').forEach(collapsible => {
   collapsible.querySelector('.card-header').addEventListener('click', _ => {
     collapsible.classList.toggle('collapsed')
 
+    output_policy.refresh()
     output_miniscript.refresh()
     output_script.refresh()
   })
