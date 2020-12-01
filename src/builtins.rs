@@ -150,9 +150,12 @@ pub mod fns {
     // Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
     pub fn sh(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(match args.remove(0).into_desc()? {
-            Descriptor::Wsh(miniscript) => Descriptor::ShWsh(miniscript),
-            Descriptor::Wpkh(key) => Descriptor::ShWpkh(key),
+        Ok(match args.remove(0) {
+            Value::Descriptor(desc) => match desc {
+                Descriptor::Wsh(miniscript) => Descriptor::ShWsh(miniscript),
+                Descriptor::Wpkh(key) => Descriptor::ShWpkh(key),
+                _ => bail!(Error::InvalidShUse),
+            },
             _ => bail!(Error::InvalidShUse),
         }
         .into())

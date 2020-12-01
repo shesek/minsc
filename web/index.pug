@@ -293,10 +293,10 @@ body
         +snippet.
           // p2sh-p2wsh
           $policy = pk($alice) && older(1 month);
-          $desc1 = sh($policy); // == sh(wsh($policy))
+          $desc1 = sh(wsh($policy));
 
-          // p2sh-p2pkh
-          $desc2 = sh($alice); // == sh(wpkh($alice))
+          // p2sh-p2wpkh
+          $desc2 = sh(wpkh($alice));
 
           [ $desc1, $desc2, address($desc1), address($desc2) ]
 
