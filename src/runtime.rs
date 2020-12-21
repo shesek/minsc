@@ -109,7 +109,7 @@ fn eval_andor(name: &str, thresh_n: usize, policies: &[Expr], scope: &Scope) -> 
         call(scope, &name.into(), policies)
     } else {
         // delegate to thresh() when there are more
-        let thresh_n = ast::Expr::Number(thresh_n).into();
+        let thresh_n = ast::Expr::Number(thresh_n);
         let mut args = vec![&thresh_n];
         args.extend(policies);
         call(scope, &"thresh".into(), &args)
@@ -337,10 +337,7 @@ impl_hash_conv!(hashes::hash160::Hash);
 
 impl Value {
     pub fn is_array(&self) -> bool {
-        match self {
-            Value::Array(_) => true,
-            _ => false,
-        }
+        matches!(self, Value::Array(_))
     }
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
@@ -379,7 +376,7 @@ impl fmt::Display for Value {
             Value::Network(x) => write!(f, "{}", x),
             Value::Array(Array(elements)) => {
                 write!(f, "[")?;
-                for (i, element) in elements.into_iter().enumerate() {
+                for (i, element) in elements.iter().enumerate() {
                     if i > 0 {
                         write!(f, ",")?;
                     }
