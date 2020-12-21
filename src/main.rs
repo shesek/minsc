@@ -1,4 +1,4 @@
-use minsc::{parse, run, Result};
+use minsc::{compile, parse, Result};
 use std::{env, fs, io};
 
 fn main() -> Result<()> {
@@ -20,7 +20,7 @@ fn main() -> Result<()> {
     if print_ast {
         println!("{:#?}", parse(&code));
     } else {
-        let res = run(&code)?;
+        let res = compile(&code)?;
         println!("{}", res);
         if debug {
             println!("\n\n{:#?}", res);

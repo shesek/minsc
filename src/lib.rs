@@ -45,6 +45,6 @@ pub fn eval(expr: Expr) -> Result<Value> {
     expr.eval(&Scope::root())
 }
 
-pub fn run(s: &str) -> Result<Policy> {
+pub fn compile(s: &str) -> Result<Policy> {
     eval(parse(s)?)?.into_policy()
 }
