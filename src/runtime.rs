@@ -3,12 +3,13 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use miniscript::bitcoin::hashes::{self, hex::FromHex, hex::ToHex, Hash};
-use miniscript::bitcoin::{Address, Network};
+use miniscript::bitcoin::{Address, Network, Script};
 use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::builtins::fns;
 use crate::function::{Call, Function};
+use crate::util::get_descriptor_ctx;
 use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
@@ -26,6 +27,7 @@ pub enum Value {
 
     Miniscript(Miniscript),
     Descriptor(Descriptor),
+    Script(Script),
     Address(Address),
 
     Function(Function),
@@ -39,6 +41,7 @@ impl_from_variant!(Policy, Value);
 impl_from_variant!(Miniscript, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
+impl_from_variant!(Script, Value);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
@@ -354,6 +357,10 @@ impl Value {
     pub fn into_desc(self) -> Result<Descriptor> {
         self.try_into()
     }
+    pub fn into_script_pubkey(self) -> Result<Script> {
+        let ctx = get_descriptor_ctx(0);
+        Ok(self.into_desc()?.script_pubkey(ctx))
+    }
     pub fn into_array_elements(self) -> Result<Vec<Value>> {
         Ok(Array::try_from(self)?.0)
     }
@@ -372,6 +379,7 @@ impl fmt::Display for Value {
             Value::Miniscript(x) => write!(f, "{}", x),
             Value::Descriptor(x) => write!(f, "{}", x),
             Value::Address(x) => write!(f, "{}", x),
+            Value::Script(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{:?}", x),
             Value::Network(x) => write!(f, "{}", x),
             Value::Array(Array(elements)) => {

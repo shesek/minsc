@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use miniscript::bitcoin::Network;
+use miniscript::bitcoin::{Address, Network};
 
 use crate::function::{Function, NativeFunction};
 use crate::runtime::Value;
@@ -40,6 +40,9 @@ pub fn attach_builtins(scope: &mut Scope) {
 
     // Compile policy to miniscript
     attach("miniscript", fns::miniscript);
+    // Script functions
+    attach("script_pubkey", fns::script_pubkey);
+    attach("script_witness", fns::script_witness);
     // Address generation
     attach("address", fns::address);
 
@@ -161,16 +164,30 @@ pub mod fns {
         .into())
     }
 
-    // Descriptor, Policy, Miniscript, or Key -> Address
+    // Descriptor, Policy, Miniscript, or Key -> Pubkey Script
+    pub fn script_pubkey(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let ctx = get_descriptor_ctx(0);
+        let descriptor = args.remove(0).into_desc()?;
+        Ok(descriptor.script_pubkey(ctx).into())
+    }
+
+    // Descriptor, Policy, Miniscript, or Key -> Witness Script
+    pub fn script_witness(mut args: Vec<Value>) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let ctx = get_descriptor_ctx(0);
+        let descriptor = args.remove(0).into_desc()?;
+        Ok(descriptor.witness_script(ctx).into())
+    }
+
+    // Descriptor, Policy, Miniscript, Script or Key -> Address
     pub fn address(mut args: Vec<Value>) -> Result<Value> {
         ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        let descriptor = args.remove(0).into_desc()?;
+        let script = args.remove(0).into_script_pubkey()?;
         let network = args.pop().map_or(Ok(Network::Testnet), TryInto::try_into)?;
-        let address = descriptor
-            .address(network, get_descriptor_ctx(0))
+        let address = Address::from_script(&script, network)
             .expect("non-addressable descriptors cannot be constructed");
         Ok(address.into())
-        // XXX support ctx child_code? already possible by deriving the descriptor, but using the ctx is cheaper
     }
 
     // `prob(A, B)` -> `A@B`
