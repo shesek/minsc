@@ -1,7 +1,8 @@
-use minsc::compile;
+use minsc::run;
 
 fn test(minsc: &str, expected_policy: &str) {
-    let policy = compile(&replace_dummy(minsc)).unwrap().to_string();
+    let res = run(&replace_dummy(minsc)).unwrap();
+    let policy = res.into_policy().unwrap().to_string();
     assert_eq!(policy, replace_dummy(expected_policy));
 }
 
