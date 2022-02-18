@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::ast::{self, Expr, Ident};
 use crate::error::{Error, Result};
 use crate::runtime::{Evaluate, Value};
@@ -19,11 +21,17 @@ pub struct UserFunction {
 impl_from_variant!(UserFunction, Function, User);
 
 /// A native function implemented in Rust
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NativeFunction {
-    pub body: fn(Vec<Value>) -> Result<Value>,
+    pub body: fn(Vec<Value>, &Scope) -> Result<Value>,
 }
 impl_from_variant!(NativeFunction, Function, Native);
+
+impl fmt::Debug for NativeFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("NativeFunction")
+    }
+}
 
 pub trait Call {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value>;
@@ -57,8 +65,8 @@ impl Call for UserFunction {
 }
 
 impl Call for NativeFunction {
-    fn call(&self, args: Vec<Value>, _scope: &Scope) -> Result<Value> {
-        (self.body)(args)
+    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
+        (self.body)(args, scope)
     }
 }
 

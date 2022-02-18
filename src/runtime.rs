@@ -253,7 +253,7 @@ impl TryFrom<Value> for Policy {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
-            arr @ Value::Array(Array(_)) => fns::all(vec![arr])?.try_into(),
+            arr @ Value::Array(Array(_)) => fns::all_(arr)?.try_into(),
             v => Err(Error::NotPolicyLike(v)),
         }
     }

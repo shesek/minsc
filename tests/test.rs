@@ -30,7 +30,6 @@ fn test_probs() {
     test("10@pk(A) || pk(B)", "or(10@pk(A),1@pk(B))");
     test("likely@pk(A) || pk(B)", "or(10@pk(A),1@pk(B))");
     test("prob(10, pk(A)) || pk(B)", "or(10@pk(A),1@pk(B))");
-    test("likely(pk(A)) || pk(B)", "or(10@pk(A),1@pk(B))");
 }
 
 #[test]
