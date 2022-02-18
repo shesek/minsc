@@ -89,21 +89,6 @@ ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:Number> =>
 // TODO support all Paren<Expr>
 ArrayAccessLHS = { Ident, Call, Array, BlockExpr };
 
-// Statements
-
-Assign: Stmt = "let"? <assigns:List1<Assignment, ",">> ";" =>
-    ast::Assign(assigns).into();
-
-Assignment: ast::Assignment = <lhs:IdentTerm> "=" <rhs:Expr> =>
-    ast::Assignment { lhs, rhs };
-
-FnDef: Stmt = {
-    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "=" <body:Expr> ";" =>
-        ast::FnDef { ident, signature, body }.into(),
-    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "{" <body:Block> "}" ";"? =>
-        ast::FnDef { ident, signature, body }.into(),
-}
-
 // An xpub or compressed standalone public key (uncomporessed is unsupported), with optional bip32 origin
 PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
     Expr::PubKey(<>.into());
@@ -140,6 +125,21 @@ DurationClockPart: ast::DurationPart = {
 
 DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
   Expr::DateTime(<>.into());
+
+// Statements
+
+Assign: Stmt = "let"? <assigns:List1<Assignment, ",">> ";" =>
+    ast::Assign(assigns).into();
+
+Assignment: ast::Assignment = <lhs:IdentTerm> "=" <rhs:Expr> =>
+    ast::Assignment { lhs, rhs };
+
+FnDef: Stmt = {
+    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "=" <body:Expr> ";" =>
+        ast::FnDef { ident, signature, body }.into(),
+    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "{" <body:Block> "}" ";"? =>
+        ast::FnDef { ident, signature, body }.into(),
+}
 
 // Helpers
 
