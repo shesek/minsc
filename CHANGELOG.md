@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add script fragment interpolation syntax
+
+  With a space-separated list of expressions enclosed in backticks. For example: ``` `1 2 OP_DUP OP_ADD 3 OP_EQUAL` ```
+
+  The data types that can be interpolated are: Scripts, Descriptor, Miniscript and Policy (concatenated as script bytes), as well as Number, PubKey, Hash, Duration and DateTime (as PUSH operations).
+
 - Add anonymous function expressions
 
   With a Rust-like syntax: `|params| body` or `|params| { multi statement body }`

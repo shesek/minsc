@@ -2,13 +2,16 @@ use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use miniscript::bitcoin::hashes::{self, hex::FromHex, hex::ToHex, Hash};
-use miniscript::bitcoin::{Address, Network, Script};
+use bitcoin::blockdata::script::Builder as ScriptBuilder;
+use bitcoin::hashes::{self, hex::FromHex, hex::ToHex, Hash};
+use bitcoin::{Address, Network, Script};
 use miniscript::descriptor::DescriptorPublicKey;
+use miniscript::{bitcoin, ToPublicKey};
 
 use crate::ast::{self, Expr, Stmt};
 use crate::builtins::fns;
 use crate::function::{Call, Function};
+use crate::time;
 use crate::util::get_descriptor_ctx;
 use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 
@@ -194,6 +197,22 @@ impl Evaluate for ast::FnExpr {
     }
 }
 
+impl Evaluate for ast::ScriptFrag {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let scripts = self
+            .fragments
+            .iter()
+            .map(|frag| frag.eval(scope)?.into_script())
+            .collect::<Result<Vec<Script>>>()?;
+        let bytes = scripts
+            .into_iter()
+            .map(|script| script.into_bytes())
+            .flatten()
+            .collect::<Vec<u8>>();
+        Ok(Script::from(bytes).into())
+    }
+}
+
 impl Evaluate for ast::Block {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut scope = scope.child();
@@ -226,6 +245,7 @@ impl Evaluate for Expr {
             Expr::Array(x) => x.eval(scope)?,
             Expr::ArrayAccess(x) => x.eval(scope)?,
             Expr::ChildDerive(x) => x.eval(scope)?,
+            Expr::ScriptFrag(x) => x.eval(scope)?,
             Expr::FnExpr(x) => x.eval(scope)?,
 
             // Atoms
@@ -307,6 +327,7 @@ impl TryFrom<Value> for Miniscript {
         }
     }
 }
+
 impl TryFrom<Value> for Array {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -322,6 +343,51 @@ impl TryFrom<Value> for Network {
         match value {
             Value::Network(array) => Ok(array),
             v => Err(Error::NotNetwork(v)),
+        }
+    }
+}
+
+impl TryFrom<Value> for Script {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Script(x) => Ok(x),
+
+            // Descriptor or descriptor-like
+            v @ Value::Descriptor(_) | v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
+                let ctx = get_descriptor_ctx(0);
+                Ok(v.into_desc()?.script_code(ctx))
+            }
+            Value::Number(n) => Ok(ScriptBuilder::new().push_int(n as i64).into_script()),
+            Value::PubKey(desc_pubkey) => {
+                let pubkey = desc_pubkey.to_public_key(get_descriptor_ctx(0));
+                Ok(ScriptBuilder::new().push_key(&pubkey).into_script())
+            }
+            Value::Hash(hash) => {
+                let script = ScriptBuilder::new().push_slice(&hash).into_script();
+                Ok(script.into())
+            }
+            Value::Duration(dur) => {
+                let seq_num = time::duration_to_seq(&dur)?;
+                Ok(ScriptBuilder::new().push_int(seq_num as i64).into_script())
+            }
+            Value::DateTime(datetime) => {
+                let unix_timestamp = time::parse_datetime(&datetime)?;
+                Ok(ScriptBuilder::new()
+                    .push_int(unix_timestamp as i64)
+                    .into_script())
+            }
+            Value::Array(Array(elements)) => {
+                let scriptbytes = elements
+                    .into_iter()
+                    .map(|val| Ok(val.into_script()?.into_bytes()))
+                    .collect::<Result<Vec<Vec<u8>>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<u8>>();
+                Ok(scriptbytes.into())
+            }
+            v => Err(Error::NotScriptLike(v)),
         }
     }
 }
@@ -364,12 +430,15 @@ impl Value {
     pub fn into_desc(self) -> Result<Descriptor> {
         self.try_into()
     }
-    pub fn into_script_pubkey(self) -> Result<Script> {
-        let ctx = get_descriptor_ctx(0);
-        Ok(self.into_desc()?.script_pubkey(ctx))
+    pub fn into_script(self) -> Result<Script> {
+        self.try_into()
     }
     pub fn into_array_elements(self) -> Result<Vec<Value>> {
         Ok(Array::try_from(self)?.0)
+    }
+    pub fn into_script_pubkey(self) -> Result<Script> {
+        let ctx = get_descriptor_ctx(0);
+        Ok(self.into_desc()?.script_pubkey(ctx))
     }
 }
 

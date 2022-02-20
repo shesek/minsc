@@ -45,6 +45,7 @@ SimpleExpr: Expr = {
   DateTime,
   Hash,
   PubKey,
+  ScriptFrag,
   Paren<And>,
   Paren<Or>,
   Paren<ChildDerive>,
@@ -107,6 +108,10 @@ ChildDerive: Expr = {
     <parent:SimpleExpr> "/*" =>
       ast::ChildDerive { parent: parent.into(), path: vec![], is_wildcard: true }.into(),
 };
+
+ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
+  ast::ScriptFrag { fragments }.into();
+ScriptFragPart = { Ident, Number, Call, BlockExpr, ArrayAccess, Hash, PubKey };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();

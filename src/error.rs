@@ -51,6 +51,9 @@ pub enum Error {
     #[error("Expected a descriptor, policy or miniscript, not {0:?}")]
     NotDescriptorLike(Value),
 
+    #[error("Expected value castable to Script, not {0:?}")]
+    NotScriptLike(Value),
+
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,
 

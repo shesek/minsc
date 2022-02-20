@@ -11,6 +11,7 @@ pub enum Expr {
     Array(Array),
     ArrayAccess(ArrayAccess),
     ChildDerive(ChildDerive),
+    ScriptFrag(ScriptFrag),
     FnExpr(FnExpr),
 
     // Atoms
@@ -65,7 +66,7 @@ pub struct Thresh {
 }
 impl_from_variant!(Thresh, Expr);
 
-/// A terminal word expression. This can either be a variable name or a plain value passed-through to miniscript.
+/// A terminal word expression
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Ident(pub String);
 impl_from_variant!(Ident, Expr);
@@ -107,6 +108,12 @@ pub struct ChildDerive {
     pub is_wildcard: bool,
 }
 impl_from_variant!(ChildDerive, Expr);
+
+#[derive(Debug, Clone)]
+pub struct ScriptFrag {
+    pub fragments: Vec<Expr>,
+}
+impl_from_variant!(ScriptFrag, Expr);
 
 /// An anonymous function expression
 #[derive(Debug, Clone)]
