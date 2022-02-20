@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add anonymous function expressions
+
+  With a Rust-like syntax: `|params| body` or `|params| { multi statement body }`
+
 - New `Script` runtime data type and `script_pubkey()`/`script_witness()` functions
 
 ## 0.2.0 - 2020-11-27

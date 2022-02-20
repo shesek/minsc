@@ -11,6 +11,7 @@ pub enum Expr {
     Array(Array),
     ArrayAccess(ArrayAccess),
     ChildDerive(ChildDerive),
+    FnExpr(FnExpr),
 
     // Atoms
     PubKey(String),
@@ -106,6 +107,14 @@ pub struct ChildDerive {
     pub is_wildcard: bool,
 }
 impl_from_variant!(ChildDerive, Expr);
+
+/// An anonymous function expression
+#[derive(Debug, Clone)]
+pub struct FnExpr {
+    pub signature: Vec<Ident>,
+    pub body: Box<Expr>,
+}
+impl_from_variant!(FnExpr, Expr);
 
 // Duration (relative block height or time)
 #[derive(Debug, Clone)]

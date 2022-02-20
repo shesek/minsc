@@ -188,6 +188,12 @@ impl Evaluate for ast::ChildDerive {
     }
 }
 
+impl Evaluate for ast::FnExpr {
+    fn eval(&self, _scope: &Scope) -> Result<Value> {
+        Ok(Function::from(self.clone()).into())
+    }
+}
+
 impl Evaluate for ast::Block {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut scope = scope.child();
@@ -220,6 +226,7 @@ impl Evaluate for Expr {
             Expr::Array(x) => x.eval(scope)?,
             Expr::ArrayAccess(x) => x.eval(scope)?,
             Expr::ChildDerive(x) => x.eval(scope)?,
+            Expr::FnExpr(x) => x.eval(scope)?,
 
             // Atoms
             Expr::PubKey(x) => Value::PubKey(x.parse()?),

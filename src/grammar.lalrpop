@@ -26,6 +26,7 @@ Expr: Expr = {
   And,
   Or,
   ChildDerive,
+  FnExpr,
 };
 
 SimpleExpr: Expr = {
@@ -44,6 +45,7 @@ SimpleExpr: Expr = {
   Paren<And>,
   Paren<Or>,
   Paren<ChildDerive>,
+  Paren<FnExpr>,
   Paren<SimpleExpr>,
 };
 
@@ -102,6 +104,15 @@ ChildDerive: Expr = {
     <parent:SimpleExpr> "/*" =>
       ast::ChildDerive { parent: parent.into(), path: vec![], is_wildcard: true }.into(),
 };
+
+FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
+    ast::FnExpr { signature, body: body.into() }.into();
+FnExprSignature = {
+  "|" <List0<IdentTerm, ",">> "|",
+  // No arguments should already be captured by the `List0`, but for some reason it isn't.
+  // Possibly because `||` is also a terminal for policy OR?
+  "||" => vec![],
+}
 
 // Duration and times
 

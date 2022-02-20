@@ -89,3 +89,14 @@ impl From<ast::FnDef> for Function {
         .into()
     }
 }
+
+impl From<ast::FnExpr> for Function {
+    fn from(fn_expr: ast::FnExpr) -> Self {
+        UserFunction {
+            ident: "_anon".into(),
+            signature: fn_expr.signature,
+            body: *fn_expr.body,
+        }
+        .into()
+    }
+}
