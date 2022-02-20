@@ -3,18 +3,21 @@ use crate::util::{concat, parse_str_prefix};
 
 grammar;
 
-// Enable `//` comments
 match {
-    r"\s*" => { },
-    r"//[^\n\r]*[\n\r]*" => { },
-    _,
+  // Skip extra whitespace
+  r"\s*" => { },
+  // Skip `//` comments
+  r"//[^\n\r]*[\n\r]*" => { },
+  // Skip `/* */` comments
+  r"/\*([^\*]*\*+[^\*/])*([^\*]*\*+|[^\*])*\*/" => { },
+  _,
 }
 
 pub Program: Expr = <stmts:Stmt*> <ret:Return?> =>
-  ast::Block { stmts,  return_value: ret.map(Into::into) }.into();
+  ast::Block { stmts, return_value: ret.map(Into::into) }.into();
 
 Block: Expr = <stmts:Stmt*> <ret:Return> =>
-  ast::Block { stmts,  return_value: Some(ret.into()) }.into();
+  ast::Block { stmts, return_value: Some(ret.into()) }.into();
 
 Stmt: Stmt = {
   FnDef,
