@@ -96,15 +96,15 @@ ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:SimpleExpr> =>
 ArrayAccessLHS = { Ident, Call, Array, BlockExpr };
 
 // An xpub or compressed standalone public key (uncompressed is unsupported), with optional bip32 origin
-PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
+PubKey: Expr = <s:r"(\[[a-fA-F0-9]{8}(/\d+['h]?)*\])?([a-fA-F0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
     Expr::PubKey(<>.into());
 
 Bytes: Expr = {
-  <s:r"0x[a-f0-9]*"> =>? Expr::bytes_from_hex(&<>[2..]),
+  <s:r"0x[a-fA-F0-9]*"> =>? Expr::bytes_from_hex(&<>[2..]),
   // Bytes are typically constructed with the `0x` prefix, but can be constructed without
   // it if the length is exactly 32 or 20 bytes. This is done for compatibility with the
   // Miniscript Policy syntax for hash literals.
-  <s:r"[a-f0-9]{64}|[a-f0-9]{40}"> =>? Expr::bytes_from_hex(&<>),
+  <s:r"[a-fA-F0-9]{64}|[a-fA-F0-9]{40}"> =>? Expr::bytes_from_hex(&<>),
 };
 
 ChildDerive: Expr = {
