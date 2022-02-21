@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     reader.read_to_string(&mut code)?;
 
     if print_ast {
-        println!("{:#?}", parse(&code));
+        println!("{:#?}", parse(&code)?);
     } else {
         let res = eval(parse(&code)?)?;
         println!("{}", res);
