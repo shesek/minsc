@@ -36,8 +36,8 @@ pub enum Error {
     #[error("Expected a pubkey, not {0:?}")]
     NotPubKey(Value),
 
-    #[error("Expected an hash, not {0:?}")]
-    NotHash(Value),
+    #[error("Expected hash bytes, not {0:?}")]
+    NotHashLike(Value),
 
     #[error("Expected a network type, not {0:?}")]
     NotNetwork(Value),

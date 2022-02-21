@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
-use bitcoin::hashes::{self, hex::FromHex, hex::ToHex, Hash};
+use bitcoin::hashes::{self, hex::ToHex, Hash};
 use bitcoin::{Address, Network, Script};
 use miniscript::descriptor::DescriptorPublicKey;
 use miniscript::{bitcoin, ToPublicKey};
@@ -20,7 +20,6 @@ use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 #[derive(Debug, Clone)]
 pub enum Value {
     PubKey(DescriptorPublicKey),
-    Hash(Vec<u8>),
     Bytes(Vec<u8>),
     Number(usize),
     DateTime(String),
@@ -252,7 +251,6 @@ impl Evaluate for Expr {
 
             // Atoms
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
-            Expr::Hash(x) => Value::Hash(Vec::from_hex(&x)?),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::Number(x) => Value::Number(*x),
             Expr::Duration(x) => Value::Duration(x.clone()),
@@ -367,7 +365,6 @@ impl TryFrom<Value> for Script {
                 let pubkey = desc_pubkey.to_public_key(get_descriptor_ctx(0));
                 Ok(ScriptBuilder::new().push_key(&pubkey).into_script())
             }
-            Value::Hash(hash) => Ok(ScriptBuilder::new().push_slice(&hash).into_script()),
             Value::Duration(dur) => {
                 let seq_num = time::duration_to_seq(&dur)?;
                 Ok(ScriptBuilder::new().push_int(seq_num as i64).into_script())
@@ -399,9 +396,8 @@ macro_rules! impl_hash_conv {
             type Error = Error;
             fn try_from(value: Value) -> Result<Self> {
                 match value {
-                    Value::Hash(h) => Ok(Self::from_slice(&h)?),
                     Value::Bytes(b) => Ok(Self::from_slice(&b)?),
-                    v => Err(Error::NotHash(v)),
+                    v => Err(Error::NotHashLike(v)),
                 }
             }
         }
@@ -451,7 +447,6 @@ impl fmt::Display for Value {
             Value::Number(x) => write!(f, "{}", x),
             Value::DateTime(x) => write!(f, "{}", x),
             Value::Duration(x) => write!(f, "{:?}", x),
-            Value::Hash(x) => write!(f, "{}", x.to_hex()),
             Value::Bytes(x) => write!(f, "{}", x.to_hex()),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),

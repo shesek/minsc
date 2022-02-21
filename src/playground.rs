@@ -166,7 +166,7 @@ lazy_static! {
 
         let mut add_hash = |name, hash: &str| {
             scope
-                .set(name, Value::Hash(Vec::from_hex(hash).unwrap()))
+                .set(name, Value::Bytes(Vec::from_hex(hash).unwrap()))
                 .unwrap();
         };
         add_hash(

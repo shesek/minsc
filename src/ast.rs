@@ -16,7 +16,6 @@ pub enum Expr {
 
     // Atoms
     PubKey(String),
-    Hash(String),
     Bytes(Vec<u8>),
     Number(usize),
     Duration(Duration),

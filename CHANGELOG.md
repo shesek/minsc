@@ -14,7 +14,12 @@
 
 - Add new `Bytes` runtime data type
 
-  Constructable using a new `0x<hex>` expression syntax
+  Constructable using a new `0x<hex>` expression syntax.
+
+  This can now be used in place of the `Hash` data type, which was removed.
+  To remain compatible with the Miniscript Policy syntax for literal
+  hashes, a Bytes value can be constructed without the `0x` prefix
+  when it is exactly 32 or 20 bytes.
 
 - New `Script` runtime data type and `script_pubkey()`/`script_witness()` functions
 
