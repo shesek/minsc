@@ -45,6 +45,7 @@ SimpleExpr: Expr = {
   DateTime,
   Hash,
   PubKey,
+  Bytes,
   ScriptFrag,
   Paren<And>,
   Paren<Or>,
@@ -95,12 +96,15 @@ ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:SimpleExpr> =>
 // TODO support all Paren<Expr>
 ArrayAccessLHS = { Ident, Call, Array, BlockExpr };
 
-// An xpub or compressed standalone public key (uncomporessed is unsupported), with optional bip32 origin
+// An xpub or compressed standalone public key (uncompressed is unsupported), with optional bip32 origin
 PubKey: Expr = <s:r"(\[[a-f0-9]{8}(/\d+['h]?)*\])?([a-f0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
     Expr::PubKey(<>.into());
 
 Hash: Expr = <s:r"[a-f0-9]{64}|[a-f0-9]{40}"> =>
     Expr::Hash(<>.into());
+
+Bytes: Expr = <s:r"0x[a-f0-9]+"> =>?
+  Expr::bytes_from_hex(&<>);
 
 ChildDerive: Expr = {
     <parent:SimpleExpr> "/" <path:List1<SimpleExpr, "/">> <wildcard:"/*"?> =>
@@ -111,7 +115,7 @@ ChildDerive: Expr = {
 
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
   ast::ScriptFrag { fragments }.into();
-ScriptFragPart = { Ident, Number, Call, BlockExpr, ArrayAccess, Hash, PubKey };
+ScriptFragPart = { Ident, Number, Call, BlockExpr, ArrayAccess, Hash, PubKey, Bytes };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();

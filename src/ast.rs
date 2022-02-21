@@ -17,6 +17,7 @@ pub enum Expr {
     // Atoms
     PubKey(String),
     Hash(String),
+    Bytes(Vec<u8>),
     Number(usize),
     Duration(Duration),
     DateTime(String),
@@ -163,4 +164,19 @@ impl_from_variant!(Assign, Stmt);
 pub struct Assignment {
     pub lhs: Ident,
     pub rhs: Expr,
+}
+
+use lalrpop_util::ParseError;
+type LalrError = ParseError<usize, lalrpop_util::lexer::Token<'static>, &'static str>;
+
+impl Expr {
+    pub fn bytes_from_hex(s: &str) -> Result<Expr, LalrError> {
+        use miniscript::bitcoin::hashes::hex::FromHex;
+
+        Ok(Expr::Bytes(Vec::from_hex(s).map_err(|_| {
+            ParseError::User {
+                error: "Invalid bytes hex string",
+            }
+        })?))
+    }
 }

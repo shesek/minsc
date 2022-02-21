@@ -12,6 +12,10 @@
 
   With a Rust-like syntax: `|params| body` or `|params| { multi statement body }`
 
+- Add new `Bytes` runtime data type
+
+  Constructable using a new `0x<hex>` expression syntax
+
 - New `Script` runtime data type and `script_pubkey()`/`script_witness()` functions
 
 - Add support for multi-line `/* .. */` comments
