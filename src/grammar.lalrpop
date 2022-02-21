@@ -89,7 +89,7 @@ WithProb: Expr = <prob:SExpr> "@" <expr:SimpleExpr> =>
 Array: Expr = "[" <List0<Expr, ",">> "]" =>
   ast::Array(<>).into();
 
-ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:Number> =>
+ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:SimpleExpr> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
 
 // TODO support all Paren<Expr>

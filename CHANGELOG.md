@@ -16,6 +16,10 @@
 
 - Add support for multi-line `/* .. */` comments
 
+- Allow using non-literal expressions as the array access index
+
+  For example: `$list.$n` or `$list.(some complex expression)`
+
 ## 0.2.0 - 2020-11-27
 
 - Ported from sipa-miniscript to rust-miniscript (#1)
