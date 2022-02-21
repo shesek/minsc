@@ -1,7 +1,7 @@
 use lalrpop_util::ParseError;
 use std::fmt;
 
-use miniscript::bitcoin::hashes;
+use miniscript::bitcoin::{self, hashes};
 use miniscript::descriptor::DescriptorKeyParseError;
 use miniscript::policy::compiler::CompilerError;
 
@@ -107,6 +107,9 @@ pub enum Error {
 
     #[error("IO error: {0:?}")]
     Io(std::io::Error),
+
+    #[error("Bitcoin key error: {0}")]
+    BitcoinKey(bitcoin::util::key::Error),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -126,3 +129,4 @@ impl_from_variant!(hashes::Error, Error, HashError);
 impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
+impl_from_variant!(bitcoin::util::key::Error, Error, BitcoinKey);

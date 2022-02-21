@@ -5,7 +5,7 @@ use std::fmt;
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, hex::ToHex, Hash};
 use bitcoin::{Address, Network, Script};
-use miniscript::descriptor::DescriptorPublicKey;
+use miniscript::descriptor::{self, DescriptorPublicKey};
 use miniscript::{bitcoin, ToPublicKey};
 
 use crate::ast::{self, Expr, Stmt};
@@ -302,6 +302,15 @@ impl TryFrom<Value> for DescriptorPublicKey {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::PubKey(x) => Ok(x),
+            Value::Bytes(x) => {
+                let pubkey = bitcoin::PublicKey::from_slice(&x)?;
+                Ok(DescriptorPublicKey::SinglePub(
+                    descriptor::DescriptorSinglePub {
+                        key: pubkey,
+                        origin: None,
+                    },
+                ))
+            }
             v => Err(Error::NotPubKey(v)),
         }
     }
