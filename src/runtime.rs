@@ -342,6 +342,16 @@ impl TryFrom<Value> for Miniscript {
     }
 }
 
+impl TryFrom<Value> for Vec<u8> {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Bytes(bytes) => Ok(bytes),
+            v => Err(Error::NotBytes(v)),
+        }
+    }
+}
+
 impl TryFrom<Value> for Array {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -433,6 +443,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_key(self) -> Result<DescriptorPublicKey> {
+        self.try_into()
+    }
+    pub fn into_bytes(self) -> Result<Vec<u8>> {
         self.try_into()
     }
     pub fn into_miniscript(self) -> Result<Miniscript> {

@@ -42,6 +42,9 @@ pub enum Error {
     #[error("Expected a network type, not {0:?}")]
     NotNetwork(Value),
 
+    #[error("Expected bytes, not {0:?}")]
+    NotBytes(Value),
+
     #[error("Expected a policy or array of policies, not {0:?}")]
     NotPolicyLike(Value),
 

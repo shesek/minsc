@@ -6,7 +6,7 @@
 
   With a space-separated list of expressions enclosed in backticks. For example: ``` `1 2 OP_DUP OP_ADD 3 OP_EQUAL` ```
 
-  The data types that can be interpolated are: Scripts, Descriptor, Miniscript and Policy (concatenated as script bytes), as well as Number, PubKey, Hash, Duration and DateTime (as PUSH operations).
+  The data types that can be interpolated are: Scripts, Descriptor, Miniscript and Policy (concatenated as script bytes), as well as Number, PubKey, Hash, Duration, DateTime and Bytes (as PUSH operations).
 
 - Add anonymous function expressions
 
@@ -21,7 +21,13 @@
   hashes, a Bytes value can be constructed without the `0x` prefix
   when it is exactly 32 or 20 bytes.
 
-- New `Script` runtime data type and `script_pubkey()`/`script_witness()` functions
+- New `Script` runtime data type and new functions for producing it:
+
+  a. `rawscript(Bytes) -> Script` (get a Script for the given raw opcode bytes. e.g. `rawscript(0xb2)` for `OP_CSV`)
+  a. `script_pubkey(Descriptor) -> Script` (get the scriptPubKey to be used in the output)
+  b. `script_witness(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the `redeemScript` for P2SH)
+
+  The `script_*` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
 - Add support for multi-line `/* .. */` comments
 
