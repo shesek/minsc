@@ -46,11 +46,15 @@ impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(Script, Value);
 impl_from_variant!(Address, Value);
-impl_from_variant!(Function, Value);
 impl_from_variant!(Array, Value);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(Network, Value);
 impl_from_variant!(usize, Value, Number);
+impl<T: Into<Function>> From<T> for Value {
+    fn from(f: T) -> Self {
+        Value::Function(f.into())
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Array(pub Vec<Value>);
@@ -78,7 +82,7 @@ impl Execute for ast::Assign {
 impl Execute for ast::FnDef {
     fn exec(&self, scope: &mut Scope) -> Result<()> {
         let func = Function::from(self.clone());
-        scope.set(self.ident.clone(), func.into())
+        scope.set(self.ident.clone(), func)
     }
 }
 

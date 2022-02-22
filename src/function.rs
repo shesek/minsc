@@ -22,9 +22,10 @@ impl_from_variant!(UserFunction, Function, User);
 
 /// A native function implemented in Rust
 #[derive(Clone)]
-pub struct NativeFunction {
-    pub body: fn(Vec<Value>, &Scope) -> Result<Value>,
-}
+pub struct NativeFunction(pub NativeFunctionPt);
+
+pub type NativeFunctionPt = fn(Vec<Value>, &Scope) -> Result<Value>;
+
 impl_from_variant!(NativeFunction, Function, Native);
 
 impl fmt::Debug for NativeFunction {
@@ -66,7 +67,7 @@ impl Call for UserFunction {
 
 impl Call for NativeFunction {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        (self.body)(args, scope)
+        (self.0)(args, scope)
     }
 }
 
@@ -76,6 +77,12 @@ impl Call for Value {
             Value::Function(func) => func.call(args, scope),
             v => Err(Error::NotFn(v.clone())),
         }
+    }
+}
+
+impl From<NativeFunctionPt> for Function {
+    fn from(f: NativeFunctionPt) -> Self {
+        NativeFunction(f).into()
     }
 }
 
