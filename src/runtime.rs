@@ -9,8 +9,8 @@ use miniscript::descriptor::{self, DescriptorPublicKey};
 use miniscript::{bitcoin, ToPublicKey};
 
 use crate::ast::{self, Expr, Stmt};
-use crate::builtins::fns;
 use crate::function::{Call, Function};
+use crate::stdlib::miniscript::fns as miniscript_fns;
 use crate::time;
 use crate::util::get_descriptor_ctx;
 use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
@@ -285,7 +285,7 @@ impl TryFrom<Value> for Policy {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
-            arr @ Value::Array(Array(_)) => fns::all_(arr)?.try_into(),
+            arr @ Value::Array(Array(_)) => miniscript_fns::all_(arr)?.try_into(),
             v => Err(Error::NotPolicyLike(v)),
         }
     }

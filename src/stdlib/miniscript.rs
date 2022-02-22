@@ -1,8 +1,7 @@
 use std::convert::TryInto;
 
-use miniscript::bitcoin::{Address, Network};
+use ::miniscript::bitcoin::{Address, Network};
 
-use crate::function::{Function, NativeFunction};
 use crate::runtime::Value;
 use crate::time::{duration_to_seq, parse_datetime};
 use crate::util::get_descriptor_ctx;
@@ -10,59 +9,50 @@ use crate::{Descriptor, Policy, Result, Scope};
 
 const LIKELY_PROB: usize = 10;
 
-/// Attach built-in functions to the Minsc runtime envirnoment
-pub fn attach_builtins(scope: &mut Scope) {
-    let mut attach = |ident, body| {
-        let func = Function::from(NativeFunction { body });
-        scope.set(ident, func.into()).unwrap();
-    };
-
+pub fn attach_stdlib(scope: &mut Scope) {
     // Miniscript Policy functions exposed in the Minsc runtime
-    attach("or", fns::or);
-    attach("and", fns::and);
-    attach("thresh", fns::thresh);
-    attach("older", fns::older);
-    attach("after", fns::after);
-    attach("pk", fns::pk);
-    attach("sha256", fns::sha256);
-    attach("hash256", fns::hash256);
-    attach("ripemd160", fns::ripemd160);
-    attach("hash160", fns::hash160);
+    scope.set_fn("or", fns::or).unwrap();
+    scope.set_fn("and", fns::and).unwrap();
+    scope.set_fn("thresh", fns::thresh).unwrap();
+    scope.set_fn("older", fns::older).unwrap();
+    scope.set_fn("after", fns::after).unwrap();
+    scope.set_fn("pk", fns::pk).unwrap();
+    scope.set_fn("sha256", fns::sha256).unwrap();
+    scope.set_fn( "hash256", fns::hash256).unwrap();
+    scope.set_fn("ripemd160", fns::ripemd160).unwrap();
+    scope.set_fn("hash160", fns::hash160).unwrap();
 
     // Descriptor functions
-    attach("wsh", fns::wsh);
-    attach("wpkh", fns::wpkh);
-    attach("sh", fns::sh);
+    scope.set_fn("wsh", fns::wsh).unwrap();
+    scope.set_fn("wpkh", fns::wpkh).unwrap();
+    scope.set_fn("sh", fns::sh).unwrap();
 
     // Minsc policy functions
-    attach("prob", fns::prob);
-    attach("all", fns::all);
-    attach("any", fns::any);
+    scope.set_fn("all", fns::all).unwrap();
+    scope.set_fn("any", fns::any).unwrap();
+    scope.set_fn("prob", fns::prob).unwrap();
 
     // Compile policy to miniscript
-    attach("miniscript", fns::miniscript);
-    // Script functions
-    attach("script_pubkey", fns::script_pubkey);
-    attach("script_witness", fns::script_witness);
+    scope.set_fn("miniscript", fns::miniscript).unwrap();
+
+    // Compile descriptor/miniscript to script
+    scope.set_fn("script_pubkey", fns::script_pubkey).unwrap();
+    scope.set_fn("script_witness", fns::script_witness).unwrap();
+
     // Address generation
-    attach("address", fns::address);
+    scope.set_fn("address", fns::address).unwrap();
 
-    scope.set("likely", Value::Number(LIKELY_PROB)).unwrap();
-
-    // Network types
-    scope.set("testnet", Network::Testnet.into()).unwrap();
-    scope.set("regtest", Network::Regtest.into()).unwrap();
-    scope
-        .set(
-            "_$$_RECKLESSLY_RISK_MY_BITCOINS_$$_",
-            Network::Bitcoin.into(),
-        )
-        .unwrap();
+    // `likely` as an alias for 10 (i.e. `likely@pk(A) || pk(B)`)
+    scope.set("likely", LIKELY_PROB).unwrap();
 }
 
 pub mod fns {
     use super::*;
     use crate::Error;
+
+    //
+    // Miniscript Policy functions
+    //
 
     pub fn or(args: Vec<Value>, _: &Scope) -> Result<Value> {
         let policies_with_probs = args
@@ -200,6 +190,7 @@ pub mod fns {
         Ok(Value::WithProb(prob_n, policy))
     }
 
+    // Turn `[A,B,C]` array into an `A && B && C` policy
     pub fn all(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         all_(args.remove(0))
@@ -210,6 +201,7 @@ pub mod fns {
         Ok(Policy::Threshold(policies.len(), policies).into())
     }
 
+    // Turn `[A,B,C]` array into an `A || B || C` policy
     pub fn any(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let policies = map_policy_array(args.remove(0))?;
