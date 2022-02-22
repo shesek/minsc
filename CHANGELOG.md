@@ -31,6 +31,13 @@
 
 - New array function: `len(Array) -> Number`
 
+- New utility function: `repeat(Number, Function|Value) -> Array`
+
+  The second parameter can be a value to fill the array with,
+  or a function that gets called with the index to produce the value.
+
+  For example: `repeat(3, 111) == [111, 111, 111]`, or with a function: `repeat(3, |$n| 100+$n) == [100, 101, 102]`.
+
 - Add support for multi-line `/* .. */` comments
 
 - Allow using non-literal expressions as the array access index

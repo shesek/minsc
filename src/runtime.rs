@@ -361,6 +361,17 @@ impl TryFrom<Value> for Array {
         }
     }
 }
+
+impl TryFrom<Value> for Function {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Function(f) => Ok(f),
+            v => Err(Error::NotFn(v)),
+        }
+    }
+}
+
 impl TryFrom<Value> for Network {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -433,6 +444,9 @@ impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
 
 impl Value {
+    pub fn array(elements: Vec<Value>) -> Value {
+        Array(elements).into()
+    }
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
@@ -455,6 +469,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_script(self) -> Result<Script> {
+        self.try_into()
+    }
+    pub fn into_fn(self) -> Result<Function> {
         self.try_into()
     }
     pub fn into_array_elements(self) -> Result<Vec<Value>> {
