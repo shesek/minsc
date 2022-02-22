@@ -29,6 +29,8 @@
 
   The `script_*` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
+- New array function: `len(Array) -> Number`
+
 - Add support for multi-line `/* .. */` comments
 
 - Allow using non-literal expressions as the array access index

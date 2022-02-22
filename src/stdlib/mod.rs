@@ -9,6 +9,7 @@ pub mod miniscript;
 pub fn attach_stdlib(scope: &mut Scope) {
     self::miniscript::attach_stdlib(scope);
 
+    scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("rawscript", fns::rawscript).unwrap();
 
     // Network types
@@ -22,6 +23,12 @@ pub fn attach_stdlib(scope: &mut Scope) {
 pub mod fns {
     use super::*;
     use crate::Error;
+
+    pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let array_els = args.remove(0).into_array_elements()?;
+        Ok(array_els.len().into())
+    }
 
     pub fn rawscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
