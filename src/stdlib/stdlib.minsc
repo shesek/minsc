@@ -1,0 +1,38 @@
+// Bitcoin opcodes
+// Generated with: curl -s https://raw.githubusercontent.com/rust-bitcoin/rust-bitcoin/master/src/blockdata/opcodes.rs | grep 'pub const'  | sed -r 's/.*(OP_\w+).* (0x\w{2}).*/\1 = rawscript(\2),/' | egrep -v 'OP_RETURN_|PUSH|NOP|INVALIDOPCODE')
+OP_RESERVED = rawscript(0x50), OP_VER = rawscript(0x62), OP_IF = rawscript(0x63), OP_NOTIF = rawscript(0x64), OP_VERIF = rawscript(0x65), OP_VERNOTIF = rawscript(0x66), OP_ELSE = rawscript(0x67), OP_ENDIF = rawscript(0x68), OP_VERIFY = rawscript(0x69), OP_TOALTSTACK = rawscript(0x6b), OP_FROMALTSTACK = rawscript(0x6c), OP_2DROP = rawscript(0x6d), OP_2DUP = rawscript(0x6e), OP_3DUP = rawscript(0x6f), OP_2OVER = rawscript(0x70), OP_2ROT = rawscript(0x71), OP_2SWAP = rawscript(0x72), OP_IFDUP = rawscript(0x73), OP_DEPTH = rawscript(0x74), OP_DROP = rawscript(0x75), OP_DUP = rawscript(0x76), OP_NIP = rawscript(0x77), OP_OVER = rawscript(0x78), OP_PICK = rawscript(0x79), OP_ROLL = rawscript(0x7a), OP_ROT = rawscript(0x7b), OP_SWAP = rawscript(0x7c), OP_TUCK = rawscript(0x7d), OP_CAT = rawscript(0x7e), OP_SUBSTR = rawscript(0x7f), OP_LEFT = rawscript(0x80), OP_RIGHT = rawscript(0x81), OP_SIZE = rawscript(0x82), OP_INVERT = rawscript(0x83), OP_AND = rawscript(0x84), OP_OR = rawscript(0x85), OP_XOR = rawscript(0x86), OP_EQUAL = rawscript(0x87), OP_EQUALVERIFY = rawscript(0x88), OP_RESERVED1 = rawscript(0x89), OP_RESERVED2 = rawscript(0x8a), OP_1ADD = rawscript(0x8b), OP_1SUB = rawscript(0x8c), OP_2MUL = rawscript(0x8d), OP_2DIV = rawscript(0x8e), OP_NEGATE = rawscript(0x8f), OP_ABS = rawscript(0x90), OP_NOT = rawscript(0x91), OP_0NOTEQUAL = rawscript(0x92), OP_ADD = rawscript(0x93), OP_SUB = rawscript(0x94), OP_MUL = rawscript(0x95), OP_DIV = rawscript(0x96), OP_MOD = rawscript(0x97), OP_LSHIFT = rawscript(0x98), OP_RSHIFT = rawscript(0x99), OP_BOOLAND = rawscript(0x9a), OP_BOOLOR = rawscript(0x9b), OP_NUMEQUAL = rawscript(0x9c), OP_NUMEQUALVERIFY = rawscript(0x9d), OP_NUMNOTEQUAL = rawscript(0x9e), OP_LESSTHAN = rawscript(0x9f), OP_GREATERTHAN = rawscript(0xa0), OP_LESSTHANOREQUAL = rawscript(0xa1), OP_GREATERTHANOREQUAL = rawscript(0xa2), OP_MIN = rawscript(0xa3), OP_MAX = rawscript(0xa4), OP_WITHIN = rawscript(0xa5), OP_RIPEMD160 = rawscript(0xa6), OP_SHA1 = rawscript(0xa7), OP_SHA256 = rawscript(0xa8), OP_HASH160 = rawscript(0xa9), OP_HASH256 = rawscript(0xaa), OP_CODESEPARATOR = rawscript(0xab), OP_CHECKSIG = rawscript(0xac), OP_CHECKSIGVERIFY = rawscript(0xad), OP_CHECKMULTISIG = rawscript(0xae), OP_CHECKMULTISIGVERIFY = rawscript(0xaf), OP_CLTV = rawscript(0xb1), OP_CSV = rawscript(0xb2), OP_RETURN = rawscript(0x6a);
+OP_FALSE = `0`, OP_TRUE = `1`;
+
+// Elements additions
+OP_CHECKSIGFROMSTACK = rawscript(0xc1), OP_CHECKSIGFROMSTACKVERIFY = rawscript(0xc2), OP_SUBSTR_LAZY = rawscript(0xc3);
+
+// Elements taproot additions
+OP_INSPECTINPUTOUTPOINT = rawscript(0xc7), OP_INSPECTINPUTASSET = rawscript(0xc8), OP_INSPECTINPUTVALUE = rawscript(0xc9), OP_INSPECTINPUTSCRIPTPUBKEY = rawscript(0xca), OP_INSPECTINPUTSEQUENCE = rawscript(0xcb), OP_INSPECTINPUTISSUANCE = rawscript(0xcc), OP_PUSHCURRENTINPUTINDEX = rawscript(0xcd), OP_INSPECTOUTPUTASSET = rawscript(0xce), OP_INSPECTOUTPUTVALUE = rawscript(0xcf), OP_INSPECTOUTPUTNONCE = rawscript(0xd0), OP_INSPECTOUTPUTSCRIPTPUBKEY = rawscript(0xd1), OP_INSPECTVERSION = rawscript(0xd2), OP_INSPECTLOCKTIME = rawscript(0xd3), OP_INSPECTNUMINPUTS = rawscript(0xd4), OP_INSPECTNUMOUTPUTS = rawscript(0xd5), OP_TXWEIGHT = rawscript(0xd6), OP_ADD64 = rawscript(0xd7), OP_SUB64 = rawscript(0xd8), OP_MUL64 = rawscript(0xd9), OP_DIV64 = rawscript(0xda), OP_NEG64 = rawscript(0xdb), OP_LESSTHAN64 = rawscript(0xdc), OP_LESSTHANOREQUAL64 = rawscript(0xdd), OP_GREATERTHAN64 = rawscript(0xde), OP_GREATERTHANOREQUAL64 = rawscript(0xdf), OP_SCRIPTNUMTOLE64 = rawscript(0xe0), OP_LE64TOSCRIPTNUM = rawscript(0xe1), OP_LE32TOLE64 = rawscript(0xe2), OP_TWEAKVERIFY = rawscript(0xe4);
+
+// Array functions
+fn first($arr) = $arr.0;
+fn last($arr) = $arr.(sub(len($arr), 1));
+fn map($arr, $cb) = repeat(len($arr), |$n| $cb($arr.$n));
+fn range($start, $end) = repeat(add(sub($end, $start), 1), |$n| add($start, $n));
+fn slice($arr, $start, $len) = map(range($start, add($start, $len)), |$n| $arr.$n);
+fn tail($arr) = slice($arr, 1, sub(len($arr), 1));
+
+// Dispatch the call to the script fragment identified by its index at the top of the stack
+fn switch($frags) = `
+  repeat(sub(len($frags), 1), |$n|
+    `OP_DUP $n OP_EQUAL OP_IF OP_DROP $frags.$n OP_ELSE`)
+  // Using EQUALVERIFY instead of IF for the last fragment saves us 4 bytes
+  sub(len($frags), 1) OP_EQUALVERIFY last($frags)
+  repeat(sub(len($frags), 1), OP_ENDIF)
+`;
+
+// ROLL/PICK from the altstack. $n must be known statically (cannot be read from the stack).
+fn rollFromAltStack($n) = `
+  repeat($n, OP_FROMALTSTACK)
+  repeat(sub($n, 1), `OP_SWAP OP_TOALTSTACK`)
+`;
+fn pickFromAltStack($n) = `
+  repeat($n, OP_FROMALTSTACK)
+  OP_DUP OP_TOALTSTACK
+  repeat(sub($n, 1), `OP_SWAP OP_TOALTSTACK`)
+`;

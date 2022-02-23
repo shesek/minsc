@@ -1,9 +1,13 @@
 use ::miniscript::bitcoin::{Network, Script};
 
-use crate::runtime::Value;
-use crate::{Result, Scope};
+use crate::runtime::{Execute, Value};
+use crate::{ast, parse_lib, Result, Scope};
 
 pub mod miniscript;
+
+lazy_static! {
+    static ref MINSC_STDLIB: ast::Library = parse_lib(include_str!("stdlib.minsc")).unwrap();
+}
 
 /// Attach built-in functions and variables to the Minsc runtime environment
 pub fn attach_stdlib(scope: &mut Scope) {
@@ -21,6 +25,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope
         .set("_$$_RECKLESSLY_RISK_MY_BITCOINS_$$_", Network::Bitcoin)
         .unwrap();
+
+    // Standard library implemented in Minsc
+    MINSC_STDLIB.exec(scope).unwrap();
 }
 
 pub mod fns {
