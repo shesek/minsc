@@ -144,8 +144,12 @@ Infix: Expr = <lhs:SimpleExpr> <op:InfixOp> <rhs:Expr> =>
 InfixOp: ast::InfixOp = {
   "+" => ast::InfixOp::Add,
   "-" => ast::InfixOp::Subtract,
-  "==" => ast::InfixOp::Equals,
-  "!=" => ast::InfixOp::NotEquals,
+  "==" => ast::InfixOp::Eq,
+  "!=" => ast::InfixOp::NotEq,
+  ">" => ast::InfixOp::Gt,
+  "<" => ast::InfixOp::Lt,
+  ">=" => ast::InfixOp::Gte,
+  "<=" => ast::InfixOp::Lte,
 };
 
 // Duration and times

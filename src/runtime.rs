@@ -234,6 +234,7 @@ impl Evaluate for ast::Infix {
 impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value) -> Result<Value> {
         Ok(match self {
+            // Arithmetic operators that require both operands to be numbers and returns a number
             ast::InfixOp::Add | ast::InfixOp::Subtract => {
                 let lhs = lhs.into_i64()?;
                 let rhs = rhs.into_i64()?;
@@ -245,8 +246,22 @@ impl ast::InfixOp {
                 .ok_or(Error::Overflow)?
                 .into()
             }
-            ast::InfixOp::Equals => (lhs == rhs).into(),
-            ast::InfixOp::NotEquals => (lhs != rhs).into(),
+            // Comparison operators that require both operands to be numbers and returns a boolean
+            ast::InfixOp::Gt | ast::InfixOp::Lt | ast::InfixOp::Gte | ast::InfixOp::Lte => {
+                let lhs = lhs.into_i64()?;
+                let rhs = rhs.into_i64()?;
+                match self {
+                    ast::InfixOp::Gt => lhs > rhs,
+                    ast::InfixOp::Lt => lhs < rhs,
+                    ast::InfixOp::Gte => lhs >= rhs,
+                    ast::InfixOp::Lte => lhs <= rhs,
+                    _ => unreachable!(),
+                }
+                .into()
+            }
+            // Comparison operators that work on all types (except functions)
+            ast::InfixOp::Eq => (lhs == rhs).into(),
+            ast::InfixOp::NotEq => (lhs != rhs).into(),
         })
     }
 }

@@ -138,8 +138,12 @@ impl_from_variant!(Infix, Expr);
 pub enum InfixOp {
     Add,
     Subtract,
-    Equals,
-    NotEquals,
+    Eq,
+    NotEq,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
 }
 
 // Duration (relative block height or time)
