@@ -21,7 +21,7 @@ use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 pub enum Value {
     PubKey(DescriptorPublicKey),
     Bytes(Vec<u8>),
-    Number(usize),
+    Number(i64),
     DateTime(String),
     Duration(ast::Duration),
 
@@ -49,7 +49,12 @@ impl_from_variant!(Address, Value);
 impl_from_variant!(Array, Value);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(Network, Value);
-impl_from_variant!(usize, Value, Number);
+impl_from_variant!(i64, Value, Number);
+impl From<usize> for Value {
+    fn from(num: usize) -> Self {
+        (num as i64).into()
+    }
+}
 impl<T: Into<Function>> From<T> for Value {
     fn from(f: T) -> Self {
         Value::Function(f.into())
@@ -120,7 +125,7 @@ fn eval_andor(name: &str, thresh_n: usize, policies: &[Expr], scope: &Scope) -> 
         call(scope, &name.into(), policies)
     } else {
         // delegate to thresh() when there are more
-        let thresh_n = ast::Expr::Number(thresh_n);
+        let thresh_n = ast::Expr::Number(thresh_n as i64);
         let mut args = vec![&thresh_n];
         args.extend(policies);
         call(scope, &"thresh".into(), &args)
@@ -302,13 +307,20 @@ impl TryFrom<Value> for Policy {
     }
 }
 
-impl TryFrom<Value> for usize {
+impl TryFrom<Value> for i64 {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Number(n) => Ok(n),
             v => Err(Error::NotNumber(v)),
         }
+    }
+}
+
+impl TryFrom<Value> for usize {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(value.into_i64()?.try_into()?)
     }
 }
 
@@ -462,6 +474,9 @@ impl Value {
         matches!(self, Value::Array(_))
     }
     pub fn into_policy(self) -> Result<Policy> {
+        self.try_into()
+    }
+    pub fn into_i64(self) -> Result<i64> {
         self.try_into()
     }
     pub fn into_usize(self) -> Result<usize> {

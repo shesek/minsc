@@ -113,6 +113,9 @@ pub enum Error {
 
     #[error("Bitcoin key error: {0}")]
     BitcoinKey(bitcoin::util::key::Error),
+
+    #[error("number type conversion failed (likely an unexpected negative number)")]
+    TryFromInt(std::num::TryFromIntError),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -133,3 +136,4 @@ impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
 impl_from_variant!(bitcoin::util::key::Error, Error, BitcoinKey);
+impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);

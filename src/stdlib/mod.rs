@@ -63,16 +63,16 @@ pub mod fns {
 
     pub fn add(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidArguments);
-        let a = args.remove(0).into_usize()?;
-        let b = args.remove(0).into_usize()?;
+        let a = args.remove(0).into_i64()?;
+        let b = args.remove(0).into_i64()?;
         // TODO checked_add
         Ok((a + b).into())
     }
 
     pub fn sub(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidArguments);
-        let a = args.remove(0).into_usize()?;
-        let b = args.remove(0).into_usize()?;
+        let a = args.remove(0).into_i64()?;
+        let b = args.remove(0).into_i64()?;
         // TODO checked_sub
         Ok((a - b).into())
     }

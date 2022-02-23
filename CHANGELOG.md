@@ -57,6 +57,8 @@
 
   For example: `$list.$n` or `$list.(some complex expression)`
 
+- Add support for negative numbers
+
 ## 0.2.0 - 2020-11-27
 
 - Ported from sipa-miniscript to rust-miniscript (#1)

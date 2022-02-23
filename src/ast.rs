@@ -17,12 +17,12 @@ pub enum Expr {
     // Atoms
     PubKey(String),
     Bytes(Vec<u8>),
-    Number(usize),
+    Number(i64),
     Duration(Duration),
     DateTime(String),
 }
 
-impl_from_variant!(usize, Expr, Number);
+impl_from_variant!(i64, Expr, Number);
 
 /// Statements have side-effects and don't produce a value
 #[derive(Debug, Clone)]
