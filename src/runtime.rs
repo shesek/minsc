@@ -219,6 +219,7 @@ impl Evaluate for ast::ScriptFrag {
 }
 
 impl Evaluate for ast::Block {
+    // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut scope = scope.child();
         for stmt in &self.stmts {
@@ -234,6 +235,16 @@ impl Evaluate for ast::Block {
         } else {
             Err(Error::NoReturnValue)
         }
+    }
+}
+
+impl Execute for ast::Library {
+    // Execute the library in the given scope, producing visible side-effects
+    fn exec(&self, scope: &mut Scope) -> Result<()> {
+        for stmt in &self.stmts {
+            stmt.exec(scope)?;
+        }
+        Ok(())
     }
 }
 

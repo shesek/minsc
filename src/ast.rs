@@ -165,6 +165,13 @@ pub struct Assignment {
     pub rhs: Expr,
 }
 
+/// A library is collection of statements with no return value
+/// This is always parsed at the top-level and is never contained within an Expr/Stmt.
+#[derive(Debug, Clone)]
+pub struct Library {
+    pub stmts: Vec<Stmt>,
+}
+
 use lalrpop_util::ParseError;
 type LalrError = ParseError<usize, lalrpop_util::lexer::Token<'static>, &'static str>;
 
