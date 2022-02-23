@@ -141,7 +141,7 @@ pub enum Operator {
 }
 
 // Duration (relative block height or time)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Duration {
     BlockHeight(u32),
     BlockTime {
@@ -151,7 +151,7 @@ pub enum Duration {
 }
 impl_from_variant!(Duration, Expr);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DurationPart {
     Years(f64),
     Months(f64),

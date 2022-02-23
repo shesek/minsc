@@ -63,7 +63,7 @@ impl<T: Into<Function>> From<T> for Value {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
@@ -233,16 +233,20 @@ impl Evaluate for ast::Op {
 
 impl ast::Operator {
     fn apply(&self, lhs: Value, rhs: Value) -> Result<Value> {
-        let a = lhs.into_i64()?;
-        let b = rhs.into_i64()?;
-
         Ok(match self {
-            ast::Operator::Add => a.checked_add(b).ok_or(Error::Overflow)?.into(),
-            ast::Operator::Subtract => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
-
-            // == and != currently only work with Numbers
-            ast::Operator::Equals => (a == b).into(),
-            ast::Operator::NotEquals => (a != b).into(),
+            ast::Operator::Add | ast::Operator::Subtract => {
+                let lhs = lhs.into_i64()?;
+                let rhs = rhs.into_i64()?;
+                match self {
+                    ast::Operator::Add => lhs.checked_add(rhs),
+                    ast::Operator::Subtract => lhs.checked_sub(rhs),
+                    _ => unreachable!(),
+                }
+                .ok_or(Error::Overflow)?
+                .into()
+            }
+            ast::Operator::Equals => (lhs == rhs).into(),
+            ast::Operator::NotEquals => (lhs != rhs).into(),
         })
     }
 }
@@ -544,6 +548,32 @@ impl Value {
     pub fn into_script_pubkey(self) -> Result<Script> {
         let ctx = get_descriptor_ctx(0);
         Ok(self.into_desc()?.script_pubkey(ctx))
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Bool(a), Value::Bool(b)) => a == b,
+            (Value::Number(a), Value::Number(b)) => a == b,
+            (Value::Network(a), Value::Network(b)) => a == b,
+            (Value::Bytes(a), Value::Bytes(b)) => a == b,
+            (Value::Script(a), Value::Script(b)) => a == b,
+            (Value::DateTime(a), Value::DateTime(b)) => a == b,
+            (Value::Duration(a), Value::Duration(b)) => a == b,
+            (Value::Address(a), Value::Address(b)) => a == b,
+            (Value::Policy(a), Value::Policy(b)) => a == b,
+            (Value::Miniscript(a), Value::Miniscript(b)) => a == b,
+            (Value::Array(a), Value::Array(b)) => a == b,
+            (Value::Descriptor(a), Value::Descriptor(b)) => a == b,
+            (Value::PubKey(a), Value::PubKey(b)) => a == b,
+            (Value::WithProb(a_p, a_d), Value::WithProb(b_p, b_d)) => a_p == b_p && a_d == b_d,
+            (Value::Function(_), Value::Function(_)) => {
+                unimplemented!("functions cannot be compared")
+            }
+            // comparsion with a different type always returns false (no casting)
+            (_, _) => false,
+        }
     }
 }
 
