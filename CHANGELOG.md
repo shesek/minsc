@@ -38,6 +38,12 @@
   6. `slice(Array, Number start, Number len) -> Array`
   7. `tail(Array) -> Array`
 
+- New function for conditionals: `iif(Number condition, Any then_value, Any else_value)`
+
+  If the condition is truthy (`!= 0`), returns the `then_value`. Otherwise returns the `else_value`.
+
+  The values may be provided as thunks to be lazily-evaluated. This can be useful to avoid infinite recursion, for example: `fn S(n) = n + iif(n == 0, 0, || S(n - 1));`.
+
 - New utility function: `repeat(Number, Function|Value) -> Array`
 
   The second parameter can be a value to fill the array with,

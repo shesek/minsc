@@ -16,6 +16,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("rawscript", fns::rawscript).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
+    scope.set_fn("iif", fns::iif).unwrap();
 
     // Network types
     scope.set("testnet", Network::Testnet).unwrap();
@@ -57,5 +58,18 @@ pub mod fns {
                 })
                 .collect::<Result<_>>()?,
         ))
+    }
+
+    pub fn iif(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
+        ensure!(args.len() == 3, Error::InvalidArguments);
+        let condition = args.remove(0).into_usize()?;
+        let then_val = args.remove(0);
+        let else_val = args.remove(0);
+        let result = if condition != 0 { then_val } else { else_val };
+        match result {
+            // then_val/else_val may be provided as thunks to be lazily evaluated
+            Value::Function(f) => f.call(vec![], scope),
+            other => Ok(other),
+        }
     }
 }
