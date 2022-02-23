@@ -104,39 +104,83 @@ impl Execute for Stmt {
 
 impl Evaluate for ast::Call {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call(scope, &self.ident, &self.args)
+        call_exprs(scope, &self.ident, &self.args)
     }
 }
 
 impl Evaluate for ast::Or {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor("or", 1, &self.0, scope)
+        eval_andor(&self.0, scope, true, "or", 1)
     }
 }
 
 impl Evaluate for ast::And {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor("and", self.0.len(), &self.0, scope)
+        eval_andor(&self.0, scope, false, "and", self.0.len())
     }
 }
 
-// convert and/or calls with more than two args into thresh()
-fn eval_andor(name: &str, thresh_n: usize, policies: &[Expr], scope: &Scope) -> Result<Value> {
+fn eval_andor(
+    operands: &[Expr],
+    scope: &Scope,
+    bool_stop_on: bool,
+    desc_op: &str,
+    desc_thresh_n: usize,
+) -> Result<Value> {
+    // Peek at the first operand to determine if its an operation between booleans or between descriptors.
+    // All the other operands are expected to have the same type.
+    let first_operand = operands[0].eval(scope)?;
+    if first_operand.is_bool() {
+        eval_bool_andor(first_operand, &operands[1..], scope, bool_stop_on)
+    } else if first_operand.is_desc_like() {
+        eval_desc_andor(desc_op, desc_thresh_n, first_operand, &operands[1..], scope)
+    } else {
+        Err(Error::InvalidArguments)
+    }
+}
+
+// Evaluate && / || for booleans (lazily evaluated)
+fn eval_bool_andor(
+    first_operand: Value,
+    other_exprs: &[Expr],
+    scope: &Scope,
+    stop_on: bool,
+) -> Result<Value> {
+    if first_operand.into_bool()? == stop_on {
+        return Ok(stop_on.into());
+    }
+    for expr in other_exprs {
+        let operand = expr.eval(scope)?;
+        if operand.into_bool()? == stop_on {
+            return Ok(stop_on.into());
+        }
+    }
+    return Ok((!stop_on).into());
+}
+
+// Evaluate && / || for combining descriptors, using the or()/and()/thres() policy functions
+fn eval_desc_andor(
+    op_name: &str,
+    thresh_n: usize,
+    first_policy: Value,
+    other_policies: &[Expr],
+    scope: &Scope,
+) -> Result<Value> {
+    let policies = [&[first_policy], &eval_exprs(scope, other_policies)?[..]].concat();
     if policies.len() == 2 {
         // delegate to or()/and() when there are exactly 2 subpolicies
-        call(scope, &name.into(), policies)
+        call_args(scope, &op_name.into(), policies)
     } else {
         // delegate to thresh() when there are more
-        let thresh_n = ast::Expr::Number(thresh_n as i64);
-        let mut args = vec![&thresh_n];
+        let mut args = vec![thresh_n.into()];
         args.extend(policies);
-        call(scope, &"thresh".into(), &args)
+        call_args(scope, &"thresh".into(), args)
     }
 }
 
 impl Evaluate for ast::Thresh {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call(scope, &"thresh".into(), &[&*self.thresh, &*self.policies])
+        call_exprs(scope, &"thresh".into(), &[&*self.thresh, &*self.policies])
     }
 }
 
@@ -166,7 +210,7 @@ impl Evaluate for ast::ArrayAccess {
 
 impl Evaluate for ast::WithProb {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call(scope, &"prob".into(), &[&*self.prob, &*self.expr])
+        call_exprs(scope, &"prob".into(), &[&*self.prob, &*self.expr])
     }
 }
 
@@ -327,18 +371,22 @@ impl Evaluate for Expr {
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::Number(x) => Value::Number(*x),
             Expr::Duration(x) => Value::Duration(x.clone()),
+            // XXX parse timestamp already here?
             Expr::DateTime(x) => Value::DateTime(x.clone()),
         })
     }
 }
 
 /// Call the function with the given expressions evaluated into values
-fn call<T: Borrow<Expr>>(scope: &Scope, ident: &ast::Ident, exprs: &[T]) -> Result<Value> {
+fn call_exprs<T: Borrow<Expr>>(scope: &Scope, ident: &ast::Ident, exprs: &[T]) -> Result<Value> {
+    call_args(scope, ident, eval_exprs(scope, exprs)?)
+}
+
+/// Call the function with the given argument values (already evaluated)
+fn call_args(scope: &Scope, ident: &ast::Ident, args: Vec<Value>) -> Result<Value> {
     let func = scope
         .get(ident)
         .ok_or_else(|| Error::FnNotFound(ident.clone()))?;
-
-    let args = eval_exprs(scope, exprs)?;
 
     func.call(args, scope)
         .map_err(|e| Error::CallError(ident.clone(), e.into()))
@@ -535,6 +583,12 @@ impl Value {
     }
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
+    }
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Value::Bool(_))
+    }
+    pub fn is_desc_like(&self) -> bool {
+        matches!(self, Value::Descriptor(_) | Value::Miniscript(_) | Value::Policy(_) | Value::PubKey(_))
     }
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
