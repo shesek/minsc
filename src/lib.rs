@@ -16,9 +16,9 @@ pub mod error;
 pub mod function;
 pub mod runtime;
 pub mod scope;
+pub mod stdlib;
 pub mod time;
 pub mod util;
-pub mod stdlib;
 
 #[cfg(feature = "playground")]
 pub mod playground;

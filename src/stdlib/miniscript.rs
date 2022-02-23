@@ -18,7 +18,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("after", fns::after).unwrap();
     scope.set_fn("pk", fns::pk).unwrap();
     scope.set_fn("sha256", fns::sha256).unwrap();
-    scope.set_fn( "hash256", fns::hash256).unwrap();
+    scope.set_fn("hash256", fns::hash256).unwrap();
     scope.set_fn("ripemd160", fns::ripemd160).unwrap();
     scope.set_fn("hash160", fns::hash160).unwrap();
 
