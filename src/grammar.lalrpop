@@ -128,7 +128,8 @@ ChildDerive: Expr = {
 
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
   ast::ScriptFrag { fragments }.into();
-ScriptFragPart = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes };
+ScriptFragPart = { ScriptFragPart_, "<" <ScriptFragPart_> ">" };
+ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();
