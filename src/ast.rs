@@ -13,7 +13,7 @@ pub enum Expr {
     ChildDerive(ChildDerive),
     ScriptFrag(ScriptFrag),
     FnExpr(FnExpr),
-    Op(Op),
+    Infix(Infix),
 
     // Atoms
     PubKey(String),
@@ -124,16 +124,18 @@ pub struct FnExpr {
 }
 impl_from_variant!(FnExpr, Expr);
 
+// An infix operator call with exactly two operands
+// The && || operators which can have any number of operands are handled separately.
 #[derive(Debug, Clone)]
-pub struct Op {
-    pub op: Operator,
+pub struct Infix {
+    pub op: InfixOp,
     pub lhs: Box<Expr>,
     pub rhs: Box<Expr>,
 }
-impl_from_variant!(Op, Expr);
+impl_from_variant!(Infix, Expr);
 
 #[derive(Debug, Clone)]
-pub enum Operator {
+pub enum InfixOp {
     Add,
     Subtract,
     Equals,

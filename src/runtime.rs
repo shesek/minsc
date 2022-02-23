@@ -225,28 +225,28 @@ impl Evaluate for ast::ScriptFrag {
     }
 }
 
-impl Evaluate for ast::Op {
+impl Evaluate for ast::Infix {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         self.op.apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?)
     }
 }
 
-impl ast::Operator {
+impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value) -> Result<Value> {
         Ok(match self {
-            ast::Operator::Add | ast::Operator::Subtract => {
+            ast::InfixOp::Add | ast::InfixOp::Subtract => {
                 let lhs = lhs.into_i64()?;
                 let rhs = rhs.into_i64()?;
                 match self {
-                    ast::Operator::Add => lhs.checked_add(rhs),
-                    ast::Operator::Subtract => lhs.checked_sub(rhs),
+                    ast::InfixOp::Add => lhs.checked_add(rhs),
+                    ast::InfixOp::Subtract => lhs.checked_sub(rhs),
                     _ => unreachable!(),
                 }
                 .ok_or(Error::Overflow)?
                 .into()
             }
-            ast::Operator::Equals => (lhs == rhs).into(),
-            ast::Operator::NotEquals => (lhs != rhs).into(),
+            ast::InfixOp::Equals => (lhs == rhs).into(),
+            ast::InfixOp::NotEquals => (lhs != rhs).into(),
         })
     }
 }
@@ -296,7 +296,7 @@ impl Evaluate for Expr {
             Expr::ChildDerive(x) => x.eval(scope)?,
             Expr::ScriptFrag(x) => x.eval(scope)?,
             Expr::FnExpr(x) => x.eval(scope)?,
-            Expr::Op(x) => x.eval(scope)?,
+            Expr::Infix(x) => x.eval(scope)?,
 
             // Atoms
             Expr::PubKey(x) => Value::PubKey(x.parse()?),

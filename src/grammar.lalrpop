@@ -38,7 +38,7 @@ Expr: Expr = {
   Or,
   ChildDerive,
   FnExpr,
-  InfixOp,
+  Infix,
 };
 
 SimpleExpr: Expr = {
@@ -59,7 +59,7 @@ SimpleExpr: Expr = {
   Paren<Or>,
   Paren<ChildDerive>,
   Paren<FnExpr>,
-  Paren<InfixOp>,
+  Paren<Infix>,
   Paren<SimpleExpr>,
 };
 
@@ -137,14 +137,15 @@ FnExprSignature = {
   "||" => vec![],
 };
 
-InfixOp: Expr = <lhs:SimpleExpr> <op:InfixOperator> <rhs:Expr> =>
-   ast::Op { op, lhs: lhs.into(), rhs: rhs.into() }.into();
+// Infix op with two operands
+Infix: Expr = <lhs:SimpleExpr> <op:InfixOp> <rhs:Expr> =>
+   ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
 
-InfixOperator: ast::Operator = {
-  "+" => ast::Operator::Add,
-  "-" => ast::Operator::Subtract,
-  "==" => ast::Operator::Equals,
-  "!=" => ast::Operator::NotEquals,
+InfixOp: ast::InfixOp = {
+  "+" => ast::InfixOp::Add,
+  "-" => ast::InfixOp::Subtract,
+  "==" => ast::InfixOp::Equals,
+  "!=" => ast::InfixOp::NotEquals,
 };
 
 // Duration and times
