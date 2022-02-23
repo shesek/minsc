@@ -136,6 +136,8 @@ impl_from_variant!(Op, Expr);
 pub enum Operator {
     Add,
     Subtract,
+    Equals,
+    NotEquals,
 }
 
 // Duration (relative block height or time)

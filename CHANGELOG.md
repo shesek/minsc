@@ -51,7 +51,7 @@
   2. `rollFromAltStack(Number) -> Script`
   3. `pickFromAltStack(Number) -> Script`
 
-- New arithmetic operators: `a + b` and `a - b`
+- New operators: `a + b`, `a - b`, `a == b` and `a != b`
 
 - Add support for multi-line `/* .. */` comments
 

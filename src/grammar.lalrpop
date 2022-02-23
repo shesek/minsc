@@ -143,6 +143,8 @@ InfixOp: Expr = <lhs:SimpleExpr> <op:InfixOperator> <rhs:SimpleExpr> =>
 InfixOperator: ast::Operator = {
   "+" => ast::Operator::Add,
   "-" => ast::Operator::Subtract,
+  "==" => ast::Operator::Equals,
+  "!=" => ast::Operator::NotEquals,
 };
 
 // Duration and times

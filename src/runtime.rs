@@ -237,6 +237,10 @@ impl ast::Operator {
         Ok(match self {
             ast::Operator::Add => a.checked_add(b).ok_or(Error::Overflow)?.into(),
             ast::Operator::Subtract => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
+
+            // == and != currently only work with Numbers
+            ast::Operator::Equals => ((a == b) as usize).into(),
+            ast::Operator::NotEquals => ((a != b) as usize).into(),
         })
     }
 }
