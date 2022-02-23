@@ -13,6 +13,7 @@ pub enum Expr {
     ChildDerive(ChildDerive),
     ScriptFrag(ScriptFrag),
     FnExpr(FnExpr),
+    Op(Op),
 
     // Atoms
     PubKey(String),
@@ -122,6 +123,20 @@ pub struct FnExpr {
     pub body: Box<Expr>,
 }
 impl_from_variant!(FnExpr, Expr);
+
+#[derive(Debug, Clone)]
+pub struct Op {
+    pub op: Operator,
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+impl_from_variant!(Op, Expr);
+
+#[derive(Debug, Clone)]
+pub enum Operator {
+    Add,
+    Subtract,
+}
 
 // Duration (relative block height or time)
 #[derive(Debug, Clone)]

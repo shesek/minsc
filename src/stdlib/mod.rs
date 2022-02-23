@@ -16,8 +16,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("rawscript", fns::rawscript).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
-    scope.set_fn("add", fns::add).unwrap();
-    scope.set_fn("sub", fns::sub).unwrap();
 
     // Network types
     scope.set("testnet", Network::Testnet).unwrap();
@@ -59,21 +57,5 @@ pub mod fns {
                 })
                 .collect::<Result<_>>()?,
         ))
-    }
-
-    pub fn add(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 2, Error::InvalidArguments);
-        let a = args.remove(0).into_i64()?;
-        let b = args.remove(0).into_i64()?;
-        // TODO checked_add
-        Ok((a + b).into())
-    }
-
-    pub fn sub(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 2, Error::InvalidArguments);
-        let a = args.remove(0).into_i64()?;
-        let b = args.remove(0).into_i64()?;
-        // TODO checked_sub
-        Ok((a - b).into())
     }
 }

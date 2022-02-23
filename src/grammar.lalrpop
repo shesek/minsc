@@ -38,6 +38,7 @@ Expr: Expr = {
   Or,
   ChildDerive,
   FnExpr,
+  InfixOp,
 };
 
 SimpleExpr: Expr = {
@@ -58,6 +59,7 @@ SimpleExpr: Expr = {
   Paren<Or>,
   Paren<ChildDerive>,
   Paren<FnExpr>,
+  Paren<InfixOp>,
   Paren<SimpleExpr>,
 };
 
@@ -133,7 +135,15 @@ FnExprSignature = {
   // No arguments should already be captured by the `List0`, but for some reason it isn't.
   // Possibly because `||` is also a terminal for policy OR?
   "||" => vec![],
-}
+};
+
+InfixOp: Expr = <lhs:SimpleExpr> <op:InfixOperator> <rhs:SimpleExpr> =>
+   ast::Op { op, lhs: lhs.into(), rhs: rhs.into() }.into();
+
+InfixOperator: ast::Operator = {
+  "+" => ast::Operator::Add,
+  "-" => ast::Operator::Subtract,
+};
 
 // Duration and times
 

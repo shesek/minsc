@@ -11,28 +11,28 @@ OP_INSPECTINPUTOUTPOINT = rawscript(0xc7), OP_INSPECTINPUTASSET = rawscript(0xc8
 
 // Array functions
 fn first($arr) = $arr.0;
-fn last($arr) = $arr.(sub(len($arr), 1));
+fn last($arr) = $arr.(len($arr) - 1);
 fn map($arr, $cb) = repeat(len($arr), |$n| $cb($arr.$n));
-fn range($start, $end) = repeat(add(sub($end, $start), 1), |$n| add($start, $n));
-fn slice($arr, $start, $len) = map(range($start, add($start, $len)), |$n| $arr.$n);
-fn tail($arr) = slice($arr, 1, sub(len($arr), 1));
+fn range($start, $end) = repeat(($end-$start)+1, |$n| $start+$n);
+fn slice($arr, $start, $len) = map(range($start, $start+$len), |$n| $arr.$n);
+fn tail($arr) = slice($arr, 1, len($arr) - 1);
 
 // Dispatch the call to the script fragment identified by its index at the top of the stack
 fn switch($frags) = `
-  repeat(sub(len($frags), 1), |$n|
+  repeat(len($frags) - 1, |$n|
     `OP_DUP $n OP_EQUAL OP_IF OP_DROP $frags.$n OP_ELSE`)
   // Using EQUALVERIFY instead of IF for the last fragment saves us 4 bytes
-  sub(len($frags), 1) OP_EQUALVERIFY last($frags)
-  repeat(sub(len($frags), 1), OP_ENDIF)
+  {len($frags) - 1} OP_EQUALVERIFY last($frags)
+  repeat(len($frags) - 1, OP_ENDIF)
 `;
 
 // ROLL/PICK from the altstack. $n must be known statically (cannot be read from the stack).
 fn rollFromAltStack($n) = `
   repeat($n, OP_FROMALTSTACK)
-  repeat(sub($n, 1), `OP_SWAP OP_TOALTSTACK`)
+  repeat($n - 1, `OP_SWAP OP_TOALTSTACK`)
 `;
 fn pickFromAltStack($n) = `
   repeat($n, OP_FROMALTSTACK)
   OP_DUP OP_TOALTSTACK
-  repeat(sub($n, 1), `OP_SWAP OP_TOALTSTACK`)
+  repeat($n - 1, `OP_SWAP OP_TOALTSTACK`)
 `;

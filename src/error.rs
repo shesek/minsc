@@ -93,6 +93,9 @@ pub enum Error {
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 
+    #[error("Number operation overflowed")]
+    Overflow,
+
     #[error("in {0}(): {1}")]
     CallError(Ident, Box<Error>),
 

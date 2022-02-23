@@ -223,6 +223,24 @@ impl Evaluate for ast::ScriptFrag {
     }
 }
 
+impl Evaluate for ast::Op {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        self.op.apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?)
+    }
+}
+
+impl ast::Operator {
+    fn apply(&self, lhs: Value, rhs: Value) -> Result<Value> {
+        let a = lhs.into_i64()?;
+        let b = rhs.into_i64()?;
+
+        Ok(match self {
+            ast::Operator::Add => a.checked_add(b).ok_or(Error::Overflow)?.into(),
+            ast::Operator::Subtract => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
+        })
+    }
+}
+
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &Scope) -> Result<Value> {
@@ -268,6 +286,7 @@ impl Evaluate for Expr {
             Expr::ChildDerive(x) => x.eval(scope)?,
             Expr::ScriptFrag(x) => x.eval(scope)?,
             Expr::FnExpr(x) => x.eval(scope)?,
+            Expr::Op(x) => x.eval(scope)?,
 
             // Atoms
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
