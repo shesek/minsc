@@ -225,6 +225,12 @@ impl Evaluate for ast::ScriptFrag {
     }
 }
 
+impl Evaluate for ast::Not {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        Ok((!self.0.eval(scope)?.into_bool()?).into())
+    }
+}
+
 impl Evaluate for ast::Infix {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         self.op
@@ -314,6 +320,7 @@ impl Evaluate for Expr {
             Expr::ScriptFrag(x) => x.eval(scope)?,
             Expr::FnExpr(x) => x.eval(scope)?,
             Expr::Infix(x) => x.eval(scope)?,
+            Expr::Not(x) => x.eval(scope)?,
 
             // Atoms
             Expr::PubKey(x) => Value::PubKey(x.parse()?),

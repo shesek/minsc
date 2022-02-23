@@ -60,7 +60,7 @@
 
 - New `Bool` type, available as the `true` and `false` variables in the root scope
 
-- New operators: `+`, `-`, `==`, `!=`, `<`, `>`, `<=` and `>=`
+- New operators: `+`, `-`, `!`, `==`, `!=`, `<`, `>`, `<=` and `>=`
 
 - Add support for multi-line `/* .. */` comments
 

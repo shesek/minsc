@@ -39,6 +39,7 @@ Expr: Expr = {
   ChildDerive,
   FnExpr,
   Infix,
+  Not,
 };
 
 SimpleExpr: Expr = {
@@ -60,6 +61,7 @@ SimpleExpr: Expr = {
   Paren<ChildDerive>,
   Paren<FnExpr>,
   Paren<Infix>,
+  Paren<Not>,
   Paren<SimpleExpr>,
 };
 
@@ -151,6 +153,9 @@ InfixOp: ast::InfixOp = {
   ">=" => ast::InfixOp::Gte,
   "<=" => ast::InfixOp::Lte,
 };
+
+Not: Expr = "!" <Expr> =>
+  ast::Not(<>.into()).into();
 
 // Duration and times
 

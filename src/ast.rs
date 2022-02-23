@@ -14,6 +14,7 @@ pub enum Expr {
     ScriptFrag(ScriptFrag),
     FnExpr(FnExpr),
     Infix(Infix),
+    Not(Not),
 
     // Atoms
     PubKey(String),
@@ -145,6 +146,10 @@ pub enum InfixOp {
     Gte,
     Lte,
 }
+
+#[derive(Debug, Clone)]
+pub struct Not(pub Box<Expr>);
+impl_from_variant!(Not, Expr);
 
 // Duration (relative block height or time)
 #[derive(Debug, Clone, PartialEq)]
