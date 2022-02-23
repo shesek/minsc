@@ -51,11 +51,12 @@
 
   For example: `repeat(3, 111) == [111, 111, 111]`, or with a function: `repeat(3, |$n| 100+$n) == [100, 101, 102]`.
 
-- New utility functions for some common Scripts:
+- New utility functions for writing Scripts:
 
   1. `switch(Array<Script>) -> Script`
-  2. `rollFromAltStack(Number) -> Script`
-  3. `pickFromAltStack(Number) -> Script`
+  2. `unrollLoop(Number max_iterations, Script condition, Script body) -> Script`
+  3. `rollFromAltStack(Number) -> Script`
+  4. `pickFromAltStack(Number) -> Script`
 
 - New operators: `a + b`, `a - b`, `a == b` and `a != b`
 

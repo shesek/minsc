@@ -36,3 +36,17 @@ fn pickFromAltStack($n) = `
   OP_DUP OP_TOALTSTACK
   repeat($n - 1, `OP_SWAP OP_TOALTSTACK`)
 `;
+
+// Loop unrolling
+fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations != 0,
+  || `
+    $condition OP_IF
+      $body
+      unrollLoop($max_iterations - 1, $condition, $body)
+    OP_ENDIF
+  `,
+  // Fail the script if the condition is still met but we're passed the $max_iterations limit
+  || `$condition OP_NOT OP_VERIFY`
+);
+// e.g. `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
+// example with accumulator: `0 <num> unrollLoop(50, `OP_DUP OP_0NOTEQUAL`, `OP_DUP 2 OP_ROLL OP_ADD OP_SWAP OP_1SUB`) OP_DROP` to sum the numbers from <num> to 1
