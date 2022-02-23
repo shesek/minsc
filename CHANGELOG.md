@@ -38,9 +38,9 @@
   6. `slice(Array, Number start, Number len) -> Array`
   7. `tail(Array) -> Array`
 
-- New function for conditionals: `iif(Number condition, Any then_value, Any else_value)`
+- New function for conditionals: `iif(Bool condition, Any then_value, Any else_value)`
 
-  If the condition is truthy (`!= 0`), returns the `then_value`. Otherwise returns the `else_value`.
+  Returns the `then_value` if the condition is true, or `else_value` otherwise.
 
   The values may be provided as thunks to be lazily-evaluated. This can be useful to avoid infinite recursion, for example: `fn S(n) = n + iif(n == 0, 0, || S(n - 1));`.
 
@@ -57,6 +57,8 @@
   2. `unrollLoop(Number max_iterations, Script condition, Script body) -> Script`
   3. `rollFromAltStack(Number) -> Script`
   4. `pickFromAltStack(Number) -> Script`
+
+- New `Bool` type, available as the `true` and `false` variables in the root scope
 
 - New operators: `a + b`, `a - b`, `a == b` and `a != b`
 

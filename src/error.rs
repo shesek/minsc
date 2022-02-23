@@ -33,6 +33,9 @@ pub enum Error {
     #[error("Expected a number, not {0:?}")]
     NotNumber(Value),
 
+    #[error("Expected a boolean, not {0:?}")]
+    NotBool(Value),
+
     #[error("Expected a pubkey, not {0:?}")]
     NotPubKey(Value),
 

@@ -22,6 +22,7 @@ pub enum Value {
     PubKey(DescriptorPublicKey),
     Bytes(Vec<u8>),
     Number(i64),
+    Bool(bool),
     DateTime(String),
     Duration(ast::Duration),
 
@@ -50,6 +51,7 @@ impl_from_variant!(Array, Value);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(Network, Value);
 impl_from_variant!(i64, Value, Number);
+impl_from_variant!(bool, Value, Bool);
 impl From<usize> for Value {
     fn from(num: usize) -> Self {
         (num as i64).into()
@@ -239,8 +241,8 @@ impl ast::Operator {
             ast::Operator::Subtract => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
 
             // == and != currently only work with Numbers
-            ast::Operator::Equals => ((a == b) as usize).into(),
-            ast::Operator::NotEquals => ((a != b) as usize).into(),
+            ast::Operator::Equals => (a == b).into(),
+            ast::Operator::NotEquals => (a != b).into(),
         })
     }
 }
@@ -344,6 +346,16 @@ impl TryFrom<Value> for usize {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(value.into_i64()?.try_into()?)
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Bool(b) => Ok(b),
+            v => Err(Error::NotBool(v)),
+        }
     }
 }
 
@@ -505,6 +517,9 @@ impl Value {
     pub fn into_usize(self) -> Result<usize> {
         self.try_into()
     }
+    pub fn into_bool(self) -> Result<bool> {
+        self.try_into()
+    }
     pub fn into_key(self) -> Result<DescriptorPublicKey> {
         self.try_into()
     }
@@ -537,6 +552,7 @@ impl fmt::Display for Value {
         match self {
             Value::PubKey(x) => write!(f, "{}", x),
             Value::Number(x) => write!(f, "{}", x),
+            Value::Bool(x) => write!(f, "{}", x),
             Value::DateTime(x) => write!(f, "{}", x),
             Value::Duration(x) => write!(f, "{:?}", x),
             Value::Bytes(x) => write!(f, "{}", x.to_hex()),

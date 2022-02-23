@@ -11,12 +11,9 @@ lazy_static! {
 
 /// Attach built-in functions and variables to the Minsc runtime environment
 pub fn attach_stdlib(scope: &mut Scope) {
-    self::miniscript::attach_stdlib(scope);
-
-    scope.set_fn("len", fns::len).unwrap();
-    scope.set_fn("rawscript", fns::rawscript).unwrap();
-    scope.set_fn("repeat", fns::repeat).unwrap();
-    scope.set_fn("iif", fns::iif).unwrap();
+    // Boolean types
+    scope.set("true", true).unwrap();
+    scope.set("false", false).unwrap();
 
     // Network types
     scope.set("testnet", Network::Testnet).unwrap();
@@ -24,6 +21,15 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope
         .set("_$$_RECKLESSLY_RISK_MY_BITCOINS_$$_", Network::Bitcoin)
         .unwrap();
+
+    // Functions
+    scope.set_fn("len", fns::len).unwrap();
+    scope.set_fn("rawscript", fns::rawscript).unwrap();
+    scope.set_fn("repeat", fns::repeat).unwrap();
+    scope.set_fn("iif", fns::iif).unwrap();
+
+    // Miniscript related functions
+    self::miniscript::attach_stdlib(scope);
 
     // Standard library implemented in Minsc
     MINSC_STDLIB.exec(scope).unwrap();
@@ -62,10 +68,10 @@ pub mod fns {
 
     pub fn iif(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 3, Error::InvalidArguments);
-        let condition = args.remove(0).into_usize()?;
+        let condition = args.remove(0).into_bool()?;
         let then_val = args.remove(0);
         let else_val = args.remove(0);
-        let result = if condition != 0 { then_val } else { else_val };
+        let result = if condition { then_val } else { else_val };
         match result {
             // then_val/else_val may be provided as thunks to be lazily evaluated
             Value::Function(f) => f.call(vec![], scope),
