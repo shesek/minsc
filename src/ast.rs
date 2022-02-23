@@ -134,7 +134,7 @@ pub struct Infix {
 }
 impl_from_variant!(Infix, Expr);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum InfixOp {
     Add,
     Subtract,

@@ -227,7 +227,9 @@ impl Evaluate for ast::ScriptFrag {
 
 impl Evaluate for ast::Infix {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        self.op.apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?)
+        self.op
+            .apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?)
+            .map_err(|e| Error::OpError(self.op, e.into()))
     }
 }
 

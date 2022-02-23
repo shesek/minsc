@@ -5,7 +5,7 @@ use miniscript::bitcoin::{self, hashes};
 use miniscript::descriptor::DescriptorKeyParseError;
 use miniscript::policy::compiler::CompilerError;
 
-use crate::ast::Ident;
+use crate::ast::{Ident, InfixOp};
 use crate::runtime::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -101,6 +101,9 @@ pub enum Error {
 
     #[error("in {0}(): {1}")]
     CallError(Ident, Box<Error>),
+
+    #[error("in {0:?}: {1}")]
+    OpError(InfixOp, Box<Error>),
 
     #[error("Descriptor key parse error: {0}")]
     DescriptorKeyParseError(DescriptorKeyParseError),
