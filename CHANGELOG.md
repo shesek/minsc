@@ -38,6 +38,7 @@
   5. `range(Number start, Number end) -> Array`
   6. `slice(Array, Number start, Number len) -> Array`
   7. `tail(Array) -> Array`
+  8. `concat(Array, Array) -> Array`
 
 - New function for conditionals: `iif(Bool condition, Any then_value, Any else_value)`
 
