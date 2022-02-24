@@ -201,10 +201,19 @@ impl Evaluate for ast::Array {
 
 impl Evaluate for ast::ArrayAccess {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let mut elements = self.array.eval(scope)?.into_array_elements()?;
+        let value = self.array.eval(scope)?;
         let index = self.index.eval(scope)?.into_usize()?;
-        ensure!(index < elements.len(), Error::ArrayIndexOutOfRange);
-        Ok(elements.remove(index))
+        Ok(match value {
+            Value::Array(Array(mut elements)) => {
+                ensure!(index < elements.len(), Error::ArrayIndexOutOfRange);
+                elements.remove(index)
+            }
+            Value::Bytes(mut bytes) => {
+                ensure!(index < bytes.len(), Error::ArrayIndexOutOfRange);
+                (bytes.remove(index) as i64).into()
+            }
+            other => bail!(Error::NotArray(other))
+        })
     }
 }
 
