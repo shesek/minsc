@@ -44,14 +44,18 @@
 
   The values may be provided as thunks to be lazily-evaluated. This can be useful to avoid infinite recursion, for example: `fn S(n) = n + iif(n == 0, 0, || S(n - 1));`.
 
-- New utility function: `repeat(Number, Function|Value) -> Array`
+- New utility functions:
 
-  The second parameter can be a value to fill the array with,
-  or a function that gets called with the index to produce the value.
+  1. `repeat(Number, Function|Value) -> Array`
 
-  For example: `repeat(3, 111) == [111, 111, 111]`, or with a function: `repeat(3, |$n| 100+$n) == [100, 101, 102]`.
+    The second parameter can be a value to fill the array with,
+    or a function that gets called with the index to produce the value.
 
-- New utility functions for writing Scripts:
+    For example: `repeat(3, 111) == [111, 111, 111]`, or with a function: `repeat(3, |$n| 100+$n) == [100, 101, 102]`.
+
+  2. `le64(Number) -> Bytes` (encode the number as 64 bit little-endian)
+
+- New functions for writing Scripts:
 
   1. `switch(Array<Script>) -> Script`
   2. `unrollLoop(Number max_iterations, Script condition, Script body) -> Script`

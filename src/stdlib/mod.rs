@@ -27,6 +27,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("rawscript", fns::rawscript).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
     scope.set_fn("iif", fns::iif).unwrap();
+    scope.set_fn("le64", fns::le64).unwrap();
 
     // Miniscript related functions
     self::miniscript::attach_stdlib(scope);
@@ -77,5 +78,11 @@ pub mod fns {
             Value::Function(f) => f.call(vec![], scope),
             other => Ok(other),
         }
+    }
+
+    pub fn le64(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let num = args.remove(0).into_i64()?;
+        Ok(num.to_le_bytes().to_vec().into())
     }
 }
