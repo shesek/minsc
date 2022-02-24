@@ -1,7 +1,7 @@
 use minsc::{eval, parse, Result};
 use std::{env, fs, io};
 
-fn main() -> Result<()> {
+fn main_() -> Result<()> {
     let mut args = env::args();
     let input = args.nth(1).unwrap_or_else(|| "-".into());
 
@@ -28,4 +28,11 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn main() {
+    // Print errors using Display rather than Debug
+    if let Err(e) = main_() {
+        eprintln!("{}", e)
+    }
 }
