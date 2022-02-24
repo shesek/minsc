@@ -2,7 +2,7 @@ use lalrpop_util::ParseError;
 use std::fmt;
 
 use miniscript::bitcoin::{self, hashes};
-use miniscript::descriptor::DescriptorKeyParseError;
+use miniscript::descriptor;
 use miniscript::policy::compiler::CompilerError;
 
 use crate::ast::{Ident, InfixOp};
@@ -106,7 +106,13 @@ pub enum Error {
     OpError(InfixOp, Box<Error>),
 
     #[error("Descriptor key parse error: {0}")]
-    DescriptorKeyParseError(DescriptorKeyParseError),
+    DescriptorKeyParse(descriptor::DescriptorKeyParseError),
+
+    #[error("Descriptor conversion error: {0}")]
+    DescriptorConversion(descriptor::ConversionError),
+
+    #[error("Miniscript error: {0}")]
+    MiniscriptError(miniscript::Error),
 
     #[error("Miniscript compiler error: {0}")]
     MiniscriptCompilerError(CompilerError),
@@ -138,7 +144,8 @@ where
     }
 }
 
-impl_from_variant!(DescriptorKeyParseError, Error);
+impl_from_variant!(descriptor::ConversionError, Error, DescriptorConversion);
+impl_from_variant!(miniscript::Error, Error, MiniscriptError);
 impl_from_variant!(CompilerError, Error, MiniscriptCompilerError);
 impl_from_variant!(hashes::Error, Error, HashError);
 impl_from_variant!(hashes::hex::Error, Error, HexError);
@@ -146,3 +153,8 @@ impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
 impl_from_variant!(bitcoin::util::key::Error, Error, BitcoinKey);
 impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
+impl_from_variant!(
+    descriptor::DescriptorKeyParseError,
+    Error,
+    DescriptorKeyParse
+);

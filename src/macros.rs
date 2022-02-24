@@ -24,3 +24,14 @@ macro_rules! bail {
         return Err($e.into());
     };
 }
+
+// Syntactic sugar for a one-liner lazily-evaluated if expression
+macro_rules! iif {
+    ($cond:expr, $then:expr, $else:expr) => {
+        if $cond {
+            $then
+        } else {
+            $else
+        }
+    };
+}

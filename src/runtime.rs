@@ -5,14 +5,14 @@ use std::fmt;
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, hex::ToHex, Hash};
 use bitcoin::{Address, Network, Script};
+use miniscript::bitcoin;
 use miniscript::descriptor::{self, DescriptorPublicKey};
-use miniscript::{bitcoin, ToPublicKey};
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
 use crate::stdlib::miniscript::fns as miniscript_fns;
 use crate::time;
-use crate::util::get_descriptor_ctx;
+use crate::util::{DescriptorExt, EC};
 use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
@@ -228,7 +228,11 @@ impl Evaluate for ast::ChildDerive {
                 let child = child.eval(scope)?.into_usize()? as u32;
                 xpub.derivation_path = xpub.derivation_path.into_child(child.into());
             }
-            xpub.is_wildcard = self.is_wildcard;
+            xpub.wildcard = iif!(
+                self.is_wildcard,
+                descriptor::Wildcard::Unhardened,
+                descriptor::Wildcard::None
+            );
             Ok(DescriptorPublicKey::XPub(xpub).into())
         }
         // Derive descriptor children
@@ -458,9 +462,9 @@ impl TryFrom<Value> for Descriptor {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Descriptor(x) => Ok(x),
-            Value::Miniscript(x) => Ok(Descriptor::Wsh(x)),
-            Value::Policy(x) => Ok(Descriptor::Wsh(x.compile()?)),
-            Value::PubKey(x) => Ok(Descriptor::Wpkh(x)),
+            Value::Miniscript(x) => Ok(Descriptor::new_wsh(x)?),
+            Value::Policy(x) => Ok(Descriptor::new_wsh(x.compile()?)?),
+            Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
             v => Err(Error::NotDescriptorLike(v)),
         }
     }
@@ -521,16 +525,13 @@ impl TryFrom<Value> for Script {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Script(x) => Ok(x),
-
-            // Descriptor or descriptor-like
             v @ Value::Descriptor(_) | v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
-                let ctx = get_descriptor_ctx(0);
-                Ok(v.into_desc()?.script_code(ctx))
+                Ok(v.into_desc()?.to_explicit_script()?)
             }
             Value::Number(n) => Ok(ScriptBuilder::new().push_int(n as i64).into_script()),
             Value::Bytes(bytes) => Ok(ScriptBuilder::new().push_slice(&bytes).into_script()),
             Value::PubKey(desc_pubkey) => {
-                let pubkey = desc_pubkey.to_public_key(get_descriptor_ctx(0));
+                let pubkey = desc_pubkey.derive_public_key(&EC)?;
                 Ok(ScriptBuilder::new().push_key(&pubkey).into_script())
             }
             Value::Duration(dur) => {
@@ -588,7 +589,7 @@ impl Value {
         matches!(self, Value::Bool(_))
     }
     pub fn is_desc_like(&self) -> bool {
-        matches!(self, Value::Descriptor(_) | Value::Miniscript(_) | Value::Policy(_) | Value::PubKey(_))
+        matches!(self, Value::Descriptor(_) | Value::Miniscript(_) | Value::Policy(_) | Value::PubKey(_) | Value::WithProb(_, _))
     }
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
@@ -624,8 +625,7 @@ impl Value {
         Ok(Array::try_from(self)?.0)
     }
     pub fn into_script_pubkey(self) -> Result<Script> {
-        let ctx = get_descriptor_ctx(0);
-        Ok(self.into_desc()?.script_pubkey(ctx))
+        Ok(self.into_desc()?.to_script_pubkey()?)
     }
 }
 

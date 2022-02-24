@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
-use crate::util::get_descriptor_ctx;
+use crate::util::DescriptorExt;
 use crate::{parse, Evaluate, Result, Scope, Value};
 
 #[derive(Serialize)]
@@ -21,37 +21,40 @@ pub struct PlaygroundResult {
 
 #[wasm_bindgen]
 pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue, JsValue> {
-    let network = Network::from_str(network).map_err(|e| e.to_string())?;
-    let ctx = get_descriptor_ctx(0);
+    let network = Network::from_str(network).map_err(stringify)?;
 
-    let value = run(code).map_err(|e| e.to_string())?;
+    let value = run(code).map_err(stringify)?;
 
     let (policy, miniscript, desc, addr, other) = match value {
         Value::Policy(policy) => {
-            let miniscript = policy.compile().map_err(|e| e.to_string())?;
-            let desc = Descriptor::Wsh(miniscript.clone());
-            let addr = desc.address(network, ctx).unwrap();
+            let miniscript = policy.compile().map_err(stringify)?;
+            let desc = Descriptor::new_wsh(miniscript.clone()).map_err(stringify)?;
+            let addr = desc.to_address(network).unwrap();
             (Some(policy), Some(miniscript), Some(desc), Some(addr), None)
         }
         Value::Miniscript(miniscript) => {
-            let desc = Descriptor::Wsh(miniscript.clone());
-            let addr = desc.address(network, ctx).unwrap();
+            let desc = Descriptor::new_wsh(miniscript.clone()).map_err(stringify)?;
+            let addr = desc.to_address(network).unwrap();
             (None, Some(miniscript), Some(desc), Some(addr), None)
         }
         Value::Descriptor(desc) => {
-            let addr = desc.address(network, ctx).unwrap();
+            let addr = desc.to_address(network).unwrap();
             (None, None, Some(desc), Some(addr), None)
         }
         Value::PubKey(key) => {
-            let desc = Descriptor::Wpkh(key.clone());
-            let addr = desc.address(network, ctx).unwrap();
+            let desc = Descriptor::new_wpkh(key.clone()).map_err(stringify)?;
+            let addr = desc.to_address(network).unwrap();
             (None, None, Some(desc), Some(addr), Some(key.into()))
         }
         Value::Address(addr) => (None, None, None, Some(addr), None),
         other => (None, None, None, None, Some(other)),
     };
 
-    let script = desc.as_ref().map(|d| d.witness_script(ctx));
+    let script = desc
+        .as_ref()
+        .map(|d| d.to_explicit_script())
+        .transpose()
+        .map_err(stringify)?;
 
     Ok(JsValue::from_serde(&PlaygroundResult {
         policy: policy.map(|p| p.to_string()),
@@ -72,6 +75,10 @@ fn run(code: &str) -> Result<Value> {
 fn get_script_asm(script: &Script) -> String {
     let s = format!("{:?}", script);
     s[7..s.len() - 1].into()
+}
+
+fn stringify<T: ToString>(e: T) -> String {
+    e.to_string()
 }
 
 lazy_static! {
