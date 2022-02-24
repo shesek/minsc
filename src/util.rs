@@ -2,7 +2,9 @@ use std::fmt::Debug;
 use std::str::FromStr;
 
 use bitcoin::secp256k1;
-use miniscript::{bitcoin, descriptor, DescriptorTrait, TranslatePk2};
+use miniscript::{bitcoin, DescriptorTrait, TranslatePk2};
+
+use crate::Result;
 
 lazy_static! {
     pub static ref EC: secp256k1::Secp256k1<secp256k1::VerifyOnly> =
@@ -10,24 +12,24 @@ lazy_static! {
 }
 
 pub trait DescriptorExt {
-    fn to_script_pubkey(&self) -> Result<bitcoin::Script, descriptor::ConversionError>;
-    fn to_explicit_script(&self) -> Result<bitcoin::Script, descriptor::ConversionError>;
-    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address, crate::Error>;
+    fn to_script_pubkey(&self) -> Result<bitcoin::Script>;
+    fn to_explicit_script(&self) -> Result<bitcoin::Script>;
+    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address>;
 }
 
 impl DescriptorExt for crate::Descriptor {
-    fn to_script_pubkey(&self) -> Result<bitcoin::Script, descriptor::ConversionError> {
+    fn to_script_pubkey(&self) -> Result<bitcoin::Script> {
         Ok(self
             .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
             .script_pubkey())
     }
-    fn to_explicit_script(&self) -> Result<bitcoin::Script, descriptor::ConversionError> {
+    fn to_explicit_script(&self) -> Result<bitcoin::Script> {
         Ok(self
             .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
-            .explicit_script())
+            .explicit_script()?)
     }
 
-    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address, crate::Error> {
+    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address> {
         Ok(self
             .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
             .address(network)?)
