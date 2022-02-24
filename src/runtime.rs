@@ -447,7 +447,7 @@ impl TryFrom<Value> for DescriptorPublicKey {
                 let pubkey = bitcoin::PublicKey::from_slice(&x)?;
                 Ok(DescriptorPublicKey::SinglePub(
                     descriptor::DescriptorSinglePub {
-                        key: pubkey,
+                        key: descriptor::SinglePubKey::FullKey(pubkey),
                         origin: None,
                     },
                 ))
