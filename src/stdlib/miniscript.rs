@@ -5,7 +5,7 @@ use ::miniscript::bitcoin::{Address, Network};
 use crate::runtime::Value;
 use crate::time::{duration_to_seq, parse_datetime};
 use crate::util::DescriptorExt;
-use crate::{Descriptor, Policy, Result, Scope};
+use crate::{Descriptor, Miniscript, Policy, Result, Scope};
 
 const LIKELY_PROB: usize = 10;
 
@@ -23,9 +23,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("hash160", fns::hash160).unwrap();
 
     // Descriptor functions
-    scope.set_fn("wsh", fns::wsh).unwrap();
-    scope.set_fn("wpkh", fns::wpkh).unwrap();
+    scope.set_fn("wpkh", self::fns::wpkh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
+    // the 'wsh' function is defined in super::wsh(), which delegates to self::fns::wsh_ (and also supports Scripts)
 
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();
@@ -40,9 +40,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope
         .set_fn("explicit_script", fns::explicit_script)
         .unwrap();
-
-    // Address generation
-    scope.set_fn("address", fns::address).unwrap();
 
     // `likely` as an alias for 10 (i.e. `likely@pk(A) || pk(B)`)
     scope.set("likely", LIKELY_PROB).unwrap();
@@ -139,9 +136,9 @@ pub mod fns {
     }
 
     // Policy or Miniscript -> Descriptor::Wsh
-    pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Descriptor::new_wsh(args.remove(0).into_miniscript()?)?.into())
+    // This gets called by super::wsh(), which also handles non-Miniscript Scripts
+    pub fn wsh_(ms: Miniscript) -> Result<Value> {
+        Ok(Descriptor::new_wsh(ms)?.into())
     }
 
     // Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
@@ -172,11 +169,10 @@ pub mod fns {
         Ok(descriptor.to_explicit_script()?.into())
     }
 
-    // Descriptor, Policy, Miniscript, Script or Key -> Address
-    pub fn address(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        let script = args.remove(0).into_script_pubkey()?;
-        let network = args.pop().map_or(Ok(Network::Testnet), TryInto::try_into)?;
+    // Descriptor, Policy, Miniscript or Key -> Address
+    // This gets called by super::address(), which also handles non-Miniscript Scripts
+    pub fn address_(desc: &Descriptor, network: Network) -> Result<Value> {
+        let script = desc.to_script_pubkey()?;
         let address = Address::from_script(&script, network)
             .expect("non-addressable descriptors cannot be constructed");
         Ok(address.into())
