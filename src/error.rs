@@ -96,6 +96,9 @@ pub enum Error {
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 
+    #[error("Script cannot be represented as an address: {0}")]
+    NotAddressable(bitcoin::Script),
+
     #[error("Number operation overflowed")]
     Overflow,
 

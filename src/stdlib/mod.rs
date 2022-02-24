@@ -1,4 +1,6 @@
-use ::miniscript::bitcoin::{Network, Script};
+use std::convert::TryInto;
+
+use ::miniscript::bitcoin::{Address, Network, Script};
 
 use crate::runtime::{Execute, Value};
 use crate::{ast, parse_lib, Result, Scope};
@@ -25,6 +27,8 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Functions
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("rawscript", fns::rawscript).unwrap();
+    scope.set_fn("wsh", fns::wsh).unwrap();
+    scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
     scope.set_fn("iif", fns::iif).unwrap();
     scope.set_fn("le64", fns::le64).unwrap();
@@ -51,6 +55,42 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let bytes = args.remove(0).into_bytes()?;
         Ok(Script::from(bytes).into())
+    }
+
+    // Can be used to wrap a Miniscript/Policy with a Wsh descriptor, or with raw scripts.
+    // - wsh(Miniscript|Policy) -> Descriptor
+    // - wsh(Script) -> Script
+    pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+
+        let script_or_ms = args.remove(0);
+
+        if let Value::Script(script) = script_or_ms {
+            Ok(script.to_v0_p2wsh().into())
+        } else if let Ok(ms) = script_or_ms.into_miniscript() {
+            self::miniscript::fns::wsh_(ms)
+        } else {
+            Err(Error::InvalidArguments)
+        }
+    }
+
+    /// Generate an address from the given script/miniscript
+    /// address(Script|Descriptor|Miniscript|Policy) -> Address
+    pub fn address(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
+
+        let script_or_desc = args.remove(0);
+        let network = args.pop().map_or(Ok(Network::Testnet), TryInto::try_into)?;
+
+        if let Value::Script(script) = script_or_desc {
+            Ok(Address::from_script(&script, network)
+                .ok_or_else(|| Error::NotAddressable(script))?
+                .into())
+        } else if let Ok(desc) = script_or_desc.into_desc() {
+            self::miniscript::fns::address_(&desc, network)
+        } else {
+            Err(Error::InvalidArguments)
+        }
     }
 
     pub fn repeat(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
