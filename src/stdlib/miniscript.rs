@@ -37,7 +37,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     // Compile descriptor/miniscript to script
     scope.set_fn("script_pubkey", fns::script_pubkey).unwrap();
-    scope.set_fn("script_witness", fns::script_witness).unwrap();
+    scope
+        .set_fn("explicit_script", fns::explicit_script)
+        .unwrap();
 
     // Address generation
     scope.set_fn("address", fns::address).unwrap();
@@ -164,7 +166,7 @@ pub mod fns {
     }
 
     // Descriptor, Policy, Miniscript, or Key -> Witness Script
-    pub fn script_witness(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn explicit_script(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let descriptor = args.remove(0).into_desc()?;
         Ok(descriptor.to_explicit_script()?.into())
