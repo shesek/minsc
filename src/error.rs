@@ -72,7 +72,7 @@ pub enum Error {
     #[error("Absolute by-blocktime timelock out of range, supported up to 2106")]
     InvalidDateTimeOutOfRange,
 
-    #[error("Heightwise duration must be divisible by 10 minutes")]
+    #[error("Heightwise duration must be divisible by the block interval (typically 10 minutes)")]
     InvalidDurationHeightwise,
 
     #[error("Relative by-blockheight timelocks are only supported for up to 65535 blocks (roughly 455 days)")]

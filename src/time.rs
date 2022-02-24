@@ -15,6 +15,9 @@ const BLOCKS_MAX: u32 = SEQUENCE_LOCKTIME_MASK; // 65535
 const SECONDS_MAX: u32 = SEQUENCE_LOCKTIME_MASK << SEQUENCE_LOCKTIME_GRANULARITY; // 33553920
 const SECONDS_MOD: u32 = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 
+// TODO make this configurable (via an env var, a la crates.io/crates/const_env?)
+const BLOCK_INTERVAL: f64 = 600.0;
+
 pub fn duration_to_seq(duration: &Duration) -> Result<u32> {
     match duration {
         Duration::BlockHeight(num_blocks) => rel_height_to_seq(*num_blocks),
@@ -45,8 +48,11 @@ fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<u32> {
         .sum::<f64>();
 
     if heightwise {
-        ensure!(seconds % 600.0 == 0.0, Error::InvalidDurationHeightwise);
-        return rel_height_to_seq((seconds / 600.0) as u32);
+        ensure!(
+            seconds % BLOCK_INTERVAL == 0.0,
+            Error::InvalidDurationHeightwise
+        );
+        return rel_height_to_seq((seconds / BLOCK_INTERVAL) as u32);
     }
 
     ensure!(
