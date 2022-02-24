@@ -25,7 +25,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Descriptor functions
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("wpkh", fns::wpkh).unwrap();
-    //scope.set_fn("sh", fns::sh).unwrap();
+    scope.set_fn("sh", fns::sh).unwrap();
 
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();
@@ -142,21 +142,19 @@ pub mod fns {
         Ok(Descriptor::new_wsh(args.remove(0).into_miniscript()?)?.into())
     }
 
-    /*
     // Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
     pub fn sh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(match args.remove(0) {
             Value::Descriptor(desc) => match desc {
-                Descriptor::Wsh(miniscript) => Descriptor::ShWsh(miniscript),
-                Descriptor::Wpkh(key) => Descriptor::ShWpkh(key),
+                Descriptor::Wsh(wsh) => Descriptor::new_sh_with_wsh(wsh),
+                Descriptor::Wpkh(wpkh) => Descriptor::new_sh_with_wpkh(wpkh),
                 _ => bail!(Error::InvalidShUse),
             },
             _ => bail!(Error::InvalidShUse),
         }
         .into())
     }
-    */
 
     // Descriptor, Policy, Miniscript, or Key -> Pubkey Script
     pub fn script_pubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
