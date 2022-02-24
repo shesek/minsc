@@ -25,7 +25,7 @@
 
   a. `rawscript(Bytes) -> Script` (get a Script for the given raw opcode bytes. e.g. `rawscript(0xb2)` for `OP_CSV`)
   a. `script_pubkey(Descriptor) -> Script` (get the scriptPubKey to be used in the output)
-  b. `script_witness(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the `redeemScript` for P2SH)
+  b. `explicit_script(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the `redeemScript` for P2SH)
 
   The `script_*` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
