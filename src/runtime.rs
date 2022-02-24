@@ -130,12 +130,12 @@ fn eval_andor(
     // Peek at the first operand to determine if its an operation between booleans or between descriptors.
     // All the other operands are expected to have the same type.
     let first_operand = operands[0].eval(scope)?;
-    if first_operand.is_bool() {
-        eval_bool_andor(first_operand, &operands[1..], scope, bool_stop_on)
-    } else if first_operand.is_desc_like() {
-        eval_desc_andor(desc_op, desc_thresh_n, first_operand, &operands[1..], scope)
-    } else {
-        Err(Error::InvalidArguments)
+    match &first_operand {
+        Value::Bool(_) => eval_bool_andor(first_operand, &operands[1..], scope, bool_stop_on),
+        Value::Policy(_) | Value::WithProb(_, _) => {
+            eval_desc_andor(desc_op, desc_thresh_n, first_operand, &operands[1..], scope)
+        }
+        _ => Err(Error::InvalidArguments),
     }
 }
 
@@ -155,7 +155,7 @@ fn eval_bool_andor(
             return Ok(stop_on.into());
         }
     }
-    return Ok((!stop_on).into());
+    Ok((!stop_on).into())
 }
 
 // Evaluate && / || for combining descriptors, using the or()/and()/thres() policy functions
@@ -588,9 +588,6 @@ impl Value {
     pub fn is_bool(&self) -> bool {
         matches!(self, Value::Bool(_))
     }
-    pub fn is_desc_like(&self) -> bool {
-        matches!(self, Value::Descriptor(_) | Value::Miniscript(_) | Value::Policy(_) | Value::PubKey(_) | Value::WithProb(_, _))
-    }
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
     }
@@ -649,7 +646,7 @@ impl PartialEq for Value {
             (Value::Function(_), Value::Function(_)) => {
                 unimplemented!("functions cannot be compared")
             }
-            // comparsion with a different type always returns false (no casting)
+            // comparsion with a different type always returns false (no coercion)
             (_, _) => false,
         }
     }
@@ -663,7 +660,7 @@ impl fmt::Display for Value {
             Value::Bool(x) => write!(f, "{}", x),
             Value::DateTime(x) => write!(f, "{}", x),
             Value::Duration(x) => write!(f, "{:?}", x),
-            Value::Bytes(x) => write!(f, "{}", x.to_hex()),
+            Value::Bytes(x) => write!(f, "0x{}", x.to_hex()),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
             Value::Miniscript(x) => write!(f, "{}", x),
