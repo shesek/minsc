@@ -57,6 +57,7 @@
   2. `unrollLoop(Number max_iterations, Script condition, Script body) -> Script`
   3. `rollFromAltStack(Number) -> Script`
   4. `pickFromAltStack(Number) -> Script`
+  4. Introspection helpers: `checkSameValue()`, `checkSameAsset()` and `checkSameSpk()` (Elements only)
 
 - New `Bool` type, available as the `true` and `false` variables in the root scope
 
