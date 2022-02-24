@@ -34,6 +34,10 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("iif", fns::iif).unwrap();
     scope.set_fn("le64", fns::le64).unwrap();
 
+    // Constants
+    scope.set("MAX_NUMBER", i64::MAX).unwrap();
+    scope.set("MIN_NUMBER", i64::MIN).unwrap();
+
     // Miniscript related functions
     self::miniscript::attach_stdlib(scope);
 

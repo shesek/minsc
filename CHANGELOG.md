@@ -68,6 +68,8 @@
 
 - New operators: `+`, `-`, `!`, `==`, `!=`, `<`, `>`, `<=` and `>=`
 
+- New constants: `MIN_NUMBER`, `MAX_NUMBER`
+
 - Add support for multi-line `/* .. */` comments
 
 - Allow using non-literal expressions as the array access index
