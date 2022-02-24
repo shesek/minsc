@@ -31,7 +31,7 @@
   The `script_*` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
 - New array functions:
-  1. `len(Array) -> Number`
+  1. `len(Array|Bytes) -> Number`
   2. `first(Array) -> Any`
   3. `last(Array) -> Any`
   4. `map(Array, Function) -> Array`
