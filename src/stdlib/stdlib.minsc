@@ -50,3 +50,29 @@ fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations != 0,
 );
 // e.g. `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
 // example with accumulator: `0 <num> unrollLoop(50, `OP_DUP OP_0NOTEQUAL`, `OP_DUP 2 OP_ROLL OP_ADD OP_SWAP OP_1SUB`) OP_DROP` to sum the numbers from <num> to 1
+
+
+// Introspection helpers (Elements only)
+fn checkSameAsset($vin, $vout) = `
+    $vin inspectExplicitInAsset
+    $vout inspectExplicitOutAsset
+    OP_EQUALVERIFY
+`;
+fn checkSameValue($vin, $vout) = `
+    $vin inspectExplicitInValue
+    $vout inspectExplicitOutValue
+    OP_EQUALVERIFY
+    // Checking the value matches without also checking the asset doesn't really make sense, so we always check both.
+    checkSameAsset($vin, $vout)
+`;
+fn checkSameSpk($vin, $vout) = `
+    $vin OP_INSPECTINPUTSCRIPTPUBKEY
+    $vout OP_INSPECTOUTPUTSCRIPTPUBKEY
+    2 OP_ROLL
+    OP_EQUALVERIFY OP_EQUALVERIFY
+`;
+
+inspectExplicitInValue = `OP_INSPECTINPUTVALUE OP_VERIFY`;
+inspectExplicitOutValue = `OP_INSPECTOUTPUTVALUE OP_VERIFY`;
+inspectExplicitInAsset = `OP_INSPECTINPUTASSET OP_VERIFY`;
+inspectExplicitOutAsset = `OP_INSPECTOUTPUTASSET OP_VERIFY`;
