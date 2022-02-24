@@ -4,7 +4,7 @@ use ::miniscript::bitcoin::{Address, Network};
 
 use crate::runtime::Value;
 use crate::time::{duration_to_seq, parse_datetime};
-use crate::util::get_descriptor_ctx;
+use crate::util::DescriptorExt;
 use crate::{Descriptor, Policy, Result, Scope};
 
 const LIKELY_PROB: usize = 10;
@@ -25,7 +25,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Descriptor functions
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("wpkh", fns::wpkh).unwrap();
-    scope.set_fn("sh", fns::sh).unwrap();
+    //scope.set_fn("sh", fns::sh).unwrap();
 
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();
@@ -133,15 +133,16 @@ pub mod fns {
     // Key -> Descriptor::Wpkh
     pub fn wpkh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Descriptor::Wpkh(args.remove(0).into_key()?).into())
+        Ok(Descriptor::new_wpkh(args.remove(0).into_key()?)?.into())
     }
 
     // Policy or Miniscript -> Descriptor::Wsh
     pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Descriptor::Wsh(args.remove(0).into_miniscript()?).into())
+        Ok(Descriptor::new_wsh(args.remove(0).into_miniscript()?)?.into())
     }
 
+    /*
     // Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
     pub fn sh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
@@ -155,21 +156,20 @@ pub mod fns {
         }
         .into())
     }
+    */
 
     // Descriptor, Policy, Miniscript, or Key -> Pubkey Script
     pub fn script_pubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let ctx = get_descriptor_ctx(0);
         let descriptor = args.remove(0).into_desc()?;
-        Ok(descriptor.script_pubkey(ctx).into())
+        Ok(descriptor.to_script_pubkey()?.into())
     }
 
     // Descriptor, Policy, Miniscript, or Key -> Witness Script
     pub fn script_witness(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let ctx = get_descriptor_ctx(0);
         let descriptor = args.remove(0).into_desc()?;
-        Ok(descriptor.witness_script(ctx).into())
+        Ok(descriptor.to_explicit_script()?.into())
     }
 
     // Descriptor, Policy, Miniscript, Script or Key -> Address

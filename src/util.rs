@@ -1,17 +1,37 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use miniscript::{bitcoin::secp256k1, descriptor};
+use bitcoin::secp256k1;
+use miniscript::{bitcoin, descriptor, DescriptorTrait, TranslatePk2};
 
 lazy_static! {
-    static ref EC: secp256k1::Secp256k1<secp256k1::VerifyOnly> =
+    pub static ref EC: secp256k1::Secp256k1<secp256k1::VerifyOnly> =
         secp256k1::Secp256k1::verification_only();
 }
 
-pub fn get_descriptor_ctx(
-    child_code: u32,
-) -> descriptor::DescriptorPublicKeyCtx<'static, secp256k1::VerifyOnly> {
-    descriptor::DescriptorPublicKeyCtx::new(&EC, child_code.into())
+pub trait DescriptorExt {
+    fn to_script_pubkey(&self) -> Result<bitcoin::Script, descriptor::ConversionError>;
+    fn to_explicit_script(&self) -> Result<bitcoin::Script, descriptor::ConversionError>;
+    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address, crate::Error>;
+}
+
+impl DescriptorExt for crate::Descriptor {
+    fn to_script_pubkey(&self) -> Result<bitcoin::Script, descriptor::ConversionError> {
+        Ok(self
+            .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
+            .script_pubkey())
+    }
+    fn to_explicit_script(&self) -> Result<bitcoin::Script, descriptor::ConversionError> {
+        Ok(self
+            .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
+            .explicit_script())
+    }
+
+    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address, crate::Error> {
+        Ok(self
+            .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
+            .address(network)?)
+    }
 }
 
 pub fn concat<T>(mut list: Vec<T>, val: Option<T>) -> Vec<T> {
