@@ -21,11 +21,12 @@
   hashes, a Bytes value can be constructed without the `0x` prefix
   when it is exactly 32 or 20 bytes.
 
-- New `Script` runtime data type and new functions for producing it:
+- New `Script` runtime data type and new functions for working with it:
 
-  a. `rawscript(Bytes) -> Script` (get a Script for the given raw opcode bytes. e.g. `rawscript(0xb2)` for `OP_CSV`)
-  a. `script_pubkey(Descriptor) -> Script` (get the scriptPubKey to be used in the output)
-  b. `explicit_script(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the `redeemScript` for P2SH)
+  1. `rawscript(Bytes) -> Script` (get a Script for the given raw opcode bytes. e.g. `rawscript(0xb2)` for `OP_CSV`)
+  2. `script_pubkey(Descriptor) -> Script` (get the scriptPubKey to be used in the output)
+  3. `explicit_script(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the `redeemScript` for P2SH)
+  4. `bytes(Script) -> Bytes` (get the Bytes representation of the Script opcodes)
 
   The `script_*` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
