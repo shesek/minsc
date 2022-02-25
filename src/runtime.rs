@@ -538,6 +538,7 @@ impl TryFrom<Value> for Script {
                 Ok(v.into_desc()?.to_explicit_script()?)
             }
             Value::Number(n) => Ok(ScriptBuilder::new().push_int(n).into_script()),
+            Value::Bool(val) => Ok(ScriptBuilder::new().push_int(val as i64).into_script()),
             Value::Bytes(bytes) => Ok(ScriptBuilder::new().push_slice(&bytes).into_script()),
             Value::PubKey(desc_pubkey) => {
                 let pubkey = desc_pubkey.derive_public_key(&EC)?;
