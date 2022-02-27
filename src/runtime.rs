@@ -487,10 +487,11 @@ impl TryFrom<Value> for Miniscript {
 impl TryFrom<Value> for Vec<u8> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Bytes(bytes) => Ok(bytes),
-            v => Err(Error::NotBytes(v)),
-        }
+        Ok(match value {
+            Value::Bytes(bytes) => bytes,
+            Value::Script(script) => script.into_bytes(),
+            v => bail!(Error::NotBytes(v)),
+        })
     }
 }
 

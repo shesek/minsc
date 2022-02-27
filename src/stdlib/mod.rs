@@ -71,7 +71,7 @@ pub mod fns {
     // bytes(Script) -> Bytes
     pub fn bytes(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let bytes = args.remove(0).into_script()?.into_bytes();
+        let bytes = args.remove(0).into_bytes()?;
         Ok(bytes.into())
     }
 
