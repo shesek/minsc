@@ -57,6 +57,11 @@ impl From<usize> for Value {
         (num as i64).into()
     }
 }
+impl From<Vec<Value>> for Value {
+    fn from(elements: Vec<Value>) -> Self {
+        Array(elements).into()
+    }
+}
 impl<T: Into<Function>> From<T> for Value {
     fn from(f: T) -> Self {
         Value::Function(f.into())
@@ -298,35 +303,26 @@ impl Evaluate for ast::Infix {
 
 impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value) -> Result<Value> {
-        Ok(match self {
-            // Arithmetic operators that require both operands to be numbers and returns a number
-            ast::InfixOp::Add | ast::InfixOp::Subtract => {
-                let lhs = lhs.into_i64()?;
-                let rhs = rhs.into_i64()?;
-                match self {
-                    ast::InfixOp::Add => lhs.checked_add(rhs),
-                    ast::InfixOp::Subtract => lhs.checked_sub(rhs),
-                    _ => unreachable!(),
-                }
-                .ok_or(Error::Overflow)?
-                .into()
-            }
-            // Comparison operators that require both operands to be numbers and returns a boolean
-            ast::InfixOp::Gt | ast::InfixOp::Lt | ast::InfixOp::Gte | ast::InfixOp::Lte => {
-                let lhs = lhs.into_i64()?;
-                let rhs = rhs.into_i64()?;
-                match self {
-                    ast::InfixOp::Gt => lhs > rhs,
-                    ast::InfixOp::Lt => lhs < rhs,
-                    ast::InfixOp::Gte => lhs >= rhs,
-                    ast::InfixOp::Lte => lhs <= rhs,
-                    _ => unreachable!(),
-                }
-                .into()
-            }
-            // Comparison operators that work on all types (except functions)
-            ast::InfixOp::Eq => (lhs == rhs).into(),
-            ast::InfixOp::NotEq => (lhs != rhs).into(),
+        use ast::InfixOp::*;
+        use Value::*;
+
+        Ok(match (self, lhs, rhs) {
+            // == != for all types
+            (Eq, a, b) => (a == b).into(),
+            (NotEq, a, b) => (a != b).into(),
+            // < > <= >= for numbers only
+            (Gt, Number(a), Number(b)) => (a > b).into(),
+            (Lt, Number(a), Number(b)) => (a < b).into(),
+            (Gte, Number(a), Number(b)) => (a >= b).into(),
+            (Lte, Number(a), Number(b)) => (a <= b).into(),
+            // + - for numbers
+            (Add, Number(a), Number(b)) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
+            (Subtract, Number(a), Number(b)) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
+            // + for arrays
+            (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
+            // + for bytes
+            (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
+            _ => bail!(Error::InvalidArguments),
         })
     }
 }
