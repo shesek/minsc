@@ -249,9 +249,9 @@ impl Evaluate for ast::ChildDerive {
                 Error::InvalidDescriptorDerivation
             );
             let desc = parent.into_desc()?;
+            ensure!(desc.is_deriveable(), Error::InvalidDescriptorNonDerivable);
             let child = self.path[0].eval(scope)?.into_usize()? as u32;
-            let desc = desc.derive(child.into());
-            Ok(desc.into())
+            Ok(desc.derive(child.into()).into())
         }
         // TODO support hardened child codes
     }

@@ -87,6 +87,9 @@ pub enum Error {
     #[error("Invalid arguments")]
     InvalidArguments,
 
+    #[error("Descriptors with no wildcard keys cannot be derived")]
+    InvalidDescriptorNonDerivable,
+
     #[error("Descriptors can only be derived with a single child code and without '/*'")]
     InvalidDescriptorDerivation,
 
