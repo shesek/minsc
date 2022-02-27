@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use ::miniscript::bitcoin::{Address, Network, Script};
 
-use crate::runtime::{Array, Execute, Value};
+use crate::runtime::{Execute, Value};
 use crate::{ast, parse_lib, Result, Scope};
 
 pub mod miniscript;
@@ -54,7 +54,7 @@ pub mod fns {
     pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(match args.remove(0) {
-            Value::Array(Array(elements)) => elements.len(),
+            Value::Array(elements) => elements.len(),
             Value::Bytes(bytes) => bytes.len(),
             _ => bail!(Error::InvalidArguments),
         }
@@ -115,7 +115,7 @@ pub mod fns {
         ensure!(args.len() == 2, Error::InvalidArguments);
         let num = args.remove(0).into_usize()?;
         let producer = args.remove(0);
-        Ok(Value::array(
+        Ok(Value::Array(
             (0..num)
                 .map(|n| match &producer {
                     Value::Function(callback) => callback.call(vec![n.into()], scope),

@@ -210,5 +210,5 @@ fn map_policy(args: Vec<Value>) -> Result<Vec<Policy>> {
 }
 
 fn map_policy_array(array: Value) -> Result<Vec<Policy>> {
-    map_policy(array.into_array_elements()?)
+    map_policy(array.into_array()?)
 }

@@ -35,7 +35,7 @@ pub enum Value {
     Address(Address),
 
     Function(Function),
-    Array(Array),
+    Array(Vec<Value>),
 
     // Exists in the runtime builtins but cannot be constructed
     Network(Network),
@@ -47,7 +47,7 @@ impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(Script, Value);
 impl_from_variant!(Address, Value);
-impl_from_variant!(Array, Value);
+impl_from_variant!(Vec<Value>, Value, Array);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(Network, Value);
 impl_from_variant!(i64, Value, Number);
@@ -57,19 +57,11 @@ impl From<usize> for Value {
         (num as i64).into()
     }
 }
-impl From<Vec<Value>> for Value {
-    fn from(elements: Vec<Value>) -> Self {
-        Array(elements).into()
-    }
-}
 impl<T: Into<Function>> From<T> for Value {
     fn from(f: T) -> Self {
         Value::Function(f.into())
     }
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Array(pub Vec<Value>);
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -200,7 +192,7 @@ impl Evaluate for ast::Ident {
 impl Evaluate for ast::Array {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let elements = eval_exprs(scope, &self.0)?;
-        Ok(Array(elements).into())
+        Ok(elements.into())
     }
 }
 
@@ -209,7 +201,7 @@ impl Evaluate for ast::ArrayAccess {
         let value = self.array.eval(scope)?;
         let index = self.index.eval(scope)?.into_usize()?;
         Ok(match value {
-            Value::Array(Array(mut elements)) => {
+            Value::Array(mut elements) => {
                 ensure!(index < elements.len(), Error::ArrayIndexOutOfRange);
                 elements.remove(index)
             }
@@ -217,7 +209,7 @@ impl Evaluate for ast::ArrayAccess {
                 ensure!(index < bytes.len(), Error::ArrayIndexOutOfRange);
                 (bytes.remove(index) as i64).into()
             }
-            other => bail!(Error::NotArray(other))
+            other => bail!(Error::NotArray(other)),
         })
     }
 }
@@ -319,7 +311,7 @@ impl ast::InfixOp {
             (Add, Number(a), Number(b)) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
             (Subtract, Number(a), Number(b)) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
             // + for arrays
-            (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
+            (Add, Array(a), Array(b)) => [a, b].concat().into(),
             // + for bytes
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             _ => bail!(Error::InvalidArguments),
@@ -410,7 +402,7 @@ impl TryFrom<Value> for Policy {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
-            arr @ Value::Array(Array(_)) => miniscript_fns::all_(arr)?.try_into(),
+            arr @ Value::Array(_) => miniscript_fns::all_(arr)?.try_into(),
             v => Err(Error::NotPolicyLike(v)),
         }
     }
@@ -495,7 +487,7 @@ impl TryFrom<Value> for Vec<u8> {
     }
 }
 
-impl TryFrom<Value> for Array {
+impl TryFrom<Value> for Vec<Value> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
@@ -550,7 +542,7 @@ impl TryFrom<Value> for Script {
                     .push_int(unix_timestamp as i64)
                     .into_script())
             }
-            Value::Array(Array(elements)) => {
+            Value::Array(elements) => {
                 let scriptbytes = elements
                     .into_iter()
                     .map(|val| Ok(val.into_script()?.into_bytes()))
@@ -585,9 +577,6 @@ impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
 
 impl Value {
-    pub fn array(elements: Vec<Value>) -> Value {
-        Array(elements).into()
-    }
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
@@ -624,8 +613,8 @@ impl Value {
     pub fn into_fn(self) -> Result<Function> {
         self.try_into()
     }
-    pub fn into_array_elements(self) -> Result<Vec<Value>> {
-        Ok(Array::try_from(self)?.0)
+    pub fn into_array(self) -> Result<Vec<Value>> {
+        self.try_into()
     }
     pub fn into_script_pubkey(self) -> Result<Script> {
         Ok(self.into_desc()?.to_script_pubkey()?)
@@ -675,15 +664,15 @@ impl fmt::Display for Value {
             Value::Script(x) => write!(f, "{}", x.to_hex()),
             Value::Function(x) => write!(f, "{:?}", x),
             Value::Network(x) => write!(f, "{}", x),
-            Value::Array(Array(elements)) => {
-                write!(f, "[")?;
+            Value::Array(elements) => {
+                write!(f, "[ ")?;
                 for (i, element) in elements.iter().enumerate() {
                     if i > 0 {
-                        write!(f, ",")?;
+                        write!(f, ", ")?;
                     }
-                    write!(f, "\n  {}", element)?;
+                    write!(f, "{}", element)?;
                 }
-                write!(f, "\n]")
+                write!(f, " ]")
             }
         }
     }
