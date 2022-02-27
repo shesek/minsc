@@ -18,7 +18,7 @@ use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     PubKey(DescriptorPublicKey),
     Bytes(Vec<u8>),
@@ -595,32 +595,6 @@ impl Value {
     }
     pub fn into_script_pubkey(self) -> Result<Script> {
         Ok(self.into_desc()?.to_script_pubkey()?)
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Bool(a), Value::Bool(b)) => a == b,
-            (Value::Number(a), Value::Number(b)) => a == b,
-            (Value::Network(a), Value::Network(b)) => a == b,
-            (Value::Bytes(a), Value::Bytes(b)) => a == b,
-            (Value::Script(a), Value::Script(b)) => a == b,
-            (Value::DateTime(a), Value::DateTime(b)) => a == b,
-            (Value::Duration(a), Value::Duration(b)) => a == b,
-            (Value::Address(a), Value::Address(b)) => a == b,
-            (Value::Policy(a), Value::Policy(b)) => a == b,
-            (Value::Miniscript(a), Value::Miniscript(b)) => a == b,
-            (Value::Array(a), Value::Array(b)) => a == b,
-            (Value::Descriptor(a), Value::Descriptor(b)) => a == b,
-            (Value::PubKey(a), Value::PubKey(b)) => a == b,
-            (Value::WithProb(a_p, a_d), Value::WithProb(b_p, b_d)) => a_p == b_p && a_d == b_d,
-            (Value::Function(_), Value::Function(_)) => {
-                unimplemented!("functions cannot be compared")
-            }
-            // comparsion with a different type always returns false (no coercion)
-            (_, _) => false,
-        }
     }
 }
 

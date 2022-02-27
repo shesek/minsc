@@ -107,3 +107,18 @@ impl From<ast::FnExpr> for Function {
         .into()
     }
 }
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Function::Native(a), Function::Native(b)) => a.0 as usize == b.0 as usize,
+            (Function::Native(_), Function::User(_)) | (Function::User(_), Function::Native(_)) => {
+                false
+            }
+            (Function::User(_), Function::User(_)) => {
+                // TODO this requires implementing PartialEq for ast::Expr
+                unimplemented!("user defined functions cannot be compared")
+            }
+        }
+    }
+}
