@@ -4,6 +4,7 @@ use std::fmt;
 
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, hex::ToHex, Hash};
+use bitcoin::util::bip32::DerivationPath;
 use bitcoin::{Address, Network, Script};
 use miniscript::bitcoin;
 use miniscript::descriptor::{self, DescriptorPublicKey};
@@ -12,7 +13,7 @@ use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
 use crate::stdlib::miniscript::fns as miniscript_fns;
 use crate::time;
-use crate::util::{DescriptorExt, EC};
+use crate::util::{DeriveExt, DescriptorExt, EC};
 use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
@@ -223,37 +224,13 @@ impl Evaluate for ast::WithProb {
 impl Evaluate for ast::ChildDerive {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let parent = self.parent.eval(scope)?;
+        let mut path = DerivationPath::master();
+        for child in &self.path {
+            let child = child.eval(scope)?.into_usize()? as u32;
+            path = path.into_child(child.into());
+        }
 
-        // Derive xpubs children
-        if let Value::PubKey(key) = parent {
-            let mut xpub = match key {
-                DescriptorPublicKey::XPub(xpub) => xpub,
-                DescriptorPublicKey::SinglePub(_) => bail!(Error::InvalidSingleDerivation),
-            };
-            for child in &self.path {
-                let child = child.eval(scope)?.into_usize()? as u32;
-                xpub.derivation_path = xpub.derivation_path.into_child(child.into());
-            }
-            xpub.wildcard = iif!(
-                self.is_wildcard,
-                descriptor::Wildcard::Unhardened,
-                descriptor::Wildcard::None
-            );
-            Ok(DescriptorPublicKey::XPub(xpub).into())
-        }
-        // Derive descriptor children
-        // Policies and Miniscripts are implicitly coerced into descriptors
-        else {
-            ensure!(
-                !self.is_wildcard && self.path.len() == 1,
-                Error::InvalidDescriptorDerivation
-            );
-            let desc = parent.into_desc()?;
-            ensure!(desc.is_deriveable(), Error::InvalidDescriptorNonDerivable);
-            let child = self.path[0].eval(scope)?.into_usize()? as u32;
-            Ok(desc.derive(child.into()).into())
-        }
-        // TODO support hardened child codes
+        parent.derive_path(path, self.is_wildcard)
     }
 }
 

@@ -79,6 +79,9 @@
 
 - Add support for negative numbers
 
+- Support child key derivation for `Policy` and `Miniscript` without coercing them into `Descriptor`,
+  as well as for `Array`s containing derivable types.
+
 ## 0.2.0 - 2020-11-27
 
 - Ported from sipa-miniscript to rust-miniscript (#1)

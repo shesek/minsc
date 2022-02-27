@@ -87,14 +87,14 @@ pub enum Error {
     #[error("Invalid arguments")]
     InvalidArguments,
 
-    #[error("Descriptors with no wildcard keys cannot be derived")]
-    InvalidDescriptorNonDerivable,
+    #[error("Cannot derive policy/miniscript/descriptor without inner wildcard keys")]
+    NonDeriveableNoWildcard,
 
-    #[error("Descriptors can only be derived with a single child code and without '/*'")]
-    InvalidDescriptorDerivation,
+    #[error("Data type cannot be derived")]
+    NonDeriveableType,
 
-    #[error("Standalone single keys cannot be derived")]
-    InvalidSingleDerivation,
+    #[error("Standalone keys cannot be derived")]
+    NonDeriveableSingle,
 
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
@@ -135,6 +135,9 @@ pub enum Error {
     #[error("Bitcoin key error: {0}")]
     BitcoinKey(bitcoin::util::key::Error),
 
+    #[error("BIP 32 error: {0}")]
+    Bip32(bitcoin::util::bip32::Error),
+
     #[error("number type conversion failed (likely an unexpected negative number)")]
     TryFromInt(std::num::TryFromIntError),
 }
@@ -158,6 +161,7 @@ impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
 impl_from_variant!(bitcoin::util::key::Error, Error, BitcoinKey);
+impl_from_variant!(bitcoin::util::bip32::Error, Error, Bip32);
 impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
 impl_from_variant!(
     descriptor::DescriptorKeyParseError,
