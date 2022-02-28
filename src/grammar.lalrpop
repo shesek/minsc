@@ -87,8 +87,9 @@ Ident: Expr = IdentTerm => <>.into();
 Call: Expr = <ident:IdentTerm> "(" <args:List0<Expr, ",">> ")" =>
     ast::Call { ident, args }.into();
 
-And: Expr = <List2<SimpleExpr, "&&">> => ast::And(<>).into();
-Or: Expr = <List2<SimpleExpr, "||">> => ast::Or(<>).into();
+And: Expr = <List2<AndOrBranch, "&&">> => ast::And(<>).into();
+Or: Expr = <List2<AndOrBranch, "||">> => ast::Or(<>).into();
+AndOrBranch = { SimpleExpr, ChildDerive };
 
 Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
   ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
