@@ -18,7 +18,7 @@ fn slice($arr, $start, $len) = map(range($start, $start+$len), |$n| $arr.$n);
 fn tail($arr) = slice($arr, 1, len($arr) - 1);
 
 // Dispatch the call to the script fragment identified by its index at the top of the stack
-fn switch($frags) = `
+fn switchIndex($frags) = `
   repeat(len($frags) - 1, |$n|
     `OP_DUP $n OP_EQUAL OP_IF OP_DROP $frags.$n OP_ELSE`)
   // Using EQUALVERIFY instead of IF for the last fragment saves us 4 bytes
@@ -77,3 +77,11 @@ inspectExplicitInValue = `OP_INSPECTINPUTVALUE OP_VERIFY`;
 inspectExplicitOutValue = `OP_INSPECTOUTPUTVALUE OP_VERIFY`;
 inspectExplicitInAsset = `OP_INSPECTINPUTASSET OP_VERIFY`;
 inspectExplicitOutAsset = `OP_INSPECTOUTPUTASSET OP_VERIFY`;
+
+// Inspect scriptPubKeys with the given expected version number, or fail if the version mismatches
+fn inspectOutSpkVer($expected_version) = `
+    OP_INSPECTOUTPUTSCRIPTPUBKEY $expected_version OP_EQUALVERIFY
+`;
+fn inspectInSpkVer($expected_version) = `
+    OP_INSPECTINPUTSCRIPTPUBKEY $expected_version OP_EQUALVERIFY
+`;
