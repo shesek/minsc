@@ -25,35 +25,37 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
     let value = run(code).map_err(stringify)?;
 
-    let (policy, miniscript, desc, addr, other) = match value {
+    let (policy, miniscript, desc, script, addr, other) = match value {
         Value::Policy(policy) => {
-            let miniscript = policy.compile().map_err(stringify)?;
-            let desc = Descriptor::new_wsh(miniscript.clone()).map_err(stringify)?;
+            let ms = policy.compile().map_err(stringify)?;
+            let desc = Descriptor::new_wsh(ms.clone()).map_err(stringify)?;
             let addr = desc.to_address(network).unwrap();
-            (Some(policy), Some(miniscript), Some(desc), Some(addr), None)
+            (Some(policy), Some(ms), Some(desc), None, Some(addr), None)
         }
         Value::Miniscript(miniscript) => {
             let desc = Descriptor::new_wsh(miniscript.clone()).map_err(stringify)?;
             let addr = desc.to_address(network).unwrap();
-            (None, Some(miniscript), Some(desc), Some(addr), None)
+            (None, Some(miniscript), Some(desc), None, Some(addr), None)
         }
         Value::Descriptor(desc) => {
             let addr = desc.to_address(network).unwrap();
-            (None, None, Some(desc), Some(addr), None)
+            (None, None, Some(desc), None, Some(addr), None)
         }
         Value::PubKey(key) => {
             let desc = Descriptor::new_wpkh(key.clone()).map_err(stringify)?;
             let addr = desc.to_address(network).unwrap();
-            (None, None, Some(desc), Some(addr), Some(key.into()))
+            (None, None, Some(desc), None, Some(addr), Some(key.into()))
         }
-        Value::Address(addr) => (None, None, None, Some(addr), None),
-        other => (None, None, None, None, Some(other)),
+        Value::Address(addr) => (None, None, None, None, Some(addr), None),
+        Value::Script(script) => (None, None, None, Some(script), None, None),
+        other => (None, None, None, None, None, Some(other)),
     };
 
-    let script = desc
-        .as_ref()
-        .map(|d| d.to_explicit_script())
-        .transpose()
+    let script = script
+        .map_or_else(
+            || desc.as_ref().map(|d| d.to_explicit_script()).transpose(),
+            |s| Ok(Some(s)),
+        )
         .map_err(stringify)?;
 
     Ok(JsValue::from_serde(&PlaygroundResult {
