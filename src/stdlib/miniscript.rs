@@ -3,7 +3,6 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::{Address, Network};
 
 use crate::runtime::Value;
-use crate::time::{duration_to_seq, parse_datetime};
 use crate::util::DescriptorExt;
 use crate::{Descriptor, Miniscript, Policy, Result, Scope};
 
@@ -82,21 +81,13 @@ pub mod fns {
 
     pub fn older(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let locktime = match args.remove(0) {
-            Value::Duration(dur) => duration_to_seq(&dur)?,
-            Value::Number(num) => num as u32,
-            _ => bail!(Error::InvalidArguments),
-        };
+        let locktime = args.remove(0).into_u32()?;
         Ok(Policy::Older(locktime).into())
     }
 
     pub fn after(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let locktime = match args.remove(0) {
-            Value::DateTime(datetime) => parse_datetime(&datetime)?,
-            Value::Number(num) => num as u32,
-            _ => bail!(Error::InvalidArguments),
-        };
+        let locktime = args.remove(0).into_u32()?;
         Ok(Policy::After(locktime).into())
     }
 

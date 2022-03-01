@@ -16,12 +16,11 @@ pub enum Expr {
     Infix(Infix),
     Not(Not),
 
-    // Atoms
     PubKey(String),
     Bytes(Vec<u8>),
     Number(i64),
     Duration(Duration),
-    DateTime(String),
+    DateTime(DateTime),
 }
 
 impl_from_variant!(i64, Expr, Number);
@@ -172,6 +171,10 @@ pub enum DurationPart {
     Minutes(f64),
     Seconds(f64),
 }
+// DateTime (YYYY-MM-DD with optional HH:MM)
+#[derive(Debug, Clone, PartialEq)]
+pub struct DateTime(pub String);
+impl_from_variant!(DateTime, Expr);
 
 /// A function definition statement
 #[derive(Debug, Clone)]

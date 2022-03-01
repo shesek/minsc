@@ -24,8 +24,7 @@ pub enum Value {
     Bytes(Vec<u8>),
     Number(i64),
     Bool(bool),
-    DateTime(String),
-    Duration(ast::Duration),
+    Network(Network),
 
     Policy(Policy),
     WithProb(usize, Policy),
@@ -37,9 +36,6 @@ pub enum Value {
 
     Function(Function),
     Array(Vec<Value>),
-
-    // Exists in the runtime builtins but cannot be constructed
-    Network(Network),
 }
 
 impl_from_variant!(Policy, Value);
@@ -297,6 +293,20 @@ impl ast::InfixOp {
     }
 }
 
+impl Evaluate for ast::Duration {
+    fn eval(&self, _: &Scope) -> Result<Value> {
+        let seq_num = time::duration_to_seq(self)?;
+        Ok(Value::Number(seq_num as i64))
+    }
+}
+
+impl Evaluate for ast::DateTime {
+    fn eval(&self, _: &Scope) -> Result<Value> {
+        let unix_timestamp = time::parse_datetime(&self.0)?;
+        Ok(Value::Number(unix_timestamp as i64))
+    }
+}
+
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &Scope) -> Result<Value> {
@@ -345,12 +355,11 @@ impl Evaluate for Expr {
             Expr::Infix(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
 
-            // Atoms
+            Expr::Duration(x) => x.eval(scope)?,
+            Expr::DateTime(x) => x.eval(scope)?,
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::Number(x) => Value::Number(*x),
-            Expr::Duration(x) => Value::Duration(x.clone()),
-            Expr::DateTime(x) => Value::DateTime(x.clone()),
         })
     }
 }
@@ -397,6 +406,13 @@ impl TryFrom<Value> for i64 {
 }
 
 impl TryFrom<Value> for usize {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(value.into_i64()?.try_into()?)
+    }
+}
+
+impl TryFrom<Value> for u32 {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(value.into_i64()?.try_into()?)
@@ -510,16 +526,6 @@ impl TryFrom<Value> for Script {
                 let pubkey = desc_pubkey.derive_public_key(&EC)?;
                 Ok(ScriptBuilder::new().push_key(&pubkey).into_script())
             }
-            Value::Duration(dur) => {
-                let seq_num = time::duration_to_seq(&dur)?;
-                Ok(ScriptBuilder::new().push_int(seq_num as i64).into_script())
-            }
-            Value::DateTime(datetime) => {
-                let unix_timestamp = time::parse_datetime(&datetime)?;
-                Ok(ScriptBuilder::new()
-                    .push_int(unix_timestamp as i64)
-                    .into_script())
-            }
             Value::Array(elements) => {
                 let scriptbytes = elements
                     .into_iter()
@@ -570,6 +576,9 @@ impl Value {
     pub fn into_usize(self) -> Result<usize> {
         self.try_into()
     }
+    pub fn into_u32(self) -> Result<u32> {
+        self.try_into()
+    }
     pub fn into_bool(self) -> Result<bool> {
         self.try_into()
     }
@@ -602,8 +611,6 @@ impl fmt::Display for Value {
             Value::PubKey(x) => write!(f, "{}", x),
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
-            Value::DateTime(x) => write!(f, "{}", x),
-            Value::Duration(x) => write!(f, "{:?}", x),
             Value::Bytes(x) => write!(f, "0x{}", x.to_hex()),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),

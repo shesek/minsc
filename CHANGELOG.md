@@ -82,6 +82,8 @@
 - Support child key derivation for `Policy` and `Miniscript` without coercing them into `Descriptor`,
   as well as for `Array`s containing derivable types.
 
+- Remove the `Duration` and `DateTime` runtime data types. They can still be used but get evaluated into a `Number`.
+
 ## 0.2.0 - 2020-11-27
 
 - Ported from sipa-miniscript to rust-miniscript (#1)
