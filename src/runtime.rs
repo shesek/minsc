@@ -294,8 +294,13 @@ impl ast::InfixOp {
 }
 
 impl Evaluate for ast::Duration {
-    fn eval(&self, _: &Scope) -> Result<Value> {
-        let seq_num = time::duration_to_seq(self)?;
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let block_interval = scope
+            .get(&"BLOCK_INTERVAL".into())
+            .expect("built-in var")
+            .clone()
+            .into_usize()? as f64;
+        let seq_num = time::duration_to_seq(self, block_interval)?;
         Ok(Value::Number(seq_num as i64))
     }
 }

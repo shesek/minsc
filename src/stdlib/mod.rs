@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::{Address, Network, Script};
 
 use crate::runtime::{Execute, Value};
-use crate::{ast, parse_lib, Result, Scope};
+use crate::{ast, parse_lib, time, Result, Scope};
 
 pub mod miniscript;
 
@@ -35,6 +35,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("le64", fns::le64).unwrap();
 
     // Constants
+    scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
     scope.set("MAX_NUMBER", i64::MAX).unwrap();
     scope.set("MIN_NUMBER", i64::MIN).unwrap();
 

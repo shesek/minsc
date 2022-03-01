@@ -15,13 +15,15 @@ const BLOCKS_MAX: u32 = SEQUENCE_LOCKTIME_MASK; // 65535
 const SECONDS_MAX: u32 = SEQUENCE_LOCKTIME_MASK << SEQUENCE_LOCKTIME_GRANULARITY; // 33553920
 const SECONDS_MOD: u32 = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 
-// TODO make this configurable (via an env var, a la crates.io/crates/const_env?)
-const BLOCK_INTERVAL: f64 = 600.0;
+// The default block interval. Can be overridden in Minsc by setting the `BLOCK_INTERVAL` variable
+pub const BLOCK_INTERVAL: usize = 600;
 
-pub fn duration_to_seq(duration: &Duration) -> Result<u32> {
+pub fn duration_to_seq(duration: &Duration, block_interval: f64) -> Result<u32> {
     match duration {
         Duration::BlockHeight(num_blocks) => rel_height_to_seq(*num_blocks),
-        Duration::BlockTime { parts, heightwise } => rel_time_to_seq(parts, *heightwise),
+        Duration::BlockTime { parts, heightwise } => {
+            rel_time_to_seq(parts, *heightwise, block_interval)
+        }
     }
 }
 
@@ -33,7 +35,7 @@ fn rel_height_to_seq(num_blocks: u32) -> Result<u32> {
     Ok(num_blocks)
 }
 
-fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<u32> {
+fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool, block_interval: f64) -> Result<u32> {
     let seconds = parts
         .iter()
         .map(|p| match p {
@@ -49,10 +51,10 @@ fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool) -> Result<u32> {
 
     if heightwise {
         ensure!(
-            seconds % BLOCK_INTERVAL == 0.0,
+            seconds % block_interval == 0.0,
             Error::InvalidDurationHeightwise
         );
-        return rel_height_to_seq((seconds / BLOCK_INTERVAL) as u32);
+        return rel_height_to_seq((seconds / block_interval) as u32);
     }
 
     ensure!(
