@@ -184,12 +184,13 @@ impl Evaluate for ast::Thresh {
 
 impl Evaluate for ast::Ident {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        Ok(match scope.get(&self) {
-            Some(binding) => binding.clone(),
-            None => bail!(Error::VarNotFound(self.clone())),
-        })
+        scope
+            .get(&self)
+            .cloned()
+            .ok_or_else(|| Error::VarNotFound(self.clone()))
     }
 }
+
 impl Evaluate for ast::Array {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let elements = eval_exprs(scope, &self.0)?;
@@ -592,9 +593,6 @@ impl Value {
     }
     pub fn into_array(self) -> Result<Vec<Value>> {
         self.try_into()
-    }
-    pub fn into_script_pubkey(self) -> Result<Script> {
-        Ok(self.into_desc()?.to_script_pubkey()?)
     }
 }
 
