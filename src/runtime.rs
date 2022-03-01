@@ -55,7 +55,7 @@ impl_from_variant!(i64, Value, Number);
 impl_from_variant!(bool, Value, Bool);
 impl From<usize> for Value {
     fn from(num: usize) -> Self {
-        (num as i64).into()
+        Value::Number(num.try_into().unwrap())
     }
 }
 impl<T: Into<Function>> From<T> for Value {
