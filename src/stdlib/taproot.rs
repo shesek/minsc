@@ -117,11 +117,7 @@ pub mod fns {
             .into_iter()
             .map(|v| {
                 Ok(match v {
-                    Value::Array(mut elements) if elements.len() == 2 => {
-                        let weight = elements.remove(0).into_u32()?;
-                        let script = elements.remove(0).into_script()?;
-                        (weight, script)
-                    }
+                    Value::WithProb(prob, value) => (prob as u32, value.into_script()?),
                     other => (1, other.into_script()?),
                 })
             })

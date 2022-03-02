@@ -27,7 +27,7 @@ pub enum Value {
     Network(Network),
 
     Policy(Policy),
-    WithProb(usize, Policy),
+    WithProb(usize, Box<Value>),
 
     Miniscript(Miniscript),
     Descriptor(Descriptor),
@@ -214,7 +214,9 @@ impl Evaluate for ast::ArrayAccess {
 
 impl Evaluate for ast::WithProb {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call_exprs(scope, &"prob".into(), &[&*self.prob, &*self.expr])
+        let prob = self.prob.eval(scope)?.into_usize()?;
+        let value = self.expr.eval(scope)?;
+        Ok(Value::WithProb(prob, value.into()))
     }
 }
 

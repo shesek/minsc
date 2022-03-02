@@ -17,6 +17,9 @@ fn range($start, $end) = repeat(($end-$start)+1, |$n| $start+$n);
 fn slice($arr, $start, $len) = map(range($start, $start+$len), |$n| $arr.$n);
 fn tail($arr) = slice($arr, 1, len($arr) - 1);
 
+// Function form for assigning execution probabilities
+fn prob($n, $val) = $n@$val;
+
 // Dispatch the call to the script fragment identified by its index at the top of the stack
 fn switchIndex($frags) = `
   repeat(len($frags) - 1, |$n|

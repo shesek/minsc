@@ -29,7 +29,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();
     scope.set_fn("any", fns::any).unwrap();
-    scope.set_fn("prob", fns::prob).unwrap();
 
     // Compile policy to miniscript
     scope.set_fn("miniscript", fns::miniscript).unwrap();
@@ -56,7 +55,7 @@ pub mod fns {
         let policies_with_probs = args
             .into_iter()
             .map(|arg| match arg {
-                Value::WithProb(usize, policy) => Ok((usize, policy)),
+                Value::WithProb(prob, value) => Ok((prob, value.into_policy()?)),
                 arg => Ok((1, arg.into_policy()?)),
             })
             .collect::<Result<_>>()?;
@@ -167,14 +166,6 @@ pub mod fns {
         let address = Address::from_script(&script, network)
             .expect("non-addressable descriptors cannot be constructed");
         Ok(address.into())
-    }
-
-    // `prob(A, B)` -> `A@B`
-    pub fn prob(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 2, Error::InvalidArguments);
-        let prob_n = args.remove(0).into_usize()?;
-        let policy = args.remove(0).into_policy()?;
-        Ok(Value::WithProb(prob_n, policy))
     }
 
     // Turn `[A,B,C]` array into an `A && B && C` policy
