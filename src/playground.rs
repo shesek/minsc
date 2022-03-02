@@ -1,5 +1,5 @@
 use miniscript::bitcoin::hashes::hex::FromHex;
-use miniscript::bitcoin::{Network, Script};
+use miniscript::bitcoin::{Address, Network, Script};
 use miniscript::descriptor::Descriptor;
 use serde::Serialize;
 use std::str::FromStr;
@@ -46,8 +46,11 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
             let addr = desc.to_address(network).unwrap();
             (None, None, Some(desc), None, Some(addr), Some(key.into()))
         }
+        Value::Script(script) => {
+            let addr = Address::from_script(&script, network);
+            (None, None, None, Some(script), addr, None)
+        }
         Value::Address(addr) => (None, None, None, None, Some(addr), None),
-        Value::Script(script) => (None, None, None, Some(script), None, None),
         other => (None, None, None, None, None, Some(other)),
     };
 
