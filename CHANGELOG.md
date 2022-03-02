@@ -13,7 +13,7 @@
   1. `tapLeaf(Script, version=0xc0) -> Hash` (compute the TapLeaf hash of the given Script)
   2. `tapBranch(Hash, Hash) -> Hash` (compute the TapBranch hash for the two given nodes)
   3. `tapTweak(PubKey internal_key, Hash merkle_root) -> Script` (tweak the `internal_key` with the `merkle_root` and return the V1 witness program SPK)
-  4. `tapHuffmanTree(Array<Script>) -> Hash` (compute the merkle root hash for the array of scripts with optional weights)
+  4. `tapTreeRoot(Script|Array) -> Hash` (compute the merkle root hash for the script tree)
 
   Taproot descriptors (`tr()`) are not supported yet.
 

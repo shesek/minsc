@@ -1,26 +1,25 @@
-use crate::Scope;
+use std::convert::TryInto;
+
+use bitcoin::hashes::{sha256, Hash, HashEngine};
+use bitcoin::schnorr::{TapTweak, UntweakedPublicKey, XOnlyPublicKey};
+use bitcoin::util::address::WitnessVersion;
+use bitcoin::util::taproot::{LeafVersion, TapBranchHash, TapLeafHash, TaprootSpendInfo};
+use bitcoin::Script;
+use miniscript::bitcoin;
+
+use crate::util::EC;
+use crate::{Error, Result, Scope, Value};
 
 pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("tapLeaf", fns::tapLeaf).unwrap();
     scope.set_fn("tapBranch", fns::tapBranch).unwrap();
     scope.set_fn("tapTweak", fns::tapTweak).unwrap();
-    scope.set_fn("tapHuffmanTree", fns::tapHuffmanTree).unwrap();
+    scope.set_fn("tapTreeRoot", fns::tapTreeRoot).unwrap();
 }
 
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
-    use std::convert::TryInto;
-
-    use bitcoin::hashes::{sha256, Hash, HashEngine};
-    use bitcoin::schnorr::{TapTweak, UntweakedPublicKey, XOnlyPublicKey};
-    use bitcoin::util::address::WitnessVersion;
-    use bitcoin::util::taproot::{LeafVersion, TapBranchHash, TapLeafHash, TaprootSpendInfo};
-    use bitcoin::Script;
-    use miniscript::bitcoin;
-
-    use crate::util::EC;
-    use crate::{Error, Result, Value};
 
     /// tapLeaf(Script, version=0xc0) -> Hash
     ///
@@ -51,81 +50,147 @@ pub mod fns {
         let a: sha256::Hash = args.remove(0).try_into()?;
         let b: sha256::Hash = args.remove(0).try_into()?;
 
-        let mut eng = TapBranchHash::engine();
-        if a < b {
-            eng.input(&a);
-            eng.input(&b);
-        } else {
-            eng.input(&b);
-            eng.input(&a);
-        };
-        let branch = sha256::Hash::from_engine(eng);
+        let branch = branch_hash(&a, &b);
 
         Ok(Value::Bytes(branch.into_inner().to_vec()))
     }
 
-    /// tapTweak(PubKey internal_key, Hash merkle_root) -> Script
+    /// tapTweak(PubKey internal_key, Mixed) -> Script
     ///
-    /// Tweak the internal key with the given script tree merkle root and return the v1 output SPK
+    /// Tweak the internal key with the given script tree and return the v1 output SPK
+    /// The second argument can be a 32 bytes hash or anything accepted by tree_root()
     pub fn tapTweak(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(matches!(args.len(), 1 | 2), Error::InvalidArguments);
 
-        // Get the pubkey out of the DescriptorPublicKey and transform it into an x-only pubkey
-        let internal_key = args.remove(0).into_key()?.derive_public_key(&EC)?;
-        let internal_key: XOnlyPublicKey = internal_key.key.into();
+        let internal_key = args.remove(0);
+        let script_tree = args.pop();
+        let output_spk = tap_tweak(internal_key, script_tree)?;
 
-        // When there's no script tree, the second argument can be omitted entirely or provided as en empty byte vector (`0x`)
-        let merkle_root = match args.pop() {
-            Some(Value::Bytes(bytes)) => match bytes.len() {
-                32 => Some(TapBranchHash::from_inner(bytes.try_into().unwrap())),
-                0 => None,
-                _ => bail!(Error::InvalidMerkleLen(bytes.len())),
-            },
-            None => None,
-            Some(_) => bail!(Error::InvalidArguments),
-        };
-
-        let (output_key, _) = internal_key.tap_tweak(&EC, merkle_root);
-
-        Ok(Script::new_witness_program(WitnessVersion::V1, &output_key.serialize()).into())
+        Ok(output_spk.into())
     }
 
-    /// tapHuffmanTree(Array<Script>) -> Hash merkle_root
+    /// tapTreeRoot(Script|Array) -> Hash merkle_root
     ///
-    /// Compute the merkle root hash of the given array of scripts using the Huffman tree algorithm.
-    /// Each element can be an array with `[ weight, script ]`.
-    ///
-    /// This cannot be used with custom leaf versions, as the underlying TaprootSpendInfo::with_huffman_tree() does not support it
-    pub fn tapHuffmanTree(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        lazy_static! {
-            // Use a fixed dummy internal key, we only care about the merkle tree root and throw away the generated output key.
-            static ref INTERNAL_KEY: UntweakedPublicKey =
-                "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
-                    .parse()
-                    .unwrap();
-        }
-
+    /// Compute the merkle root hash for the given script tree
+    pub fn tapTreeRoot(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let scripts = args.remove(0).into_array()?;
 
-        if scripts.len() == 0 {
-            // Return an empty Bytes vector to signify no merkle root (Minsc doesn't have Null/None)
-            return Ok(Value::Bytes(vec![]));
+        let merkle_root = tree_root(args.remove(0))?;
+
+        Ok(Value::Bytes(
+            // Return empty tree as an empty Bytes vector (Minsc doesn't yet have Null/None)
+            merkle_root.map_or_else(Vec::new, |r| r.into_inner().to_vec()),
+        ))
+    }
+}
+
+fn tap_tweak(internal_key: Value, script_tree: Option<Value>) -> Result<Script> {
+    // Get the pubkey out of the DescriptorPublicKey and transform it into an x-only pubkey
+    let internal_key = internal_key.into_key()?.derive_public_key(&EC)?;
+    let internal_key: XOnlyPublicKey = internal_key.key.into();
+
+    // When there's no script tree, the second argument can be omitted entirely or provided as en empty byte vector (`0x`)
+    // The second argument can be anything accepted
+    let merkle_root = script_tree.map_or(Ok(None), tree_root)?;
+
+    let (output_key, _) = internal_key.tap_tweak(&EC, merkle_root);
+
+    Ok(Script::new_witness_program(
+        WitnessVersion::V1,
+        &output_key.serialize(),
+    ))
+}
+
+fn tree_root(root: Value) -> Result<Option<TapBranchHash>> {
+    Ok(match root {
+        // Empty arrays and empty bytes are treated as an empty script tree (key-path only)
+        Value::Array(nodes) if nodes.len() == 0 => None,
+        Value::Bytes(bytes) if bytes.len() == 0 => None,
+
+        // Bytes of length 32 are considered to be the merkle root hash and returned as-is
+        Value::Bytes(bytes) if bytes.len() == 32 => Some(bytes.try_into().unwrap()),
+        Value::Bytes(bytes) => bail!(Error::InvalidMerkleLen(bytes.len())),
+
+        // An array with 1 element is a tree with a single script, where the leaf is also the root
+        // This can be useful if the single script is passed as a Bytes value.
+        Value::Array(mut nodes) if nodes.len() == 1 => {
+            Some(make_leaf(nodes.remove(0))?.into_inner())
         }
 
-        let script_weights = scripts
-            .into_iter()
-            .map(|v| {
-                Ok(match v {
-                    Value::WithProb(prob, value) => (prob as u32, value.into_script()?),
-                    other => (1, other.into_script()?),
-                })
-            })
-            .collect::<Result<Vec<_>>>()?;
+        // An array with 2 elements is constructed as a nested tree of arrays (i.e. [ [S1,S2], [S3,S4] ]  )
+        Value::Array(mut nodes) if nodes.len() == 2 => {
+            Some(combine_nodes(nodes.remove(0), nodes.remove(0))?.into_inner())
+        }
 
-        let tree_info = TaprootSpendInfo::with_huffman_tree(&EC, *INTERNAL_KEY, script_weights)?;
-        let merkle_root = tree_info.merkle_root().expect("at least 1 script");
+        // An array with 3 or more scripts is constructed as an huffman tree
+        Value::Array(nodes) if nodes.len() > 2 => Some(huffman_tree(nodes)?.into_inner()),
 
-        Ok(Value::Bytes(merkle_root.into_inner().to_vec()))
+        // Other values are expected to be script-like and are constructed as a single script tree
+        node => Some(make_leaf(node)?.into_inner()),
     }
+    .map(TapBranchHash::from_inner))
+}
+
+fn make_leaf(node: Value) -> Result<sha256::Hash> {
+    let script = node.into_script()?;
+    let leaf_hash = TapLeafHash::from_script(&script, LeafVersion::TapScript);
+    Ok(sha256::Hash::from_inner(leaf_hash.into_inner()))
+}
+
+fn combine_nodes(a: Value, b: Value) -> Result<sha256::Hash> {
+    Ok(branch_hash(&process_node(a)?, &process_node(b)?))
+}
+
+fn process_node(node: Value) -> Result<sha256::Hash> {
+    if node.is_script_like() {
+        make_leaf(node)
+    } else if let Value::Array(mut nodes) = node {
+        if nodes.len() == 2 {
+            combine_nodes(nodes.remove(0), nodes.remove(0))
+        } else {
+            Err(Error::TaprootInvalidNestedTree)
+        }
+    } else {
+        Err(Error::TaprootInvalidNestedTree)
+    }
+}
+
+fn branch_hash(a: &sha256::Hash, b: &sha256::Hash) -> sha256::Hash {
+    let mut eng = TapBranchHash::engine();
+    if a < b {
+        eng.input(a);
+        eng.input(b);
+    } else {
+        eng.input(b);
+        eng.input(a);
+    };
+    sha256::Hash::from_engine(eng)
+}
+
+fn huffman_tree(scripts: Vec<Value>) -> Result<sha256::Hash> {
+    lazy_static! {
+        // Use a fixed dummy internal key, we only care about the merkle tree root and throw away the generated output key.
+        static ref INTERNAL_KEY: UntweakedPublicKey =
+            "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+                .parse()
+                .unwrap();
+    }
+
+    ensure!(scripts.len() > 2, Error::InvalidArguments);
+
+    let script_weights = scripts
+        .into_iter()
+        .map(|v| {
+            Ok(match v {
+                Value::WithProb(prob, value) => (prob as u32, value.into_script()?),
+                other => (1, other.into_script()?),
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let tree_info = TaprootSpendInfo::with_huffman_tree(&EC, *INTERNAL_KEY, script_weights)?;
+
+    let merkle_root = tree_info.merkle_root().expect("at least 1 script");
+
+    Ok(sha256::Hash::from_inner(merkle_root.into_inner()))
 }

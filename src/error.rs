@@ -155,6 +155,9 @@ pub enum Error {
 
     #[error("Invalid merkle root hash length: {0} (expected 32)")]
     InvalidMerkleLen(usize),
+
+    #[error("Invalid taproot script tree, nested arrays are expected to have exactly 2 elements")]
+    TaprootInvalidNestedTree,
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
