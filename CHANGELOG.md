@@ -39,8 +39,8 @@
 
   The `script_*` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
-- New array functions:
-  1. `len(Array|Bytes) -> Number`
+- New utility functions:
+  1. `len(Array|Bytes|Script) -> Number`
   2. `first(Array) -> Any`
   3. `last(Array) -> Any`
   4. `map(Array, Function) -> Array`
@@ -48,23 +48,19 @@
   6. `slice(Array, Number start, Number len) -> Array`
   7. `tail(Array) -> Array`
   8. `concat(Array, Array) -> Array`
+  9. `le64(Number) -> Bytes` (encode the number as 64 bit little-endian)
+  10. `repeat(Number, Function|Value) -> Array`
+
+     The second parameter can be a value to fill the array with,
+     or a function that gets called with the index to produce the value.
+
+     For example: `repeat(3, 111) == [111, 111, 111]`, or with a function: `repeat(3, |$n| 100+$n) == [100, 101, 102]`.
 
 - New function for conditionals: `iif(Bool condition, Any then_value, Any else_value)`
 
   Returns the `then_value` if the condition is true, or `else_value` otherwise.
 
   The values may be provided as thunks to be lazily-evaluated. This can be useful to avoid infinite recursion, for example: `fn S(n) = n + iif(n == 0, 0, || S(n - 1));`.
-
-- New utility functions:
-
-  1. `repeat(Number, Function|Value) -> Array`
-
-    The second parameter can be a value to fill the array with,
-    or a function that gets called with the index to produce the value.
-
-    For example: `repeat(3, 111) == [111, 111, 111]`, or with a function: `repeat(3, |$n| 100+$n) == [100, 101, 102]`.
-
-  2. `le64(Number) -> Bytes` (encode the number as 64 bit little-endian)
 
 - New functions for writing Scripts:
 

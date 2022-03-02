@@ -55,12 +55,13 @@ pub mod fns {
     use crate::function::Call;
     use crate::Error;
 
-    // len(Array|Bytes) -> Number
+    // len(Array|Bytes|Script) -> Number
     pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(match args.remove(0) {
             Value::Array(elements) => elements.len(),
             Value::Bytes(bytes) => bytes.len(),
+            Value::Script(script) => script.into_bytes().len(),
             _ => bail!(Error::InvalidArguments),
         }
         .into())
