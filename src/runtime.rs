@@ -233,18 +233,41 @@ impl Evaluate for ast::FnExpr {
 
 impl Evaluate for ast::ScriptFrag {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let scripts = self
-            .fragments
-            .iter()
-            .map(|frag| frag.eval(scope)?.into_script())
-            .collect::<Result<Vec<Script>>>()?;
-        let bytes = scripts
-            .into_iter()
-            .map(|script| script.into_bytes())
-            .flatten()
-            .collect::<Vec<u8>>();
-        Ok(Script::from(bytes).into())
+        let frags = eval_exprs(scope, &self.fragments)?;
+        Ok(script_frag(Value::Array(frags))?.into())
     }
+}
+
+fn script_frag(value: Value) -> Result<Script> {
+    Ok(match value {
+        // As script code
+        v @ Value::Script(_)
+        | v @ Value::Descriptor(_)
+        | v @ Value::Miniscript(_)
+        | v @ Value::Policy(_) => v.into_script()?,
+
+        // As data pushes
+        Value::Number(n) => ScriptBuilder::new().push_int(n).into_script(),
+        Value::Bool(val) => ScriptBuilder::new().push_int(val as i64).into_script(),
+        Value::Bytes(bytes) => ScriptBuilder::new().push_slice(&bytes).into_script(),
+        Value::PubKey(desc_pubkey) => {
+            let pubkey = desc_pubkey.derive_public_key(&EC)?;
+            ScriptBuilder::new().push_key(&pubkey).into_script()
+        }
+
+        // Flatten arrays
+        Value::Array(elements) => {
+            let scriptbytes = elements
+                .into_iter()
+                .map(|val| Ok(script_frag(val)?.into_bytes()))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<u8>>();
+            scriptbytes.into()
+        }
+        v => bail!(Error::NotScriptLike(v)),
+    })
 }
 
 impl Evaluate for ast::Not {
@@ -520,30 +543,14 @@ impl TryFrom<Value> for Network {
 impl TryFrom<Value> for Script {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Script(x) => Ok(x),
+        Ok(match value {
+            Value::Script(script) => script,
+            Value::Bytes(bytes) => bytes.into(),
             v @ Value::Descriptor(_) | v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
-                Ok(v.into_desc()?.to_explicit_script()?)
+                v.into_desc()?.to_explicit_script()?
             }
-            Value::Number(n) => Ok(ScriptBuilder::new().push_int(n).into_script()),
-            Value::Bool(val) => Ok(ScriptBuilder::new().push_int(val as i64).into_script()),
-            Value::Bytes(bytes) => Ok(ScriptBuilder::new().push_slice(&bytes).into_script()),
-            Value::PubKey(desc_pubkey) => {
-                let pubkey = desc_pubkey.derive_public_key(&EC)?;
-                Ok(ScriptBuilder::new().push_key(&pubkey).into_script())
-            }
-            Value::Array(elements) => {
-                let scriptbytes = elements
-                    .into_iter()
-                    .map(|val| Ok(val.into_script()?.into_bytes()))
-                    .collect::<Result<Vec<Vec<u8>>>>()?
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<u8>>();
-                Ok(scriptbytes.into())
-            }
-            v => Err(Error::NotScriptLike(v)),
-        }
+            v => bail!(Error::NotScriptLike(v)),
+        })
     }
 }
 
@@ -608,6 +615,16 @@ impl Value {
     }
     pub fn into_array(self) -> Result<Vec<Value>> {
         self.try_into()
+    }
+
+    pub fn is_script_like(&self) -> bool {
+        matches!(self, Value::Script(_) | Value::Bytes(_)) || self.is_desc_like()
+    }
+    pub fn is_desc_like(&self) -> bool {
+        matches!(self, Value::Descriptor(_)
+            |  Value::Miniscript(_)
+            |  Value::Policy(_)
+            |  Value::PubKey(_))
     }
 }
 

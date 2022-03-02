@@ -106,12 +106,15 @@ pub mod fns {
         let script_or_desc = args.remove(0);
         let network = args.pop().map_or(Ok(Network::Testnet), TryInto::try_into)?;
 
-        if let Value::Script(script) = script_or_desc {
+        // Need to check if its 'descriptor-like' first because descriptors are also considered 'script-like'
+        if script_or_desc.is_desc_like() {
+            let desc = script_or_desc.into_desc()?;
+            self::miniscript::fns::address_(&desc, network)
+        } else if script_or_desc.is_script_like() {
+            let script = script_or_desc.into_script()?;
             Ok(Address::from_script(&script, network)
                 .ok_or_else(|| Error::NotAddressable(script))?
                 .into())
-        } else if let Ok(desc) = script_or_desc.into_desc() {
-            self::miniscript::fns::address_(&desc, network)
         } else {
             Err(Error::InvalidArguments)
         }
