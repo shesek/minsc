@@ -11,10 +11,8 @@ use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
-use crate::stdlib::miniscript::fns as miniscript_fns;
-use crate::time;
 use crate::util::{DeriveExt, DescriptorExt, EC};
-use crate::{Descriptor, Error, Miniscript, Policy, Result, Scope};
+use crate::{stdlib, time, Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -307,6 +305,12 @@ impl ast::InfixOp {
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             // @ to assign execution probability
             (Prob, Number(prob), value) => WithProb(prob.try_into()?, value.into()),
+            // + for tap tweak (internal_key+script_tree)
+            (Add, i @ PubKey(_), t)
+            | (Add, i @ Bytes(_), t @ Script(_))
+            | (Add, i @ Bytes(_), t @ Miniscript(_))
+            | (Add, i @ Bytes(_), t @ Policy(_))
+            | (Add, i @ Bytes(_), t @ Array(_)) => stdlib::taproot::tap_tweak(i, Some(t))?.into(),
 
             _ => bail!(Error::InvalidArguments),
         })
@@ -413,7 +417,7 @@ impl TryFrom<Value> for Policy {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
-            arr @ Value::Array(_) => miniscript_fns::all_(arr)?.try_into(),
+            arr @ Value::Array(_) => stdlib::miniscript::fns::all_(arr)?.try_into(),
             v => Err(Error::NotPolicyLike(v)),
         }
     }

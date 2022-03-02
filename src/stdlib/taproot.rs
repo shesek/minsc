@@ -84,7 +84,7 @@ pub mod fns {
     }
 }
 
-fn tap_tweak(internal_key: Value, script_tree: Option<Value>) -> Result<Script> {
+pub fn tap_tweak(internal_key: Value, script_tree: Option<Value>) -> Result<Script> {
     // Get the pubkey out of the DescriptorPublicKey and transform it into an x-only pubkey
     let internal_key = internal_key.into_key()?.derive_public_key(&EC)?;
     let internal_key: XOnlyPublicKey = internal_key.key.into();

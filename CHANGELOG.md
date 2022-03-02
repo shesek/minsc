@@ -12,8 +12,10 @@
 
   1. `tapLeaf(Script, version=0xc0) -> Hash` (compute the TapLeaf hash of the given Script)
   2. `tapBranch(Hash, Hash) -> Hash` (compute the TapBranch hash for the two given nodes)
-  3. `tapTweak(PubKey internal_key, Hash merkle_root) -> Script` (tweak the `internal_key` with the `merkle_root` and return the V1 witness program SPK)
-  4. `tapTreeRoot(Script|Array) -> Hash` (compute the merkle root hash for the script tree)
+  3. `tapTweak(PubKey internal_key, Hash|Script|Array script_tree) -> Script` (tweak the `internal_key` with the `script_tree` and return the V1 witness program SPK. `script_tree` can be the merkle root hash or any value accepted by `tapTreeRoot`)
+  4. `tapTreeRoot(Script|Array tree) -> Hash` (compute the merkle root hash for the script tree. the tree can be a single Script or an Array.)
+
+  The `+` operator can be used similarly to `tapTweak()`. For example ```H_POINT+`OP_TRUE` ``` for a script-path-only with a single script.
 
   Taproot descriptors (`tr()`) are not supported yet.
 
