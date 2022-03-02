@@ -1,6 +1,7 @@
 // Bitcoin opcodes
 // Generated with: curl -s https://raw.githubusercontent.com/rust-bitcoin/rust-bitcoin/master/src/blockdata/opcodes.rs | grep 'pub const'  | sed -r 's/.*(OP_\w+).* (0x\w{2}).*/\1 = rawscript(\2),/' | egrep -v 'OP_RETURN_|PUSHNUM|PUSHBYTES|NOP|INVALIDOPCODE')
 OP_PUSHDATA1 = rawscript(0x4c), OP_PUSHDATA2 = rawscript(0x4d), OP_PUSHDATA4 = rawscript(0x4e), OP_RESERVED = rawscript(0x50), OP_VER = rawscript(0x62), OP_IF = rawscript(0x63), OP_NOTIF = rawscript(0x64), OP_VERIF = rawscript(0x65), OP_VERNOTIF = rawscript(0x66), OP_ELSE = rawscript(0x67), OP_ENDIF = rawscript(0x68), OP_VERIFY = rawscript(0x69), OP_RETURN = rawscript(0x6a), OP_TOALTSTACK = rawscript(0x6b), OP_FROMALTSTACK = rawscript(0x6c), OP_2DROP = rawscript(0x6d), OP_2DUP = rawscript(0x6e), OP_3DUP = rawscript(0x6f), OP_2OVER = rawscript(0x70), OP_2ROT = rawscript(0x71), OP_2SWAP = rawscript(0x72), OP_IFDUP = rawscript(0x73), OP_DEPTH = rawscript(0x74), OP_DROP = rawscript(0x75), OP_DUP = rawscript(0x76), OP_NIP = rawscript(0x77), OP_OVER = rawscript(0x78), OP_PICK = rawscript(0x79), OP_ROLL = rawscript(0x7a), OP_ROT = rawscript(0x7b), OP_SWAP = rawscript(0x7c), OP_TUCK = rawscript(0x7d), OP_CAT = rawscript(0x7e), OP_SUBSTR = rawscript(0x7f), OP_LEFT = rawscript(0x80), OP_RIGHT = rawscript(0x81), OP_SIZE = rawscript(0x82), OP_INVERT = rawscript(0x83), OP_AND = rawscript(0x84), OP_OR = rawscript(0x85), OP_XOR = rawscript(0x86), OP_EQUAL = rawscript(0x87), OP_EQUALVERIFY = rawscript(0x88), OP_RESERVED1 = rawscript(0x89), OP_RESERVED2 = rawscript(0x8a), OP_1ADD = rawscript(0x8b), OP_1SUB = rawscript(0x8c), OP_2MUL = rawscript(0x8d), OP_2DIV = rawscript(0x8e), OP_NEGATE = rawscript(0x8f), OP_ABS = rawscript(0x90), OP_NOT = rawscript(0x91), OP_0NOTEQUAL = rawscript(0x92), OP_ADD = rawscript(0x93), OP_SUB = rawscript(0x94), OP_MUL = rawscript(0x95), OP_DIV = rawscript(0x96), OP_MOD = rawscript(0x97), OP_LSHIFT = rawscript(0x98), OP_RSHIFT = rawscript(0x99), OP_BOOLAND = rawscript(0x9a), OP_BOOLOR = rawscript(0x9b), OP_NUMEQUAL = rawscript(0x9c), OP_NUMEQUALVERIFY = rawscript(0x9d), OP_NUMNOTEQUAL = rawscript(0x9e), OP_LESSTHAN = rawscript(0x9f), OP_GREATERTHAN = rawscript(0xa0), OP_LESSTHANOREQUAL = rawscript(0xa1), OP_GREATERTHANOREQUAL = rawscript(0xa2), OP_MIN = rawscript(0xa3), OP_MAX = rawscript(0xa4), OP_WITHIN = rawscript(0xa5), OP_RIPEMD160 = rawscript(0xa6), OP_SHA1 = rawscript(0xa7), OP_SHA256 = rawscript(0xa8), OP_HASH160 = rawscript(0xa9), OP_HASH256 = rawscript(0xaa), OP_CODESEPARATOR = rawscript(0xab), OP_CHECKSIG = rawscript(0xac), OP_CHECKSIGVERIFY = rawscript(0xad), OP_CHECKMULTISIG = rawscript(0xae), OP_CHECKMULTISIGVERIFY = rawscript(0xaf), OP_CLTV = rawscript(0xb1), OP_CSV = rawscript(0xb2), OP_CHECKSIGADD = rawscript(0xba);
+OP_CHECKSEQUENCEVERIFY = OP_CSV;
 OP_FALSE = `0`, OP_TRUE = `1`;
 
 // Elements additions
@@ -8,6 +9,9 @@ OP_CHECKSIGFROMSTACK = rawscript(0xc1), OP_CHECKSIGFROMSTACKVERIFY = rawscript(0
 OP_INSPECTINPUTOUTPOINT = rawscript(0xc7), OP_INSPECTINPUTASSET = rawscript(0xc8), OP_INSPECTINPUTVALUE = rawscript(0xc9), OP_INSPECTINPUTSCRIPTPUBKEY = rawscript(0xca), OP_INSPECTINPUTSEQUENCE = rawscript(0xcb), OP_INSPECTINPUTISSUANCE = rawscript(0xcc), OP_PUSHCURRENTINPUTINDEX = rawscript(0xcd), OP_INSPECTOUTPUTASSET = rawscript(0xce), OP_INSPECTOUTPUTVALUE = rawscript(0xcf), OP_INSPECTOUTPUTNONCE = rawscript(0xd0), OP_INSPECTOUTPUTSCRIPTPUBKEY = rawscript(0xd1), OP_INSPECTVERSION = rawscript(0xd2), OP_INSPECTLOCKTIME = rawscript(0xd3), OP_INSPECTNUMINPUTS = rawscript(0xd4), OP_INSPECTNUMOUTPUTS = rawscript(0xd5), OP_TXWEIGHT = rawscript(0xd6);
 OP_ADD64 = rawscript(0xd7), OP_SUB64 = rawscript(0xd8), OP_MUL64 = rawscript(0xd9), OP_DIV64 = rawscript(0xda), OP_NEG64 = rawscript(0xdb), OP_LESSTHAN64 = rawscript(0xdc), OP_LESSTHANOREQUAL64 = rawscript(0xdd), OP_GREATERTHAN64 = rawscript(0xde), OP_GREATERTHANOREQUAL64 = rawscript(0xdf), OP_SCRIPTNUMTOLE64 = rawscript(0xe0), OP_LE64TOSCRIPTNUM = rawscript(0xe1), OP_LE32TOLE64 = rawscript(0xe2), OP_TWEAKVERIFY = rawscript(0xe4);
 OP_SHA256INITIALIZE = rawscript(0xc4), OP_SHA256UPDATE = rawscript(0xc5), OP_SHA256FINALIZE = rawscript(0xc6);
+
+// A point with unknown discrete logarithm (to eliminate key-path spend)
+H_POINT = 50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0;
 
 // Array functions
 fn first($arr) = $arr.0;
@@ -55,6 +59,9 @@ fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations != 0,
 // example with accumulator: `0 <num> unrollLoop(50, `OP_DUP OP_0NOTEQUAL`, `OP_DUP 2 OP_ROLL OP_ADD OP_SWAP OP_1SUB`) OP_DROP` to sum the numbers from <num> to 1
 // more advanced example with some comments: https://gist.github.com/shesek/758c25489869d77d4ef624ea43f18c49
 
+// Some useful Elements asset IDs
+LBTC = 6d521c38ec1ea15734ae22b7c46064412829c0d0579f0a713d1c04ede979026f;
+TLBTC = 499a818545f6bae39fc03b637f2a4e1e64e590cac1bc3a6f6d71aa4443654c14;
 
 // Introspection helpers (Elements only)
 fn checkSameAsset($vin, $vout) = `

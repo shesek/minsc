@@ -76,7 +76,7 @@
 
 - New operators: `+`, `-`, `!`, `==`, `!=`, `<`, `>`, `<=` and `>=`
 
-- New constants: `MIN_NUMBER`, `MAX_NUMBER`
+- New constants: `MIN_NUMBER`, `MAX_NUMBER`, `H_POINT` (point with unknown discrete logarithm for script-path-only p2tr), `LBTC`, `TLBTC`
 
 - Add support for multi-line `/* .. */` comments
 
