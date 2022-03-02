@@ -212,14 +212,6 @@ impl Evaluate for ast::ArrayAccess {
     }
 }
 
-impl Evaluate for ast::WithProb {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        let prob = self.prob.eval(scope)?.into_usize()?;
-        let value = self.expr.eval(scope)?;
-        Ok(Value::WithProb(prob, value.into()))
-    }
-}
-
 impl Evaluate for ast::ChildDerive {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let parent = self.parent.eval(scope)?;
@@ -290,6 +282,9 @@ impl ast::InfixOp {
             (Add, Array(a), Array(b)) => [a, b].concat().into(),
             // + for bytes
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
+            // @ to assign execution probability
+            (Prob, Number(prob), value) => WithProb(prob.try_into()?, value.into()),
+
             _ => bail!(Error::InvalidArguments),
         })
     }
@@ -353,7 +348,6 @@ impl Evaluate for Expr {
             Expr::And(x) => x.eval(scope)?,
             Expr::Thresh(x) => x.eval(scope)?,
             Expr::Block(x) => x.eval(scope)?,
-            Expr::WithProb(x) => x.eval(scope)?,
             Expr::Array(x) => x.eval(scope)?,
             Expr::ArrayAccess(x) => x.eval(scope)?,
             Expr::ChildDerive(x) => x.eval(scope)?,

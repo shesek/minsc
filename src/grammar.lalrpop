@@ -48,7 +48,6 @@ SimpleExpr: Expr = {
   Call,
   Thresh,
   BlockExpr,
-  WithProb,
   Array,
   ArrayAccess,
   Duration,
@@ -56,6 +55,7 @@ SimpleExpr: Expr = {
   PubKey,
   Bytes,
   ScriptFrag,
+  InfixProb,
   Paren<And>,
   Paren<Or>,
   Paren<ChildDerive>,
@@ -95,9 +95,6 @@ Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
   ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
-
-WithProb: Expr = <prob:SExpr> "@" <expr:SimpleExpr> =>
-    ast::WithProb { prob: prob.into(), expr: expr.into() }.into();
 
 Array: Expr = "[" <List0<Expr, ",">> "]" =>
   ast::Array(<>).into();
@@ -156,6 +153,11 @@ InfixOp: ast::InfixOp = {
   ">=" => ast::InfixOp::Gte,
   "<=" => ast::InfixOp::Lte,
 };
+
+// This is defined separately from InfixOp with less options for the LHS/RHS, so that
+// it can be used unambiguously as an AndOrBranch element without requiring parenthesis.
+InfixProb: Expr = <lhs:SExpr> "@" <rhs:SimpleExpr> =>
+  ast::Infix { op: ast::InfixOp::Prob, lhs: lhs.into(), rhs: rhs.into() }.into();
 
 Not: Expr = "!" <Expr> =>
   ast::Not(<>.into()).into();

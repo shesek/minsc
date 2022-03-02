@@ -7,7 +7,6 @@ pub enum Expr {
     And(And),
     Thresh(Thresh),
     Ident(Ident),
-    WithProb(WithProb),
     Array(Array),
     ArrayAccess(ArrayAccess),
     ChildDerive(ChildDerive),
@@ -82,14 +81,6 @@ impl std::fmt::Display for Ident {
     }
 }
 
-/// An expression with a probability. Valid as an argument to or().
-#[derive(Debug, Clone)]
-pub struct WithProb {
-    pub prob: Box<Expr>,
-    pub expr: Box<Expr>,
-}
-impl_from_variant!(WithProb, Expr);
-
 /// An array expression
 #[derive(Debug, Clone)]
 pub struct Array(pub Vec<Expr>);
@@ -144,6 +135,7 @@ pub enum InfixOp {
     Lt,
     Gte,
     Lte,
+    Prob,
 }
 
 #[derive(Debug, Clone)]
