@@ -95,3 +95,16 @@ fn inspectOutSpkVer($expected_version) = `
 fn inspectInSpkVer($expected_version) = `
     OP_INSPECTINPUTSCRIPTPUBKEY $expected_version OP_EQUALVERIFY
 `;
+
+outAssetEqVerify = `inspectExplicitOutAsset OP_EQUALVERIFY`;
+inAssetEqVerify = `inspectExplicitInAsset OP_EQUALVERIFY`;
+outValueEqVerify = `inspectExplicitOutValue OP_EQUALVERIFY`;
+inValueEqVerify = `inspectExplicitInValue OP_EQUALVERIFY`;
+
+// 64 bit arithmetic helpers (Elements only)
+add64Verify = `OP_ADD64 OP_VERIFY`;
+sub64Verify = `OP_SUB64 OP_VERIFY`;
+mul64Verify = `OP_MUL64 OP_VERIFY`;
+div64Verify = `OP_DIV64 OP_VERIFY`;
+div64VerifyFloor = `div64Verify OP_NIP`;
+neg64Verify = `OP_NEG64 OP_VERIFY`;
