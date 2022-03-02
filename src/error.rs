@@ -123,6 +123,15 @@ pub enum Error {
     #[error("Miniscript compiler error: {0}")]
     MiniscriptCompilerError(CompilerError),
 
+    #[error("Taproot error: {0}")]
+    TaprootError(bitcoin::util::taproot::TaprootError),
+
+    #[error("Taproot builder error: {0}")]
+    TaprootBuilderError(bitcoin::util::taproot::TaprootBuilderError),
+
+    #[error("Secp256k1 error: {0}")]
+    Secp256k1Error(bitcoin::secp256k1::Error),
+
     #[error("Hash error: {0}")]
     HashError(hashes::Error),
 
@@ -140,6 +149,12 @@ pub enum Error {
 
     #[error("number type conversion failed (likely an unexpected negative number)")]
     TryFromInt(std::num::TryFromIntError),
+
+    #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
+    InvalidPubKeyLen(usize),
+
+    #[error("Invalid merkle root hash length: {0} (expected 32)")]
+    InvalidMerkleLen(usize),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -162,6 +177,13 @@ impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
 impl_from_variant!(bitcoin::util::key::Error, Error, BitcoinKey);
 impl_from_variant!(bitcoin::util::bip32::Error, Error, Bip32);
+impl_from_variant!(bitcoin::util::taproot::TaprootError, Error, TaprootError);
+impl_from_variant!(
+    bitcoin::util::taproot::TaprootBuilderError,
+    Error,
+    TaprootBuilderError
+);
+impl_from_variant!(bitcoin::secp256k1::Error, Error, Secp256k1Error);
 impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
 impl_from_variant!(
     descriptor::DescriptorKeyParseError,

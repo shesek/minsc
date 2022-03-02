@@ -7,7 +7,7 @@ use bitcoin::hashes::{self, hex::ToHex, Hash};
 use bitcoin::util::bip32::DerivationPath;
 use bitcoin::{Address, Network, Script};
 use miniscript::bitcoin;
-use miniscript::descriptor::{self, DescriptorPublicKey};
+use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
@@ -437,16 +437,21 @@ impl TryFrom<Value> for bool {
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
+        use bitcoin::{schnorr::XOnlyPublicKey, PublicKey};
+        use miniscript::descriptor::{DescriptorSinglePub, SinglePubKey};
         match value {
             Value::PubKey(x) => Ok(x),
-            Value::Bytes(x) => {
-                let pubkey = bitcoin::PublicKey::from_slice(&x)?;
-                Ok(DescriptorPublicKey::SinglePub(
-                    descriptor::DescriptorSinglePub {
-                        key: descriptor::SinglePubKey::FullKey(pubkey),
-                        origin: None,
-                    },
-                ))
+            Value::Bytes(bytes) => {
+                let key = match bytes.len() {
+                    33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
+                    32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
+                    // uncompressed keys are currently unsupported
+                    len => bail!(Error::InvalidPubKeyLen(len)),
+                };
+                Ok(DescriptorPublicKey::SinglePub(DescriptorSinglePub {
+                    key,
+                    origin: None,
+                }))
             }
             v => Err(Error::NotPubKey(v)),
         }

@@ -8,6 +8,15 @@
 
   The data types that can be interpolated are: Scripts, Descriptor, Miniscript and Policy (concatenated as script bytes), as well as Number, PubKey, Hash, Duration, DateTime and Bytes (as PUSH operations).
 
+- Preliminary Taproot support:
+
+  1. `tapLeaf(Script, version=0xc0) -> Hash` (compute the TapLeaf hash of the given Script)
+  2. `tapBranch(Hash, Hash) -> Hash` (compute the TapBranch hash for the two given nodes)
+  3. `tapTweak(PubKey internal_key, Hash merkle_root) -> Script` (tweak the `internal_key` with the `merkle_root` and return the V1 witness program SPK)
+  4. `tapHuffmanTree(Array<Script>) -> Hash` (compute the merkle root hash for the array of scripts with optional weights)
+
+  Taproot descriptors (`tr()`) are not supported yet.
+
 - Add anonymous function expressions
 
   With a Rust-like syntax: `|params| body` or `|params| { multi statement body }`

@@ -6,6 +6,7 @@ use crate::runtime::{Execute, Value};
 use crate::{ast, parse_lib, time, Result, Scope};
 
 pub mod miniscript;
+pub mod taproot;
 
 lazy_static! {
     static ref MINSC_STDLIB: ast::Library = parse_lib(include_str!("stdlib.minsc")).unwrap();
@@ -41,6 +42,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     // Miniscript related functions
     self::miniscript::attach_stdlib(scope);
+
+    // Taproot related functions
+    self::taproot::attach_stdlib(scope);
 
     // Standard library implemented in Minsc
     MINSC_STDLIB.exec(scope).unwrap();
