@@ -6,7 +6,7 @@
 
   With a space-separated list of expressions enclosed in backticks. For example: ``` `1 2 OP_DUP OP_ADD 3 OP_EQUAL` ```
 
-  The data types that can be interpolated are: Scripts, Descriptor, Miniscript and Policy (concatenated as script bytes), as well as Number, PubKey, Hash, Duration, DateTime and Bytes (as PUSH operations).
+  The data types that can be interpolated are: `Script`, `Miniscript` and `Policy` (concatenated as script bytes), as well as `Number`, `Bool`, `PubKey`, `Hash`, `Duration`, `DateTime` and `Bytes` (as PUSH operations).
 
 - Preliminary Taproot support:
 

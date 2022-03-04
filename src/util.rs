@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use bitcoin::secp256k1;
 use bitcoin::util::bip32::IntoDerivationPath;
+use bitcoin::{secp256k1, PublicKey};
 use miniscript::descriptor::{DescriptorPublicKey, DescriptorTrait, Wildcard};
 use miniscript::{bitcoin, ForEachKey, TranslatePk2};
 
@@ -13,28 +13,36 @@ lazy_static! {
         secp256k1::Secp256k1::verification_only();
 }
 
+pub trait MiniscriptExt<T: miniscript::ScriptContext> {
+    fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, T>>;
+}
+
+impl<T: miniscript::ScriptContext> MiniscriptExt<T>
+    for miniscript::Miniscript<DescriptorPublicKey, T>
+{
+    fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, T>> {
+        Ok(self.translate_pk2(|xpk| xpk.derive_public_key(&EC))?)
+    }
+}
 pub trait DescriptorExt {
+    fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>>;
     fn to_script_pubkey(&self) -> Result<bitcoin::Script>;
     fn to_explicit_script(&self) -> Result<bitcoin::Script>;
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address>;
 }
 
 impl DescriptorExt for crate::Descriptor {
+    fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>> {
+        Ok(self.translate_pk2(|xpk| xpk.derive_public_key(&EC))?)
+    }
     fn to_script_pubkey(&self) -> Result<bitcoin::Script> {
-        Ok(self
-            .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
-            .script_pubkey())
+        Ok(self.derive_keys()?.script_pubkey())
     }
     fn to_explicit_script(&self) -> Result<bitcoin::Script> {
-        Ok(self
-            .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
-            .explicit_script()?)
+        Ok(self.derive_keys()?.explicit_script()?)
     }
-
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address> {
-        Ok(self
-            .translate_pk2(|xpk| xpk.derive_public_key(&EC))?
-            .address(network)?)
+        Ok(self.derive_keys()?.address(network)?)
     }
 }
 
@@ -127,7 +135,7 @@ impl DeriveExt for Vec<Value> {
             .collect::<Result<_>>()
     }
     fn is_deriveable(&self) -> bool {
-        self.into_iter().any(|v| v.is_deriveable())
+        self.iter().any(|v| v.is_deriveable())
     }
 }
 

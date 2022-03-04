@@ -3,6 +3,7 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::{Address, Network, Script};
 
 use crate::runtime::{Execute, Value};
+use crate::util::DescriptorExt;
 use crate::{ast, parse_lib, time, Result, Scope};
 
 pub mod miniscript;
@@ -98,26 +99,25 @@ pub mod fns {
         }
     }
 
-    /// Generate an address from the given script/miniscript
-    /// address(Script|Descriptor|Miniscript|Policy) -> Address
+    /// Generate an address
+    /// address(Script|Descriptor|Miniscript|Policy|PubKey) -> Address
     pub fn address(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
 
         let script_or_desc = args.remove(0);
         let network = args.pop().map_or(Ok(Network::Testnet), TryInto::try_into)?;
 
-        // Need to check if its 'descriptor-like' first because descriptors are also considered 'script-like'
-        if script_or_desc.is_desc_like() {
-            let desc = script_or_desc.into_desc()?;
-            self::miniscript::fns::address_(&desc, network)
+        // Need to check if its 'descriptor-like' first because Miniscript/Policy are both
+        let script = if script_or_desc.is_desc_like() {
+            script_or_desc.into_desc()?.to_script_pubkey()?
         } else if script_or_desc.is_script_like() {
-            let script = script_or_desc.into_script()?;
-            Ok(Address::from_script(&script, network)
-                .ok_or_else(|| Error::NotAddressable(script))?
-                .into())
+            script_or_desc.into_script()?
         } else {
-            Err(Error::InvalidArguments)
-        }
+            bail!(Error::InvalidArguments);
+        };
+        Ok(Address::from_script(&script, network)
+            .ok_or_else(|| Error::NotAddressable(script))?
+            .into())
     }
 
     pub fn repeat(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {

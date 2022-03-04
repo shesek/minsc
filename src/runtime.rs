@@ -11,7 +11,7 @@ use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
-use crate::util::{DeriveExt, DescriptorExt, EC};
+use crate::util::{DeriveExt, MiniscriptExt, EC};
 use crate::{stdlib, time, Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
@@ -239,10 +239,9 @@ impl Evaluate for ast::ScriptFrag {
 fn script_frag(value: Value) -> Result<Script> {
     Ok(match value {
         // As script code
-        v @ Value::Script(_)
-        | v @ Value::Descriptor(_)
-        | v @ Value::Miniscript(_)
-        | v @ Value::Policy(_) => v.into_script()?,
+        v @ Value::Script(_) | v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
+            v.into_script()?
+        }
 
         // As data pushes
         Value::Number(n) => ScriptBuilder::new().push_int(n).into_script(),
@@ -264,7 +263,8 @@ fn script_frag(value: Value) -> Result<Script> {
                 .collect::<Vec<u8>>();
             scriptbytes.into()
         }
-        v => bail!(Error::NotScriptLike(v)),
+
+        v => bail!(Error::InvalidScriptFrag(v)),
     })
 }
 
@@ -550,8 +550,8 @@ impl TryFrom<Value> for Script {
         Ok(match value {
             Value::Script(script) => script,
             Value::Bytes(bytes) => bytes.into(),
-            v @ Value::Descriptor(_) | v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
-                v.into_desc()?.to_explicit_script()?
+            v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
+                v.into_miniscript()?.derive_keys()?.encode()
             }
             v => bail!(Error::NotScriptLike(v)),
         })
@@ -622,7 +622,10 @@ impl Value {
     }
 
     pub fn is_script_like(&self) -> bool {
-        matches!(self, Value::Script(_) | Value::Bytes(_)) || self.is_desc_like()
+        matches!(self, Value::Script(_)
+            |  Value::Miniscript(_)
+            |  Value::Policy(_)
+            |  Value::Bytes(_))
     }
     pub fn is_desc_like(&self) -> bool {
         matches!(self, Value::Descriptor(_)

@@ -1,7 +1,5 @@
 use std::convert::TryInto;
 
-use ::miniscript::bitcoin::{Address, Network};
-
 use crate::runtime::Value;
 use crate::util::DescriptorExt;
 use crate::{Descriptor, Miniscript, Policy, Result, Scope};
@@ -157,15 +155,6 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let descriptor = args.remove(0).into_desc()?;
         Ok(descriptor.to_explicit_script()?.into())
-    }
-
-    // Descriptor, Policy, Miniscript or Key -> Address
-    // This gets called by super::address(), which also handles non-Miniscript Scripts
-    pub fn address_(desc: &Descriptor, network: Network) -> Result<Value> {
-        let script = desc.to_script_pubkey()?;
-        let address = Address::from_script(&script, network)
-            .expect("non-addressable descriptors cannot be constructed");
-        Ok(address.into())
     }
 
     // Turn `[A,B,C]` array into an `A && B && C` policy
