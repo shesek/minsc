@@ -644,7 +644,7 @@ impl fmt::Display for Value {
             Value::Miniscript(x) => write!(f, "{}", x),
             Value::Descriptor(x) => write!(f, "{}", x),
             Value::Address(x) => write!(f, "{}", x),
-            Value::Script(x) => write!(f, "{}", x.to_hex()),
+            Value::Script(x) => write!(f, "{:?}", x),
             Value::Function(x) => write!(f, "{:?}", x),
             Value::Network(x) => write!(f, "{}", x),
             Value::Array(elements) => {
