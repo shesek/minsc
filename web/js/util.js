@@ -30,3 +30,17 @@ export function findErrorLines (code, errMessage) {
 
   return { from, to }
 }
+
+export async function loadGist(gist_id) {
+  const resp = await fetch(`https://api.github.com/gists/${encodeURIComponent(gist_id)}`)
+      , body = await resp.json()
+  if (!body.files) return Promise.reject('gist not found');
+
+  const filenames = Object.keys(body.files)
+  let code = body.files[filenames[0]].content
+
+  // strip off ```hack syntax highlightning
+  if (code.startsWith('```hack')) code = code.trim().slice(8, -4)
+
+  return code
+}

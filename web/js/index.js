@@ -8,7 +8,7 @@ import './codemirror-minsc'
 import './codemirror-miniscript'
 import './codemirror-bitcoin'
 
-import { debounce, encode, findErrorLines } from './util'
+import { debounce, encode, findErrorLines, loadGist } from './util'
 import default_code from './default-code'
 
 const worker = new Worker('./worker.js', { name: 'w', type: 'module' })
@@ -24,10 +24,21 @@ const error_el = document.querySelector('#error')
     , output_el_other = document.querySelector('#output-other')
     , output_el_address = document.querySelector('#output-address')
 
-const initial_code = location.hash.startsWith('#c=') && location.hash.length > 3
-                     ? decodeURIComponent(location.hash.substr(3))
+const gist_id = location.hash.startsWith('#gist=') && location.hash.slice(6)
+const initial_code = gist_id ? '' // leave the editor empty while the gist is loading
+                     : location.hash.startsWith('#c=') && location.hash.length > 3
+                     ? decodeURIComponent(location.hash.slice(3))
                      : default_code
 
+// Load code from gist
+if (gist_id) {
+  loadGist(gist_id).then(code => {
+    editor.setValue(code)
+    update('gist')
+  }).catch(console.error)
+}
+
+// Handle evaluation result message from WebWorker
 worker.addEventListener('message', ({ data }) => {
   loading_el.style.display = 'none'
   clearErrorMark()
@@ -56,6 +67,7 @@ worker.addEventListener('message', ({ data }) => {
   }
 })
 
+// Send code to WebWorker for evaluation
 function update(source) {
   clearErrorMark()
 
@@ -65,20 +77,11 @@ function update(source) {
   const share_uri = `#c=${encode(code)}`
   share_el.href = share_uri
   share_box.value = share_el.href
-  if (source != 'init') location.hash = share_uri
+  if (source != 'init' && source != 'gist') location.hash = share_uri
 
   if (code) worker.postMessage({ code, network })
   else error_el.style.display = 'none'
-
-  if (source != 'init') evt[source]()
 }
-
-const evt = source => _ => {
-  _paq.push(['setCustomUrl', location.href])
-  _paq.push(['trackEvent', 'compile', source, ''])
-}
-evt.try = evt('try')
-evt.edit = debounce(evt('edit'), 5000)
 
 let error_marker
 function clearErrorMark() {
@@ -152,7 +155,7 @@ const editor = CodeMirror(document.querySelector('#editor'), {
 
 editor.on('change', debounce((_, c) =>
   c.origin != 'setValue' && update('edit')
-, 200))
+, 350))
 update('init')
 
 // Setup the 3 compile output editors (read only)
