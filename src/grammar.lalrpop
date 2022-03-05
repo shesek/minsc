@@ -68,6 +68,7 @@ SimpleExpr: Expr = {
 SExpr: Expr = {
   Number,
   Ident,
+  Bytes,
   Call,
   BlockExpr,
 };
