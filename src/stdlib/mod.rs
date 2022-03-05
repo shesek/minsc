@@ -31,7 +31,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("rawscript", fns::rawscript).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
-    scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
     scope.set_fn("iif", fns::iif).unwrap();
@@ -81,23 +80,6 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let bytes = args.remove(0).into_bytes()?;
         Ok(bytes.into())
-    }
-
-    // Can be used to wrap a Miniscript/Policy with a Wsh descriptor, or with raw scripts.
-    // - wsh(Miniscript|Policy) -> Descriptor
-    // - wsh(Script) -> Script
-    pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-
-        let script_or_ms = args.remove(0);
-
-        if let Value::Script(script) = script_or_ms {
-            Ok(script.to_v0_p2wsh().into())
-        } else if let Ok(ms) = script_or_ms.into_miniscript() {
-            self::miniscript::fns::wsh_(ms)
-        } else {
-            Err(Error::InvalidArguments)
-        }
     }
 
     /// Generate an address

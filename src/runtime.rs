@@ -622,16 +622,13 @@ impl Value {
     }
 
     pub fn is_script_like(&self) -> bool {
-        matches!(self, Value::Script(_)
-            |  Value::Miniscript(_)
-            |  Value::Policy(_)
-            |  Value::Bytes(_))
+        matches!(self, Value::Script(_) | Value::Bytes(_)) || self.is_miniscript_like()
     }
     pub fn is_desc_like(&self) -> bool {
-        matches!(self, Value::Descriptor(_)
-            |  Value::Miniscript(_)
-            |  Value::Policy(_)
-            |  Value::PubKey(_))
+        matches!(self, Value::Descriptor(_) | Value::PubKey(_)) || self.is_miniscript_like()
+    }
+    pub fn is_miniscript_like(&self) -> bool {
+        matches!(self, Value::Miniscript(_) | Value::Policy(_))
     }
 }
 

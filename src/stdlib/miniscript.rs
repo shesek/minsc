@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use crate::runtime::Value;
 use crate::util::DescriptorExt;
-use crate::{Descriptor, Miniscript, Policy, Result, Scope};
+use crate::{Descriptor, Policy, Result, Scope};
 
 const LIKELY_PROB: usize = 10;
 
@@ -20,9 +20,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("hash160", fns::hash160).unwrap();
 
     // Descriptor functions
-    scope.set_fn("wpkh", self::fns::wpkh).unwrap();
+    scope.set_fn("wpkh", fns::wpkh).unwrap();
+    scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
-    // the 'wsh' function is defined in super::wsh(), which delegates to self::fns::wsh_ (and also supports Scripts)
 
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();
@@ -123,13 +123,24 @@ pub mod fns {
         Ok(Descriptor::new_wpkh(args.remove(0).into_key()?)?.into())
     }
 
-    // Policy or Miniscript -> Descriptor::Wsh
-    // This gets called by super::wsh(), which also handles non-Miniscript Scripts
-    pub fn wsh_(ms: Miniscript) -> Result<Value> {
-        Ok(Descriptor::new_wsh(ms)?.into())
+    /// wsh(Policy|Miniscript) -> Descriptor::Wsh
+    /// wsh(Script witnessScript) -> Script scriptPubKey
+    pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let script_or_ms = args.remove(0);
+
+        Ok(if script_or_ms.is_miniscript_like() {
+            let miniscript = script_or_ms.into_miniscript()?;
+            Descriptor::new_wsh(miniscript)?.into()
+        } else if script_or_ms.is_script_like() {
+            let script = script_or_ms.into_script()?;
+            script.to_v0_p2wsh().into()
+        } else {
+            bail!(Error::InvalidArguments);
+        })
     }
 
-    // Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
+    /// Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
     pub fn sh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(match args.remove(0) {
