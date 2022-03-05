@@ -80,6 +80,8 @@
 
 - Add support for multi-line `/* .. */` comments
 
+- Add support for Signet and make it the default
+
 - Allow using non-literal expressions as the array access index
 
   For example: `$list.$n` or `$list.(some complex expression)`

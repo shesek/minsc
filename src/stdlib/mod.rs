@@ -20,6 +20,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set("false", false).unwrap();
 
     // Network types
+    scope.set("signet", Network::Signet).unwrap();
     scope.set("testnet", Network::Testnet).unwrap();
     scope.set("regtest", Network::Regtest).unwrap();
     scope
@@ -105,7 +106,7 @@ pub mod fns {
         ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
 
         let script_or_desc = args.remove(0);
-        let network = args.pop().map_or(Ok(Network::Testnet), TryInto::try_into)?;
+        let network = args.pop().map_or(Ok(Network::Signet), TryInto::try_into)?;
 
         // Need to check if its 'descriptor-like' first because Miniscript/Policy are both
         let script = if script_or_desc.is_desc_like() {

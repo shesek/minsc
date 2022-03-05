@@ -72,7 +72,7 @@ function update(source) {
   clearErrorMark()
 
   const code = editor.getValue()
-      , network = 'testnet'
+      , network = 'signet'
 
   const share_uri = `#c=${encode(code)}`
   share_el.href = share_uri
