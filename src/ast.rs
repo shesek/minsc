@@ -208,4 +208,29 @@ impl Expr {
             }
         })?))
     }
+
+    /// Expand escape characters in string literals (\", \\, \n, \r and \t)
+    /// and return the string as Bytes.
+    pub fn bytes_from_escaped_str(s: &str) -> Expr {
+        Expr::Bytes(if !s.contains('\\') {
+            s.as_bytes().to_owned()
+        } else {
+            let mut iter = s.chars();
+            let mut s_new = String::new();
+            while let Some(mut ch) = iter.next() {
+                if ch == '\\' {
+                    let next_ch = iter.next().expect("well formed string guaranteed by regex");
+                    ch = match next_ch {
+                        '\\' | '\"' => next_ch,
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        _ => unreachable!("only valid escape sequences accepted by the regex"),
+                    };
+                }
+                s_new.push(ch);
+            }
+            s_new.into_bytes()
+        })
+    }
 }

@@ -25,7 +25,7 @@
 
 - Add new `Bytes` runtime data type
 
-  Constructable using a new `0x<hex>` expression syntax.
+  Constructable using a new `0x<hex>` syntax, or from a string with `"myString"` (the string will be represented internally as a Bytes sequence).
 
   This can now be used in place of the `Hash` data type, which was removed.
   To remain compatible with the Miniscript Policy syntax for literal

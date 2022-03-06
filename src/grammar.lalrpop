@@ -111,11 +111,15 @@ PubKey: Expr = <s:r"(\[[a-fA-F0-9]{8}(/\d+['h]?)*\])?([a-fA-F0-9]{66}|([xt]pub[0
 
 Bytes: Expr = {
   <s:r"0x[a-fA-F0-9]*"> =>? Expr::bytes_from_hex(&<>[2..]),
+
   // Bytes are typically constructed with the `0x` prefix, but can be constructed without
   // it if the length is exactly 32 or 20 bytes. This is done for compatibility with the
   // Miniscript Policy syntax for hash and x-only-pubkey literals. The Bytes value will
   // later get coerced into a PubKey/Hash as needed.
   <s:r"[a-fA-F0-9]{64}|[a-fA-F0-9]{40}"> =>? Expr::bytes_from_hex(&<>),
+
+  // A string literal. Internally represented as Bytes, will probably get its own type eventually
+  <s:r#""([^\\"]|\\[\\ntr"])*""#> => Expr::bytes_from_escaped_str(&<>[1..<>.len()-1]),
 };
 
 ChildDerive: Expr = {
