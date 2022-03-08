@@ -43,12 +43,14 @@
 
 - New utility functions:
   1. `len(Array|Bytes|Script) -> Number`
+  1. `keys(Array) -> Array<Number>`
   2. `first(Array) -> Any`
   3. `last(Array) -> Any`
   4. `map(Array, Function) -> Array`
   5. `range(Number start, Number end) -> Array`
   6. `slice(Array, Number start, Number len) -> Array`
   7. `tail(Array) -> Array`
+  7. `initial(Array) -> Array`
   8. `concat(Array, Array) -> Array`
   9. `le64(Number) -> Bytes` (encode the number as 64 bit little-endian)
   10. `repeat(Number, Function|Value) -> Array`
@@ -66,7 +68,8 @@
 
 - New functions for writing Scripts:
 
-  1. `switch(Array<Script>) -> Script`
+  1. `switch(Array<(Script condition, Script body)>) -> Script`
+  1. `select(Array<Script body>) -> Script`
   2. `unrollLoop(Number max_iterations, Script condition, Script body) -> Script`
   3. `rollFromAltStack(Number) -> Script`
   4. `pickFromAltStack(Number) -> Script`

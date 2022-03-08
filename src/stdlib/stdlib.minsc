@@ -16,22 +16,36 @@ H_POINT = 50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0;
 // Array functions
 fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
-fn map($arr, $cb) = repeat(len($arr), |$n| $cb($arr.$n));
+fn map($arr_, $cb_) = repeat(len($arr_), |$n_| $cb_($arr_.$n_));
 fn range($start, $end) = repeat(($end-$start)+1, |$n| $start+$n);
-fn slice($arr, $start, $len) = map(range($start, $start+$len), |$n| $arr.$n);
-fn tail($arr) = slice($arr, 1, len($arr) - 1);
+fn keys($arr) = range(0, len($arr) - 1);
+fn slice($arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $arr.$n);
+fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
+fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 
 // Function form for assigning execution probabilities
 fn prob($n, $val) = $n@$val;
 
-// Dispatch the call to the script fragment identified by its index at the top of the stack
-fn switchIndex($frags) = `
-  repeat(len($frags) - 1, |$n|
-    `OP_DUP $n OP_EQUAL OP_IF OP_DROP $frags.$n OP_ELSE`)
-  // Using EQUALVERIFY instead of IF for the last fragment saves us 4 bytes
-  {len($frags) - 1} OP_EQUALVERIFY last($frags)
-  repeat(len($frags) - 1, OP_ENDIF)
+// Match the item at the top of the stack against the clauses and run the matching script, or abort if there's no match
+// Each clause is a tuple of [ condition_code, body_code ]. For example: switch([ [ `0 OP_EQUAL`, handleFoo ], [ `1 OP_EQUAL`, handleBar ] ])
+// Clauses are expected to consume the value being matched (e.g. with OP_EQUAL). It will be DUPd for them.
+// The last clause can be provided as a single element `[ body_code ]` with no condition to be used as the default branch.
+fn switch($clauses) = `
+  map(initial($clauses), |$clause|
+    `OP_DUP $clause.0 OP_IF OP_DROP $clause.1 OP_ELSE`)
+  // Using OP_VERIFY instead of another IF for the last fragment saves 4 bytes
+  last($clauses).0 iif(len(last($clauses)) == 2, `OP_VERIFY last($clauses).1`, ``)
+  repeat(len($clauses) - 1, OP_ENDIF)
 `;
+
+// Pop an index number off the stack and execute the script branch with that index
+// For example select([ handleFoo, handleBar ]) to run `handleFoo` if the top stack
+// element is 0, `handleBar` if its 1, or fail the script if its neither
+fn select($scripts) =
+  iif(len($scripts) == 2, // special case optimization for 2 branches
+    || `OP_IF $scripts.0 OP_ELSE $scripts.1 OP_ENDIF`,
+    || switch(map(keys($scripts), |$n| [ `$n OP_EQUAL`, $scripts.$n ]))
+  );
 
 // ROLL/PICK from the altstack. $n must be known statically (cannot be read from the stack).
 fn rollFromAltStack($n) = `
