@@ -434,19 +434,25 @@ impl TryFrom<Value> for i64 {
     }
 }
 
-impl TryFrom<Value> for usize {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(value.into_i64()?.try_into()?)
-    }
+macro_rules! impl_num_conv {
+    ($type:path, $fn_name:ident) => {
+        impl TryFrom<Value> for $type {
+            type Error = Error;
+            fn try_from(value: Value) -> Result<Self> {
+                Ok(value.into_i64()?.try_into()?)
+            }
+        }
+        impl Value {
+            pub fn $fn_name(self) -> Result<$type> {
+                self.try_into()
+            }
+        }
+    };
 }
-
-impl TryFrom<Value> for u32 {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(value.into_i64()?.try_into()?)
-    }
-}
+impl_num_conv!(usize, into_usize);
+impl_num_conv!(u32, into_u32);
+impl_num_conv!(u64, into_u64);
+impl_num_conv!(i32, into_i32);
 
 impl TryFrom<Value> for bool {
     type Error = Error;
@@ -589,12 +595,6 @@ impl Value {
         self.try_into()
     }
     pub fn into_i64(self) -> Result<i64> {
-        self.try_into()
-    }
-    pub fn into_usize(self) -> Result<usize> {
-        self.try_into()
-    }
-    pub fn into_u32(self) -> Result<u32> {
         self.try_into()
     }
     pub fn into_bool(self) -> Result<bool> {
