@@ -11,7 +11,7 @@ use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
-use crate::util::{DeriveExt, MiniscriptExt, EC};
+use crate::util::{DeriveExt, DescriptorExt, MiniscriptExt, EC};
 use crate::{stdlib, time, Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
@@ -620,6 +620,14 @@ impl Value {
     }
     pub fn into_array(self) -> Result<Vec<Value>> {
         self.try_into()
+    }
+    pub fn into_spk(self) -> Result<Script> {
+        // Need to check if its 'descriptor-like' first because Miniscript/Policy are both
+        if self.is_desc_like() {
+            self.into_desc()?.to_script_pubkey()
+        } else {
+            self.into_script()
+        }
     }
 
     pub fn is_script_like(&self) -> bool {

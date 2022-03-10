@@ -3,7 +3,6 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::{Address, Network, Script};
 
 use crate::runtime::{Execute, Value};
-use crate::util::DescriptorExt;
 use crate::{ast, parse_lib, time, Result, Scope};
 
 pub mod miniscript;
@@ -87,19 +86,11 @@ pub mod fns {
     pub fn address(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
 
-        let script_or_desc = args.remove(0);
+        let spk = args.remove(0).into_spk()?;
         let network = args.pop().map_or(Ok(Network::Signet), TryInto::try_into)?;
 
-        // Need to check if its 'descriptor-like' first because Miniscript/Policy are both
-        let script = if script_or_desc.is_desc_like() {
-            script_or_desc.into_desc()?.to_script_pubkey()?
-        } else if script_or_desc.is_script_like() {
-            script_or_desc.into_script()?
-        } else {
-            bail!(Error::InvalidArguments);
-        };
-        Ok(Address::from_script(&script, network)
-            .ok_or_else(|| Error::NotAddressable(script))?
+        Ok(Address::from_script(&spk, network)
+            .ok_or_else(|| Error::NotAddressable(spk))?
             .into())
     }
 
