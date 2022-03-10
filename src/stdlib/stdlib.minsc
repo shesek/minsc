@@ -11,7 +11,7 @@ OP_ADD64 = rawscript(0xd7), OP_SUB64 = rawscript(0xd8), OP_MUL64 = rawscript(0xd
 OP_SHA256INITIALIZE = rawscript(0xc4), OP_SHA256UPDATE = rawscript(0xc5), OP_SHA256FINALIZE = rawscript(0xc6);
 
 // A point with unknown discrete logarithm (to eliminate key-path spend)
-H_POINT = 50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0;
+H_POINT = 0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0;
 
 // Array functions
 fn first($arr) = $arr.0;
@@ -74,8 +74,8 @@ fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations != 0,
 // more advanced example with some comments: https://gist.github.com/shesek/758c25489869d77d4ef624ea43f18c49
 
 // Some useful Elements asset IDs
-LBTC = 6d521c38ec1ea15734ae22b7c46064412829c0d0579f0a713d1c04ede979026f;
-TLBTC = 499a818545f6bae39fc03b637f2a4e1e64e590cac1bc3a6f6d71aa4443654c14;
+LBTC = 0x6d521c38ec1ea15734ae22b7c46064412829c0d0579f0a713d1c04ede979026f;
+TLBTC = 0x499a818545f6bae39fc03b637f2a4e1e64e590cac1bc3a6f6d71aa4443654c14;
 
 // Introspection helpers (Elements only)
 fn checkSameAsset($vin, $vout) = `
