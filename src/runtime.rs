@@ -417,6 +417,7 @@ impl TryFrom<Value> for Policy {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
+            Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
             arr @ Value::Array(_) => stdlib::miniscript::fns::all_(arr)?.try_into(),
             v => Err(Error::NotPolicyLike(v)),
         }
