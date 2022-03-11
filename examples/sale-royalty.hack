@@ -48,10 +48,10 @@ fn RoyaltyCovenantBase($BTC, $creator_pk, $royalty) = `
     // Stack: <output key prefix> -- <script blob>
 
   // Compute the taproot merkle root hash (a single leaf script) and the tweak hash
-    elementsPushTapLeaf
+    hashTapLeaf
     H_POINT OP_TUCK
-    // Stack: <output key prefix> -- <H_POINT> <leaf hash> <H_POINT>
-    elementsPushTapTweak
+    // Stack: <output key prefix> -- <H_POINT> <leaf hash> <H_POINT as the internal key>
+    hashTapTweak
     // Stack: <output key prefix> -- <H_POINT> <tweak hash>
 
   // Enforce recursive covenant at output #0 with the new state/script
@@ -196,7 +196,7 @@ buildScriptBlob = `
 
   // PUSH for <own tapscript>
     // Get the push opcode bytes for <own tapscript>'s length
-      pushDataPrefix
+      getPushOp
     // Merge PUSH opcode and <own tapscript> blob
       OP_SWAP OP_CAT
 

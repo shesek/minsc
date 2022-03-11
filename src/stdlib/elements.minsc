@@ -1,3 +1,7 @@
+// Some useful Liquid asset IDs
+LBTC = 0x6d521c38ec1ea15734ae22b7c46064412829c0d0579f0a713d1c04ede979026f;
+TLBTC = 0x499a818545f6bae39fc03b637f2a4e1e64e590cac1bc3a6f6d71aa4443654c14;
+
 //
 // Introspection utilities
 //
@@ -77,6 +81,94 @@ lt64Verify = `OP_LESSTHAN64 OP_VERIFY`;
 gte64Verify = `OP_GREATERTHANOREQUAL64 OP_VERIFY`;
 lte64Verify = `OP_LESSTHANOREQUAL64 OP_VERIFY`;
 
-// Some useful Liquid asset IDs
-LBTC = 0x6d521c38ec1ea15734ae22b7c46064412829c0d0579f0a713d1c04ede979026f;
-TLBTC = 0x499a818545f6bae39fc03b637f2a4e1e64e590cac1bc3a6f6d71aa4443654c14;
+//
+// Length encodings
+//
+
+// Get the length of the top stack element encoded in compactSize
+// This is needed to construct the TapLeaf.
+// in: <data blob>
+// out: <data blob> <len(data blob) in compactSize>
+getCompactSize = `
+  OP_SIZE
+  OP_DUP 253 OP_GREATERTHANOREQUAL OP_IF
+    // add 0xFD prefix for sizes >= 253 (uint16 encoded as two bytes)
+    0xFD OP_SWAP OP_CAT
+    // sizes < 253 don't require a prefix
+    // sizes > 655350 require the 0xFE prefix, but they're unsupported (the maximum stack element size is 520)
+  OP_ELSE
+    OP_DUP 128 OP_GREATERTHANOREQUAL OP_IF
+      // trim trailing 0x00 for sizes 128-252. this is necessary because script sizes are signed
+      // while CompactSize is unsigned. affects sizes > 32767 too but they're unsupported.
+      1 OP_LEFT
+    OP_ENDIF
+  OP_ENDIF
+`;
+
+// Get the PUSH opcode for the length of the top stack element
+// This is useful for constructing a recursive quine.
+// in: <data blob>
+// out: <data blob> <len(data blob) as push opcode>
+getPushOp = `
+  OP_SIZE
+  OP_DUP 75 OP_GREATERTHAN OP_IF
+    OP_DUP 255 OP_GREATERTHAN OP_IF
+      // add 0x4D prefix for sizes > 255 (uint16 encoded as two bytes)
+      bytes(OP_PUSHDATA2)
+    OP_ELSE
+      // trim trailing 0x00 byte for sizes 128-255. necessary because the push data length is unsigned.
+      OP_DUP 127 OP_GREATERTHAN OP_IF 1 OP_LEFT OP_ENDIF
+      // add 0x4C prefix for sizes 76-255 (uint16 encoded as one byte)
+      bytes(OP_PUSHDATA1)
+    OP_ENDIF
+    // prepend size with the 0x4c/0x4d prefix
+    OP_SWAP OP_CAT
+  OP_ENDIF
+  // sizes <= 75 don't require a prefix
+  // sizes > 0xFFFF require OP_PUSHDATA4 but they're not supported
+`;
+
+//
+// Taproot Utilities
+//
+
+TAPSCRIPT_VERSION = 0xc4;
+TAPLEAF_TAG = "TapLeaf/elements";
+TAPTWEAK_TAG = "TapTweak/elements";
+
+// Compute the TapLeaf hash for the script bytes at the top of the stack
+// in: <script bytes>
+// out: <leaf hash>
+hashTapLeaf = `
+  // Compute the tagged hash prefix (XXX could be precomputed)
+    TAPLEAF_TAG
+    OP_SHA256 OP_DUP OP_CAT
+  // Add version
+    TAPSCRIPT_VERSION OP_CAT
+    // Stack: <script bytes> <leaf: H('TapLeaf') || H('TapLeaf') || leaf_version>
+  // Bring <script bytes> and prefix it with its size in compactSize encoding
+    OP_SWAP
+    getCompactSize
+    OP_SWAP OP_CAT
+  // Add size+script to leaf
+    OP_CAT
+    // Stack: <leaf: H('TapLeaf') || H('TapLeaf') || leaf_version || compactSize(len(script_bytes)) || script_bytes>
+  // Final tapleaf hash
+    OP_SHA256
+`;
+
+// Compute for TapTweak hash for the merkle root and internal key given on the stack
+// in: <merkle root> <internal key>
+// out: <tweak hash>
+hashTapTweak = `
+  // Compute the tagged hash prefix (XXX could be precomputed)
+    TAPTWEAK_TAG
+    OP_SHA256 OP_DUP OP_CAT
+  // Add internal pubkey to tweak data
+    OP_SWAP OP_CAT
+  // Add merkle root to tweak data (TapBranch, or TapLeaf in the case of a single script)
+    OP_SWAP OP_CAT
+    // Stack: <tweak data: H('TapTweak') || H('TapTweak') || internal_key || merkle_root>
+  // Final taptweak hash
+    OP_SHA256
+`;
