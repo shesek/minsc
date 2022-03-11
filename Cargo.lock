@@ -58,8 +58,9 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 
 [[package]]
 name = "bitcoin"
-version = "0.27.0"
-source = "git+https://github.com/rust-bitcoin/rust-bitcoin?rev=0e2e55971275da64ceb62e8991a0a5fa962cb8b1#0e2e55971275da64ceb62e8991a0a5fa962cb8b1"
+version = "0.28.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d21919f8ef56dced9c7a35d28dea7c344566e32a19533f9070d150ec33512152"
 dependencies = [
  "bech32",
  "bitcoin_hashes",
@@ -306,7 +307,7 @@ checksum = "8452105ba047068f40ff7093dd1d9da90898e63dd61736462e9cdda6a90ad3c3"
 [[package]]
 name = "miniscript"
 version = "6.0.1"
-source = "git+https://github.com/shesek/rust-miniscript?rev=bd7c642416c6176d71eca7e2a7fb374e79755da7#bd7c642416c6176d71eca7e2a7fb374e79755da7"
+source = "git+https://github.com/rust-bitcoin/rust-miniscript?rev=a881b476ecb01aa507c7e4cf253b2ed718bf914e#a881b476ecb01aa507c7e4cf253b2ed718bf914e"
 dependencies = [
  "bitcoin",
 ]

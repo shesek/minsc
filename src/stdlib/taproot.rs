@@ -1,8 +1,9 @@
 use std::convert::TryInto;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
-use bitcoin::schnorr::{TapTweak, UntweakedPublicKey, XOnlyPublicKey};
+use bitcoin::schnorr::{TapTweak, UntweakedPublicKey};
 use bitcoin::util::address::WitnessVersion;
+use bitcoin::util::key::XOnlyPublicKey;
 use bitcoin::util::taproot::{LeafVersion, TapBranchHash, TapLeafHash, TaprootSpendInfo};
 use bitcoin::Script;
 use miniscript::bitcoin;
@@ -87,7 +88,7 @@ pub mod fns {
 pub fn tap_tweak(internal_key: Value, script_tree: Option<Value>) -> Result<Script> {
     // Get the pubkey out of the DescriptorPublicKey and transform it into an x-only pubkey
     let internal_key = internal_key.into_key()?.derive_public_key(&EC)?;
-    let internal_key: XOnlyPublicKey = internal_key.key.into();
+    let internal_key: XOnlyPublicKey = internal_key.inner.into();
 
     // When there's no script tree, the second argument can be omitted entirely or provided as en empty byte vector (`0x`)
     // The second argument can be anything accepted

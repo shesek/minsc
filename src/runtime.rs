@@ -467,7 +467,7 @@ impl TryFrom<Value> for bool {
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        use bitcoin::{schnorr::XOnlyPublicKey, PublicKey};
+        use bitcoin::util::key::{PublicKey, XOnlyPublicKey};
         use miniscript::descriptor::{DescriptorSinglePub, SinglePubKey};
         match value {
             Value::PubKey(x) => Ok(x),
