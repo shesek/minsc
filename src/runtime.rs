@@ -576,9 +576,13 @@ macro_rules! impl_hash_conv {
                 }
             }
         }
+        impl From<$name> for Value {
+            fn from(hash: $name) -> Self {
+                Value::Bytes(hash.into_inner().to_vec())
+            }
+        }
     };
 }
-
 impl_hash_conv!(hashes::sha256::Hash);
 impl_hash_conv!(hashes::sha256d::Hash);
 impl_hash_conv!(hashes::ripemd160::Hash);

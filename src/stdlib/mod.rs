@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 
-use ::miniscript::bitcoin::{Address, Network, Script};
+use ::miniscript::bitcoin::{self, Address, Network, Script};
+use bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Execute, Value};
 use crate::{ast, parse_lib, time, Result, Scope};
@@ -35,6 +36,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("repeat", fns::repeat).unwrap();
     scope.set_fn("iif", fns::iif).unwrap();
     scope.set_fn("le64", fns::le64).unwrap();
+    scope.set_fn("SHA256", fns::SHA256).unwrap();
 
     // Constants
     scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
@@ -127,5 +129,17 @@ pub mod fns {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let num = args.remove(0).into_i64()?;
         Ok(num.to_le_bytes().to_vec().into())
+    }
+
+    #[allow(non_snake_case)]
+    /// SHA256(Bytes preimage) -> Bytes hash
+    /// Hash some data with SHA256
+    /// Named in upper-case to avoid a conflict with the Miniscript sha256(Bytes) policy function
+    /// (Yes, this is awfully confusing and requires a better solution. :<)
+    pub fn SHA256(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let bytes = args.remove(0).into_bytes()?;
+        let hash = sha256::Hash::hash(&bytes);
+        Ok(hash.into())
     }
 }
