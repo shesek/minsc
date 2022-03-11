@@ -42,10 +42,10 @@
 
   1. `rawscript(Bytes) -> Script` (get a Script for the given raw opcode bytes. e.g. `rawscript(0xb2)` for `OP_CSV`)
   2. `script_pubkey(Descriptor) -> Script` (get the scriptPubKey to be used in the output)
-  3. `explicit_script(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the `redeemScript` for P2SH)
+  3. `explicit_script(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the redeemScript for P2SH)
   4. `bytes(Script) -> Bytes` (get the Bytes representation of the Script opcodes)
 
-  The `script_*` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
+  The `script_pubkey`/`explicit_script` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
 - New utility functions:
   1. `len(Array|Bytes|Script) -> Number`
@@ -98,7 +98,11 @@
 - Support child key derivation for `Policy` and `Miniscript` without coercing them into `Descriptor`,
   as well as for `Array`s containing derivable types.
 
-- Remove the `Duration` and `DateTime` runtime data types. They can still be used but get evaluated into a `Number`.
+- Remove the `Duration` and `DateTime` runtime data types. Their syntax can still be used but get evaluated into a `Number`.
+
+- Allow overriding the `BLOCK_INTERVAL` used for `heightwise` durations
+
+  For example, `BLOCK_INTERVAL=60` to make `heightwise 1 day` resolve as 1440 on Elements rather than 144.
 
 ## 0.2.0 - 2020-11-27
 
