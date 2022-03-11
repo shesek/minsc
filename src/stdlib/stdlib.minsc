@@ -13,6 +13,9 @@ OP_SHA256INITIALIZE = rawscript(0xc4), OP_SHA256UPDATE = rawscript(0xc5), OP_SHA
 // A point with unknown discrete logarithm (to eliminate key-path spend)
 H_POINT = 0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0;
 
+DUST_AMOUNT = 294;
+DUST_NON_SW = 546;
+
 // Array functions
 fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
@@ -59,7 +62,7 @@ fn pickFromAltStack($n) = `
 `;
 
 // Loop unrolling
-fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations != 0,
+fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations > 0,
   || `
     $condition OP_IF
       $body
