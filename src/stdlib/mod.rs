@@ -10,6 +10,7 @@ pub mod taproot;
 
 lazy_static! {
     static ref MINSC_STDLIB: ast::Library = parse_lib(include_str!("stdlib.minsc")).unwrap();
+    static ref ELEMENTS_STDLIB: ast::Library = parse_lib(include_str!("elements.minsc")).unwrap();
 }
 
 /// Attach built-in functions and variables to the Minsc runtime environment
@@ -48,6 +49,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     // Standard library implemented in Minsc
     MINSC_STDLIB.exec(scope).unwrap();
+    ELEMENTS_STDLIB.exec(scope).unwrap();
 }
 
 pub mod fns {
