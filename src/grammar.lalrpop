@@ -3,6 +3,10 @@ use crate::util::{concat, parse_str_prefix};
 
 grammar;
 
+extern {
+  type Error = String;
+}
+
 match {
   // Skip extra whitespace
   r"\s*" => { },

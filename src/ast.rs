@@ -196,15 +196,15 @@ pub struct Library {
 }
 
 use lalrpop_util::ParseError;
-type LalrError = ParseError<usize, lalrpop_util::lexer::Token<'static>, &'static str>;
+type LalrError = ParseError<usize, lalrpop_util::lexer::Token<'static>, String>;
 
 impl Expr {
     pub fn bytes_from_hex(s: &str) -> Result<Expr, LalrError> {
         use miniscript::bitcoin::hashes::hex::FromHex;
 
-        Ok(Expr::Bytes(Vec::from_hex(s).map_err(|_| {
+        Ok(Expr::Bytes(Vec::from_hex(s).map_err(|e| {
             ParseError::User {
-                error: "Invalid bytes hex string",
+                error: format!("Invalid bytes hex string {}: {}", s, e),
             }
         })?))
     }
