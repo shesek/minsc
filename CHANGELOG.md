@@ -87,8 +87,6 @@
 
 - New constants: `MIN_NUMBER`, `MAX_NUMBER`, `H_POINT` (point with unknown discrete logarithm for script-path-only p2tr), `LBTC`, `TLBTC`
 
-- Add support for multi-line `/* .. */` comments
-
 - Add support for Signet and make it the default
 
 - Allow using non-literal expressions as the array access index

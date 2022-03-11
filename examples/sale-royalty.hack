@@ -25,9 +25,14 @@ fn RoyaltyCovenantBase($BTC, $creator_pk, $royalty) = `
   // Dispatch call type to the call handler script
     OP_ROT // bring call type byte to the top
     select([
-      /* 0x00: */ buyCall($BTC, $creator_pk, $royalty),
-      /* 0x01: */ setPriceCall,
-      /* 0x02: */ burnCall($creator_pk)
+      // Type 0x00 (witness stack: <new owner key> <output key prefix> <0x00>)
+      buyCall($BTC, $creator_pk, $royalty),
+
+      // Type 0x01 (witness stack: <new price> <owner sig> <output key prefix> <0x01>)
+      setPriceCall,
+
+      // Type 0x02 (witness stack: <creator sig> <output key prefix> <0x02>)
+      burnCall($creator_pk)
     ])
 
   // Stack: <output key prefix> -- <new owner key> <new price>
