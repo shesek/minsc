@@ -19,6 +19,12 @@
 
   Taproot descriptors (`tr()`) are not supported yet.
 
+- Support for CheckTemplateVerify (BIP 119) with a new `ctvHash()` function. For example:
+  
+  ```hack
+  `ctvHash([ txOut($alice_pk, 10000), txOut($bob_pk, 25000) ]) OP_CTV OP_DROP`
+  ```
+
 - Add anonymous function expressions
 
   With a Rust-like syntax: `|params| body` or `|params| { multi statement body }`

@@ -6,6 +6,7 @@ use bitcoin::hashes::{sha256, Hash};
 use crate::runtime::{Execute, Value};
 use crate::{ast, parse_lib, time, Result, Scope};
 
+pub mod ctv;
 pub mod miniscript;
 pub mod taproot;
 
@@ -48,6 +49,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     // Taproot related functions
     self::taproot::attach_stdlib(scope);
+
+    // CTV
+    self::ctv::attach_stdlib(scope);
 
     // Standard library implemented in Minsc
     MINSC_STDLIB.exec(scope).unwrap();

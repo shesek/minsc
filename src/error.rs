@@ -161,6 +161,9 @@ pub enum Error {
 
     #[error("Invalid taproot script tree, nested arrays are expected to have exactly 2 elements")]
     TaprootInvalidNestedTree,
+
+    #[error("UTF-8 error: {0}")]
+    Utf8Error(std::string::FromUtf8Error),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -196,3 +199,5 @@ impl_from_variant!(
     Error,
     DescriptorKeyParse
 );
+
+impl_from_variant!(std::string::FromUtf8Error, Error, Utf8Error);
