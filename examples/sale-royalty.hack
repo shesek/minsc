@@ -1,4 +1,3 @@
-
 // Construct the final covenant script, including the state and quine self-reference
 fn RoyaltyCovenant($BTC, $creator_pk, $royalty, $owner_pk, $price) {
   $script = RoyaltyCovenantBase($BTC, $creator_pk, $royalty);
@@ -16,22 +15,26 @@ fn RoyaltyCovenantBase($BTC, $creator_pk, $royalty) = `
 
   OP_TOALTSTACK // send <own tapscript> to altstack (injected by RoyaltyCovenant())
 
-  // Stack: [call type params] <output key prefix> <call type byte> -- <current price> <current owner key>
+  // Stack: <output key prefix> [call type params] <call type byte> -- <current price> <current owner key>
 
   // Some sanity checks
     requireRbf
     1 OP_CSV OP_DROP // prevent unconfirmed tx chain
+    // TODO check fee, tx version
 
   // Dispatch call type to the call handler script
     OP_ROT // bring call type byte to the top
     select([
-      // Type 0x00 (witness stack: <new owner key> <output key prefix> <0x00>)
+      // Type 0x00
+      // Witness stack: <output key prefix> <new owner key> <0x00>
       buyCall($BTC, $creator_pk, $royalty),
 
-      // Type 0x01 (witness stack: <new price> <owner sig> <output key prefix> <0x01>)
+      // Type 0x01
+      // Witness stack: <output key prefix> <new price> <owner sig> <0x01>
       setPriceCall,
 
-      // Type 0x02 (witness stack: <creator sig> <output key prefix> <0x02>)
+      // Type 0x02
+      // Witness stack: <output key prefix> <creator sig> <0x02>
       burnCall($creator_pk)
     ])
 
@@ -43,7 +46,7 @@ fn RoyaltyCovenantBase($BTC, $creator_pk, $royalty) = `
     OP_SIZE 32 OP_EQUALVERIFY
     // Stack: <output key prefix> -- <price> <owner key>
 
-  // Build new state blob (PUSHBYTES_8 <price> PUSHBYTES_20 <owner key>)
+  // Build new state blob (PUSHBYTES_8 <price> PUSHBYTES_32 <owner key>)
     buildStateBlob
     // Stack: <output key prefix> -- <state blob>
 
@@ -91,34 +94,35 @@ fn RoyaltyCovenantInit($BTC, $creator_pk, $royalty) =
 //
 
 // Buy call (0x00)
-// stack in: <new owner key> <output key prefix> -- <current price> <current owner key>
-// stack out: <output key prefix> -- <new owner key> <new price (MAX)>
+// stack in: <new owner key> -- <current price> <current owner key>
+// stack out: <new owner key> <new price (MAX)>
 fn buyCall($BTC, $creator_pk, $royalty) = `
 
   // Verify payment output to current owner at index #1
-    // Is L-BTC
-      1 inspectExplicitOutAsset
-      $BTC OP_DUP OP_TOALTSTACK // keep $BTC around in the altstack, we'll need it again shortly
-      OP_EQUALVERIFY
-
     // Pays to current owner key (pop the owner key off)
       1 inspectOutSpkVer(1)
       OP_EQUALVERIFY
 
     // Pays the correct amount
-      OP_DUP // keep a copy of the price for later user
+      OP_DUP // keep a copy of the price to verify the royalty payment
       1 inspectExplicitOutValue
       OP_EQUALVERIFY
+
+    // Is L-BTC
+      $BTC OP_DUP // keep a copy of $BTC to verify the royalty payment
+      1 inspectExplicitOutAsset
+      OP_EQUALVERIFY
+
+    // stack: <output key prefix> <new owner key> -- <price> <BTC asset id>
 
   // Verify royalty payment output to creator at index #2
     // Is L-BTC
       2 inspectExplicitOutAsset
-      OP_FROMALTSTACK // get L-BTC asset id
       OP_EQUALVERIFY
 
     // Pays to creator key
-      2 inspectOutSpkVer(1)
       $creator_pk
+      2 inspectOutSpkVer(1)
       OP_EQUALVERIFY
 
     // Amount paid matches the $royalty setting
@@ -129,46 +133,42 @@ fn buyCall($BTC, $creator_pk, $royalty) = `
       2 inspectExplicitOutValue
       OP_EQUALVERIFY
 
-  // Stack: <new owner key> <output key prefix> --
+  // Stack: <output key prefix> <new owner key> --
 
   // Prepare new state
-    // Bring new owner key (from the witness stack)
-      OP_SWAP
+    // The new owner key is already here (from the witness stack)
     // Set price to MAX (disallow sales until a new price is set by the new owner)
       MAX_NUMBER
 `;
 
 // Set price call (0x01)
-// stack in: <new price> <owner sig> <output key prefix> -- <current price> <current owner key>
-// stack out: <output key prefix> -- <owner key (unchanged)> <new price>
+// stack in: <new price> <owner sig> -- <current price> <current owner key>
+// stack out: <owner key (unchanged)> <new price>
 setPriceCall = `
   OP_NIP // drop old price
 
-  // Verify signature by current owner
+  // Verify signature by the current owner
     OP_DUP // keep current owner key to construct the state
-    3 OP_ROLL OP_SWAP // bring sig before key
+    OP_ROT OP_SWAP // bring sig before key
     OP_CHECKSIGVERIFY
 
-  // Stack: <new price> <output key prefix> -- <owner key>
+  // Stack: <new price> -- <owner key>
 
   // Prepare new state
-    // (owner key is already here)
+    // The owner key is already here
     // Bring new price to top (from the witness stack)
-      OP_ROT
+      OP_SWAP
 `;
 
 // Burn call (0x02)
-// stack in: <creator sig> <output key prefix> -- <current price> <current owner key>
-// stack out: <output key prefix> -- <owner key (H_POINT)> <new price (max)>
+// stack in: <creator sig>-- <current price> <current owner key>
+// stack out: <owner key (H_POINT)> <new price (MAX)>
 fn burnCall($creator_pk) = `
   OP_2DROP // drop current state, we don't need it
 
   // Verify signature by creator
-    OP_SWAP // bring sig from witness stack
     $creator_pk
     OP_CHECKSIGVERIFY
-
-  // Stack: <output key prefix>
 
   // Prepare new state
     // Use point with unknown discrete logarithm as the new owner pubkey (no owner)
