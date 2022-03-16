@@ -574,6 +574,13 @@ impl TryFrom<Value> for Script {
     }
 }
 
+impl TryFrom<Value> for String {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(String::from_utf8(value.into_bytes()?)?)
+    }
+}
+
 macro_rules! impl_hash_conv {
     ($name:path) => {
         impl TryFrom<Value> for $name {
@@ -626,6 +633,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_script(self) -> Result<Script> {
+        self.try_into()
+    }
+    pub fn into_string(self) -> Result<String> {
         self.try_into()
     }
     pub fn into_fn(self) -> Result<Function> {

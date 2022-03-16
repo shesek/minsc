@@ -65,7 +65,7 @@ fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
     for inst in instructions {
         let mut inst = inst.into_array()?;
         ensure!(inst.len() > 0, Error::InvalidArguments);
-        let inst_name = String::from_utf8(inst.remove(0).into_bytes()?)?;
+        let inst_name = inst.remove(0).into_string()?;
 
         match (inst_name.as_str(), inst.len()) {
             ("version", 1) => tx.version = inst.remove(0).into_i32()?,
