@@ -6,10 +6,10 @@ TLBTC = 0x499a818545f6bae39fc03b637f2a4e1e64e590cac1bc3a6f6d71aa4443654c14;
 // Opcodes
 //
 
-OP_CHECKSIGFROMSTACK = rawscript(0xc1), OP_CHECKSIGFROMSTACKVERIFY = rawscript(0xc2), OP_SUBSTR_LAZY = rawscript(0xc3);
+OP_DETERMINISTICRANDOM = rawscript(0xc0), OP_CHECKSIGFROMSTACK = rawscript(0xc1), OP_CHECKSIGFROMSTACKVERIFY = rawscript(0xc2), OP_SUBSTR_LAZY = rawscript(0xc3);
+OP_SHA256INITIALIZE = rawscript(0xc4), OP_SHA256UPDATE = rawscript(0xc5), OP_SHA256FINALIZE = rawscript(0xc6);
 OP_INSPECTINPUTOUTPOINT = rawscript(0xc7), OP_INSPECTINPUTASSET = rawscript(0xc8), OP_INSPECTINPUTVALUE = rawscript(0xc9), OP_INSPECTINPUTSCRIPTPUBKEY = rawscript(0xca), OP_INSPECTINPUTSEQUENCE = rawscript(0xcb), OP_INSPECTINPUTISSUANCE = rawscript(0xcc), OP_PUSHCURRENTINPUTINDEX = rawscript(0xcd), OP_INSPECTOUTPUTASSET = rawscript(0xce), OP_INSPECTOUTPUTVALUE = rawscript(0xcf), OP_INSPECTOUTPUTNONCE = rawscript(0xd0), OP_INSPECTOUTPUTSCRIPTPUBKEY = rawscript(0xd1), OP_INSPECTVERSION = rawscript(0xd2), OP_INSPECTLOCKTIME = rawscript(0xd3), OP_INSPECTNUMINPUTS = rawscript(0xd4), OP_INSPECTNUMOUTPUTS = rawscript(0xd5), OP_TXWEIGHT = rawscript(0xd6);
 OP_ADD64 = rawscript(0xd7), OP_SUB64 = rawscript(0xd8), OP_MUL64 = rawscript(0xd9), OP_DIV64 = rawscript(0xda), OP_NEG64 = rawscript(0xdb), OP_LESSTHAN64 = rawscript(0xdc), OP_LESSTHANOREQUAL64 = rawscript(0xdd), OP_GREATERTHAN64 = rawscript(0xde), OP_GREATERTHANOREQUAL64 = rawscript(0xdf), OP_SCRIPTNUMTOLE64 = rawscript(0xe0), OP_LE64TOSCRIPTNUM = rawscript(0xe1), OP_LE32TOLE64 = rawscript(0xe2), OP_TWEAKVERIFY = rawscript(0xe4);
-OP_SHA256INITIALIZE = rawscript(0xc4), OP_SHA256UPDATE = rawscript(0xc5), OP_SHA256FINALIZE = rawscript(0xc6);
 
 //
 // Introspection utilities

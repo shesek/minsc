@@ -13,10 +13,11 @@ lazy_static! {
 
         fn ctv($tx) = `ctvHash($tx) OP_CHECKTEMPLATEVERIFY OP_DROP`;
 
-        // Utility functions for tagged arrays with more DSL-y syntax
+        // Utility functions for tagged arrays with a more DSL-y syntax
         fn txVersion($version) = [ "version", $version ];
         fn txLocktime($locktime) = [ "locktime", $locktime ];
-        fn txIn($seq) = [ "input", $seq ];
+        fn txInSeq($seq) = [ "input", $seq ];
+        fn txIn() = [ "input" ];
         fn txOut($spk, $amount) = [ "output", $spk, $amount ];
         "#
     )

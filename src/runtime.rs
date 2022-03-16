@@ -120,12 +120,12 @@ fn eval_andor(
     desc_op: &str,
     desc_thresh_n: usize,
 ) -> Result<Value> {
-    // Peek at the first operand to determine if its an operation between booleans or between descriptors.
+    // Peek at the first operand to determine if its an operation between booleans or between policies.
     // All the other operands are expected to have the same type.
     let first_operand = operands[0].eval(scope)?;
     match &first_operand {
         Value::Bool(_) => eval_bool_andor(first_operand, &operands[1..], scope, bool_stop_on),
-        Value::Policy(_) | Value::WithProb(_, _) => {
+        Value::Policy(_) | Value::WithProb(_, _) | Value::PubKey(_) | Value::Array(_) => {
             eval_policy_andor(desc_op, desc_thresh_n, first_operand, &operands[1..], scope)
         }
         _ => Err(Error::InvalidArguments),
@@ -307,11 +307,12 @@ impl ast::InfixOp {
             // @ to assign execution probability
             (Prob, Number(prob), value) => WithProb(prob.try_into()?, value.into()),
             // + for tap tweak (internal_key+script_tree)
-            (Add, i @ PubKey(_), t)
-            | (Add, i @ Bytes(_), t @ Script(_))
-            | (Add, i @ Bytes(_), t @ Miniscript(_))
-            | (Add, i @ Bytes(_), t @ Policy(_))
-            | (Add, i @ Bytes(_), t @ Array(_)) => stdlib::taproot::tap_tweak(i, Some(t))?.into(),
+            (Add, k @ PubKey(_), s)
+            | (
+                Add,
+                k @ Bytes(_),
+                s @ Script(_) | s @ Miniscript(_) | s @ Policy(_) | s @ Array(_),
+            ) => stdlib::taproot::tap_tweak(k, Some(s))?.into(),
 
             _ => bail!(Error::InvalidArguments),
         })
@@ -645,10 +646,10 @@ impl Value {
         self.try_into()
     }
     pub fn into_spk(self) -> Result<Script> {
-        // Need to check if its 'descriptor-like' first because Miniscript/Policy are both
         if self.is_desc_like() {
             self.into_desc()?.to_script_pubkey()
         } else {
+            // For plain Script values (non-Policy/Descriptor), into_spk() is the same as into_script()
             self.into_script()
         }
     }

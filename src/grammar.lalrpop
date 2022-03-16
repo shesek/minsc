@@ -128,7 +128,7 @@ Bytes: Expr = {
 ChildDerive: Expr = {
     <parent:SimpleExpr> "/" <path:List1<SimpleExpr, "/">> <wildcard:ChildDeriveWildcard?> =>
       ast::ChildDerive { parent: parent.into(), path, is_wildcard: wildcard.is_some() }.into(),
-    <parent:SimpleExpr> "/*" =>
+    <parent:SimpleExpr> <wildcard:ChildDeriveWildcard> =>
       ast::ChildDerive { parent: parent.into(), path: vec![], is_wildcard: true }.into(),
 };
 // Allow `xpub/ *` so that it doesn't look like a comment.
