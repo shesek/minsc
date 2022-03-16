@@ -4,7 +4,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
-use bitcoin::hashes::{self, hex::ToHex, Hash};
+use bitcoin::hashes::{self, hex::ToHex, sha256, Hash};
 use bitcoin::util::bip32::DerivationPath;
 use bitcoin::{Address, Network, Script};
 use miniscript::bitcoin;
@@ -12,7 +12,7 @@ use miniscript::descriptor::DescriptorPublicKey;
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
-use crate::util::{DeriveExt, DescriptorExt, MiniscriptExt, EC};
+use crate::util::{self, DeriveExt, DescriptorExt, MiniscriptExt, EC};
 use crate::{stdlib, time, Descriptor, Error, Miniscript, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
@@ -213,13 +213,23 @@ impl Evaluate for ast::ArrayAccess {
 
 impl Evaluate for ast::ChildDerive {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let parent = self.parent.eval(scope)?;
         let mut path = DerivationPath::master();
         for child in &self.path {
-            let child = child.eval(scope)?.into_usize()? as u32;
-            path = path.into_child(child.into());
+            path = match child.eval(scope)? {
+                // Derive with a BIP 32 child code index number
+                Value::Number(num) => path.into_child(u32::try_from(num)?.into()),
+
+                // Derive with a hash converted into a series of BIP32 non-hardened derivations using the hash_to_child_vec()
+                Value::Bytes(bytes) => {
+                    let hash = sha256::Hash::from_slice(&bytes)?;
+                    path.extend(util::hash_to_child_vec(hash))
+                }
+
+                _ => bail!(Error::InvalidDerivationCode),
+            }
         }
 
+        let parent = self.parent.eval(scope)?;
         parent.derive_path(path, self.is_wildcard)
     }
 }
@@ -611,6 +621,9 @@ impl Value {
     }
     pub fn is_bool(&self) -> bool {
         matches!(self, Value::Bool(_))
+    }
+    pub fn is_bytes(&self) -> bool {
+        matches!(self, Value::Bytes(_))
     }
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()

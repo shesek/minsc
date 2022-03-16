@@ -99,6 +99,9 @@ pub enum Error {
     #[error("Standalone keys cannot be derived")]
     NonDeriveableSingle,
 
+    #[error("Invalid derivation child code index. Only numbers and SHA256 hashes are supported.")]
+    InvalidDerivationCode,
+
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 
