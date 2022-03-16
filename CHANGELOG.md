@@ -47,6 +47,8 @@
 
   The `script_pubkey`/`explicit_script` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
 
+- New syntax for BTC amounts: `0.5 BTC`. Evaluates to the amount in satoshis. Supports all the [denominations in rust-bitcoin](https://docs.rs/bitcoin/latest/bitcoin/util/amount/enum.Denomination.html) (`BTC`, `mBTC`, `uBTC`, `bits`, `satoshi`/`sat`, `msat`).
+
 - New utility functions:
   1. `len(Array|Bytes|Script) -> Number`
   1. `keys(Array) -> Array<Number>`

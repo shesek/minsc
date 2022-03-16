@@ -20,6 +20,7 @@ pub enum Expr {
     Number(i64),
     Duration(Duration),
     DateTime(DateTime),
+    BtcAmount(BtcAmount),
 }
 
 impl_from_variant!(i64, Expr, Number);
@@ -167,6 +168,10 @@ pub enum DurationPart {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DateTime(pub String);
 impl_from_variant!(DateTime, Expr);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BtcAmount(pub String);
+impl_from_variant!(BtcAmount, Expr);
 
 /// A function definition statement
 #[derive(Debug, Clone)]

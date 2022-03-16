@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
+use std::str::FromStr;
 
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, hex::ToHex, Hash};
@@ -336,6 +337,13 @@ impl Evaluate for ast::DateTime {
     }
 }
 
+impl Evaluate for ast::BtcAmount {
+    fn eval(&self, _: &Scope) -> Result<Value> {
+        let amount = bitcoin::Amount::from_str(&self.0)?;
+        Ok(Value::Number(amount.as_sat().try_into()?))
+    }
+}
+
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &Scope) -> Result<Value> {
@@ -385,6 +393,7 @@ impl Evaluate for Expr {
 
             Expr::Duration(x) => x.eval(scope)?,
             Expr::DateTime(x) => x.eval(scope)?,
+            Expr::BtcAmount(x) => x.eval(scope)?,
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::Number(x) => Value::Number(*x),
@@ -545,7 +554,7 @@ impl TryFrom<Value> for Network {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
-            Value::Network(array) => Ok(array),
+            Value::Network(network) => Ok(network),
             v => Err(Error::NotNetwork(v)),
         }
     }

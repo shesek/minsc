@@ -1,7 +1,7 @@
 use lalrpop_util::ParseError;
 use std::fmt;
 
-use miniscript::bitcoin::{self, hashes};
+use miniscript::bitcoin::{self, hashes, util as bu};
 use miniscript::descriptor;
 use miniscript::policy::compiler::CompilerError;
 
@@ -127,10 +127,10 @@ pub enum Error {
     MiniscriptCompilerError(CompilerError),
 
     #[error("Taproot error: {0}")]
-    TaprootError(bitcoin::util::taproot::TaprootError),
+    TaprootError(bu::taproot::TaprootError),
 
     #[error("Taproot builder error: {0}")]
-    TaprootBuilderError(bitcoin::util::taproot::TaprootBuilderError),
+    TaprootBuilderError(bu::taproot::TaprootBuilderError),
 
     #[error("Secp256k1 error: {0}")]
     Secp256k1Error(bitcoin::secp256k1::Error),
@@ -145,10 +145,13 @@ pub enum Error {
     Io(std::io::Error),
 
     #[error("Bitcoin key error: {0}")]
-    BitcoinKey(bitcoin::util::key::Error),
+    BitcoinKey(bu::key::Error),
 
     #[error("BIP 32 error: {0}")]
-    Bip32(bitcoin::util::bip32::Error),
+    Bip32(bu::bip32::Error),
+
+    #[error("Bitcoin amount parse error: {0}")]
+    ParseAmountError(bu::amount::ParseAmountError),
 
     #[error("number type conversion failed (likely an unexpected negative number)")]
     TryFromInt(std::num::TryFromIntError),
@@ -184,14 +187,10 @@ impl_from_variant!(hashes::Error, Error, HashError);
 impl_from_variant!(hashes::hex::Error, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
-impl_from_variant!(bitcoin::util::key::Error, Error, BitcoinKey);
-impl_from_variant!(bitcoin::util::bip32::Error, Error, Bip32);
-impl_from_variant!(bitcoin::util::taproot::TaprootError, Error, TaprootError);
-impl_from_variant!(
-    bitcoin::util::taproot::TaprootBuilderError,
-    Error,
-    TaprootBuilderError
-);
+impl_from_variant!(bu::key::Error, Error, BitcoinKey);
+impl_from_variant!(bu::bip32::Error, Error, Bip32);
+impl_from_variant!(bu::taproot::TaprootError, Error, TaprootError);
+impl_from_variant!(bu::taproot::TaprootBuilderError, Error, TaprootBuilderError);
 impl_from_variant!(bitcoin::secp256k1::Error, Error, Secp256k1Error);
 impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
 impl_from_variant!(
@@ -201,3 +200,4 @@ impl_from_variant!(
 );
 
 impl_from_variant!(std::string::FromUtf8Error, Error, Utf8Error);
+impl_from_variant!(bu::amount::ParseAmountError, Error, ParseAmountError);
