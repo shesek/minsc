@@ -1,9 +1,11 @@
+use std::convert::TryInto;
+
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::{Transaction, TxIn, TxOut};
 use miniscript::bitcoin;
 
 use crate::runtime::Execute;
-use crate::{ast, parse_lib, Error, Result, Scope, Value};
+use crate::{ast, parse_lib, Error, Policy, Result, Scope, Value};
 
 lazy_static! {
     static ref MINSC_CTV_LIB: ast::Library = parse_lib(
@@ -26,6 +28,7 @@ lazy_static! {
 
 pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("ctvHash", fns::ctvHash).unwrap();
+    scope.set_fn("txtmpl", fns::txtmpl).unwrap();
 
     MINSC_CTV_LIB.exec(scope).unwrap();
 }
@@ -46,6 +49,13 @@ pub mod fns {
         let hash = get_ctv_hash(&tx, input_index);
 
         Ok(hash.into())
+    }
+
+    /// txtmpl(Hash) -> Policy
+    pub fn txtmpl(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let hash = args.remove(0).try_into()?;
+        Ok(Policy::TxTemplate(hash).into())
     }
 }
 

@@ -16,7 +16,7 @@ lalrpop = { version = "0.19.0", features = ["lexer"] }
 
 [dependencies]
 #miniscript = { version = "6.0.1", features = ["compiler"] }
-miniscript = { git = "https://github.com/rust-bitcoin/rust-miniscript", rev = "a881b476ecb01aa507c7e4cf253b2ed718bf914e", features = ["compiler"] }
+miniscript = { git = "https://github.com/shesek/rust-miniscript", rev = "7fa64fd99b15f668f28836c845c03a606b7aca24", features = ["compiler"], package = "sapio-miniscript" }
 
 lalrpop-util = "0.19.0"
 regex = "1.3.9"
