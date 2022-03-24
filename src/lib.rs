@@ -33,8 +33,9 @@ pub use scope::Scope;
 use miniscript::{descriptor, policy};
 
 pub type Policy = policy::concrete::Policy<descriptor::DescriptorPublicKey>;
-pub type Miniscript = miniscript::Miniscript<descriptor::DescriptorPublicKey, miniscript::Segwitv0>;
 pub type Descriptor = descriptor::Descriptor<descriptor::DescriptorPublicKey>;
+
+pub type MiniscriptDpk<T> = miniscript::Miniscript<descriptor::DescriptorPublicKey, T>;
 
 pub fn parse(s: &str) -> Result<Expr> {
     let parser = grammar::ProgramParser::new();

@@ -71,10 +71,10 @@ body
         #outputs
           +box('Result', true, true)#output-other.mb-3: .codeview
           +box('Policy', true).mb-3#output-policy: .codeview
-          +box('Miniscript / Descriptor', true).mb-3#output-miniscript: .codeview
-          +box('Bitcoin Script', true).mb-3#output-script: .codeview
-          +box('Address', true, true)#output-address.mb-3(title="Getting bitcoins in is easy, getting them out is not. For testnet use only.")
-            p.m-0.p-2 #[span] ⚠️
+          +box('Miniscript / Descriptor', true).mb-3#output-desc: .codeview
+          +box('Bitcoin Script', true, true).mb-3#output-script: .codeview
+          +box('Address', true, false)#output-address.mb-3
+            p.m-0.p-2 #[span]
 
     #ref.mt-4
       +h(2, 'Reference')
@@ -258,13 +258,12 @@ body
           sha256($hash_256) && hash160($hash_160) && pk($alice)
 
         +h(3, 'Descriptors & Addresses')
-        :markdown-it Explicit Policy -> Miniscript -> Descriptor -> Address conversion:
+        :markdown-it Explicit Policy -> Descriptor -> Address conversion:
         +snippet.
           $alice = xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw/9/0;
 
           $policy = pk($alice/1/3) && older(1 month);
-          $miniscript = miniscript($policy); // compile policy to miniscript
-          $descriptor = wsh($miniscript); // wrap with a p2wsh descriptor
+          $descriptor = wsh($policy); // compile policy to miniscript and wrap with a p2wsh descriptor
           $address = address($descriptor); // generate the address
 
           [ $policy, $miniscript, $descriptor, $address ]
@@ -273,7 +272,7 @@ body
         :markdown-it Descriptors containing wildcard keys (ending with `/*`) can be derived as well.
         +snippet.
           $policy = pk($alice/1/*) && older(1 month);
-          $descriptor = wsh(miniscript($policy));
+          $descriptor = wsh($policy);
           address($descriptor/3) // same as previous example
 
         :markdown-it

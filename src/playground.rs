@@ -11,7 +11,6 @@ use crate::{parse, Evaluate, Result, Scope, Value};
 #[derive(Serialize)]
 pub struct PlaygroundResult {
     policy: Option<String>,
-    miniscript: Option<String>,
     //script_hex: Option<String>,
     script_asm: Option<String>,
     descriptor: Option<String>,
@@ -25,33 +24,28 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
     let value = run(code).map_err(stringify)?;
 
-    let (policy, miniscript, desc, script, addr, other) = match value {
+    let (policy, desc, script, addr, other) = match value {
         Value::Policy(policy) => {
             let ms = policy.compile().map_err(stringify)?;
-            let desc = Descriptor::new_wsh(ms.clone()).map_err(stringify)?;
+            let desc = Descriptor::new_wsh(ms).map_err(stringify)?;
             let addr = desc.to_address(network).unwrap();
-            (Some(policy), Some(ms), Some(desc), None, Some(addr), None)
-        }
-        Value::Miniscript(miniscript) => {
-            let desc = Descriptor::new_wsh(miniscript.clone()).map_err(stringify)?;
-            let addr = desc.to_address(network).unwrap();
-            (None, Some(miniscript), Some(desc), None, Some(addr), None)
+            (Some(policy), Some(desc), None, Some(addr), None)
         }
         Value::Descriptor(desc) => {
             let addr = desc.to_address(network).unwrap();
-            (None, None, Some(desc), None, Some(addr), None)
+            (None, Some(desc), None, Some(addr), None)
         }
         Value::PubKey(key) => {
             let desc = Descriptor::new_wpkh(key.clone()).map_err(stringify)?;
             let addr = desc.to_address(network).unwrap();
-            (None, None, Some(desc), None, Some(addr), Some(key.into()))
+            (None, Some(desc), None, Some(addr), Some(key.into()))
         }
         Value::Script(script) => {
             let addr = Address::from_script(&script, network);
-            (None, None, None, Some(script), addr, None)
+            (None, None, Some(script), addr, None)
         }
-        Value::Address(addr) => (None, None, None, None, Some(addr), None),
-        other => (None, None, None, None, None, Some(other)),
+        Value::Address(addr) => (None, None, None, Some(addr), None),
+        other => (None, None, None, None, Some(other)),
     };
 
     let script = script
@@ -63,7 +57,6 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
     Ok(JsValue::from_serde(&PlaygroundResult {
         policy: policy.map(|p| p.to_string()),
-        miniscript: miniscript.map(|m| m.to_string()),
         descriptor: desc.map(|d| d.to_string()),
         //script_hex: script.as_ref().map(|s| s.to_hex()),
         script_asm: script.as_ref().map(get_script_asm),

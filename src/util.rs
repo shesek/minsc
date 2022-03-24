@@ -18,10 +18,10 @@ pub trait MiniscriptExt<T: miniscript::ScriptContext> {
     fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, T>>;
 }
 
-impl<T: miniscript::ScriptContext> MiniscriptExt<T>
-    for miniscript::Miniscript<DescriptorPublicKey, T>
+impl<Ctx: miniscript::ScriptContext> MiniscriptExt<Ctx>
+    for miniscript::Miniscript<DescriptorPublicKey, Ctx>
 {
-    fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, T>> {
+    fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
         Ok(self.translate_pk2(|xpk| xpk.derive_public_key(&EC))?)
     }
 }
@@ -86,7 +86,7 @@ impl DeriveExt for crate::Policy {
         true
     }
 }
-impl DeriveExt for crate::Miniscript {
+impl<Ctx: miniscript::ScriptContext> DeriveExt for crate::MiniscriptDpk<Ctx> {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
@@ -112,7 +112,6 @@ impl DeriveExt for Value {
         Ok(match self {
             Value::PubKey(key) => key.derive_path(path, is_wildcard)?.into(),
             Value::Descriptor(desc) => desc.derive_path(path, is_wildcard)?.into(),
-            Value::Miniscript(ms) => ms.derive_path(path, is_wildcard)?.into(),
             Value::Policy(policy) => policy.derive_path(path, is_wildcard)?.into(),
             Value::Array(array) => array.derive_path(path, is_wildcard)?.into(),
             _ => bail!(Error::NonDeriveableType),
@@ -122,7 +121,6 @@ impl DeriveExt for Value {
         match self {
             Value::PubKey(key) => key.is_deriveable(),
             Value::Descriptor(desc) => desc.is_deriveable(),
-            Value::Miniscript(ms) => ms.is_deriveable(),
             Value::Policy(policy) => policy.is_deriveable(),
             Value::Array(array) => array.is_deriveable(),
             _ => false,

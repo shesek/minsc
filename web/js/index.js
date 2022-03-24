@@ -19,7 +19,7 @@ const error_el = document.querySelector('#error')
     , loading_el = document.querySelector('#loading')
     , share_el = document.querySelector('#share')
     , output_el_policy = document.querySelector('#output-policy')
-    , output_el_miniscript = document.querySelector('#output-miniscript')
+    , output_el_desc = document.querySelector('#output-desc')
     , output_el_script = document.querySelector('#output-script')
     , output_el_other = document.querySelector('#output-other')
     , output_el_address = document.querySelector('#output-address')
@@ -54,13 +54,13 @@ worker.addEventListener('message', ({ data }) => {
     outputs_el.style.display = 'block'
 
     output_el_policy.style.display = r.policy ? 'block' : 'none'
-    output_el_miniscript.style.display = r.miniscript || r.descriptor ? 'block' : 'none'
+    output_el_desc.style.display = r.descriptor ? 'block' : 'none'
     output_el_script.style.display = r.script_asm ? 'block' : 'none'
     output_el_address.style.display = r.address ? 'block' : 'none'
     output_el_other.style.display = r.other ? 'block' : 'none'
 
     output_policy.setValue(r.policy || '')
-    output_miniscript.setValue(r.descriptor || r.miniscript || '')
+    output_desc.setValue(r.descriptor || '')
     output_script.setValue(r.script_asm || '')
     output_other.setValue(r.other || '')
     output_el_address.querySelector('span').innerText = r.address || ''
@@ -126,7 +126,7 @@ document.querySelectorAll('.card.collapsible').forEach(collapsible => {
     collapsible.classList.toggle('collapsed')
 
     output_policy.refresh()
-    output_miniscript.refresh()
+    output_desc.refresh()
     output_script.refresh()
   })
 })
@@ -166,7 +166,7 @@ const output_policy = CodeMirror(output_el_policy.querySelector('.codeview'), {
   matchBrackets: true,
   theme: 'darcula',
 })
-const output_miniscript = CodeMirror(output_el_miniscript.querySelector('.codeview'), {
+const output_desc = CodeMirror(output_el_desc.querySelector('.codeview'), {
   mode: 'miniscript',
   readOnly: true,
   lineWrapping: true,

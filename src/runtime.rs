@@ -7,13 +7,13 @@ use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, hex::ToHex, sha256, Hash};
 use bitcoin::util::bip32::DerivationPath;
 use bitcoin::{Address, Network, Script};
-use miniscript::bitcoin;
 use miniscript::descriptor::DescriptorPublicKey;
+use miniscript::{bitcoin, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
 use crate::util::{self, DeriveExt, DescriptorExt, MiniscriptExt, EC};
-use crate::{stdlib, time, Descriptor, Error, Miniscript, Policy, Result, Scope};
+use crate::{stdlib, time, Descriptor, Error, MiniscriptDpk, Policy, Result, Scope};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -28,7 +28,6 @@ pub enum Value {
     Policy(Policy),
     WithProb(usize, Box<Value>),
 
-    Miniscript(Miniscript),
     Descriptor(Descriptor),
     Script(Script),
     Address(Address),
@@ -38,7 +37,6 @@ pub enum Value {
 }
 
 impl_from_variant!(Policy, Value);
-impl_from_variant!(Miniscript, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(Script, Value);
@@ -250,9 +248,7 @@ impl Evaluate for ast::ScriptFrag {
 fn script_frag(value: Value) -> Result<Script> {
     Ok(match value {
         // As script code
-        v @ Value::Script(_) | v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
-            v.into_script()?
-        }
+        Value::Script(script) => script,
 
         // As data pushes
         Value::Number(n) => ScriptBuilder::new().push_int(n).into_script(),
@@ -318,11 +314,9 @@ impl ast::InfixOp {
             (Prob, Number(prob), value) => WithProb(prob.try_into()?, value.into()),
             // + for tap tweak (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
-            | (
-                Add,
-                k @ Bytes(_),
-                s @ Script(_) | s @ Miniscript(_) | s @ Policy(_) | s @ Array(_),
-            ) => stdlib::taproot::tap_tweak(k, Some(s))?.into(),
+            | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
+                stdlib::taproot::tap_tweak(k, Some(s))?.into()
+            }
 
             _ => bail!(Error::InvalidArguments),
         })
@@ -512,21 +506,16 @@ impl TryFrom<Value> for Descriptor {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Descriptor(x) => Ok(x),
-            Value::Miniscript(x) => Ok(Descriptor::new_wsh(x)?),
             Value::Policy(x) => Ok(Descriptor::new_wsh(x.compile()?)?),
             Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
             v => Err(Error::NotDescriptorLike(v)),
         }
     }
 }
-impl TryFrom<Value> for Miniscript {
+impl<Ctx: ScriptContext> TryFrom<Value> for MiniscriptDpk<Ctx> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Miniscript(x) => Ok(x),
-            Value::Policy(x) => Ok(x.compile()?),
-            v => Err(Error::NotMiniscriptLike(v)),
-        }
+        Ok(value.into_policy()?.compile()?)
     }
 }
 
@@ -571,20 +560,6 @@ impl TryFrom<Value> for Network {
     }
 }
 
-impl TryFrom<Value> for Script {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(match value {
-            Value::Script(script) => script,
-            Value::Bytes(bytes) => bytes.into(),
-            v @ Value::Miniscript(_) | v @ Value::Policy(_) => {
-                v.into_miniscript()?.derive_keys()?.encode()
-            }
-            v => bail!(Error::NotScriptLike(v)),
-        })
-    }
-}
-
 impl TryFrom<Value> for String {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -625,6 +600,13 @@ impl Value {
     pub fn is_bytes(&self) -> bool {
         matches!(self, Value::Bytes(_))
     }
+    pub fn is_policy(&self) -> bool {
+        matches!(self, Value::Policy(_))
+    }
+    pub fn is_desc(&self) -> bool {
+        matches!(self, Value::Descriptor(_))
+    }
+
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
     }
@@ -640,13 +622,7 @@ impl Value {
     pub fn into_bytes(self) -> Result<Vec<u8>> {
         self.try_into()
     }
-    pub fn into_miniscript(self) -> Result<Miniscript> {
-        self.try_into()
-    }
     pub fn into_desc(self) -> Result<Descriptor> {
-        self.try_into()
-    }
-    pub fn into_script(self) -> Result<Script> {
         self.try_into()
     }
     pub fn into_string(self) -> Result<String> {
@@ -658,23 +634,50 @@ impl Value {
     pub fn into_array(self) -> Result<Vec<Value>> {
         self.try_into()
     }
+    pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<MiniscriptDpk<Ctx>> {
+        self.try_into()
+    }
+
+    pub fn raw_script(self) -> Result<Script> {
+        Ok(match self {
+            Value::Script(script) => script,
+            Value::Bytes(bytes) => bytes.into(),
+            v => bail!(Error::NotScriptLike(v)),
+        })
+    }
+    pub fn into_script<Ctx: ScriptContext>(self) -> Result<Script> {
+        Ok(match self {
+            Value::Script(script) => script,
+            Value::Bytes(bytes) => bytes.into(),
+            Value::Policy(policy) => {
+                let ms = policy.compile::<Ctx>()?;
+                ms.derive_keys()?.encode()
+            }
+            v => bail!(Error::NotScriptLike(v)),
+        })
+    }
+    pub fn into_tapscript(self) -> Result<Script> {
+        self.into_script::<miniscript::Tap>()
+    }
     pub fn into_spk(self) -> Result<Script> {
         if self.is_desc_like() {
             self.into_desc()?.to_script_pubkey()
+        } else if self.is_raw_script() {
+            // Plain Script values (non-Policy/Descriptor) are returned as-is
+            self.raw_script()
         } else {
-            // For plain Script values (non-Policy/Descriptor), into_spk() is the same as into_script()
-            self.into_script()
+            Err(Error::NotScriptLike(self))
         }
     }
 
+    pub fn is_raw_script(&self) -> bool {
+        matches!(self, Value::Script(_) | Value::Bytes(_))
+    }
     pub fn is_script_like(&self) -> bool {
-        matches!(self, Value::Script(_) | Value::Bytes(_)) || self.is_miniscript_like()
+        self.is_raw_script() || self.is_policy()
     }
     pub fn is_desc_like(&self) -> bool {
-        matches!(self, Value::Descriptor(_) | Value::PubKey(_)) || self.is_miniscript_like()
-    }
-    pub fn is_miniscript_like(&self) -> bool {
-        matches!(self, Value::Miniscript(_) | Value::Policy(_))
+        matches!(self, Value::Descriptor(_) | Value::PubKey(_)) || self.is_policy()
     }
 }
 
@@ -687,7 +690,6 @@ impl fmt::Display for Value {
             Value::Bytes(x) => write!(f, "0x{}", x.to_hex()),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Miniscript(x) => write!(f, "{}", x),
             Value::Descriptor(x) => write!(f, "{}", x),
             Value::Address(x) => write!(f, "{}", x),
             Value::Script(x) => write!(f, "{:?}", x),

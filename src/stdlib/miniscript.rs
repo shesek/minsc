@@ -28,14 +28,10 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("all", fns::all).unwrap();
     scope.set_fn("any", fns::any).unwrap();
 
-    // Compile policy to miniscript
-    scope.set_fn("miniscript", fns::miniscript).unwrap();
-
-    // Compile descriptor/miniscript to script
+    // Compile descriptor/policy to script
     scope.set_fn("script_pubkey", fns::script_pubkey).unwrap();
-    scope
-        .set_fn("explicit_script", fns::explicit_script)
-        .unwrap();
+    scope.set_fn("tapscript", fns::tapscript).unwrap();
+    scope.set_fn("segwitv0", fns::segwitv0).unwrap();
 
     // `likely` as an alias for 10 (i.e. `likely@pk(A) || pk(B)`)
     scope.set("likely", LIKELY_PROB).unwrap();
@@ -111,12 +107,6 @@ pub mod fns {
         Ok(Policy::Hash160(args.remove(0).try_into()?).into())
     }
 
-    // Policy -> Miniscript
-    pub fn miniscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(args.remove(0).into_miniscript()?.into())
-    }
-
     // Key -> Descriptor::Wpkh
     pub fn wpkh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
@@ -127,13 +117,13 @@ pub mod fns {
     /// wsh(Script witnessScript) -> Script scriptPubKey
     pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let script_or_ms = args.remove(0);
+        let script_or_policy = args.remove(0);
 
-        Ok(if script_or_ms.is_miniscript_like() {
-            let miniscript = script_or_ms.into_miniscript()?;
+        Ok(if script_or_policy.is_policy() {
+            let miniscript = script_or_policy.into_miniscript()?;
             Descriptor::new_wsh(miniscript)?.into()
-        } else if script_or_ms.is_script_like() {
-            let script = script_or_ms.into_script()?;
+        } else if script_or_policy.is_raw_script() {
+            let script = script_or_policy.raw_script()?;
             script.to_v0_p2wsh().into()
         } else {
             bail!(Error::InvalidArguments);
@@ -154,18 +144,44 @@ pub mod fns {
         .into())
     }
 
-    // Descriptor, Policy, Miniscript, or Key -> Pubkey Script
+    /// Descriptor -> Script scriptPubKey
     pub fn script_pubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
+        ensure!(
+            args.len() == 1 && args[0].is_desc(),
+            Error::InvalidArguments
+        );
         let descriptor = args.remove(0).into_desc()?;
         Ok(descriptor.to_script_pubkey()?.into())
     }
 
-    // Descriptor, Policy, Miniscript, or Key -> Witness Script
+    /// Descriptor -> Script witnessScript
     pub fn explicit_script(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
+        ensure!(
+            args.len() == 1 && args[0].is_desc(),
+            Error::InvalidArguments
+        );
         let descriptor = args.remove(0).into_desc()?;
         Ok(descriptor.to_explicit_script()?.into())
+    }
+
+    /// Policy -> Script witnessScript
+    pub fn tapscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(
+            args.len() == 1 && args[0].is_policy(),
+            Error::InvalidArguments
+        );
+        let script = args.remove(0).into_script::<miniscript::Tap>()?;
+        Ok(script.into())
+    }
+
+    /// Policy -> Script (witnessScript)
+    pub fn segwitv0(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(
+            args.len() == 1 && args[0].is_policy(),
+            Error::InvalidArguments
+        );
+        let script = args.remove(0).into_script::<miniscript::Segwitv0>()?;
+        Ok(script.into())
     }
 
     // Turn `[A,B,C]` array into an `A && B && C` policy
