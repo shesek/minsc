@@ -427,27 +427,35 @@ fn eval_exprs<T: Borrow<Expr>>(scope: &Scope, exprs: &[T]) -> Result<Vec<Value>>
     exprs.iter().map(|arg| arg.borrow().eval(scope)).collect()
 }
 
-impl TryFrom<Value> for Policy {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Policy(policy) => Ok(policy),
-            Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
-            v => Err(Error::NotPolicyLike(v)),
-        }
-    }
-}
 
-impl TryFrom<Value> for i64 {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Number(n) => Ok(n),
-            v => Err(Error::NotNumber(v)),
+// Simple conversion, extract the specified variant from the Value or issue an error,
+// with no specialized type conversion logic
+macro_rules! impl_simple_into_variant_conv {
+    ($type:path, $variant:ident, $into_fn_name:ident, $error:ident) => {
+        impl TryFrom<Value> for $type {
+            type Error = Error;
+            fn try_from(value: Value) -> Result<Self> {
+                match value {
+                    Value::$variant(x) => Ok(x),
+                    v => Err(Error::$error(v)),
+                }
+            }
         }
-    }
+        impl Value {
+            pub fn $into_fn_name(self) -> Result<$type> {
+                self.try_into()
+            }
+        }
+    };
 }
+impl_simple_into_variant_conv!(bool, Bool, into_bool, NotBool);
+impl_simple_into_variant_conv!(i64, Number, into_i64, NotNumber);
+impl_simple_into_variant_conv!(Vec<Value>, Array, into_array, NotArray);
+impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
+impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
 
+
+// Conversion from the runtime Number (always an i64) to other number types, with overflow check
 macro_rules! impl_num_conv {
     ($type:path, $fn_name:ident) => {
         impl TryFrom<Value> for $type {
@@ -468,12 +476,15 @@ impl_num_conv!(u32, into_u32);
 impl_num_conv!(u64, into_u64);
 impl_num_conv!(i32, into_i32);
 
-impl TryFrom<Value> for bool {
+
+impl TryFrom<Value> for Policy {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
-            Value::Bool(b) => Ok(b),
-            v => Err(Error::NotBool(v)),
+            Value::Policy(policy) => Ok(policy),
+            // Pubkeys are coerced into a pk() policy
+            Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
+            v => Err(Error::NotPolicyLike(v)),
         }
     }
 }
@@ -485,6 +496,7 @@ impl TryFrom<Value> for DescriptorPublicKey {
         use miniscript::descriptor::{DescriptorSinglePub, SinglePubKey};
         match value {
             Value::PubKey(x) => Ok(x),
+            // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
             Value::Bytes(bytes) => {
                 let key = match bytes.len() {
                     33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
@@ -506,6 +518,7 @@ impl TryFrom<Value> for Descriptor {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Descriptor(x) => Ok(x),
+            // PubKeys are coerced into a wpkh() descriptor
             Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
             v => Err(Error::NotDescriptorLike(v)),
         }
@@ -529,36 +542,7 @@ impl TryFrom<Value> for Vec<u8> {
     }
 }
 
-impl TryFrom<Value> for Vec<Value> {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Array(array) => Ok(array),
-            v => Err(Error::NotArray(v)),
-        }
-    }
-}
-
-impl TryFrom<Value> for Function {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Function(f) => Ok(f),
-            v => Err(Error::NotFn(v)),
-        }
-    }
-}
-
-impl TryFrom<Value> for Network {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Network(network) => Ok(network),
-            v => Err(Error::NotNetwork(v)),
-        }
-    }
-}
-
+// Strings are represented as Bytes in the runtime and get converted to a String as needed
 impl TryFrom<Value> for String {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -609,12 +593,6 @@ impl Value {
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
     }
-    pub fn into_i64(self) -> Result<i64> {
-        self.try_into()
-    }
-    pub fn into_bool(self) -> Result<bool> {
-        self.try_into()
-    }
     pub fn into_key(self) -> Result<DescriptorPublicKey> {
         self.try_into()
     }
@@ -625,12 +603,6 @@ impl Value {
         self.try_into()
     }
     pub fn into_string(self) -> Result<String> {
-        self.try_into()
-    }
-    pub fn into_fn(self) -> Result<Function> {
-        self.try_into()
-    }
-    pub fn into_array(self) -> Result<Vec<Value>> {
         self.try_into()
     }
     pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<Miniscript<Ctx>> {
