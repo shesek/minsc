@@ -29,7 +29,8 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("any", fns::any).unwrap();
 
     // Compile descriptor/policy to script
-    scope.set_fn("script_pubkey", fns::script_pubkey).unwrap();
+    scope.set_fn("scriptPubkey", fns::scriptPubkey).unwrap();
+    scope.set_fn("explicitScript", fns::explicitScript).unwrap();
     scope.set_fn("tapscript", fns::tapscript).unwrap();
     scope.set_fn("segwitv0", fns::segwitv0).unwrap();
 
@@ -37,6 +38,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set("likely", LIKELY_PROB).unwrap();
 }
 
+#[allow(non_snake_case)]
 pub mod fns {
     use super::*;
     use crate::Error;
@@ -145,17 +147,14 @@ pub mod fns {
     }
 
     /// Descriptor -> Script scriptPubKey
-    pub fn script_pubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(
-            args.len() == 1 && args[0].is_desc(),
-            Error::InvalidArguments
-        );
-        let descriptor = args.remove(0).into_desc()?;
-        Ok(descriptor.to_script_pubkey()?.into())
+    pub fn scriptPubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let script = args.remove(0).into_spk()?;
+        Ok(script.into())
     }
 
     /// Descriptor -> Script witnessScript
-    pub fn explicit_script(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn explicitScript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(
             args.len() == 1 && args[0].is_desc(),
             Error::InvalidArguments
