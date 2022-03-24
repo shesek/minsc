@@ -32,7 +32,7 @@ pub trait DescriptorExt {
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address>;
 }
 
-impl DescriptorExt for crate::Descriptor {
+impl DescriptorExt for crate::DescriptorDpk {
     fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>> {
         Ok(self.translate_pk2(|xpk| xpk.derive_public_key(&EC))?)
     }
@@ -74,7 +74,7 @@ impl DeriveExt for DescriptorPublicKey {
         matches!(self, DescriptorPublicKey::XPub(_))
     }
 }
-impl DeriveExt for crate::Policy {
+impl DeriveExt for crate::PolicyDpk {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         // ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
@@ -96,7 +96,7 @@ impl<Ctx: miniscript::ScriptContext> DeriveExt for crate::MiniscriptDpk<Ctx> {
         self.for_any_key(|key| key.as_key().is_deriveable())
     }
 }
-impl DeriveExt for crate::Descriptor {
+impl DeriveExt for crate::DescriptorDpk {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;

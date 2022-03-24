@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use crate::runtime::Value;
 use crate::util::DescriptorExt;
-use crate::{Descriptor, Policy, Result, Scope};
+use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy, Result, Scope};
 
 const LIKELY_PROB: usize = 10;
 

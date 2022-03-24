@@ -13,7 +13,8 @@ use miniscript::{bitcoin, ScriptContext};
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
 use crate::util::{self, DeriveExt, DescriptorExt, MiniscriptExt, EC};
-use crate::{stdlib, time, Descriptor, Error, MiniscriptDpk, Policy, Result, Scope};
+use crate::{stdlib, time, Error, Result, Scope};
+use crate::{DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -510,7 +511,7 @@ impl TryFrom<Value> for Descriptor {
         }
     }
 }
-impl<Ctx: ScriptContext> TryFrom<Value> for MiniscriptDpk<Ctx> {
+impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(value.into_policy()?.compile()?)
@@ -632,7 +633,7 @@ impl Value {
     pub fn into_array(self) -> Result<Vec<Value>> {
         self.try_into()
     }
-    pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<MiniscriptDpk<Ctx>> {
+    pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<Miniscript<Ctx>> {
         self.try_into()
     }
 
