@@ -225,8 +225,6 @@ body
           $directors = [ pk(A), pk(B), pk(C) ];
           pk(ceo_pk) || all($directors) // thresh(3, $directors)
 
-        :markdown-it The last example could alternatively be written as `pk(ceo) || $directors`.
-
         +h(3, 'Public keys')
         :markdown-it
            Public keys can be specified in hex (for standalone keys, compressed only) or as xpubs.
@@ -274,19 +272,6 @@ body
           $policy = pk($alice/1/*) && older(1 month);
           $descriptor = wsh($policy);
           address($descriptor/3) // same as previous example
-
-        :markdown-it
-          Policies, miniscripts and public keys get auto-coerced into descriptors, so explicit
-          `miniscript()` and `wsh()` calls are typically not necessary.
-        +snippet.
-          // Policies are automatically compiled and wrapped with a p2wsh descriptor
-          $policy = pk($alice/*) && older(1 month);
-          $address1 = address($policy/10); // == address(wsh(miniscript($policy))/10)
-
-          // Public keys are wrapped with a p2wpkh descriptor
-          $address2 = address($alice/2); // == address(wpkh($alice/2))
-
-          [ $address1, $address2 ]
 
         :markdown-it `sh()` can be used to get `p2sh-p2wsh` and `p2sh-p2wpkh` descriptors.
         +snippet.

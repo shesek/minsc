@@ -122,7 +122,7 @@ pub mod fns {
         Ok(if script_or_policy.is_policy() {
             let miniscript = script_or_policy.into_miniscript()?;
             Descriptor::new_wsh(miniscript)?.into()
-        } else if script_or_policy.is_raw_script() {
+        } else if script_or_policy.is_rawscript_like() {
             let script = script_or_policy.raw_script()?;
             script.to_v0_p2wsh().into()
         } else {
@@ -187,11 +187,7 @@ pub mod fns {
     // Turn `[A,B,C]` array into an `A && B && C` policy
     pub fn all(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        all_(args.remove(0))
-    }
-
-    pub fn all_(array: Value) -> Result<Value> {
-        let policies = map_policy_array(array)?;
+        let policies = map_policy_array(args.remove(0))?;
         Ok(Policy::Threshold(policies.len(), policies).into())
     }
 

@@ -48,13 +48,10 @@ pub enum Error {
     #[error("Expected bytes, not {0:?}")]
     NotBytes(Value),
 
-    #[error("Expected a policy or array of policies, not {0:?}")]
+    #[error("Expected a policy or pubkey, not {0:?}")]
     NotPolicyLike(Value),
 
-    #[error("Expected a miniscript or policy, not {0:?}")]
-    NotMiniscriptLike(Value),
-
-    #[error("Expected a descriptor, policy or miniscript, not {0:?}")]
+    #[error("Expected a descriptor or pubkey, not {0:?}")]
     NotDescriptorLike(Value),
 
     #[error("Expected a value coercible into Script, not {0:?}")]

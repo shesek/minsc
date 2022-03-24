@@ -432,7 +432,6 @@ impl TryFrom<Value> for Policy {
         match value {
             Value::Policy(policy) => Ok(policy),
             Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
-            arr @ Value::Array(_) => stdlib::miniscript::fns::all_(arr)?.try_into(),
             v => Err(Error::NotPolicyLike(v)),
         }
     }
@@ -506,7 +505,6 @@ impl TryFrom<Value> for Descriptor {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Descriptor(x) => Ok(x),
-            Value::Policy(x) => Ok(Descriptor::new_wsh(x.compile()?)?),
             Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
             v => Err(Error::NotDescriptorLike(v)),
         }
@@ -662,7 +660,7 @@ impl Value {
     pub fn into_spk(self) -> Result<Script> {
         if self.is_desc_like() {
             self.into_desc()?.to_script_pubkey()
-        } else if self.is_raw_script() {
+        } else if self.is_rawscript_like() {
             // Plain Script values (non-Policy/Descriptor) are returned as-is
             self.raw_script()
         } else {
@@ -670,14 +668,14 @@ impl Value {
         }
     }
 
-    pub fn is_raw_script(&self) -> bool {
+    pub fn is_rawscript_like(&self) -> bool {
         matches!(self, Value::Script(_) | Value::Bytes(_))
     }
     pub fn is_script_like(&self) -> bool {
-        self.is_raw_script() || self.is_policy()
+        self.is_rawscript_like() || self.is_policy()
     }
     pub fn is_desc_like(&self) -> bool {
-        matches!(self, Value::Descriptor(_) | Value::PubKey(_)) || self.is_policy()
+        matches!(self, Value::Descriptor(_) | Value::PubKey(_))
     }
 }
 
