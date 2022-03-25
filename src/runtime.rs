@@ -8,6 +8,7 @@ use bitcoin::hashes::{self, hex::ToHex, sha256, Hash};
 use bitcoin::util::bip32::DerivationPath;
 use bitcoin::{Address, Network, Script};
 use miniscript::descriptor::DescriptorPublicKey;
+use bitcoin::util::taproot::TaprootSpendInfo;
 use miniscript::{bitcoin, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
@@ -33,6 +34,8 @@ pub enum Value {
     Script(Script),
     Address(Address),
 
+    TapInfo(TaprootSpendInfo),
+
     Function(Function),
     Array(Vec<Value>),
 }
@@ -45,6 +48,7 @@ impl_from_variant!(Address, Value);
 impl_from_variant!(Vec<Value>, Value, Array);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(Network, Value);
+impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl_from_variant!(i64, Value, Number);
 impl_from_variant!(bool, Value, Bool);
 impl From<usize> for Value {
@@ -427,7 +431,6 @@ fn eval_exprs<T: Borrow<Expr>>(scope: &Scope, exprs: &[T]) -> Result<Vec<Value>>
     exprs.iter().map(|arg| arg.borrow().eval(scope)).collect()
 }
 
-
 // Simple conversion, extract the specified variant from the Value or issue an error,
 // with no specialized type conversion logic
 macro_rules! impl_simple_into_variant_conv {
@@ -453,7 +456,7 @@ impl_simple_into_variant_conv!(i64, Number, into_i64, NotNumber);
 impl_simple_into_variant_conv!(Vec<Value>, Array, into_array, NotArray);
 impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
 impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
-
+impl_simple_into_variant_conv!(TaprootSpendInfo, TapInfo, into_tapinfo, NotTapInfo);
 
 // Conversion from the runtime Number (always an i64) to other number types, with overflow check
 macro_rules! impl_num_conv {
@@ -475,7 +478,6 @@ impl_num_conv!(usize, into_usize);
 impl_num_conv!(u32, into_u32);
 impl_num_conv!(u64, into_u64);
 impl_num_conv!(i32, into_i32);
-
 
 impl TryFrom<Value> for Policy {
     type Error = Error;
@@ -630,15 +632,19 @@ impl Value {
     pub fn into_tapscript(self) -> Result<Script> {
         self.into_script::<miniscript::Tap>()
     }
+
     pub fn into_spk(self) -> Result<Script> {
-        if self.is_desc_like() {
-            self.into_desc()?.to_script_pubkey()
-        } else if self.is_rawscript_like() {
-            // Plain Script values (non-Policy/Descriptor) are returned as-is
-            self.raw_script()
-        } else {
-            Err(Error::NotScriptLike(self))
-        }
+        Ok(match self {
+            // Raw scripts are returned as-is
+            v @ Value::Script(_) | v @ Value::Bytes(_) => v.raw_script()?,
+            // Descriptors (or values coercible into them) are converted into their scriptPubKey
+            v @ Value::Descriptor(_) | v @ Value::PubKey(_) => v.into_desc()?.to_script_pubkey()?,
+            // TapInfo returns the output V1 witness program of the output key
+            Value::TapInfo(tapinfo) => {
+                Script::new_witness_program(WitnessVersion::V1, &tapinfo.output_key().serialize())
+            }
+            v => bail!(Error::NotScriptLike(v)),
+        })
     }
 
     pub fn is_rawscript_like(&self) -> bool {
@@ -646,9 +652,6 @@ impl Value {
     }
     pub fn is_script_like(&self) -> bool {
         self.is_rawscript_like() || self.is_policy()
-    }
-    pub fn is_desc_like(&self) -> bool {
-        matches!(self, Value::Descriptor(_) | Value::PubKey(_))
     }
 }
 
@@ -666,6 +669,7 @@ impl fmt::Display for Value {
             Value::Script(x) => write!(f, "{:?}", x),
             Value::Function(x) => write!(f, "{:?}", x),
             Value::Network(x) => write!(f, "{}", x),
+            Value::TapInfo(x) => write!(f, "{:?}", x),
             Value::Array(elements) => {
                 write!(f, "[ ")?;
                 for (i, element) in elements.iter().enumerate() {
