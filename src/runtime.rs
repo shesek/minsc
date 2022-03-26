@@ -5,10 +5,12 @@ use std::str::FromStr;
 
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, hex::ToHex, sha256, Hash};
+use bitcoin::schnorr::TweakedPublicKey;
+use bitcoin::util::address::WitnessVersion;
 use bitcoin::util::bip32::DerivationPath;
-use bitcoin::{Address, Network, Script};
-use miniscript::descriptor::DescriptorPublicKey;
 use bitcoin::util::taproot::TaprootSpendInfo;
+use bitcoin::{Address, Network, PublicKey, Script, XOnlyPublicKey};
+use miniscript::descriptor::{DescriptorPublicKey, DescriptorSinglePub, SinglePubKey};
 use miniscript::{bitcoin, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
@@ -320,7 +322,7 @@ impl ast::InfixOp {
             // + for tap tweak (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
             | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
-                stdlib::taproot::tap_tweak(k, Some(s))?.into()
+                stdlib::taproot::tap_tweak(k, s)?.into()
             }
 
             _ => bail!(Error::InvalidArguments),
@@ -494,8 +496,6 @@ impl TryFrom<Value> for Policy {
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        use bitcoin::util::key::{PublicKey, XOnlyPublicKey};
-        use miniscript::descriptor::{DescriptorSinglePub, SinglePubKey};
         match value {
             Value::PubKey(x) => Ok(x),
             // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
@@ -574,6 +574,20 @@ impl_hash_conv!(hashes::sha256::Hash);
 impl_hash_conv!(hashes::sha256d::Hash);
 impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
+
+impl From<XOnlyPublicKey> for Value {
+    fn from(key: XOnlyPublicKey) -> Self {
+        Value::PubKey(DescriptorPublicKey::SinglePub(DescriptorSinglePub {
+            key: SinglePubKey::XOnly(key),
+            origin: None,
+        }))
+    }
+}
+impl From<TweakedPublicKey> for Value {
+    fn from(key: TweakedPublicKey) -> Self {
+        key.into_inner().into()
+    }
+}
 
 impl Value {
     pub fn is_array(&self) -> bool {
