@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::util::key::XOnlyPublicKey;
-use bitcoin::util::taproot::{LeafVersion, TapBranchHash, TapLeafHash, TaprootSpendInfo};
+use bitcoin::util::taproot::{LeafVersion, NodeInfo, TapBranchHash, TapLeafHash, TaprootSpendInfo};
 use miniscript::bitcoin;
 
 use crate::util::EC;
@@ -140,6 +140,9 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
     // Construct a key-path-only TapInfo
     let key_only_tr = || TaprootSpendInfo::new_key_spend(&EC, internal_key, None);
 
+    // Construct a script tree with the given top-level node
+    let script_tree_tr = |node| TaprootSpendInfo::from_node_info(&EC, internal_key, node);
+
     Ok(match script_tree {
         // Empty bytes or arrays are treated as an empty script tree (key-path only)
         Value::Bytes(bytes) if bytes.len() == 0 => key_only_tr(),
@@ -153,12 +156,30 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
         }
         Value::Bytes(bytes) => bail!(Error::InvalidMerkleLen(bytes.len())),
 
-        // Construct an huffman tree for the given set of scripts
-        Value::Array(nodes) => huffman_tree(internal_key, nodes)?,
+        // Arrays of length != 2 are constructed as a huffman tree
+        Value::Array(nodes) if nodes.len() != 2 => huffman_tree(internal_key, nodes)?,
+
+        // Arrays of length 2 are processed as a nested tree structure (i.e. [ [ S1, S2 ], [ [ S3, S4 ], S5 ] ] )
+        array @ Value::Array(_) => script_tree_tr(process_node(array)?),
 
         // Single script tree
-        node => huffman_tree(internal_key, vec![node])?,
+        node => script_tree_tr(process_node(node)?),
     })
+}
+
+fn process_node(node: Value) -> Result<NodeInfo> {
+    if node.is_script_like() {
+        let script = node.into_tapscript()?;
+        return Ok(NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript));
+    }
+    if let Value::Array(mut nodes) = node {
+        if nodes.len() == 2 {
+            let a = process_node(nodes.remove(0))?;
+            let b = process_node(nodes.remove(0))?;
+            return Ok(NodeInfo::combine(a, b)?);
+        }
+    }
+    Err(Error::TaprootInvalidNestedTree)
 }
 
 fn huffman_tree(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {

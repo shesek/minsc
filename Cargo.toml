@@ -41,3 +41,7 @@ crate-type = ["cdylib", "lib"]
 lto = true
 # webpack fail wasm compilation without this
 opt-level = "s"
+
+[patch.crates-io]
+# 0.28.0-rc1 with https://github.com/rust-bitcoin/rust-bitcoin/pull/910
+bitcoin = { git = "https://github.com/shesek/rust-bitcoin", branch = "0.28.0-rc1-nodeinfo_pub" }
