@@ -140,9 +140,6 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
     // Construct a key-path-only TapInfo
     let key_only_tr = || TaprootSpendInfo::new_key_spend(&EC, internal_key, None);
 
-    // Construct a script tree with the given top-level node
-    //let script_tree_tr = |node| TaprootSpendInfo::from_node_info(&EC, internal_key, node);
-
     Ok(match script_tree {
         // Empty bytes or arrays are treated as an empty script tree (key-path only)
         Value::Bytes(bytes) if bytes.len() == 0 => key_only_tr(),
@@ -156,43 +153,13 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
         }
         Value::Bytes(bytes) => bail!(Error::InvalidMerkleLen(bytes.len())),
 
-        // Arrays with exactly 2 elements are expected to be a nested tree (i.e. [ [S1,S2], [S3,S4] ]  )
-        //Value::Array(mut nodes) if nodes.len() == 2 => {
-        //    script_tree_tr(combine_nodes(nodes.remove(0), nodes.remove(0))?)
-        //}
-
         // Construct an huffman tree for the given set of scripts
         Value::Array(nodes) => huffman_tree(internal_key, nodes)?,
 
         // Single script tree
         node => huffman_tree(internal_key, vec![node])?,
-        // node => script_tree_tr(make_leaf(node)?),
     })
 }
-
-/*
-fn make_leaf(node: Value) -> Result<NodeInfo> {
-    let script = node.into_tapscript()?;
-    Ok(NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript))
-}
-
-fn combine_nodes(a: Value, b: Value) -> Result<NodeInfo> {
-    Ok(NodeInfo::combine(&process_node(a)?, &process_node(b)?))
-}
-
-fn process_node(node: Value) -> Result<NodeInfo> {
-    if node.is_script_like() {
-        make_leaf(node)
-    } else if let Value::Array(mut nodes) = node {
-        if nodes.len() == 2 {
-            combine_nodes(nodes.remove(0), nodes.remove(0))
-        } else {
-            Err(Error::TaprootInvalidNestedTree)
-        }
-    } else {
-        Err(Error::TaprootInvalidNestedTree)
-    }
-}*/
 
 fn huffman_tree(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {
     let script_weights = scripts

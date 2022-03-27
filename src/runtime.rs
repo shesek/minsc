@@ -351,8 +351,8 @@ impl Evaluate for ast::DateTime {
 
 impl Evaluate for ast::BtcAmount {
     fn eval(&self, _: &Scope) -> Result<Value> {
-        let amount = bitcoin::Amount::from_str(&self.0)?;
-        Ok(Value::Number(amount.as_sat().try_into()?))
+        let amount = bitcoin::SignedAmount::from_str(&self.0)?;
+        Ok(Value::Number(amount.as_sat()))
     }
 }
 

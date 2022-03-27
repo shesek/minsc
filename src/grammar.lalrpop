@@ -194,7 +194,7 @@ DurationClockPart: ast::DurationPart = {
 DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
   ast::DateTime(<>.into()).into();
 
-BtcAmount: Expr = r"(\d+(?:\.\d+)?) (BTC|mBTC|uBTC|bits|satoshi|sat|msat)" =>
+BtcAmount: Expr = r"(-?\d+(?:\.\d+)?) (BTC|mBTC|uBTC|bits|satoshi|sat|msat)" =>
   ast::BtcAmount(<>.into()).into();
 
 // Statements
