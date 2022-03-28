@@ -29,7 +29,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("any", fns::any).unwrap();
 
     // Compile descriptor/policy to script
-    scope.set_fn("scriptPubkey", fns::scriptPubkey).unwrap();
     scope.set_fn("explicitScript", fns::explicitScript).unwrap();
     scope.set_fn("tapscript", fns::tapscript).unwrap();
     scope.set_fn("segwitv0", fns::segwitv0).unwrap();
@@ -146,13 +145,6 @@ pub mod fns {
         .into())
     }
 
-    /// Descriptor -> Script scriptPubKey
-    pub fn scriptPubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let script = args.remove(0).into_spk()?;
-        Ok(script.into())
-    }
-
     /// Descriptor -> Script witnessScript
     pub fn explicitScript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(
@@ -173,7 +165,7 @@ pub mod fns {
         Ok(script.into())
     }
 
-    /// Policy -> Script (witnessScript)
+    /// Policy -> Script witnessScript
     pub fn segwitv0(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(
             args.len() == 1 && args[0].is_policy(),
