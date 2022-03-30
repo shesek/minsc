@@ -74,7 +74,7 @@ pub mod fns {
         Ok(Value::TapInfo(tapinfo))
     }
 
-    /// tapInternal(TapInfo) -> PubKey
+    /// tapInternalKey(TapInfo) -> PubKey
     ///
     /// Get the internal x-only key of the given TapInfo
     pub fn tapInternalKey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
@@ -84,7 +84,7 @@ pub mod fns {
         Ok(tapinfo.internal_key().into())
     }
 
-    /// tapOutput(TapInfo) -> (PubKey, Number parity)
+    /// tapOutputKey(TapInfo) -> (PubKey, Number parity)
     ///
     /// Get the output key and parity of the given TapInfo as a tuple of [ key, parity ]
     pub fn tapOutputKey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
@@ -168,7 +168,7 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
 }
 
 fn process_node(node: Value) -> Result<NodeInfo> {
-    if node.is_script_like() {
+    if node.is_script_coercible(true) {
         let script = node.into_tapscript()?;
         return Ok(NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript));
     }

@@ -123,8 +123,8 @@ pub mod fns {
         Ok(if script_or_policy.is_policy() {
             let miniscript = script_or_policy.into_miniscript()?;
             Descriptor::new_wsh(miniscript)?.into()
-        } else if script_or_policy.is_rawscript_like() {
-            let script = script_or_policy.raw_script()?;
+        } else if script_or_policy.is_script_coercible(false) {
+            let script = script_or_policy.into_script_noctx()?;
             script.to_v0_p2wsh().into()
         } else {
             bail!(Error::InvalidArguments);

@@ -625,13 +625,16 @@ impl Value {
         self.try_into()
     }
 
-    pub fn raw_script(self) -> Result<Script> {
+    /// Coerce into a Script when the context is unknown (i.e. raw scripts only, not policies)
+    pub fn into_script_noctx(self) -> Result<Script> {
         Ok(match self {
             Value::Script(script) => script,
             Value::Bytes(bytes) => bytes.into(),
             v => bail!(Error::NotScriptLike(v)),
         })
     }
+
+    /// Coerce into a Script when the context is known
     pub fn into_script<Ctx: ScriptContext>(self) -> Result<Script> {
         Ok(match self {
             Value::Script(script) => script,
@@ -650,7 +653,7 @@ impl Value {
     pub fn into_spk(self) -> Result<Script> {
         Ok(match self {
             // Raw scripts are returned as-is
-            v @ Value::Script(_) | v @ Value::Bytes(_) => v.raw_script()?,
+            v @ Value::Script(_) | v @ Value::Bytes(_) => v.into_script_noctx()?,
             // Descriptors (or values coercible into them) are converted into their scriptPubKey
             v @ Value::Descriptor(_) | v @ Value::PubKey(_) => v.into_desc()?.to_script_pubkey()?,
             // TapInfo returns the output V1 witness program of the output key
@@ -661,11 +664,8 @@ impl Value {
         })
     }
 
-    pub fn is_rawscript_like(&self) -> bool {
-        matches!(self, Value::Script(_) | Value::Bytes(_))
-    }
-    pub fn is_script_like(&self) -> bool {
-        self.is_rawscript_like() || self.is_policy()
+    pub fn is_script_coercible(&self, known_ctx: bool) -> bool {
+        matches!(self, Value::Script(_) | Value::Bytes(_)) || (known_ctx && self.is_policy())
     }
 }
 
