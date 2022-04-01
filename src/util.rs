@@ -78,7 +78,7 @@ impl DeriveExt for crate::PolicyDpk {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         // ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
-        self.translate_pk(|pk| pk.clone().derive_path(path.clone(), is_wildcard))
+        self.translate_pk(|pk| pk.derive_path(path.clone(), is_wildcard))
     }
     fn is_deriveable(&self) -> bool {
         // TODO This fails with 'reached the recursion limit while instantiating'
@@ -90,7 +90,7 @@ impl<Ctx: miniscript::ScriptContext> DeriveExt for crate::MiniscriptDpk<Ctx> {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
-        self.translate_pk2(|pk| pk.clone().derive_path(path.clone(), is_wildcard))
+        self.translate_pk2(|pk| pk.derive_path(path.clone(), is_wildcard))
     }
     fn is_deriveable(&self) -> bool {
         self.for_any_key(|key| key.as_key().is_deriveable())
@@ -100,7 +100,7 @@ impl DeriveExt for crate::DescriptorDpk {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
-        self.translate_pk2(|pk| pk.clone().derive_path(path.clone(), is_wildcard))
+        self.translate_pk2(|pk| pk.derive_path(path.clone(), is_wildcard))
     }
     fn is_deriveable(&self) -> bool {
         // delegate to miniscript::Descriptor::is_derivable()
