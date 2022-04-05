@@ -585,7 +585,7 @@ impl From<XOnlyPublicKey> for Value {
 }
 impl From<TweakedPublicKey> for Value {
     fn from(key: TweakedPublicKey) -> Self {
-        key.into_inner().into()
+        key.to_inner().into()
     }
 }
 

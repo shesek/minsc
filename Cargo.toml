@@ -16,7 +16,7 @@ lalrpop = { version = "0.19.0", features = ["lexer"] }
 
 [dependencies]
 #miniscript = { version = "6.0.1", features = ["compiler"] }
-miniscript = { git = "https://github.com/rust-bitcoin/rust-miniscript", rev = "a881b476ecb01aa507c7e4cf253b2ed718bf914e", features = ["compiler"] }
+miniscript = { git = "https://github.com/rust-bitcoin/rust-miniscript", rev = "d8cc633b5b726e7ae595031ba04dcc1c1c2d6fda", features = ["compiler"] }
 
 lalrpop-util = "0.19.0"
 regex = "1.3.9"
@@ -41,7 +41,3 @@ crate-type = ["cdylib", "lib"]
 lto = true
 # webpack fail wasm compilation without this
 opt-level = "s"
-
-[patch.crates-io]
-# 0.28.0-rc1 with https://github.com/rust-bitcoin/rust-bitcoin/pull/910
-bitcoin = { git = "https://github.com/shesek/rust-bitcoin", branch = "0.28.0-rc1-nodeinfo_pub" }

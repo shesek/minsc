@@ -122,7 +122,7 @@ pub mod fns {
             .keys()
             .map(|script_ver| {
                 let script = script_ver.0.clone();
-                let version = vec![script_ver.1.into_consensus()];
+                let version = vec![script_ver.1.to_consensus()];
                 let ctrl = tapinfo.control_block(script_ver).unwrap().serialize();
                 Value::Array(vec![script.into(), version.into(), ctrl.into()])
             })
