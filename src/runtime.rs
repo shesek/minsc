@@ -588,6 +588,11 @@ impl From<TweakedPublicKey> for Value {
         key.to_inner().into()
     }
 }
+impl From<bitcoin::util::bip32::ExtendedPubKey> for Value {
+    fn from(xpub: bitcoin::util::bip32::ExtendedPubKey) -> Self {
+        Value::PubKey(xpub.to_string().parse().unwrap())
+    }
+}
 
 impl Value {
     pub fn is_array(&self) -> bool {
