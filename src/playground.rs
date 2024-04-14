@@ -41,7 +41,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
             (None, Some(desc), None, Some(addr), Some(key.into()))
         }
         Value::Script(script) => {
-            let addr = Address::from_script(&script, network);
+            let addr = Address::from_script(&script, network).ok();
             (None, None, Some(script), addr, None)
         }
         Value::Address(addr) => (None, None, None, Some(addr), None),

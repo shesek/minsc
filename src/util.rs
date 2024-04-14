@@ -1,11 +1,12 @@
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::str::FromStr;
 
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::util::bip32::{ChildNumber, IntoDerivationPath};
 use bitcoin::{secp256k1, PublicKey};
-use miniscript::descriptor::{DescriptorPublicKey, DescriptorTrait, Wildcard};
-use miniscript::{bitcoin, ForEachKey, TranslatePk2};
+use miniscript::descriptor::{DescriptorPublicKey, Wildcard};
+use miniscript::{bitcoin, ForEachKey, MiniscriptKey, TranslatePk, Translator};
 
 use crate::{Error, Result, Value};
 
@@ -15,14 +16,16 @@ lazy_static! {
 }
 
 pub trait MiniscriptExt<T: miniscript::ScriptContext> {
-    fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, T>>;
+    fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, T>>;
 }
 
 impl<Ctx: miniscript::ScriptContext> MiniscriptExt<Ctx>
     for miniscript::Miniscript<DescriptorPublicKey, Ctx>
 {
-    fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
-        Ok(self.translate_pk2(|xpk| xpk.derive_public_key(&EC))?)
+    fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
+        self.translate_pk(&mut FnTranslator::new(|xpk: &DescriptorPublicKey| {
+            Ok(xpk.clone().at_derivation_index(0).derive_public_key(&EC)?)
+        }))
     }
 }
 pub trait DescriptorExt {
@@ -34,7 +37,8 @@ pub trait DescriptorExt {
 
 impl DescriptorExt for crate::DescriptorDpk {
     fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>> {
-        Ok(self.translate_pk2(|xpk| xpk.derive_public_key(&EC))?)
+        // XXX verify no wildcard?
+        Ok(self.derived_descriptor(&EC, 0)?)
     }
     fn to_script_pubkey(&self) -> Result<bitcoin::Script> {
         Ok(self.derive_keys()?.script_pubkey())
@@ -62,7 +66,7 @@ impl DeriveExt for DescriptorPublicKey {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         let mut xpub = match self {
             DescriptorPublicKey::XPub(xpub) => xpub.clone(),
-            DescriptorPublicKey::SinglePub(_) => bail!(Error::NonDeriveableSingle),
+            DescriptorPublicKey::Single(_) => bail!(Error::NonDeriveableSingle),
         };
         xpub.derivation_path = xpub.derivation_path.extend(path.into_derivation_path()?);
         // XXX hardened derivation is currently unsupported
@@ -78,33 +82,36 @@ impl DeriveExt for crate::PolicyDpk {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         // ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
-        self.translate_pk(|pk| pk.derive_path(path.clone(), is_wildcard))
+        self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
+            Ok(pk.derive_path(path.clone(), is_wildcard)?)
+        }))
     }
     fn is_deriveable(&self) -> bool {
-        // TODO This fails with 'reached the recursion limit while instantiating'
-        // self.for_any_key(|key| key.as_key().is_deriveable())
-        true
+        self.for_any_key(|key| key.has_wildcard())
     }
 }
 impl<Ctx: miniscript::ScriptContext> DeriveExt for crate::MiniscriptDpk<Ctx> {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
-        self.translate_pk2(|pk| pk.derive_path(path.clone(), is_wildcard))
+        self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
+            pk.derive_path(path.clone(), is_wildcard)
+        }))
     }
     fn is_deriveable(&self) -> bool {
-        self.for_any_key(|key| key.as_key().is_deriveable())
+        self.for_any_key(|pk| pk.has_wildcard())
     }
 }
 impl DeriveExt for crate::DescriptorDpk {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
-        ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
+        ensure!(DeriveExt::is_deriveable(self), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
-        self.translate_pk2(|pk| pk.derive_path(path.clone(), is_wildcard))
+        self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
+            pk.derive_path(path.clone(), is_wildcard)
+        }))
     }
     fn is_deriveable(&self) -> bool {
-        // delegate to miniscript::Descriptor::is_derivable()
-        self.is_deriveable()
+        self.has_wildcard()
     }
 }
 impl DeriveExt for Value {
@@ -119,8 +126,8 @@ impl DeriveExt for Value {
     }
     fn is_deriveable(&self) -> bool {
         match self {
-            Value::PubKey(key) => key.is_deriveable(),
-            Value::Descriptor(desc) => desc.is_deriveable(),
+            Value::PubKey(key) => DeriveExt::is_deriveable(key),
+            Value::Descriptor(desc) => DeriveExt::is_deriveable(desc),
             Value::Policy(policy) => policy.is_deriveable(),
             Value::Array(array) => array.is_deriveable(),
             _ => false,
@@ -135,6 +142,52 @@ impl DeriveExt for Vec<Value> {
     }
     fn is_deriveable(&self) -> bool {
         self.iter().any(|v| v.is_deriveable())
+    }
+}
+
+// A `Translator` for keys using a closure function, similar to
+// the `TranslatePk2` available in prior rust-miniscript releases
+struct FnTranslator<P: MiniscriptKey, Q: MiniscriptKey, F: Fn(&P) -> Result<Q>> {
+    func: F,
+    _marker: PhantomData<(P, Q)>,
+}
+
+impl<P: MiniscriptKey, Q: MiniscriptKey, F: Fn(&P) -> Result<Q>> FnTranslator<P, Q, F> {
+    pub fn new(func: F) -> Self {
+        FnTranslator {
+            func,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<P, Q, F> Translator<P, Q, Error> for FnTranslator<P, Q, F>
+where
+    P: MiniscriptKey,
+    // hashes are passed through as-is, P and Q must share the same hash types
+    Q: MiniscriptKey<
+        Sha256 = P::Sha256,
+        Hash256 = P::Hash256,
+        Ripemd160 = P::Ripemd160,
+        Hash160 = P::Hash160,
+    >,
+    F: Fn(&P) -> Result<Q>,
+{
+    fn pk(&mut self, pk: &P) -> Result<Q> {
+        (self.func)(pk)
+    }
+
+    fn sha256(&mut self, sha256: &P::Sha256) -> Result<Q::Sha256> {
+        Ok(sha256.clone())
+    }
+    fn hash256(&mut self, hash256: &P::Hash256) -> Result<Q::Hash256> {
+        Ok(hash256.clone())
+    }
+    fn ripemd160(&mut self, ripemd160: &P::Ripemd160) -> Result<Q::Ripemd160> {
+        Ok(ripemd160.clone())
+    }
+    fn hash160(&mut self, ripemd160: &P::Hash160) -> Result<Q::Hash160> {
+        Ok(ripemd160.clone())
     }
 }
 

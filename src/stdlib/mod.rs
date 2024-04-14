@@ -100,7 +100,7 @@ pub mod fns {
         let network = args.pop().map_or(Ok(Network::Signet), TryInto::try_into)?;
 
         Ok(Address::from_script(&spk, network)
-            .ok_or_else(|| Error::NotAddressable(spk))?
+            .map_err(|_| Error::NotAddressable(spk))?
             .into())
     }
 
@@ -114,7 +114,6 @@ pub mod fns {
         let script = args.remove(0).into_spk()?;
         Ok(script.into())
     }
-
 
     pub fn repeat(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidArguments);

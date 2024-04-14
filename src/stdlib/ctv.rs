@@ -1,5 +1,5 @@
 use bitcoin::hashes::{sha256, Hash};
-use bitcoin::{Transaction, TxIn, TxOut};
+use bitcoin::{PackedLockTime, Sequence, Transaction, TxIn, TxOut};
 use miniscript::bitcoin;
 
 use crate::runtime::Execute;
@@ -53,7 +53,7 @@ pub mod fns {
 fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
     let mut tx = Transaction {
         version: 2,
-        lock_time: 0,
+        lock_time: PackedLockTime::ZERO,
         input: vec![],
         output: vec![],
     };
@@ -70,12 +70,12 @@ fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
 
         match (inst_name.as_str(), inst.len()) {
             ("version", 1) => tx.version = inst.remove(0).into_i32()?,
-            ("locktime", 1) => tx.lock_time = inst.remove(0).into_u32()?,
+            ("locktime", 1) => tx.lock_time = PackedLockTime(inst.remove(0).into_u32()?),
             ("input", 0 | 1) => tx.input.push(TxIn {
                 previous_output: Default::default(),
                 script_sig: Default::default(),
                 witness: Default::default(),
-                sequence: inst.pop().map_or(Ok(u32::MAX), |v| v.into_u32())?,
+                sequence: Sequence(inst.pop().map_or(Ok(u32::MAX), |v| v.into_u32())?),
             }),
             ("output", 2) => tx.output.push(TxOut {
                 script_pubkey: inst.remove(0).into_spk()?,
@@ -93,7 +93,7 @@ fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
             previous_output: Default::default(),
             script_sig: Default::default(),
             witness: Default::default(),
-            sequence: u32::MAX,
+            sequence: Sequence::MAX,
         })
     }
 

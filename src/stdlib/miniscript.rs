@@ -1,5 +1,7 @@
 use std::convert::TryInto;
 
+use miniscript::bitcoin::{PackedLockTime, Sequence};
+
 use crate::runtime::Value;
 use crate::util::DescriptorExt;
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy, Result, Scope};
@@ -76,13 +78,13 @@ pub mod fns {
     pub fn older(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let locktime = args.remove(0).into_u32()?;
-        Ok(Policy::Older(locktime).into())
+        Ok(Policy::Older(Sequence(locktime)).into())
     }
 
     pub fn after(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let locktime = args.remove(0).into_u32()?;
-        Ok(Policy::After(locktime).into())
+        Ok(Policy::After(PackedLockTime(locktime)).into())
     }
 
     pub fn pk(mut args: Vec<Value>, _: &Scope) -> Result<Value> {

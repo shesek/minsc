@@ -10,7 +10,7 @@ use bitcoin::util::address::WitnessVersion;
 use bitcoin::util::bip32::DerivationPath;
 use bitcoin::util::taproot::TaprootSpendInfo;
 use bitcoin::{Address, Network, PublicKey, Script, XOnlyPublicKey};
-use miniscript::descriptor::{DescriptorPublicKey, DescriptorSinglePub, SinglePubKey};
+use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
@@ -262,7 +262,7 @@ fn script_frag(value: Value) -> Result<Script> {
         Value::Bool(val) => ScriptBuilder::new().push_int(val as i64).into_script(),
         Value::Bytes(bytes) => ScriptBuilder::new().push_slice(&bytes).into_script(),
         Value::PubKey(desc_pubkey) => {
-            let pubkey = desc_pubkey.derive_public_key(&EC)?;
+            let pubkey = desc_pubkey.at_derivation_index(0).derive_public_key(&EC)?;
             ScriptBuilder::new().push_key(&pubkey).into_script()
         }
 
@@ -352,7 +352,7 @@ impl Evaluate for ast::DateTime {
 impl Evaluate for ast::BtcAmount {
     fn eval(&self, _: &Scope) -> Result<Value> {
         let amount = bitcoin::SignedAmount::from_str(&self.0)?;
-        Ok(Value::Number(amount.as_sat()))
+        Ok(Value::Number(amount.to_sat()))
     }
 }
 
@@ -506,10 +506,7 @@ impl TryFrom<Value> for DescriptorPublicKey {
                     // uncompressed keys are currently unsupported
                     len => bail!(Error::InvalidPubKeyLen(len)),
                 };
-                Ok(DescriptorPublicKey::SinglePub(DescriptorSinglePub {
-                    key,
-                    origin: None,
-                }))
+                Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
             }
             v => Err(Error::NotPubKey(v)),
         }
@@ -574,10 +571,11 @@ impl_hash_conv!(hashes::sha256::Hash);
 impl_hash_conv!(hashes::sha256d::Hash);
 impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
+impl_hash_conv!(miniscript::hash256::Hash);
 
 impl From<XOnlyPublicKey> for Value {
     fn from(key: XOnlyPublicKey) -> Self {
-        Value::PubKey(DescriptorPublicKey::SinglePub(DescriptorSinglePub {
+        Value::PubKey(DescriptorPublicKey::Single(SinglePub {
             key: SinglePubKey::XOnly(key),
             origin: None,
         }))
