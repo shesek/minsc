@@ -2,10 +2,10 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::str::FromStr;
 
+use bitcoin::bip32::{ChildNumber, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
-use bitcoin::util::bip32::{ChildNumber, IntoDerivationPath};
 use bitcoin::{secp256k1, PublicKey};
-use miniscript::descriptor::{DescriptorPublicKey, Wildcard};
+use miniscript::descriptor::{DerivPaths, DescriptorPublicKey, Wildcard};
 use miniscript::{bitcoin, ForEachKey, MiniscriptKey, TranslatePk, Translator};
 
 use crate::{Error, Result, Value};
@@ -23,15 +23,17 @@ impl<Ctx: miniscript::ScriptContext> MiniscriptExt<Ctx>
     for miniscript::Miniscript<DescriptorPublicKey, Ctx>
 {
     fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
-        self.translate_pk(&mut FnTranslator::new(|xpk: &DescriptorPublicKey| {
-            Ok(xpk.clone().at_derivation_index(0).derive_public_key(&EC)?)
-        }))
+        Ok(
+            self.translate_pk(&mut FnTranslator::new(|xpk: &DescriptorPublicKey| {
+                Ok(xpk.clone().at_derivation_index(0)?.derive_public_key(&EC)?)
+            }))?,
+        )
     }
 }
 pub trait DescriptorExt {
     fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>>;
-    fn to_script_pubkey(&self) -> Result<bitcoin::Script>;
-    fn to_explicit_script(&self) -> Result<bitcoin::Script>;
+    fn to_script_pubkey(&self) -> Result<bitcoin::ScriptBuf>;
+    fn to_explicit_script(&self) -> Result<bitcoin::ScriptBuf>;
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address>;
 }
 
@@ -40,10 +42,10 @@ impl DescriptorExt for crate::DescriptorDpk {
         // XXX verify no wildcard?
         Ok(self.derived_descriptor(&EC, 0)?)
     }
-    fn to_script_pubkey(&self) -> Result<bitcoin::Script> {
+    fn to_script_pubkey(&self) -> Result<bitcoin::ScriptBuf> {
         Ok(self.derive_keys()?.script_pubkey())
     }
-    fn to_explicit_script(&self) -> Result<bitcoin::Script> {
+    fn to_explicit_script(&self) -> Result<bitcoin::ScriptBuf> {
         Ok(self.derive_keys()?.explicit_script()?)
     }
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address> {
@@ -64,14 +66,30 @@ impl<T: IntoDerivationPath + Clone> DerivePath for T {}
 
 impl DeriveExt for DescriptorPublicKey {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
-        let mut xpub = match self {
-            DescriptorPublicKey::XPub(xpub) => xpub.clone(),
+        let path = path.into_derivation_path()?;
+        match self {
+            DescriptorPublicKey::XPub(xpub) => {
+                let mut xpub = xpub.clone();
+                xpub.derivation_path = xpub.derivation_path.extend(path);
+                // XXX hardened derivation is currently unsupported
+                xpub.wildcard = iif!(is_wildcard, Wildcard::Unhardened, Wildcard::None);
+                Ok(DescriptorPublicKey::XPub(xpub))
+            }
+            DescriptorPublicKey::MultiXPub(mxpub) => {
+                let mut mxpub = mxpub.clone();
+                mxpub.derivation_paths = DerivPaths::new(
+                    mxpub
+                        .derivation_paths
+                        .into_paths()
+                        .into_iter()
+                        .map(|mx_path| mx_path.extend(&path))
+                        .collect(),
+                )
+                .unwrap();
+                Ok(DescriptorPublicKey::MultiXPub(mxpub))
+            }
             DescriptorPublicKey::Single(_) => bail!(Error::NonDeriveableSingle),
-        };
-        xpub.derivation_path = xpub.derivation_path.extend(path.into_derivation_path()?);
-        // XXX hardened derivation is currently unsupported
-        xpub.wildcard = iif!(is_wildcard, Wildcard::Unhardened, Wildcard::None);
-        Ok(DescriptorPublicKey::XPub(xpub))
+        }
     }
     fn is_deriveable(&self) -> bool {
         // Xpubs are always derivable, even without the * wildcard suffix
@@ -94,9 +112,11 @@ impl<Ctx: miniscript::ScriptContext> DeriveExt for crate::MiniscriptDpk<Ctx> {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
         ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
-        self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-            pk.derive_path(path.clone(), is_wildcard)
-        }))
+        Ok(
+            self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
+                pk.derive_path(path.clone(), is_wildcard)
+            }))?,
+        )
     }
     fn is_deriveable(&self) -> bool {
         self.for_any_key(|pk| pk.has_wildcard())
@@ -104,11 +124,16 @@ impl<Ctx: miniscript::ScriptContext> DeriveExt for crate::MiniscriptDpk<Ctx> {
 }
 impl DeriveExt for crate::DescriptorDpk {
     fn derive_path<P: DerivePath>(&self, path: P, is_wildcard: bool) -> Result<Self> {
-        ensure!(DeriveExt::is_deriveable(self), Error::NonDeriveableNoWildcard);
+        ensure!(
+            DeriveExt::is_deriveable(self),
+            Error::NonDeriveableNoWildcard
+        );
         let path = path.into_derivation_path()?;
-        self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-            pk.derive_path(path.clone(), is_wildcard)
-        }))
+        Ok(
+            self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
+                pk.derive_path(path.clone(), is_wildcard)
+            }))?,
+        )
     }
     fn is_deriveable(&self) -> bool {
         self.has_wildcard()
@@ -202,7 +227,7 @@ where
 ///
 /// Copied from https://github.com/sapio-lang/sapio/blob/072b8835dcf4ba6f8f00f3a5d9034ef8e021e0a7/ctv_emulators/src/lib.rs
 pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
-    let a: [u8; 32] = h.into_inner();
+    let a: [u8; 32] = h.to_byte_array();
     let b: [[u8; 4]; 8] = unsafe { std::mem::transmute(a) };
     let mut c: Vec<ChildNumber> = b
         .iter()

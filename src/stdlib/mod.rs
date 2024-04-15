@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use ::miniscript::bitcoin::{self, Address, Network, Script};
+use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
 use bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Execute, Value};
@@ -81,7 +81,7 @@ pub mod fns {
     pub fn rawscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let bytes = args.remove(0).into_bytes()?;
-        Ok(Script::from(bytes).into())
+        Ok(ScriptBuf::from(bytes).into())
     }
 
     // bytes(Script) -> Bytes

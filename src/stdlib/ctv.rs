@@ -1,5 +1,7 @@
 use bitcoin::hashes::{sha256, Hash};
-use bitcoin::{PackedLockTime, Sequence, Transaction, TxIn, TxOut};
+use bitcoin::{
+    absolute::LockTime, transaction::Version, Amount, Sequence, Transaction, TxIn, TxOut,
+};
 use miniscript::bitcoin;
 
 use crate::runtime::Execute;
@@ -52,8 +54,8 @@ pub mod fns {
 // Parse tagged array instructions to build a Transaction
 fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
     let mut tx = Transaction {
-        version: 2,
-        lock_time: PackedLockTime::ZERO,
+        version: Version(2),
+        lock_time: LockTime::ZERO,
         input: vec![],
         output: vec![],
     };
@@ -69,8 +71,8 @@ fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
         let inst_name = inst.remove(0).into_string()?;
 
         match (inst_name.as_str(), inst.len()) {
-            ("version", 1) => tx.version = inst.remove(0).into_i32()?,
-            ("locktime", 1) => tx.lock_time = PackedLockTime(inst.remove(0).into_u32()?),
+            ("version", 1) => tx.version = Version(inst.remove(0).into_i32()?),
+            ("locktime", 1) => tx.lock_time = LockTime::from_consensus(inst.remove(0).into_u32()?),
             ("input", 0 | 1) => tx.input.push(TxIn {
                 previous_output: Default::default(),
                 script_sig: Default::default(),
@@ -79,7 +81,7 @@ fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
             }),
             ("output", 2) => tx.output.push(TxOut {
                 script_pubkey: inst.remove(0).into_spk()?,
-                value: inst.remove(0).into_u64()?,
+                value: Amount::from_sat(inst.remove(0).into_u64()?),
             }),
             _ => bail!(Error::InvalidArguments),
         }
@@ -117,7 +119,7 @@ fn get_ctv_hash(tx: &Transaction, input_index: u32) -> sha256::Hash {
             seq.consensus_encode(&mut enc).unwrap();
         }
         sha256::Hash::from_engine(enc)
-            .into_inner()
+            .to_byte_array()
             .consensus_encode(&mut ctv_hash)
             .unwrap();
     }
@@ -132,7 +134,7 @@ fn get_ctv_hash(tx: &Transaction, input_index: u32) -> sha256::Hash {
             out.consensus_encode(&mut enc).unwrap();
         }
         sha256::Hash::from_engine(enc)
-            .into_inner()
+            .to_byte_array()
             .consensus_encode(&mut ctv_hash)
             .unwrap();
     }

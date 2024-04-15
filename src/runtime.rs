@@ -3,13 +3,16 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
+use bitcoin::bip32::{DerivationPath, ExtendendPubKey};
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
-use bitcoin::hashes::{self, hex::ToHex, sha256, Hash};
-use bitcoin::schnorr::TweakedPublicKey;
-use bitcoin::util::address::WitnessVersion;
-use bitcoin::util::bip32::DerivationPath;
-use bitcoin::util::taproot::TaprootSpendInfo;
-use bitcoin::{Address, Network, PublicKey, Script, XOnlyPublicKey};
+use bitcoin::hashes::{self, sha256, Hash};
+use bitcoin::hex::DisplayHex;
+use bitcoin::key::TweakedPublicKey;
+use bitcoin::script::PushBytesBuf;
+use bitcoin::taproot::TaprootSpendInfo;
+use bitcoin::{
+    Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
+};
 use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, ScriptContext};
 
@@ -33,7 +36,7 @@ pub enum Value {
     WithProb(usize, Box<Value>),
 
     Descriptor(Descriptor),
-    Script(Script),
+    Script(ScriptBuf),
     Address(Address),
 
     TapInfo(TaprootSpendInfo),
@@ -45,7 +48,7 @@ pub enum Value {
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
-impl_from_variant!(Script, Value);
+impl_from_variant!(ScriptBuf, Value, Script);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Vec<Value>, Value, Array);
 impl_from_variant!(Vec<u8>, Value, Bytes);
@@ -252,7 +255,7 @@ impl Evaluate for ast::ScriptFrag {
     }
 }
 
-fn script_frag(value: Value) -> Result<Script> {
+fn script_frag(value: Value) -> Result<ScriptBuf> {
     Ok(match value {
         // As script code
         Value::Script(script) => script,
@@ -260,9 +263,11 @@ fn script_frag(value: Value) -> Result<Script> {
         // As data pushes
         Value::Number(n) => ScriptBuilder::new().push_int(n).into_script(),
         Value::Bool(val) => ScriptBuilder::new().push_int(val as i64).into_script(),
-        Value::Bytes(bytes) => ScriptBuilder::new().push_slice(&bytes).into_script(),
+        Value::Bytes(bytes) => ScriptBuilder::new()
+            .push_slice(PushBytesBuf::try_from(bytes)?)
+            .into_script(),
         Value::PubKey(desc_pubkey) => {
-            let pubkey = desc_pubkey.at_derivation_index(0).derive_public_key(&EC)?;
+            let pubkey = desc_pubkey.at_derivation_index(0)?.derive_public_key(&EC)?;
             ScriptBuilder::new().push_key(&pubkey).into_script()
         }
 
@@ -562,7 +567,7 @@ macro_rules! impl_hash_conv {
         }
         impl From<$name> for Value {
             fn from(hash: $name) -> Self {
-                Value::Bytes(hash.into_inner().to_vec())
+                Value::Bytes(hash.to_byte_array().to_vec())
             }
         }
     };
@@ -586,8 +591,8 @@ impl From<TweakedPublicKey> for Value {
         key.to_inner().into()
     }
 }
-impl From<bitcoin::util::bip32::ExtendedPubKey> for Value {
-    fn from(xpub: bitcoin::util::bip32::ExtendedPubKey) -> Self {
+impl From<ExtendendPubKey> for Value {
+    fn from(xpub: ExtendendPubKey) -> Self {
         Value::PubKey(xpub.to_string().parse().unwrap())
     }
 }
@@ -629,7 +634,7 @@ impl Value {
     }
 
     /// Coerce into a Script when the context is unknown (i.e. raw scripts only, not policies)
-    pub fn into_script_noctx(self) -> Result<Script> {
+    pub fn into_script_noctx(self) -> Result<ScriptBuf> {
         Ok(match self {
             Value::Script(script) => script,
             Value::Bytes(bytes) => bytes.into(),
@@ -638,7 +643,7 @@ impl Value {
     }
 
     /// Coerce into a Script when the context is known
-    pub fn into_script<Ctx: ScriptContext>(self) -> Result<Script> {
+    pub fn into_script<Ctx: ScriptContext>(self) -> Result<ScriptBuf> {
         Ok(match self {
             Value::Script(script) => script,
             Value::Bytes(bytes) => bytes.into(),
@@ -649,20 +654,21 @@ impl Value {
             v => bail!(Error::NotScriptLike(v)),
         })
     }
-    pub fn into_tapscript(self) -> Result<Script> {
+    pub fn into_tapscript(self) -> Result<ScriptBuf> {
         self.into_script::<miniscript::Tap>()
     }
 
-    pub fn into_spk(self) -> Result<Script> {
+    pub fn into_spk(self) -> Result<ScriptBuf> {
         Ok(match self {
             // Raw scripts are returned as-is
             v @ Value::Script(_) | v @ Value::Bytes(_) => v.into_script_noctx()?,
             // Descriptors (or values coercible into them) are converted into their scriptPubKey
             v @ Value::Descriptor(_) | v @ Value::PubKey(_) => v.into_desc()?.to_script_pubkey()?,
             // TapInfo returns the output V1 witness program of the output key
-            Value::TapInfo(tapinfo) => {
-                Script::new_witness_program(WitnessVersion::V1, &tapinfo.output_key().serialize())
-            }
+            Value::TapInfo(tapinfo) => ScriptBuf::new_witness_program(&WitnessProgram::new(
+                WitnessVersion::V1,
+                &tapinfo.output_key().serialize(),
+            )?),
             v => bail!(Error::NotScriptLike(v)),
         })
     }
@@ -678,7 +684,7 @@ impl fmt::Display for Value {
             Value::PubKey(x) => write!(f, "{}", x),
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
-            Value::Bytes(x) => write!(f, "0x{}", x.to_hex()),
+            Value::Bytes(x) => write!(f, "0x{}", x.to_lower_hex_string()),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
             Value::Descriptor(x) => write!(f, "{}", x),

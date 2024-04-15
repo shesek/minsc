@@ -1,9 +1,11 @@
 use lalrpop_util::ParseError;
 use std::fmt;
 
-use miniscript::bitcoin::{self, hashes, util as bu};
-use miniscript::descriptor;
+use miniscript::bitcoin::{
+    self, amount, bip32, hashes, hex, key, script, taproot, witness_program,
+};
 use miniscript::policy::compiler::CompilerError;
+use miniscript::{descriptor, TranslateErr};
 
 use crate::ast::{Ident, InfixOp};
 use crate::runtime::Value;
@@ -106,7 +108,7 @@ pub enum Error {
     InvalidShUse,
 
     #[error("Script cannot be represented as an address: {0}")]
-    NotAddressable(bitcoin::Script),
+    NotAddressable(bitcoin::ScriptBuf),
 
     #[error("Number operation overflowed")]
     Overflow,
@@ -130,31 +132,31 @@ pub enum Error {
     MiniscriptCompilerError(CompilerError),
 
     #[error("Taproot error: {0}")]
-    TaprootError(bu::taproot::TaprootError),
+    TaprootError(taproot::TaprootError),
 
     #[error("Taproot builder error: {0}")]
-    TaprootBuilderError(bu::taproot::TaprootBuilderError),
+    TaprootBuilderError(taproot::TaprootBuilderError),
 
     #[error("Secp256k1 error: {0}")]
     Secp256k1Error(bitcoin::secp256k1::Error),
 
     #[error("Hash error: {0}")]
-    HashError(hashes::Error),
+    HashError(hashes::FromSliceError),
 
     #[error("Invalid hex: {0}")]
-    HexError(hashes::hex::Error),
+    HexError(hex::HexToBytesError),
 
     #[error("IO error: {0:?}")]
     Io(std::io::Error),
 
     #[error("Bitcoin key error: {0}")]
-    BitcoinKey(bu::key::Error),
+    BitcoinKey(key::Error),
 
     #[error("BIP 32 error: {0}")]
-    Bip32(bu::bip32::Error),
+    Bip32(bip32::Error),
 
     #[error("Bitcoin amount parse error: {0}")]
-    ParseAmountError(bu::amount::ParseAmountError),
+    ParseAmountError(amount::ParseAmountError),
 
     #[error("number type conversion failed (likely an unexpected negative number)")]
     TryFromInt(std::num::TryFromIntError),
@@ -170,6 +172,15 @@ pub enum Error {
 
     #[error("UTF-8 error: {0}")]
     Utf8Error(std::string::FromUtf8Error),
+
+    #[error("Witness program error: {0}")]
+    WitnessProgError(witness_program::Error),
+
+    #[error("Push bytes error: {0}")]
+    PushBytesError(script::PushBytesError),
+
+    #[error("Key translation error: {0:?}")]
+    TranslateError(Box<miniscript::TranslateErr<Error>>),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -186,14 +197,14 @@ where
 impl_from_variant!(descriptor::ConversionError, Error, DescriptorConversion);
 impl_from_variant!(miniscript::Error, Error, MiniscriptError);
 impl_from_variant!(CompilerError, Error, MiniscriptCompilerError);
-impl_from_variant!(hashes::Error, Error, HashError);
-impl_from_variant!(hashes::hex::Error, Error, HexError);
+impl_from_variant!(hashes::FromSliceError, Error, HashError);
+impl_from_variant!(hex::HexToBytesError, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
-impl_from_variant!(bu::key::Error, Error, BitcoinKey);
-impl_from_variant!(bu::bip32::Error, Error, Bip32);
-impl_from_variant!(bu::taproot::TaprootError, Error, TaprootError);
-impl_from_variant!(bu::taproot::TaprootBuilderError, Error, TaprootBuilderError);
+impl_from_variant!(key::Error, Error, BitcoinKey);
+impl_from_variant!(bip32::Error, Error, Bip32);
+impl_from_variant!(taproot::TaprootError, Error, TaprootError);
+impl_from_variant!(taproot::TaprootBuilderError, Error, TaprootBuilderError);
 impl_from_variant!(bitcoin::secp256k1::Error, Error, Secp256k1Error);
 impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
 impl_from_variant!(
@@ -203,4 +214,13 @@ impl_from_variant!(
 );
 
 impl_from_variant!(std::string::FromUtf8Error, Error, Utf8Error);
-impl_from_variant!(bu::amount::ParseAmountError, Error, ParseAmountError);
+impl_from_variant!(amount::ParseAmountError, Error, ParseAmountError);
+impl_from_variant!(witness_program::Error, Error, WitnessProgError);
+impl_from_variant!(script::PushBytesError, Error, PushBytesError);
+impl_from_variant!(Box<TranslateErr<Error>>, Error, TranslateError);
+
+impl From<TranslateErr<Error>> for Error {
+    fn from(e: TranslateErr<Error>) -> Self {
+        Box::new(e).into()
+    }
+}

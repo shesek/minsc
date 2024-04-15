@@ -59,7 +59,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
         policy: policy.map(|p| p.to_string()),
         descriptor: desc.map(|d| d.to_string()),
         //script_hex: script.as_ref().map(|s| s.to_hex()),
-        script_asm: script.as_ref().map(get_script_asm),
+        script_asm: script.as_ref().map(|s| get_script_asm(s)),
         address: addr.map(|a| a.to_string()),
         other: other.map(|o| o.to_string()),
     })

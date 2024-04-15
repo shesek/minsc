@@ -1,8 +1,8 @@
 use std::convert::TryInto;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
-use bitcoin::util::key::XOnlyPublicKey;
-use bitcoin::util::taproot::{LeafVersion, NodeInfo, TapBranchHash, TapLeafHash, TaprootSpendInfo};
+use bitcoin::key::XOnlyPublicKey;
+use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 use miniscript::bitcoin;
 
 use crate::util::EC;
@@ -44,7 +44,7 @@ pub mod fns {
                 Ok(LeafVersion::from_consensus(leaf_ver)?)
             })?;
         let leaf_hash = TapLeafHash::from_script(&script, leaf_ver);
-        Ok(Value::Bytes(leaf_hash.into_inner().to_vec()))
+        Ok(Value::Bytes(leaf_hash.to_byte_array().to_vec()))
     }
 
     /// tapBranch(Hash node_a, Hash node_b) -> Hash
@@ -58,7 +58,7 @@ pub mod fns {
 
         let branch = branch_hash(&a, &b);
 
-        Ok(Value::Bytes(branch.into_inner().to_vec()))
+        Ok(Value::Bytes(branch.to_byte_array().to_vec()))
     }
 
     /// tapTweak(PubKey internal_key, Bytes|Script|Array tree) -> TapInfo
@@ -106,7 +106,7 @@ pub mod fns {
 
         Ok(Value::Bytes(match tapinfo.merkle_root() {
             None => vec![], // empty byte vector signifies an empty script tree
-            Some(root) => root.into_inner().to_vec(),
+            Some(root) => root.to_byte_array().to_vec(),
         }))
     }
 
@@ -118,7 +118,7 @@ pub mod fns {
         let tapinfo = args.remove(0).into_tapinfo()?;
 
         let scripts_ctrls = tapinfo
-            .as_script_map()
+            .script_map()
             .keys()
             .map(|script_ver| {
                 let script = script_ver.0.clone();
@@ -137,7 +137,7 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
     // XXX ensure no wildcards?
     let internal_key = internal_key
         .into_key()?
-        .at_derivation_index(0)
+        .at_derivation_index(0)?
         .derive_public_key(&EC)?;
     let internal_key: XOnlyPublicKey = internal_key.inner.into();
 
@@ -155,7 +155,7 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
         // Bytes of length 32 are used as the merkle root hash
         // The script tree contents will be unknown.
         Value::Bytes(bytes) if bytes.len() == 32 => {
-            let merkle_root = TapBranchHash::from_slice(&bytes)?;
+            let merkle_root = TapNodeHash::from_slice(&bytes)?;
             TaprootSpendInfo::new_key_spend(&EC, internal_key, Some(merkle_root))
         }
         Value::Bytes(bytes) => bail!(Error::InvalidMerkleLen(bytes.len())),
@@ -205,13 +205,13 @@ fn huffman_tree(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<Tap
 }
 
 fn branch_hash(a: &sha256::Hash, b: &sha256::Hash) -> sha256::Hash {
-    let mut eng = TapBranchHash::engine();
+    let mut eng = TapNodeHash::engine();
     if a < b {
-        eng.input(a);
-        eng.input(b);
+        eng.input(a.as_byte_array());
+        eng.input(b.as_byte_array());
     } else {
-        eng.input(b);
-        eng.input(a);
+        eng.input(b.as_byte_array());
+        eng.input(a.as_byte_array());
     };
     sha256::Hash::from_engine(eng)
 }

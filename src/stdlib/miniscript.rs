@@ -1,6 +1,8 @@
 use std::convert::TryInto;
+use std::sync::Arc;
 
-use miniscript::bitcoin::{PackedLockTime, Sequence};
+use miniscript::bitcoin::Sequence;
+use miniscript::AbsLockTime;
 
 use crate::runtime::Value;
 use crate::util::DescriptorExt;
@@ -52,8 +54,8 @@ pub mod fns {
         let policies_with_probs = args
             .into_iter()
             .map(|arg| match arg {
-                Value::WithProb(prob, value) => Ok((prob, value.into_policy()?)),
-                arg => Ok((1, arg.into_policy()?)),
+                Value::WithProb(prob, value) => Ok((prob, Arc::new(value.into_policy()?))),
+                arg => Ok((1, Arc::new(arg.into_policy()?))),
             })
             .collect::<Result<_>>()?;
         Ok(Policy::Or(policies_with_probs).into())
@@ -61,7 +63,7 @@ pub mod fns {
 
     pub fn and(args: Vec<Value>, _: &Scope) -> Result<Value> {
         let policies = map_policy(args)?;
-        Ok(Policy::And(policies).into())
+        Ok(Policy::And(arc_vec(policies)).into())
     }
 
     pub fn thresh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
@@ -72,7 +74,7 @@ pub mod fns {
         } else {
             map_policy(args)?
         };
-        Ok(Policy::Threshold(thresh_n, policies).into())
+        Ok(Policy::Threshold(thresh_n, arc_vec(policies)).into())
     }
 
     pub fn older(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
@@ -84,7 +86,7 @@ pub mod fns {
     pub fn after(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let locktime = args.remove(0).into_u32()?;
-        Ok(Policy::After(PackedLockTime(locktime)).into())
+        Ok(Policy::After(AbsLockTime::from_consensus(locktime).into()).into())
     }
 
     pub fn pk(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
@@ -127,7 +129,7 @@ pub mod fns {
             Descriptor::new_wsh(miniscript)?.into()
         } else if script_or_policy.is_script_coercible(false) {
             let script = script_or_policy.into_script_noctx()?;
-            script.to_v0_p2wsh().into()
+            script.to_p2wsh().into()
         } else {
             bail!(Error::InvalidArguments);
         })
@@ -181,14 +183,14 @@ pub mod fns {
     pub fn all(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let policies = map_policy_array(args.remove(0))?;
-        Ok(Policy::Threshold(policies.len(), policies).into())
+        Ok(Policy::Threshold(policies.len(), arc_vec(policies)).into())
     }
 
     // Turn `[A,B,C]` array into an `A || B || C` policy
     pub fn any(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let policies = map_policy_array(args.remove(0))?;
-        Ok(Policy::Threshold(1, policies).into())
+        Ok(Policy::Threshold(1, arc_vec(policies)).into())
     }
 }
 
@@ -198,4 +200,8 @@ fn map_policy(args: Vec<Value>) -> Result<Vec<Policy>> {
 
 fn map_policy_array(array: Value) -> Result<Vec<Policy>> {
     map_policy(array.into_array()?)
+}
+
+fn arc_vec<T>(v: Vec<T>) -> Vec<Arc<T>> {
+    v.into_iter().map(Arc::new).collect()
 }
