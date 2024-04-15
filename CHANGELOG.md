@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add support for BIP389 multi-path descriptors
+
+  Currently only supported using Minsc's standard arrays and not using the `<N;M..>` syntax.
+
+   For example: `xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8/0/9/[0,1]/100`
+
 - Add script fragment interpolation syntax
 
   With a space-separated list of expressions enclosed in backticks. For example: ``` `1 2 OP_DUP OP_ADD 3 OP_EQUAL` ```

@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
-use bitcoin::bip32::{DerivationPath, ExtendendPubKey};
+use bitcoin::bip32::{ChildNumber, DerivationPath, ExtendendPubKey};
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, sha256, Hash};
 use bitcoin::hex::DisplayHex;
@@ -13,7 +13,9 @@ use bitcoin::taproot::TaprootSpendInfo;
 use bitcoin::{
     Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
 };
-use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
+use miniscript::descriptor::{
+    DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, SinglePub, SinglePubKey, Wildcard,
+};
 use miniscript::{bitcoin, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
@@ -221,24 +223,40 @@ impl Evaluate for ast::ArrayAccess {
 
 impl Evaluate for ast::ChildDerive {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let mut path = DerivationPath::master();
-        for child in &self.path {
-            path = match child.eval(scope)? {
-                // Derive with a BIP 32 child code index number
-                Value::Number(num) => path.into_child(u32::try_from(num)?.into()),
+        let mut node = self.parent.eval(scope)?;
 
-                // Derive with a hash converted into a series of BIP32 non-hardened derivations using the hash_to_child_vec()
+        for derivation_step in &self.path {
+            node = match derivation_step.eval(scope)? {
+                // Derive with a BIP 32 child code index number
+                Value::Number(child_num) => {
+                    let child_num = ChildNumber::from_normal_idx(child_num.try_into()?)?;
+                    node.derive_path(&[child_num][..], self.is_wildcard)?
+                }
+
+                // Derive with a hash converted into a series of BIP32 non-hardened derivations using hash_to_child_vec()
                 Value::Bytes(bytes) => {
                     let hash = sha256::Hash::from_slice(&bytes)?;
-                    path.extend(util::hash_to_child_vec(hash))
+                    node.derive_path(util::hash_to_child_vec(hash), self.is_wildcard)?
+                }
+
+                // Derive a BIP389 Multipath descriptor
+                Value::Array(child_nums) => {
+                    let child_paths = child_nums
+                        .into_iter()
+                        .map(|c| {
+                            // XXX this doesn't support hashes
+                            let child_num = ChildNumber::from_normal_idx(c.into_u32()?)?;
+                            Ok(DerivationPath::from(&[child_num][..]))
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+
+                    node.derive_multi(&child_paths, self.is_wildcard)?
                 }
 
                 _ => bail!(Error::InvalidDerivationCode),
             }
         }
-
-        let parent = self.parent.eval(scope)?;
-        parent.derive_path(path, self.is_wildcard)
+        Ok(node)
     }
 }
 
