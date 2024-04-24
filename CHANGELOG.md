@@ -4,9 +4,9 @@
 
 - Add support for BIP389 multi-path descriptors
 
-  Currently only supported using Minsc's standard arrays and not using the `<N;M..>` syntax.
+  Using the BIP389 `<M;N..>` syntax: `XPUB/0/9/<0;1;2>/100`
 
-   For example: `xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8/0/9/[0,1]/100`
+  Or using standard Minsc arrays: `XPUB/0/9/[0,1,2]/100`
 
 - Add script fragment interpolation syntax
 
