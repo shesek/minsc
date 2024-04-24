@@ -28,6 +28,11 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
 
+    // Descriptor utilities
+    scope
+        .set_fn("single_descriptors", fns::single_descriptors)
+        .unwrap();
+
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();
     scope.set_fn("any", fns::any).unwrap();
@@ -177,6 +182,16 @@ pub mod fns {
         );
         let script = args.remove(0).into_script::<miniscript::Segwitv0>()?;
         Ok(script.into())
+    }
+
+    /// Descriptor<Multi> -> Array<Descriptor<Single>>
+    pub fn single_descriptors(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let desc = args.remove(0).into_desc()?;
+        let descs = desc.into_single_descriptors()?;
+        Ok(Value::Array(
+            descs.into_iter().map(Value::Descriptor).collect(),
+        ))
     }
 
     // Turn `[A,B,C]` array into an `A && B && C` policy

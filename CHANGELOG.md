@@ -8,6 +8,9 @@
 
   Or using standard Minsc arrays: `XPUB/0/9/[0,1,2]/100`
 
+  `single_descriptors()` can be used to split multi-path descriptors into an array of single descriptors.
+  For example `address(single_descriptors(wpkh(XPUB/0/<1;3;5>/100/*)).2/8)` to generate an address for `XPUB/0/5/100/8`
+
 - Add script fragment interpolation syntax
 
   With a space-separated list of expressions enclosed in backticks. For example: ``` `1 2 OP_DUP OP_ADD 3 OP_EQUAL` ```
