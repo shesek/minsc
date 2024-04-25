@@ -62,6 +62,7 @@
 
 - New utility functions:
   1. `len(Array|Bytes|Script) -> Number`
+  1. `typeof(Value) -> Bytes` (returns the type string as Bytes)
   1. `keys(Array) -> Array<Number>`
   2. `first(Array) -> Any`
   3. `last(Array) -> Any`

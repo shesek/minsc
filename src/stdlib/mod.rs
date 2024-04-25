@@ -31,6 +31,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     // Functions
     scope.set_fn("len", fns::len).unwrap();
+    scope.set_fn("typeof", fns::r#typeof).unwrap();
     scope.set_fn("rawscript", fns::rawscript).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
     scope.set_fn("address", fns::address).unwrap();
@@ -77,6 +78,14 @@ pub mod fns {
         .into())
     }
 
+    /// Get the argument type as a string (currently represented as Bytes)
+    /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array
+    /// typeof(Value) -> Bytes
+    pub fn r#typeof(args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        Ok(args[0].type_of().to_string().into_bytes().into())
+    }
+
     // rawscript(Bytes) -> Script
     pub fn rawscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
@@ -84,7 +93,9 @@ pub mod fns {
         Ok(ScriptBuf::from(bytes).into())
     }
 
-    // bytes(Script) -> Bytes
+    /// Convert the argument into Bytes
+    /// Scripts are serialized, Bytes are returned as-is
+    /// bytes(Script|Bytes) -> Bytes
     pub fn bytes(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let bytes = args.remove(0).into_bytes()?;

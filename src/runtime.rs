@@ -694,6 +694,24 @@ impl Value {
     pub fn is_script_coercible(&self, known_ctx: bool) -> bool {
         matches!(self, Value::Script(_) | Value::Bytes(_)) || (known_ctx && self.is_policy())
     }
+
+    pub fn type_of(&self) -> &'static str {
+        match self {
+            Value::PubKey(_) => "pubkey",
+            Value::Number(_) => "number",
+            Value::Bool(_) => "bool",
+            Value::Bytes(_) => "bytes",
+            Value::Policy(_) => "policy",
+            Value::WithProb(_, _) => "withprob",
+            Value::Descriptor(_) => "descriptor",
+            Value::Address(_) => "address",
+            Value::Script(_) => "script",
+            Value::Function(_) => "function",
+            Value::Network(_) => "network",
+            Value::TapInfo(_) => "tapinfo",
+            Value::Array(_) => "array",
+        }
+    }
 }
 
 impl fmt::Display for Value {
