@@ -32,6 +32,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope
         .set_fn("single_descriptors", fns::single_descriptors)
         .unwrap();
+    scope.set_fn("pubkey", fns::pubkey).unwrap();
 
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();
@@ -192,6 +193,15 @@ pub mod fns {
         Ok(Value::Array(
             descs.into_iter().map(Value::Descriptor).collect(),
         ))
+    }
+
+    /// Cast 32/33 long Bytes into a Single DescriptorPubKey
+    /// PubKeys are returned as-is
+    /// pubkey(Bytes|PubKey) -> PubKey
+    pub fn pubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let pubkey = args.remove(0).into_key()?;
+        Ok(pubkey.into())
     }
 
     // Turn `[A,B,C]` array into an `A && B && C` policy

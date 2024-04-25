@@ -73,7 +73,8 @@
   7. `initial(Array) -> Array`
   8. `concat(Array, Array) -> Array`
   9. `le64(Number) -> Bytes` (encode the number as 64 bit little-endian)
-  10. `repeat(Number, Function|Value) -> Array`
+  10. `pubkey(Bytes) -> PubKey` (cast a 32/33 long Bytes into a single PubKey)
+  11. `repeat(Number, Function|Value) -> Array`
 
      The second parameter can be a value to fill the array with,
      or a function that gets called with the index to produce the value.
