@@ -13,9 +13,7 @@ use bitcoin::taproot::TaprootSpendInfo;
 use bitcoin::{
     Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
 };
-use miniscript::descriptor::{
-    DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, SinglePub, SinglePubKey, Wildcard,
-};
+use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};

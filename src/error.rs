@@ -104,6 +104,15 @@ pub enum Error {
     #[error("Invalid derivation child code index. Only numbers and SHA256 hashes are supported.")]
     InvalidDerivationCode,
 
+    #[error("Invalid tr() use. Valid invocations are tr(policy) or tr(internal_key, policy)")]
+    InvalidTrUse,
+
+    #[error("Invalid Taproot unspendable key: {0}")]
+    InvalidTrUnspendable(Value),
+
+    #[error("No viable internal key found (TR_UNSPENDABLE was unset)")]
+    TaprootNoViableKey,
+
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 

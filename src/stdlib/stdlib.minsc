@@ -4,11 +4,13 @@ OP_PUSHDATA1 = rawscript(0x4c), OP_PUSHDATA2 = rawscript(0x4d), OP_PUSHDATA4 = r
 OP_CHECKSEQUENCEVERIFY = OP_CSV;
 OP_FALSE = `0`, OP_TRUE = `1`;
 
-// A point with unknown discrete logarithm (to eliminate key-path spend)
-H_POINT = 0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0;
-
+// Some useful constants
 DUST_AMOUNT = 294;
 DUST_NON_SW = 546;
+
+// A point with unknown discrete logarithm (to eliminate key-path spend)
+NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
+TR_UNSPENDABLE = NUMS, H_POINT = NUMS;
 
 // Array functions
 fn first($arr) = $arr.0;

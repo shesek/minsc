@@ -1,15 +1,22 @@
 use std::convert::TryInto;
+use std::sync::Arc;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::key::XOnlyPublicKey;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
-use miniscript::bitcoin;
+use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
+use crate::error::{Error, Result};
 use crate::util::EC;
-use crate::{Error, Result, Scope, Value};
+use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy, Scope, Value};
 
+// XXX mention in header that some miniscript stuff is over here
 pub fn attach_stdlib(scope: &mut Scope) {
-    // Tweak an internal key with the script tree/root
+    // Miniscript descriptor function
+    scope.set_fn("tr", fns::tr).unwrap();
+    //scope.set_fn("rawtr", fns::rawtr).unwrap();
+
+    // Tweak an internal key with the script tree/root, returning a TapInfo
     scope.set_fn("tapTweak", fns::tapTweak).unwrap();
 
     // Functions for extracting information out of TapInfo
@@ -26,6 +33,41 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
+
+    pub fn tr(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
+        let unspendable = tr_unspendable(scope)?;
+
+        Ok(match (args.remove(0), args.pop()) {
+            // tr(Policy)
+            // Extracts the internal key from the policy, or uses the UNSPENDABLE key
+            (Value::Policy(policy), None) => descriptor_from_policy(None, unspendable, policy)?,
+
+            // tr(PubKey)
+            // Key-path spend only
+            (Value::PubKey(pk), None) => Descriptor::new_tr(pk, None)?,
+
+            // tr(PubKey, Policy)
+            // Use an explicit internal key with the give policy
+            (Value::PubKey(pk), Some(Value::Policy(policy))) => {
+                descriptor_from_policy(Some(pk), None, policy)?
+            }
+
+            // tr(PubKey, [ A, [ B, C ] ])
+            // Nested array tuples to manually construct the taproot script tree
+            // tr(PubKey, [ A, B, C ])
+            // Or an array of >2 elements to create a policy with an OR between all the sub-policies
+            (Value::PubKey(pk), Some(Value::Array(nodes))) => {
+                descriptor_from_array(Some(pk), unspendable, nodes)?
+            }
+
+            // tr([ A, B, .. ])
+            (Value::Array(nodes), None) => descriptor_from_array(None, unspendable, nodes)?,
+
+            _ => bail!(Error::InvalidTrUse),
+        }
+        .into())
+    }
 
     /// tapLeaf(Script, version=0xc0) -> Hash
     ///
@@ -214,4 +256,67 @@ fn branch_hash(a: &sha256::Hash, b: &sha256::Hash) -> sha256::Hash {
         eng.input(a.as_byte_array());
     };
     sha256::Hash::from_engine(eng)
+}
+
+// Functions for miniscript descriptor taproot construction
+
+fn descriptor_from_policy(
+    pk: Option<DescriptorPublicKey>,
+    unspendable: Option<DescriptorPublicKey>,
+    policy: Policy,
+) -> Result<Descriptor> {
+    let policy = match pk {
+        // Create an OR policy between the provided PubKey and Policy, then compile that
+        Some(pk) => Policy::Or(vec![
+            // 10000x likelihood given to the key spend. should (hopefully?) be picked up as the internal key by the compiler.
+            (10000, Arc::new(Policy::Key(pk))),
+            (1, Arc::new(policy)),
+        ]),
+        // If no key was provided, use the policy as-is
+        None => policy,
+    };
+    Ok(policy.compile_tr(unspendable)?)
+}
+
+fn descriptor_from_array(
+    pk: Option<DescriptorPublicKey>,
+    unspendable: Option<DescriptorPublicKey>,
+    policies: Vec<Value>,
+) -> Result<Descriptor> {
+    if policies.len() == 2 {
+        let internal_key = pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?;
+        descriptor_from_tree(internal_key, Value::Array(policies))
+    } else {
+        let policies = policies
+            .into_iter()
+            .map(|v| Ok(Arc::new(v.into_policy()?)))
+            .collect::<Result<_>>()?;
+        let policy = Policy::Threshold(1, policies);
+        descriptor_from_policy(pk, unspendable, policy)
+    }
+}
+
+fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descriptor> {
+    fn tree_node(node: Value) -> Result<TapTree<DescriptorPublicKey>> {
+        Ok(match node {
+            Value::Policy(policy) => TapTree::Leaf(Arc::new(policy.compile()?)),
+            Value::Array(mut nodes) if nodes.len() == 2 => {
+                let a = tree_node(nodes.remove(0))?;
+                let b = tree_node(nodes.remove(0))?;
+                TapTree::combine(a, b)
+            }
+            _ => bail!(Error::TaprootInvalidNestedTree),
+        })
+    }
+    let tree = tree_node(node)?;
+    Ok(Descriptor::new_tr(pk, Some(tree))?)
+}
+
+fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
+    // Must exists in scope because its set in the stdlib
+    Ok(match scope.get(&"TR_UNSPENDABLE".into()).unwrap().clone() {
+        Value::Bool(val) if val == false => None,
+        Value::PubKey(val) => Some(val),
+        other => bail!(Error::InvalidTrUnspendable(other)),
+    })
 }
