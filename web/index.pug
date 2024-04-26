@@ -111,6 +111,8 @@ body
           // Traditional preimage-based HTLC
           (pk(A) && sha256(H)) || (pk(B) && older(10))
 
+        :markdown-it Supports >2 branches by compiling to `thresh(N, ...)` or `thresh(1, ...)`.
+
         +snippet.
           // All of four keys
           pk(A) && pk(B) && pk(C) && pk(D)
@@ -131,7 +133,12 @@ body
 
         :markdown-it You may use the `likely` keyword as an alias for `10`.
         +snippet.
-          likely@pk(A) || pk(B) || pk(C) || pk(D)
+          likely@pk(A) || pk(B)
+
+        :markdown-it Probabilities are only supported with two branches, but you can do something like:
+        +snippet.
+          // One of four keys, A more likely
+          likely@pk(A) || (pk(B) || pk(C) || pk(D))
 
         :markdown-it Can alternatively be used as functions: `likely(policy)` and `prob(n, policy)`.
 

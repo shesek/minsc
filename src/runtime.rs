@@ -113,13 +113,13 @@ impl Evaluate for ast::Call {
 
 impl Evaluate for ast::Or {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor(&self.0, scope, true, "or")
+        eval_andor(&self.0, scope, true, "or", 1)
     }
 }
 
 impl Evaluate for ast::And {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor(&self.0, scope, false, "and")
+        eval_andor(&self.0, scope, false, "and", self.0.len())
     }
 }
 
@@ -128,6 +128,7 @@ fn eval_andor(
     scope: &Scope,
     bool_stop_on: bool,
     desc_op: &str,
+    desc_thresh_n: usize,
 ) -> Result<Value> {
     // Peek at the first operand to determine if its an operation between booleans or between policies.
     // All the other operands are expected to have the same type.
@@ -135,7 +136,7 @@ fn eval_andor(
     match &first_operand {
         Value::Bool(_) => eval_bool_andor(first_operand, &operands[1..], scope, bool_stop_on),
         Value::Policy(_) | Value::WithProb(_, _) | Value::PubKey(_) | Value::Array(_) => {
-            eval_policy_andor(desc_op, first_operand, &operands[1..], scope)
+            eval_policy_andor(desc_op, desc_thresh_n, first_operand, &operands[1..], scope)
         }
         _ => Err(Error::InvalidArguments),
     }
@@ -163,13 +164,21 @@ fn eval_bool_andor(
 // Evaluate && / || for combining policies, using the or()/and()/thres() policy functions
 fn eval_policy_andor(
     op_name: &str,
+    thresh_n: usize,
     first_policy: Value,
     other_policies: &[Expr],
     scope: &Scope,
 ) -> Result<Value> {
     let policies = [&[first_policy], &eval_exprs(scope, other_policies)?[..]].concat();
-    // delegate to or()/and()
-    call_args(scope, &op_name.into(), policies)
+    if policies.len() == 2 {
+        // delegate to or()/and() when there are exactly 2 subpolicies
+        call_args(scope, &op_name.into(), policies)
+    } else {
+        // delegate to thresh() when there are more
+        let mut args = vec![thresh_n.into()];
+        args.extend(policies);
+        call_args(scope, &"thresh".into(), args)
+    }
 }
 
 impl Evaluate for ast::Thresh {
