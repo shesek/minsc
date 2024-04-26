@@ -128,16 +128,14 @@ pub mod fns {
     /// wsh(Script witnessScript) -> Script scriptPubKey
     pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let script_or_policy = args.remove(0);
 
-        Ok(if script_or_policy.is_policy() {
-            let miniscript = script_or_policy.into_miniscript()?;
-            Descriptor::new_wsh(miniscript)?.into()
-        } else if script_or_policy.is_script_coercible(false) {
-            let script = script_or_policy.into_script_noctx()?;
-            script.to_p2wsh().into()
-        } else {
-            bail!(Error::InvalidArguments);
+        Ok(match args.remove(0) {
+            Value::Policy(policy) => {
+                let miniscript = policy.compile()?;
+                Descriptor::new_wsh(miniscript)?.into()
+            }
+            Value::Script(script) => script.to_p2wsh().into(),
+            _ => bail!(Error::InvalidArguments)
         })
     }
 

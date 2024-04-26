@@ -653,7 +653,6 @@ impl Value {
     pub fn into_script_noctx(self) -> Result<ScriptBuf> {
         Ok(match self {
             Value::Script(script) => script,
-            Value::Bytes(bytes) => bytes.into(),
             v => bail!(Error::NotScriptLike(v)),
         })
     }
@@ -662,7 +661,6 @@ impl Value {
     pub fn into_script<Ctx: ScriptContext>(self) -> Result<ScriptBuf> {
         Ok(match self {
             Value::Script(script) => script,
-            Value::Bytes(bytes) => bytes.into(),
             Value::Policy(policy) => {
                 let ms = policy.compile::<Ctx>()?;
                 ms.derive_keys()?.encode()
@@ -677,7 +675,7 @@ impl Value {
     pub fn into_spk(self) -> Result<ScriptBuf> {
         Ok(match self {
             // Raw scripts are returned as-is
-            v @ Value::Script(_) | v @ Value::Bytes(_) => v.into_script_noctx()?,
+            v @ Value::Script(_) => v.into_script_noctx()?,
             // Descriptors (or values coercible into them) are converted into their scriptPubKey
             v @ Value::Descriptor(_) | v @ Value::PubKey(_) => v.into_desc()?.to_script_pubkey()?,
             // TapInfo returns the output V1 witness program of the output key
@@ -687,10 +685,6 @@ impl Value {
             )?),
             v => bail!(Error::NotScriptLike(v)),
         })
-    }
-
-    pub fn is_script_coercible(&self, known_ctx: bool) -> bool {
-        matches!(self, Value::Script(_) | Value::Bytes(_)) || (known_ctx && self.is_policy())
     }
 
     pub fn type_of(&self) -> &'static str {
