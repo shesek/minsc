@@ -100,8 +100,16 @@ Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
-Array: Expr = "[" <List0<Expr, ",">> "]" =>
+// Standard square brackets array - [E1, E2, E3, ...]
+ArraySquare: Expr = "[" <List0<Expr, ",">> "]" =>
   ast::Array(<>).into();
+
+// Support curly brackets arrays with exactly two elements: {E1,E2}
+// For compatibility with the BIP386 tr() Output Descriptor syntax for script trees
+ArrayCurly: Expr = "{" <e1:Expr> "," <e2:Expr> "}" =>
+  ast::Array(vec![e1, e2]).into();
+
+Array: Expr = { ArraySquare, ArrayCurly }
 
 ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:ArrayAccessRHS> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
