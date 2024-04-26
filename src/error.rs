@@ -50,8 +50,8 @@ pub enum Error {
     #[error("Expected bytes, not {0:?}")]
     NotBytes(Value),
 
-    #[error("Expected TapInfo, not {0:?}")]
-    NotTapInfo(Value),
+    #[error("Expected TapInfo or tr() Descriptor, not {0:?}")]
+    NotTapInfoLike(Value),
 
     #[error("Expected a policy or pubkey, not {0:?}")]
     NotPolicyLike(Value),

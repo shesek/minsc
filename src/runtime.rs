@@ -479,7 +479,6 @@ impl_simple_into_variant_conv!(i64, Number, into_i64, NotNumber);
 impl_simple_into_variant_conv!(Vec<Value>, Array, into_array, NotArray);
 impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
 impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
-impl_simple_into_variant_conv!(TaprootSpendInfo, TapInfo, into_tapinfo, NotTapInfo);
 
 // Conversion from the runtime Number (always an i64) to other number types, with overflow check
 macro_rules! impl_num_conv {
@@ -570,6 +569,20 @@ impl TryFrom<Value> for String {
     }
 }
 
+impl TryFrom<Value> for TaprootSpendInfo {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
+            Value::TapInfo(tapinfo) => tapinfo,
+            Value::Descriptor(desc) => match desc.at_derivation_index(0)? {
+                miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
+                _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc))),
+            },
+            v => bail!(Error::NotTapInfoLike(v)),
+        })
+    }
+}
+
 macro_rules! impl_hash_conv {
     ($name:path) => {
         impl TryFrom<Value> for $name {
@@ -646,6 +659,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<Miniscript<Ctx>> {
+        self.try_into()
+    }
+    pub fn into_tapinfo(self) -> Result<TaprootSpendInfo> {
         self.try_into()
     }
 
