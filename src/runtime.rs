@@ -343,7 +343,7 @@ impl ast::InfixOp {
             // + for tap tweak (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
             | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
-                stdlib::taproot::tap_tweak(k, s)?.into()
+                stdlib::taproot::tap_tweak(k, s)?
             }
 
             _ => bail!(Error::InvalidArguments),

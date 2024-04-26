@@ -209,7 +209,7 @@ pub mod fns {
     }
 }
 
-fn into_policies(args: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
+pub fn into_policies(args: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
     args.into_iter()
         .map(|v| Ok(Arc::new(Value::into_policy(v)?)))
         .collect()

@@ -6,6 +6,7 @@ use bitcoin::key::XOnlyPublicKey;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
+use super::miniscript::into_policies;
 use crate::error::{Error, Result};
 use crate::util::EC;
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy, Scope, Value};
@@ -54,11 +55,11 @@ pub mod fns {
             }
 
             // tr(PubKey, [ A, [ B, C ] ])
-            // Nested array tuples to manually construct the taproot script tree
+            // Nested binary array to manually construct the taproot script tree
             // tr(PubKey, [ A, B, C ])
             // Or an array of >2 elements to create a policy with an OR between all the sub-policies
             (Value::PubKey(pk), Some(Value::Array(nodes))) => {
-                descriptor_from_array(Some(pk), unspendable, nodes)?
+                descriptor_from_array(Some(pk), None, nodes)?
             }
 
             // tr([ A, B, .. ])
@@ -103,17 +104,16 @@ pub mod fns {
         Ok(Value::Bytes(branch.to_byte_array().to_vec()))
     }
 
-    /// tapTweak(PubKey internal_key, Bytes|Script|Array tree) -> TapInfo
+    /// tapTweak(PubKey internal_key, Policy|Script|Array|Bytes tree) -> TapInfo|Descriptor
     ///
-    /// Tweak the internal key with the given script tree and return the TapInfo (TaprootSpendInfo)
+    /// Tweak the internal key with the given script tree
     pub fn tapTweak(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidArguments);
 
         let internal_key = args.remove(0);
         let script_tree = args.remove(0);
-        let tapinfo = tap_tweak(internal_key, script_tree)?;
 
-        Ok(Value::TapInfo(tapinfo))
+        tap_tweak(internal_key, script_tree)
     }
 
     /// tapInternalKey(TapInfo) -> PubKey
@@ -172,62 +172,116 @@ pub mod fns {
 
         Ok(Value::Array(scripts_ctrls))
     }
+
+    /// tapInfo(Descriptor|TapInfo) -> TapInfo
+    ///
+    /// Convert the Tr Descriptor into a TapInfo (or return TapInfo as-is)
+    pub fn tapInfo(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let tapinfo = args.remove(0).into_tapinfo()?;
+        Ok(tapinfo.into())
+    }
 }
 
-pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpendInfo> {
-    // Get the pubkey out of the DescriptorPublicKey and transform it into an x-only pubkey
-    // XXX ensure no wildcards?
-    let internal_key = internal_key
-        .into_key()?
-        .at_derivation_index(0)?
-        .derive_public_key(&EC)?;
-    let internal_key: XOnlyPublicKey = internal_key.inner.into();
+/// Tweak the internal_key with the script_tree, which can be one of:
+/// - a Policy or an array of Policies (returns a tr() Descriptor)
+/// - a Script or an array of Scripts (returns TaprootSpendInfo)
+/// - empty Array for keypath-spend only (returns a tr() Descriptor)
+/// - Bytes of length 32 to be used as the raw merkle root hash (returns a TaprootSpendInfo)
+pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<Value> {
+    let internal_key = internal_key.into_key()?;
 
-    // Construct a key-path-only TapInfo
-    let key_only_tr = || TaprootSpendInfo::new_key_spend(&EC, internal_key, None);
-
-    // Construct a script tree with the given top-level node
-    let script_tree_tr = |node| TaprootSpendInfo::from_node_info(&EC, internal_key, node);
+    // TODO ensure no wildcards for TaprootInfo construction
 
     Ok(match script_tree {
-        // Empty bytes or arrays are treated as an empty script tree (key-path only)
-        Value::Bytes(bytes) if bytes.len() == 0 => key_only_tr(),
-        Value::Array(array) if array.len() == 0 => key_only_tr(),
+        // Single policy, compiled into a tree
+        Value::Policy(policy) => descriptor_from_policy(Some(internal_key), None, policy)?.into(),
+
+        // Single script, used as the tree root
+        Value::Script(script) => {
+            tapinfo_from_tree(definite_xonly(internal_key)?, Value::Script(script))?.into()
+        }
+
+        // Arrays can be of Policies or Scripts, but cannot be mixed
+        // They can be provided as a nested binary tree structure (e.g. [ [ A, B ], [ [ C, D ], E ] ]),
+        // as a flat array to automatically build a tree, or empty to construct a keypath-only descriptor.
+        // Scripts may include weights.
+        Value::Array(nodes) => tr_from_array(internal_key, nodes)?,
 
         // Bytes of length 32 are used as the merkle root hash
         // The script tree contents will be unknown.
         Value::Bytes(bytes) if bytes.len() == 32 => {
             let merkle_root = TapNodeHash::from_slice(&bytes)?;
-            TaprootSpendInfo::new_key_spend(&EC, internal_key, Some(merkle_root))
+            // TODO should ideally return a Descriptor, but rawtr() is not yet supported in rust-miniscript
+            TaprootSpendInfo::new_key_spend(&EC, definite_xonly(internal_key)?, Some(merkle_root))
+                .into()
         }
         Value::Bytes(bytes) => bail!(Error::InvalidMerkleLen(bytes.len())),
 
-        // Arrays of length != 2 are constructed as a huffman tree
-        Value::Array(nodes) if nodes.len() != 2 => huffman_tree(internal_key, nodes)?,
-
-        // Arrays of length 2 are processed as a nested tree structure (i.e. [ [ S1, S2 ], [ [ S3, S4 ], S5 ] ] )
-        array @ Value::Array(_) => script_tree_tr(process_node(array)?),
-
-        // Single script tree
-        node @ Value::Script(_) => script_tree_tr(process_node(node)?),
-
         _ => bail!(Error::TaprootInvalidNestedTree),
     })
 }
 
-fn process_node(node: Value) -> Result<NodeInfo> {
-    Ok(match node {
-        Value::Script(script) => NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript),
-        Value::Array(mut nodes) if nodes.len() == 2 => {
-            let a = process_node(nodes.remove(0))?;
-            let b = process_node(nodes.remove(0))?;
-            NodeInfo::combine(a, b)?
+fn tr_from_array(internal_key: DescriptorPublicKey, nodes: Vec<Value>) -> Result<Value> {
+    // Determine the type of node based on the first Script/Policy. The other nodes are
+    // expected to be of the same type.
+    fn peek_node_type(node: &Value) -> Result<NodeType> {
+        Ok(match node {
+            Value::Script(_) => NodeType::Script,
+            Value::Policy(_) => NodeType::Policy,
+            Value::Array(array) if array.len() > 0 => peek_node_type(&array[0])?,
+            _ => bail!(Error::TaprootInvalidNestedTree),
+        })
+    }
+    enum NodeType {
+        Script,
+        Policy,
+    }
+
+    Ok(if nodes.len() == 0 {
+        // Key-path only
+        Descriptor::new_tr(internal_key, None)?.into()
+    } else {
+        match peek_node_type(&nodes[0])? {
+            NodeType::Policy => descriptor_from_array(Some(internal_key), None, nodes)?.into(),
+            NodeType::Script => tapinfo_from_array(definite_xonly(internal_key)?, nodes)?.into(),
         }
-        _ => bail!(Error::TaprootInvalidNestedTree),
     })
 }
 
-fn huffman_tree(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {
+// Functions for TaprootSpendInfo construction
+
+fn tapinfo_from_array(dpk: XOnlyPublicKey, array: Vec<Value>) -> Result<TaprootSpendInfo> {
+    if array.len() == 2 {
+        // Arrays of length 2 are treated as a nested binary tree of scripts (e.g. [ A, [ [ B, C ], D ] ])
+        tapinfo_from_tree(dpk, Value::Array(array))
+    } else {
+        // Arrays of length >2 are expected to be flat and are built into a huffman tree
+        // Scripts may include weights (e.g. [ 10@`$pk OP_CHECSIG`, 1@`OP_ADD 2 OP_EQUAL` ] )
+        tapinfo_huffman(dpk, array)
+    }
+}
+
+fn tapinfo_from_tree(dpk: XOnlyPublicKey, node: Value) -> Result<TaprootSpendInfo> {
+    fn process_node(node: Value) -> Result<NodeInfo> {
+        Ok(match node {
+            Value::Script(script) => NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript),
+            Value::Array(mut nodes) if nodes.len() == 2 => {
+                let a = process_node(nodes.remove(0))?;
+                let b = process_node(nodes.remove(0))?;
+                NodeInfo::combine(a, b)?
+            }
+            _ => bail!(Error::TaprootInvalidNestedTree),
+        })
+    }
+    Ok(TaprootSpendInfo::from_node_info(
+        &EC,
+        dpk,
+        process_node(node)?,
+    ))
+}
+
+fn tapinfo_huffman(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {
     let script_weights = scripts
         .into_iter()
         .map(|v| {
@@ -257,7 +311,7 @@ fn branch_hash(a: &sha256::Hash, b: &sha256::Hash) -> sha256::Hash {
     sha256::Hash::from_engine(eng)
 }
 
-// Functions for miniscript descriptor taproot construction
+// Functions for Taproot tr() descriptor construction
 
 fn descriptor_from_policy(
     pk: Option<DescriptorPublicKey>,
@@ -280,37 +334,36 @@ fn descriptor_from_policy(
 fn descriptor_from_array(
     pk: Option<DescriptorPublicKey>,
     unspendable: Option<DescriptorPublicKey>,
-    policies: Vec<Value>,
+    array: Vec<Value>,
 ) -> Result<Descriptor> {
-    if policies.len() == 2 {
+    if array.len() == 2 {
+        // Arrays of length 2 are treated as a nested binary tree of policies (e.g. [ A, [ [ B, C ], D ] ])
         let internal_key = pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?;
-        descriptor_from_tree(internal_key, Value::Array(policies))
+        descriptor_from_tree(internal_key, Value::Array(array))
     } else {
-        let policies = policies
-            .into_iter()
-            .map(|v| Ok(Arc::new(v.into_policy()?)))
-            .collect::<Result<_>>()?;
-        let policy = Policy::Threshold(1, policies);
+        // Arrays of length >2 are expected to be flat and are compiled into a thresh(1, POLICIES) policy
+        let policy = Policy::Threshold(1, into_policies(array)?);
         descriptor_from_policy(pk, unspendable, policy)
     }
 }
 
 fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descriptor> {
-    fn tree_node(node: Value) -> Result<TapTree<DescriptorPublicKey>> {
+    fn process_node(node: Value) -> Result<TapTree<DescriptorPublicKey>> {
         Ok(match node {
             Value::Policy(policy) => TapTree::Leaf(Arc::new(policy.compile()?)),
             Value::Array(mut nodes) if nodes.len() == 2 => {
-                let a = tree_node(nodes.remove(0))?;
-                let b = tree_node(nodes.remove(0))?;
+                let a = process_node(nodes.remove(0))?;
+                let b = process_node(nodes.remove(0))?;
                 TapTree::combine(a, b)
             }
             _ => bail!(Error::TaprootInvalidNestedTree),
         })
     }
-    let tree = tree_node(node)?;
+    let tree = process_node(node)?;
     Ok(Descriptor::new_tr(pk, Some(tree))?)
 }
 
+// Get the TR_UNSPENDABLE key from scope. It may be set to false to disable it.
 fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
     // Must exists in scope because its set in the stdlib
     Ok(match scope.get(&"TR_UNSPENDABLE".into()).unwrap().clone() {
@@ -318,4 +371,11 @@ fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
         Value::PubKey(val) => Some(val),
         other => bail!(Error::InvalidTrUnspendable(other)),
     })
+}
+
+// Derive the DescriptorPublicKey into a definite key and transform to an x-only
+fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
+    Ok(XOnlyPublicKey::from(
+        pk.at_derivation_index(0)?.derive_public_key(&EC)?.inner,
+    ))
 }
