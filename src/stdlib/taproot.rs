@@ -209,23 +209,22 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<TaprootSpend
         array @ Value::Array(_) => script_tree_tr(process_node(array)?),
 
         // Single script tree
-        node => script_tree_tr(process_node(node)?),
+        node @ Value::Script(_) => script_tree_tr(process_node(node)?),
+
+        _ => bail!(Error::TaprootInvalidNestedTree),
     })
 }
 
 fn process_node(node: Value) -> Result<NodeInfo> {
-    if node.is_script_coercible(true) {
-        let script = node.into_tapscript()?;
-        return Ok(NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript));
-    }
-    if let Value::Array(mut nodes) = node {
-        if nodes.len() == 2 {
+    Ok(match node {
+        Value::Script(script) => NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript),
+        Value::Array(mut nodes) if nodes.len() == 2 => {
             let a = process_node(nodes.remove(0))?;
             let b = process_node(nodes.remove(0))?;
-            return Ok(NodeInfo::combine(a, b)?);
+            NodeInfo::combine(a, b)?
         }
-    }
-    Err(Error::TaprootInvalidNestedTree)
+        _ => bail!(Error::TaprootInvalidNestedTree),
+    })
 }
 
 fn huffman_tree(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {
