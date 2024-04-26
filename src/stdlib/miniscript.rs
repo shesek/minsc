@@ -205,17 +205,15 @@ pub mod fns {
     }
 
     // Turn `[A,B,C]` array into an `A && B && C` policy
-    pub fn all(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn all(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = map_policy_array(args.remove(0))?;
-        Ok(Policy::Threshold(policies.len(), arc_vec(policies)).into())
+        and(args.remove(0).into_array()?, scope)
     }
 
     // Turn `[A,B,C]` array into an `A || B || C` policy
-    pub fn any(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn any(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = map_policy_array(args.remove(0))?;
-        Ok(Policy::Threshold(1, arc_vec(policies)).into())
+        or(args.remove(0).into_array()?, scope)
     }
 }
 
