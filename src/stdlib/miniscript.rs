@@ -57,30 +57,22 @@ pub mod fns {
     //
 
     pub fn or(args: Vec<Value>, _: &Scope) -> Result<Value> {
-        let policies_with_probs = args
-            .into_iter()
-            .map(|arg| match arg {
-                Value::WithProb(prob, value) => Ok((prob, Arc::new(value.into_policy()?))),
-                arg => Ok((1, Arc::new(arg.into_policy()?))),
-            })
-            .collect::<Result<_>>()?;
-        Ok(Policy::Or(policies_with_probs).into())
+        Ok(Policy::Or(into_prob_policies(args)?).into())
     }
 
     pub fn and(args: Vec<Value>, _: &Scope) -> Result<Value> {
-        let policies = map_policy(args)?;
-        Ok(Policy::And(arc_vec(policies)).into())
+        Ok(Policy::And(into_policies(args)?).into())
     }
 
     pub fn thresh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         let thresh_n = args.remove(0).into_usize()?;
         // Support thresh(n, $array) as well as thresh(n, pol1, pol2, ...) invocations
         let policies = if args.len() == 1 && args[0].is_array() {
-            map_policy_array(args.remove(0))?
+            into_policies(args.remove(0).into_array()?)?
         } else {
-            map_policy(args)?
+            into_policies(args)?
         };
-        Ok(Policy::Threshold(thresh_n, arc_vec(policies)).into())
+        Ok(Policy::Threshold(thresh_n, policies).into())
     }
 
     pub fn older(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
@@ -135,7 +127,7 @@ pub mod fns {
                 Descriptor::new_wsh(miniscript)?.into()
             }
             Value::Script(script) => script.to_p2wsh().into(),
-            _ => bail!(Error::InvalidArguments)
+            _ => bail!(Error::InvalidArguments),
         })
     }
 
@@ -205,26 +197,32 @@ pub mod fns {
     // Turn `[A,B,C]` array into an `A && B && C` policy
     pub fn all(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = map_policy_array(args.remove(0))?;
-        Ok(Policy::Threshold(policies.len(), arc_vec(policies)).into())
+        let policies = into_policies(args.remove(0).into_array()?)?;
+        Ok(Policy::Threshold(policies.len(), policies).into())
     }
 
     // Turn `[A,B,C]` array into an `A || B || C` policy
     pub fn any(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = map_policy_array(args.remove(0))?;
-        Ok(Policy::Threshold(1, arc_vec(policies)).into())
+        let policies = into_policies(args.remove(0).into_array()?)?;
+        Ok(Policy::Threshold(1, policies).into())
     }
 }
 
-fn map_policy(args: Vec<Value>) -> Result<Vec<Policy>> {
-    args.into_iter().map(Value::into_policy).collect()
+fn into_policies(args: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
+    args.into_iter()
+        .map(|v| Ok(Arc::new(Value::into_policy(v)?)))
+        .collect()
 }
 
-fn map_policy_array(array: Value) -> Result<Vec<Policy>> {
-    map_policy(array.into_array()?)
-}
-
-fn arc_vec<T>(v: Vec<T>) -> Vec<Arc<T>> {
-    v.into_iter().map(Arc::new).collect()
+fn into_prob_policies(values: Vec<Value>) -> Result<Vec<(usize, Arc<Policy>)>> {
+    values
+        .into_iter()
+        .map(|arg| {
+            Ok(match arg {
+                Value::WithProb(prob, value) => (prob, Arc::new(value.into_policy()?)),
+                arg => (1, Arc::new(arg.into_policy()?)),
+            })
+        })
+        .collect()
 }
