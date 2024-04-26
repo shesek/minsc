@@ -35,14 +35,19 @@ pub fn attach_stdlib(scope: &mut Scope) {
 pub mod fns {
     use super::*;
 
+    /// tr(PubKey[, Policy|Array<Policy>]) -> Descriptor
+    /// tr(Policy|Array<Policy>) -> Descriptor
+    ///
+    /// Construct a tr() descriptor from the given internal_key and/or policy
     pub fn tr(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        let unspendable = tr_unspendable(scope)?;
 
         Ok(match (args.remove(0), args.pop()) {
             // tr(Policy)
             // Extracts the internal key from the policy, or uses the UNSPENDABLE key
-            (Value::Policy(policy), None) => descriptor_from_policy(None, unspendable, policy)?,
+            (Value::Policy(policy), None) => {
+                descriptor_from_policy(None, tr_unspendable(scope)?, policy)?
+            }
 
             // tr(PubKey)
             // Key-path spend only
@@ -63,7 +68,9 @@ pub mod fns {
             }
 
             // tr([ A, B, .. ])
-            (Value::Array(nodes), None) => descriptor_from_array(None, unspendable, nodes)?,
+            (Value::Array(nodes), None) => {
+                descriptor_from_array(None, tr_unspendable(scope)?, nodes)?
+            }
 
             _ => bail!(Error::InvalidTrUse),
         }
