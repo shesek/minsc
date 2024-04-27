@@ -59,8 +59,11 @@ pub enum Error {
     #[error("Expected a descriptor or pubkey, not {0:?}")]
     NotDescriptorLike(Value),
 
-    #[error("Expected a value coercible into Script, not {0:?}")]
-    NotScriptLike(Value),
+    #[error("Expected Script, not {0:?}")]
+    NotScript(Value),
+
+    #[error("Cannot represent as a scriptPubKey: {0:?}")]
+    NotSpkLike(Value),
 
     #[error("Invalid script fragment {0:?}")]
     InvalidScriptFrag(Value),

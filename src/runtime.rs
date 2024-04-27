@@ -479,6 +479,7 @@ impl_simple_into_variant_conv!(i64, Number, into_i64, NotNumber);
 impl_simple_into_variant_conv!(Vec<Value>, Array, into_array, NotArray);
 impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
 impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
+impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
 
 // Conversion from the runtime Number (always an i64) to other number types, with overflow check
 macro_rules! impl_num_conv {
@@ -664,34 +665,10 @@ impl Value {
     pub fn into_tapinfo(self) -> Result<TaprootSpendInfo> {
         self.try_into()
     }
-
-    /// Coerce into a Script when the context is unknown (i.e. raw scripts only, not policies)
-    pub fn into_script_noctx(self) -> Result<ScriptBuf> {
-        Ok(match self {
-            Value::Script(script) => script,
-            v => bail!(Error::NotScriptLike(v)),
-        })
-    }
-
-    /// Coerce into a Script when the context is known
-    pub fn into_script<Ctx: ScriptContext>(self) -> Result<ScriptBuf> {
-        Ok(match self {
-            Value::Script(script) => script,
-            Value::Policy(policy) => {
-                let ms = policy.compile::<Ctx>()?;
-                ms.derive_keys()?.encode()
-            }
-            v => bail!(Error::NotScriptLike(v)),
-        })
-    }
-    pub fn into_tapscript(self) -> Result<ScriptBuf> {
-        self.into_script::<miniscript::Tap>()
-    }
-
     pub fn into_spk(self) -> Result<ScriptBuf> {
         Ok(match self {
             // Raw scripts are returned as-is
-            v @ Value::Script(_) => v.into_script_noctx()?,
+            Value::Script(script) => script,
             // Descriptors (or values coercible into them) are converted into their scriptPubKey
             v @ Value::Descriptor(_) | v @ Value::PubKey(_) => v.into_desc()?.to_script_pubkey()?,
             // TapInfo returns the output V1 witness program of the output key
@@ -699,7 +676,7 @@ impl Value {
                 WitnessVersion::V1,
                 &tapinfo.output_key().serialize(),
             )?),
-            v => bail!(Error::NotScriptLike(v)),
+            v => bail!(Error::NotSpkLike(v)),
         })
     }
 

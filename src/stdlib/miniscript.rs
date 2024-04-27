@@ -5,7 +5,7 @@ use miniscript::bitcoin::Sequence;
 use miniscript::AbsLockTime;
 
 use crate::runtime::Value;
-use crate::util::DescriptorExt;
+use crate::util::{DescriptorExt, MiniscriptExt};
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy, Result, Scope};
 
 const LIKELY_PROB: usize = 10;
@@ -156,23 +156,23 @@ pub mod fns {
     }
 
     /// Policy -> Script witnessScript
+    // XXX to taproot.rs
     pub fn tapscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(
-            args.len() == 1 && args[0].is_policy(),
-            Error::InvalidArguments
-        );
-        let script = args.remove(0).into_script::<miniscript::Tap>()?;
-        Ok(script.into())
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        let policy = args.remove(0).into_policy()?;
+        let miniscript = policy.compile::<miniscript::Tap>()?;
+        Ok(miniscript.derive_keys()?.encode().into())
     }
 
     /// Policy -> Script witnessScript
     pub fn segwitv0(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(
-            args.len() == 1 && args[0].is_policy(),
+            args.len() == 1,
             Error::InvalidArguments
         );
-        let script = args.remove(0).into_script::<miniscript::Segwitv0>()?;
-        Ok(script.into())
+        let policy = args.remove(0).into_policy()?;
+        let miniscript = policy.compile::<miniscript::Segwitv0>()?;
+        Ok(miniscript.derive_keys()?.encode().into())
     }
 
     /// Descriptor<Multi> -> Array<Descriptor<Single>>

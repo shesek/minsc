@@ -82,7 +82,7 @@ pub mod fns {
     /// Compute the leaf hash of the given script
     pub fn tapLeaf(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(matches!(args.len(), 1 | 2), Error::InvalidArguments);
-        let script = args.remove(0).into_tapscript()?;
+        let script = args.remove(0).into_script()?;
         let leaf_ver = args
             .pop()
             .map_or(Ok(LeafVersion::TapScript), |v| -> Result<_> {
@@ -293,8 +293,8 @@ fn tapinfo_huffman(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<
         .into_iter()
         .map(|v| {
             Ok(match v {
-                Value::WithProb(prob, value) => (prob as u32, value.into_tapscript()?),
-                other => (1, other.into_tapscript()?),
+                Value::WithProb(prob, value) => (prob as u32, value.into_script()?),
+                other => (1, other.into_script()?),
             })
         })
         .collect::<Result<Vec<_>>>()?;
