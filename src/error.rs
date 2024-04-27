@@ -47,8 +47,11 @@ pub enum Error {
     #[error("Expected a network type, not {0:?}")]
     NotNetwork(Value),
 
-    #[error("Expected bytes, not {0:?}")]
-    NotBytes(Value),
+    #[error("Cannot be converted to Bytes: {0:?}")]
+    NotBytesLike(Value),
+
+    #[error("Expected a string, not {0:?}")]
+    NotString(Value),
 
     #[error("Expected TapInfo or tr() Descriptor, not {0:?}")]
     NotTapInfoLike(Value),

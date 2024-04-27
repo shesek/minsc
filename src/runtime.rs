@@ -28,6 +28,7 @@ use crate::{DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk 
 pub enum Value {
     PubKey(DescriptorPublicKey),
     Bytes(Vec<u8>),
+    String(String),
     Number(i64),
     Bool(bool),
     Network(Network),
@@ -52,6 +53,7 @@ impl_from_variant!(ScriptBuf, Value, Script);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Vec<Value>, Value, Array);
 impl_from_variant!(Vec<u8>, Value, Bytes);
+impl_from_variant!(String, Value);
 impl_from_variant!(Network, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl_from_variant!(i64, Value, Number);
@@ -305,6 +307,9 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
         Value::Bytes(bytes) => ScriptBuilder::new()
             .push_slice(PushBytesBuf::try_from(bytes)?)
             .into_script(),
+        Value::String(string) => ScriptBuilder::new()
+            .push_slice(PushBytesBuf::try_from(string.into_bytes())?)
+            .into_script(),
         Value::PubKey(desc_pubkey) => {
             let pubkey = desc_pubkey.at_derivation_index(0)?.derive_public_key(&EC)?;
             ScriptBuilder::new().push_key(&pubkey).into_script()
@@ -453,6 +458,7 @@ impl Evaluate for Expr {
             Expr::BtcAmount(x) => x.eval(scope)?,
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
+            Expr::String(x) => Value::String(x.clone()),
             Expr::Number(x) => Value::Number(*x),
         })
     }
@@ -504,6 +510,7 @@ impl_simple_into_variant_conv!(Vec<Value>, Array, into_array, NotArray);
 impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
 impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
+impl_simple_into_variant_conv!(String, String, into_string, NotString);
 
 // Conversion from the runtime Number (always an i64) to other number types, with overflow check
 macro_rules! impl_num_conv {
@@ -580,17 +587,10 @@ impl TryFrom<Value> for Vec<u8> {
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value {
             Value::Bytes(bytes) => bytes,
+            Value::String(string) => string.into_bytes(),
             Value::Script(script) => script.into_bytes(),
-            v => bail!(Error::NotBytes(v)),
+            v => bail!(Error::NotBytesLike(v)),
         })
-    }
-}
-
-// Strings are represented as Bytes in the runtime and get converted to a String as needed
-impl TryFrom<Value> for String {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(String::from_utf8(value.into_bytes()?)?)
     }
 }
 
@@ -680,9 +680,6 @@ impl Value {
     pub fn into_desc(self) -> Result<Descriptor> {
         self.try_into()
     }
-    pub fn into_string(self) -> Result<String> {
-        self.try_into()
-    }
     pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<Miniscript<Ctx>> {
         self.try_into()
     }
@@ -710,6 +707,7 @@ impl Value {
             Value::Number(_) => "number",
             Value::Bool(_) => "bool",
             Value::Bytes(_) => "bytes",
+            Value::String(_) => "string",
             Value::Policy(_) => "policy",
             Value::WithProb(_, _) => "withprob",
             Value::Descriptor(_) => "descriptor",
@@ -730,6 +728,7 @@ impl fmt::Display for Value {
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
             Value::Bytes(x) => write!(f, "0x{}", x.to_lower_hex_string()),
+            Value::String(x) => write!(f, "\"{}\"", escape_str(x)),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
             Value::Descriptor(x) => write!(f, "{}", x),
@@ -750,4 +749,12 @@ impl fmt::Display for Value {
             }
         }
     }
+}
+
+fn escape_str(str: &str) -> String {
+    str.bytes()
+        .into_iter()
+        .flat_map(core::ascii::escape_default)
+        .map(char::from)
+        .collect()
 }

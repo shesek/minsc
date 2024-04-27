@@ -18,6 +18,7 @@ pub enum Expr {
 
     PubKey(String),
     Bytes(Vec<u8>),
+    String(String),
     Number(i64),
     Duration(Duration),
     DateTime(DateTime),
@@ -235,10 +236,9 @@ impl Expr {
     }
 
     /// Expand escape characters in string literals (\", \\, \n, \r and \t)
-    /// and return the string as Bytes.
-    pub fn bytes_from_escaped_str(s: &str) -> Expr {
-        Expr::Bytes(if !s.contains('\\') {
-            s.as_bytes().to_owned()
+    pub fn string_from_escaped_str(s: &str) -> Expr {
+        Expr::String(if !s.contains('\\') {
+            s.to_owned()
         } else {
             let mut iter = s.chars();
             let mut s_new = String::new();
@@ -255,7 +255,7 @@ impl Expr {
                 }
                 s_new.push(ch);
             }
-            s_new.into_bytes()
+            s_new
         })
     }
 }

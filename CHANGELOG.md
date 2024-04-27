@@ -42,7 +42,7 @@
 
 - New `Bytes` runtime data type
 
-  Constructable using a new `0x<hex>` syntax, or from a string with `"myString"` (the string will be represented internally as a Bytes sequence).
+  Constructable using a new `0x<hex>` syntax.
 
   This can now be used in place of the `Hash` data type, which was removed.
   To remain compatible with the Miniscript Policy syntax for literal
@@ -56,7 +56,9 @@
   3. `explicit_script(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the redeemScript for P2SH)
   4. `bytes(Script) -> Bytes` (get the Bytes representation of the Script opcodes)
 
-  The `script_pubkey`/`explicit_script` functions also accept types that can be casted into Descriptors as their argument (Policy, Miniscript and PubKey).
+  The `script_pubkey`/`explicit_script` functions also accept types that can be coerced into Descriptors as their argument (Policy, Miniscript and PubKey).
+
+- New `String` runtime data type
 
 - New syntax for BTC amounts: `0.5 BTC`. Evaluates to the amount in satoshis. Supports all the [denominations in rust-bitcoin](https://docs.rs/bitcoin/latest/bitcoin/util/amount/enum.Denomination.html) (`BTC`, `mBTC`, `uBTC`, `bits`, `satoshi`/`sat`, `msat`).
 
@@ -64,7 +66,7 @@
 
 - New utility functions:
   1. `len(Array|Bytes|Script) -> Number`
-  1. `typeof(Value) -> Bytes` (returns the type string as Bytes)
+  1. `typeof(Value) -> String`
   1. `keys(Array) -> Array<Number>`
   2. `first(Array) -> Any`
   3. `last(Array) -> Any`

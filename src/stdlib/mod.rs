@@ -66,24 +66,25 @@ pub mod fns {
     use crate::function::Call;
     use crate::Error;
 
-    // len(Array|Bytes|Script) -> Number
+    // len(Array|Bytes|Script|String) -> Number
     pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(match args.remove(0) {
             Value::Array(elements) => elements.len(),
             Value::Bytes(bytes) => bytes.len(),
+            Value::String(string) => string.len(),
             Value::Script(script) => script.into_bytes().len(),
             _ => bail!(Error::InvalidArguments),
         }
         .into())
     }
 
-    /// Get the argument type as a string (currently represented as Bytes)
+    /// Get the argument type as a string
     /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array
-    /// typeof(Value) -> Bytes
+    /// typeof(Value) -> String
     pub fn r#typeof(args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(args[0].type_of().to_string().into_bytes().into())
+        Ok(args[0].type_of().to_string().into())
     }
 
     // rawscript(Bytes) -> Script
@@ -95,7 +96,7 @@ pub mod fns {
 
     /// Convert the argument into Bytes
     /// Scripts are serialized, Bytes are returned as-is
-    /// bytes(Script|Bytes) -> Bytes
+    /// bytes(Script|Bytes|String) -> Bytes
     pub fn bytes(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let bytes = args.remove(0).into_bytes()?;

@@ -60,6 +60,7 @@ SimpleExpr: Expr = {
   BtcAmount,
   PubKey,
   Bytes,
+  String,
   ScriptFrag,
   InfixProb,
   Paren<And>,
@@ -76,6 +77,7 @@ SExpr: Expr = {
   Number,
   Ident,
   Bytes,
+  String,
   Call,
   BlockExpr,
 };
@@ -136,9 +138,10 @@ Bytes: Expr = {
   // Miniscript Policy syntax for hash and x-only-pubkey literals. The Bytes value will
   // later get coerced into a PubKey/Hash as needed.
   <s:r"[a-fA-F0-9]{64}|[a-fA-F0-9]{40}"> =>? Expr::bytes_from_hex(&<>),
+};
 
-  // A string literal. Internally represented as Bytes, will probably get its own type eventually
-  <s:r#""([^\\"]|\\[\\ntr"])*""#> => Expr::bytes_from_escaped_str(&<>[1..<>.len()-1]),
+String: Expr = {
+  <s:r#""([^\\"]|\\[\\ntr"])*""#> => Expr::string_from_escaped_str(&<>[1..<>.len()-1]),
 };
 
 // BIP32 child key derivation
@@ -160,7 +163,7 @@ ChildDeriveWildcard = { "/*", "/ *" };
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
   ast::ScriptFrag { fragments }.into();
 ScriptFragPart = { ScriptFragPart_, "<" <SimpleExpr> ">" };
-ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes };
+ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes, String };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();
