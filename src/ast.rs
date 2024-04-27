@@ -166,13 +166,13 @@ impl_from_variant!(Duration, Expr);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DurationPart {
-    Years(f64),
-    Months(f64),
-    Weeks(f64),
-    Days(f64),
-    Hours(f64),
-    Minutes(f64),
-    Seconds(f64),
+    Years(u32),
+    Months(u32),
+    Weeks(u32),
+    Days(u32),
+    Hours(u32),
+    Minutes(u32),
+    Seconds(u32),
 }
 // DateTime (YYYY-MM-DD with optional HH:MM)
 #[derive(Debug, Clone, PartialEq)]

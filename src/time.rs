@@ -18,7 +18,7 @@ const SECONDS_MOD: u32 = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 // The default block interval. Can be overridden in Minsc by setting the `BLOCK_INTERVAL` variable
 pub const BLOCK_INTERVAL: usize = 600;
 
-pub fn duration_to_seq(duration: &Duration, block_interval: f64) -> Result<u32> {
+pub fn duration_to_seq(duration: &Duration, block_interval: u32) -> Result<u32> {
     match duration {
         Duration::BlockHeight(num_blocks) => rel_height_to_seq(*num_blocks),
         Duration::BlockTime { parts, heightwise } => {
@@ -35,34 +35,34 @@ fn rel_height_to_seq(num_blocks: u32) -> Result<u32> {
     Ok(num_blocks)
 }
 
-fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool, block_interval: f64) -> Result<u32> {
+fn rel_time_to_seq(parts: &[DurationPart], heightwise: bool, block_interval: u32) -> Result<u32> {
     let seconds = parts
         .iter()
         .map(|p| match p {
-            DurationPart::Years(n) => n * 31536000.0,
-            DurationPart::Months(n) => n * 2629800.0, // 30.4375 days, divisible by 10 minutes
-            DurationPart::Weeks(n) => n * 604800.0,
-            DurationPart::Days(n) => n * 86400.0,
-            DurationPart::Hours(n) => n * 3600.0,
-            DurationPart::Minutes(n) => n * 60.0,
+            DurationPart::Years(n) => n * 31536000,
+            DurationPart::Months(n) => n * 2629800, // 30.4375 days, divisible by 10 minutes
+            DurationPart::Weeks(n) => n * 604800,
+            DurationPart::Days(n) => n * 86400,
+            DurationPart::Hours(n) => n * 3600,
+            DurationPart::Minutes(n) => n * 60,
             DurationPart::Seconds(n) => *n,
         })
-        .sum::<f64>();
+        .sum::<u32>();
 
     if heightwise {
         ensure!(
-            seconds % block_interval == 0.0,
+            seconds % block_interval == 0,
             Error::InvalidDurationHeightwise
         );
         return rel_height_to_seq((seconds / block_interval) as u32);
     }
 
     ensure!(
-        seconds > 0.0 && seconds <= SECONDS_MAX as f64,
+        seconds > 0 && seconds <= SECONDS_MAX,
         Error::InvalidDurationTimeOutOfRange
     );
 
-    let units = (seconds / SECONDS_MOD as f64).ceil() as u32;
+    let units = (seconds as f64 / SECONDS_MOD as f64).ceil() as u32;
     Ok(SEQUENCE_LOCKTIME_TYPE_FLAG | units)
 }
 

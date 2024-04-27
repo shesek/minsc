@@ -380,7 +380,7 @@ impl Evaluate for ast::Duration {
             .get(&"BLOCK_INTERVAL".into())
             .expect("built-in var")
             .clone()
-            .into_usize()? as f64;
+            .into_u32()?;
         let seq_num = time::duration_to_seq(self, block_interval)?;
         Ok(Value::Number(seq_num as i64))
     }
