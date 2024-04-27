@@ -181,7 +181,7 @@ const output_script = CodeMirror(output_el_script.querySelector('.codeview'), {
   theme: 'darcula',
 })
 const output_other = CodeMirror(output_el_other.querySelector('.codeview'), {
-  mode: 'miniscript',
+  mode: 'minsc',
   readOnly: true,
   lineWrapping: true,
   matchBrackets: true,
