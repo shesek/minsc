@@ -38,6 +38,7 @@ Expr: Expr = {
   SimpleExpr,
   And,
   Or,
+  IfExpr,
   ChildDerive,
   FnExpr,
   Infix,
@@ -65,6 +66,7 @@ SimpleExpr: Expr = {
   Paren<FnExpr>,
   Paren<Infix>,
   Paren<Not>,
+  Paren<IfExpr>,
   Paren<SimpleExpr>,
 };
 
@@ -90,6 +92,9 @@ Ident: Expr = IdentTerm => <>.into();
 
 Call: Expr = <ident:IdentTerm> "(" <args:List0<Expr, ",">> ")" =>
     ast::Call { ident, args }.into();
+
+IfExpr: Expr = "if" <condition:Expr> "then" <then_val:Expr> "else" <else_val:Expr> =>
+    ast::IfExpr { condition: condition.into(), then_val: then_val.into(), else_val: else_val.into() }.into();
 
 And: Expr = <List2<AndOrBranch, "&&">> => ast::And(<>).into();
 Or: Expr = <List2<AndOrBranch, "||">> => ast::Or(<>).into();

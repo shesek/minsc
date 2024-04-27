@@ -38,7 +38,9 @@
 
   With a Rust-like syntax: `|params| body` or `|params| { multi statement body }`
 
-- Add new `Bytes` runtime data type
+- Add `if .. then .. else ..` expressions
+
+- New `Bytes` runtime data type
 
   Constructable using a new `0x<hex>` syntax, or from a string with `"myString"` (the string will be represented internally as a Bytes sequence).
 
@@ -81,7 +83,7 @@
 
      For example: `repeat(3, 111) == [111, 111, 111]`, or with a function: `repeat(3, |$n| 100+$n) == [100, 101, 102]`.
 
-- New function for conditionals: `iif(Bool condition, Any then_value, Any else_value)`
+- New function for conditionals: `iif(Bool condition, Any then_value, Any else_value)` -- **use `if .. then .. else ..` instead**
 
   Returns the `then_value` if the condition is true, or `else_value` otherwise.
 

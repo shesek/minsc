@@ -3,6 +3,7 @@
 pub enum Expr {
     Block(Block),
     Call(Call),
+    If(IfExpr),
     Or(Or),
     And(And),
     Thresh(Thresh),
@@ -48,6 +49,14 @@ pub struct Call {
     pub args: Vec<Expr>,
 }
 impl_from_variant!(Call, Expr);
+
+#[derive(Debug, Clone)]
+pub struct IfExpr {
+    pub condition: Box<Expr>,
+    pub then_val: Box<Expr>,
+    pub else_val: Box<Expr>,
+}
+impl_from_variant!(IfExpr, Expr, If);
 
 /// Logical OR expression
 #[derive(Debug, Clone)]

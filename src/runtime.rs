@@ -109,6 +109,16 @@ impl Evaluate for ast::Call {
     }
 }
 
+impl Evaluate for ast::IfExpr {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        if self.condition.eval(scope)?.into_bool()? {
+            self.then_val.eval(scope)
+        } else {
+            self.else_val.eval(scope)
+        }
+    }
+}
+
 impl Evaluate for ast::Or {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         eval_andor(&self.0, scope, true, "or", 1)
@@ -412,6 +422,7 @@ impl Evaluate for Expr {
         Ok(match self {
             Expr::Ident(x) => x.eval(scope)?,
             Expr::Call(x) => x.eval(scope)?,
+            Expr::If(x) => x.eval(scope)?,
             Expr::Or(x) => x.eval(scope)?,
             Expr::And(x) => x.eval(scope)?,
             Expr::Thresh(x) => x.eval(scope)?,

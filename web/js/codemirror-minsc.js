@@ -8,7 +8,7 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /\b([a-f0-9]{8}|[a-f0-9]{40,130}|[xt]pub[0-9a-zA-Z]{100,120})\b/, token: "number"},
     {regex: /\b\d+\b/, token: "number"},
     {regex: /\b(fn)(\s+)([$a-zA-Z_]\w*)/, token: ["keyword", null, "def"]},
-    {regex: /\b(of|return|let|heightwise|likely)\b/, token: "keyword"},
+    {regex: /\b(of|return|let|heightwise|likely|if|then|else)\b/, token: "keyword"},
     {regex: /\/\/.*/, token: "comment"},
     {regex: /[-+\/*=<>!;@]+|&&|\|\|/, token: "operator"}, // */
     {regex: /\b(or|and|thresh)\b/, token: "builtin"},

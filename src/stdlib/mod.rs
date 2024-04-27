@@ -140,6 +140,7 @@ pub mod fns {
         ))
     }
 
+    /// To be removed, use `if .. then .. else ..` instead
     pub fn iif(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 3, Error::InvalidArguments);
         let condition = args.remove(0).into_bool()?;

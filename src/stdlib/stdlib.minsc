@@ -40,8 +40,8 @@ fn pickFromAltStack($n) = `
 fn switch($clauses) = `
   map(initial($clauses), |$clause|
     `OP_DUP $clause.0 OP_IF OP_DROP $clause.1 OP_ELSE`)
-  // Using OP_VERIFY instead of another IF for the last fragment saves 4 bytes
-  last($clauses).0 iif(len(last($clauses)) == 2, `OP_VERIFY last($clauses).1`, ``)
+  // Using OP_VERIFY instead of another IF..ELSE for the last fragment saves 4 bytes
+  last($clauses).0 {if len(last($clauses)) == 2 then `OP_VERIFY last($clauses).1` else ``}
   repeat(len($clauses) - 1, OP_ENDIF)
 `;
 
@@ -49,10 +49,10 @@ fn switch($clauses) = `
 // For example select([ handleFoo, handleBar ]) to run `handleFoo` if the top stack
 // element is 0, `handleBar` if its 1, or fail the script if its neither
 fn select($scripts) =
-  iif(len($scripts) == 2, // special case optimization for 2 branches
-    || `OP_IF $scripts.0 OP_ELSE $scripts.1 OP_ENDIF`,
-    || switch(map(keys($scripts), |$n| [ `$n OP_EQUAL`, $scripts.$n ]))
-  );
+  if len($scripts) == 2 // special case optimization for 2 branches
+    then `OP_IF $scripts.0 OP_ELSE $scripts.1 OP_ENDIF`
+    else switch(map(keys($scripts), |$n| [ `$n OP_EQUAL`, $scripts.$n ]))
+;
 
 // Loop unrolling
 fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations > 0,
