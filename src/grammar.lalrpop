@@ -227,8 +227,8 @@ SecondsAliases: &'input str = { "second", "seconds" };
 DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
   ast::DateTime(<>.into()).into();
 
-BtcAmount: Expr = r"(-?\d+(?:\.\d+)?) (BTC|mBTC|uBTC|bits|satoshi|sat|msat)" =>
-  ast::BtcAmount(<>.into()).into();
+BtcAmount: Expr = r"(-?\d+(?:\.\d+)?) (BTC|mBTC|uBTC|bits?|satoshis?|sats?|msats?)" =>?
+  Ok(Expr::BtcAmount(<>.parse().map_err(|e| format!("invalid BTC amount \"{}\": {}", <>, e))?));
 
 // Statements
 

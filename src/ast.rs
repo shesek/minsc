@@ -1,3 +1,5 @@
+use miniscript::bitcoin;
+
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -22,10 +24,11 @@ pub enum Expr {
     Number(i64),
     Duration(Duration),
     DateTime(DateTime),
-    BtcAmount(BtcAmount),
+    BtcAmount(bitcoin::SignedAmount),
 }
 
 impl_from_variant!(i64, Expr, Number);
+impl_from_variant!(bitcoin::SignedAmount, Expr, BtcAmount);
 
 /// Statements have side-effects and don't produce a value
 #[derive(Debug, Clone)]
@@ -179,10 +182,6 @@ pub enum DurationPart {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DateTime(pub String);
 impl_from_variant!(DateTime, Expr);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct BtcAmount(pub String);
-impl_from_variant!(BtcAmount, Expr);
 
 /// A function definition statement
 #[derive(Debug, Clone)]
