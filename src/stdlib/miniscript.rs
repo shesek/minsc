@@ -23,6 +23,10 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("ripemd160", fns::ripemd160).unwrap();
     scope.set_fn("hash160", fns::hash160).unwrap();
 
+    // Expose TRIVIAL (always true) and UNSATISFIABLE (always false) policies
+    scope.set("TRIVIAL", Policy::Trivial).unwrap();
+    scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
+
     // Descriptor functions
     scope.set_fn("wpkh", fns::wpkh).unwrap();
     scope.set_fn("wsh", fns::wsh).unwrap();
@@ -166,10 +170,7 @@ pub mod fns {
 
     /// Policy -> Script witnessScript
     pub fn segwitv0(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(
-            args.len() == 1,
-            Error::InvalidArguments
-        );
+        ensure!(args.len() == 1, Error::InvalidArguments);
         let policy = args.remove(0).into_policy()?;
         let miniscript = policy.compile::<miniscript::Segwitv0>()?;
         Ok(miniscript.derive_keys()?.encode().into())
