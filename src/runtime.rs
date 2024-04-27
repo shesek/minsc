@@ -18,7 +18,7 @@ use miniscript::{bitcoin, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
-use crate::util::{self, DeriveExt, DescriptorExt, MiniscriptExt, EC};
+use crate::util::{self, DeriveExt, DescriptorExt, EC};
 use crate::{stdlib, time, Error, Result, Scope};
 use crate::{DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
@@ -94,11 +94,24 @@ impl Execute for ast::FnDef {
     }
 }
 
+impl Execute for ast::IfStmt {
+    fn exec(&self, scope: &mut Scope) -> Result<()> {
+        if self.condition.eval(scope)?.into_bool()? {
+            self.then_body.exec(scope)
+        } else if let Some(else_body) = &*self.else_body {
+            else_body.exec(scope)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 impl Execute for Stmt {
     fn exec(&self, scope: &mut Scope) -> Result<()> {
         match self {
             Stmt::FnDef(x) => x.exec(scope),
             Stmt::Assign(x) => x.exec(scope),
+            Stmt::If(x) => x.exec(scope),
         }
     }
 }
@@ -407,8 +420,8 @@ impl Evaluate for ast::Block {
     }
 }
 
-impl Execute for ast::Library {
-    // Execute the library in the given scope, producing visible side-effects
+impl Execute for ast::Stmts {
+    // Execute the statements in the given scope, producing visible side-effects
     fn exec(&self, scope: &mut Scope) -> Result<()> {
         for stmt in &self.stmts {
             stmt.exec(scope)?;

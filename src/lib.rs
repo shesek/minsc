@@ -49,7 +49,7 @@ pub fn run(s: &str) -> Result<Value> {
     eval(parse(s)?)
 }
 
-pub fn parse_lib(s: &str) -> Result<ast::Library> {
-    let parser = grammar::LibraryParser::new();
+pub fn parse_lib(s: &str) -> Result<ast::Stmts> {
+    let parser = grammar::StmtsParser::new();
     Ok(parser.parse(s)?)
 }

@@ -31,6 +31,7 @@ impl_from_variant!(i64, Expr, Number);
 pub enum Stmt {
     FnDef(FnDef),
     Assign(Assign),
+    If(IfStmt),
 }
 
 /// A collection of statements and a final expression used as the return value.
@@ -202,12 +203,22 @@ pub struct Assignment {
     pub rhs: Expr,
 }
 
-/// A library is collection of statements with no return value
-/// This is always parsed at the top-level and is never contained within an Expr/Stmt.
 #[derive(Debug, Clone)]
-pub struct Library {
+pub struct IfStmt {
+    pub condition: Expr,
+    pub then_body: Box<Stmts>,
+    pub else_body: Box<Option<Stmts>>,
+}
+impl_from_variant!(IfStmt, Stmt, If);
+
+/// A collection of statements with no return value
+/// Used for library files and as the body of if statements
+#[derive(Debug, Clone)]
+pub struct Stmts {
     pub stmts: Vec<Stmt>,
 }
+
+pub type Library = Stmts;
 
 use lalrpop_util::ParseError;
 type LalrError = ParseError<usize, lalrpop_util::lexer::Token<'static>, String>;

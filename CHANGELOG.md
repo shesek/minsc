@@ -38,7 +38,7 @@
 
   With a Rust-like syntax: `|params| body` or `|params| { multi statement body }`
 
-- Add `if .. then .. else ..` expressions
+- Add if expressions (`if .. then .. else ..`) and statements (`if .. { ..; } else { ..; }`)
 
 - New `Bytes` runtime data type
 
