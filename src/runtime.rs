@@ -297,19 +297,21 @@ impl Evaluate for ast::ScriptFrag {
 }
 
 fn script_frag(value: Value) -> Result<ScriptBuf> {
+    let push_int = |num| ScriptBuilder::new().push_int(num).into_script();
+    let push_slice = |slice| -> Result<_> {
+        Ok(ScriptBuilder::new()
+            .push_slice(PushBytesBuf::try_from(slice)?)
+            .into_script())
+    };
     Ok(match value {
         // As script code
         Value::Script(script) => script,
 
         // As data pushes
-        Value::Number(n) => ScriptBuilder::new().push_int(n).into_script(),
-        Value::Bool(val) => ScriptBuilder::new().push_int(val as i64).into_script(),
-        Value::Bytes(bytes) => ScriptBuilder::new()
-            .push_slice(PushBytesBuf::try_from(bytes)?)
-            .into_script(),
-        Value::String(string) => ScriptBuilder::new()
-            .push_slice(PushBytesBuf::try_from(string.into_bytes())?)
-            .into_script(),
+        Value::Number(n) => push_int(n),
+        Value::Bool(val) => push_int(val as i64),
+        Value::Bytes(bytes) => push_slice(bytes)?,
+        Value::String(string) => push_slice(string.into_bytes())?,
         Value::PubKey(desc_pubkey) => {
             let pubkey = desc_pubkey.at_derivation_index(0)?.derive_public_key(&EC)?;
             ScriptBuilder::new().push_key(&pubkey).into_script()
@@ -324,11 +326,12 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
                 .into_iter()
                 .flatten()
                 .collect::<Vec<u8>>();
-            scriptbytes.into()
+            ScriptBuf::from(scriptbytes)
         }
 
         v => bail!(Error::InvalidScriptFrag(v)),
     })
+    // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible
 }
 
 impl Evaluate for ast::Not {
