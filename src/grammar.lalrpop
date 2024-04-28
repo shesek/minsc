@@ -175,8 +175,10 @@ FnExprSignature = {
 };
 
 // Infix op with two operands
-Infix: Expr = <lhs:SimpleExpr> <op:InfixOp> <rhs:Expr> =>
+Infix: Expr = <lhs:InfixLhs> <op:InfixOp> <rhs:Expr> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
+
+InfixLhs: Expr = { SimpleExpr, ChildDerive };
 
 InfixOp: ast::InfixOp = {
   "+" => ast::InfixOp::Add,
