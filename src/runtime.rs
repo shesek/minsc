@@ -1,7 +1,6 @@
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
-use std::str::FromStr;
 
 use bitcoin::bip32::{ChildNumber, DerivationPath, ExtendendPubKey};
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
@@ -369,6 +368,8 @@ impl ast::InfixOp {
             (Add, Array(a), Array(b)) => [a, b].concat().into(),
             // + for bytes
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
+            // + for strings
+            (Add, String(a), String(b)) => [a, b].concat().into(),
             // @ to assign execution probability
             (Prob, Number(prob), value) => WithProb(prob.try_into()?, value.into()),
             // + for tap tweak (internal_key+script_tree)
