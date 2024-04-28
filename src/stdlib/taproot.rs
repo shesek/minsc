@@ -234,8 +234,9 @@ fn tr_from_array(internal_key: DescriptorPublicKey, nodes: Vec<Value>) -> Result
     // expected to be of the same type.
     fn peek_node_type(node: &Value) -> Result<NodeType> {
         Ok(match node {
-            Value::Script(_) => NodeType::Script,
             Value::Policy(_) => NodeType::Policy,
+            Value::Script(_) => NodeType::Script,
+            Value::WithProb(_, inner) if inner.is_script() => NodeType::Script,
             Value::Array(array) if array.len() > 0 => peek_node_type(&array[0])?,
             _ => bail!(Error::TaprootInvalidNestedTree),
         })

@@ -665,6 +665,9 @@ impl Value {
     pub fn is_desc(&self) -> bool {
         matches!(self, Value::Descriptor(_))
     }
+    pub fn is_script(&self) -> bool {
+        matches!(self, Value::Script(_))
+    }
 
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
