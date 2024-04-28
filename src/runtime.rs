@@ -361,9 +361,10 @@ impl ast::InfixOp {
             (Lt, Number(a), Number(b)) => (a < b).into(),
             (Gte, Number(a), Number(b)) => (a >= b).into(),
             (Lte, Number(a), Number(b)) => (a <= b).into(),
-            // + - for numbers
+            // + - * for numbers
             (Add, Number(a), Number(b)) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
             (Subtract, Number(a), Number(b)) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
+            (Multiply, Number(a), Number(b)) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
             // + for arrays
             (Add, Array(a), Array(b)) => [a, b].concat().into(),
             // + for bytes

@@ -144,6 +144,7 @@ impl_from_variant!(Infix, Expr);
 pub enum InfixOp {
     Add,
     Subtract,
+    Multiply,
     Eq,
     NotEq,
     Gt,
