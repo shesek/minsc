@@ -63,14 +63,7 @@ SimpleExpr: Expr = {
   String,
   ScriptFrag,
   InfixProb,
-  Paren<And>,
-  Paren<Or>,
-  Paren<ChildDerive>,
-  Paren<FnExpr>,
-  Paren<Infix>,
-  Paren<Not>,
-  Paren<IfExpr>,
-  Paren<SimpleExpr>,
+  Paren<Expr>,
 };
 
 SExpr: Expr = {
@@ -89,7 +82,7 @@ Return: Expr = {
 
 // Expressions
 
-Number: Expr = <INumber> => ast::Expr::Number(<>).into();
+Number: Expr = <INumber> => ast::Expr::Number(<>);
 INumber: i64 = <s:r"-?\d{1,39}"> => <>.parse().unwrap();
 
 IdentTerm: ast::Ident = <s:r"[a-zA-Z_$][a-zA-Z0-9_$]{0,38}"> => ast::Ident(<>.into());
@@ -248,10 +241,9 @@ FnDef: Stmt = {
         ast::FnDef { ident, signature, body }.into(),
 }
 
-IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmts> "}" <else_body:IfStmtElse?> =>
+IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmts> "}"
+               <else_body:("else" "{" <Stmts> "}")?> =>
     ast::IfStmt { condition: condition.into(), then_body: then_body.into(), else_body: else_body.into() }.into();
-IfStmtElse: ast::Stmts = "else" "{" <Stmts> "}";
-
 
 // Helpers
 
