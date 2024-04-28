@@ -163,7 +163,7 @@ ChildDeriveWildcard = { "/*", "/ *" };
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
   ast::ScriptFrag { fragments }.into();
 ScriptFragPart = { ScriptFragPart_, "<" <SimpleExpr> ">" };
-ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes, String };
+ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes, String, DateTime, BtcAmount, Array };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();
