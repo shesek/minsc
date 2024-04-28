@@ -59,6 +59,11 @@ worker.addEventListener('message', ({ data }) => {
     output_el_address.style.display = r.address ? 'block' : 'none'
     output_el_other.style.display = r.other ? 'block' : 'none'
 
+    // If nothing visible is collapsed, collapse the first visible output
+    if (!document.querySelector("#outputs > .collapsed[style*=block]")) {
+      document.querySelector("#outputs > [style*=block]").classList.add('collapsed')
+    }
+
     output_policy.setValue(r.policy || '')
     output_desc.setValue(r.descriptor || '')
     output_script.setValue(r.script_asm || '')
@@ -158,7 +163,7 @@ editor.on('change', debounce((_, c) =>
 , 350))
 update('init')
 
-// Setup the 3 compile output editors (read only)
+// Setup the 4 output editors (read only)
 const output_policy = CodeMirror(output_el_policy.querySelector('.codeview'), {
   mode: 'miniscript',
   readOnly: true,
