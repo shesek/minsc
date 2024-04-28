@@ -225,7 +225,7 @@ pub fn tap_tweak(internal_key: Value, script_tree: Value) -> Result<Value> {
         }
         Value::Bytes(bytes) => bail!(Error::InvalidMerkleLen(bytes.len())),
 
-        _ => bail!(Error::TaprootInvalidNestedTree),
+        _ => bail!(Error::TaprootInvalidScript),
     })
 }
 
@@ -238,7 +238,7 @@ fn tr_from_array(internal_key: DescriptorPublicKey, nodes: Vec<Value>) -> Result
             Value::Script(_) => NodeType::Script,
             Value::WithProb(_, inner) if inner.is_script() => NodeType::Script,
             Value::Array(array) if array.len() > 0 => peek_node_type(&array[0])?,
-            _ => bail!(Error::TaprootInvalidNestedTree),
+            _ => bail!(Error::TaprootInvalidScript),
         })
     }
     enum NodeType {
@@ -279,7 +279,7 @@ fn tapinfo_from_tree(dpk: XOnlyPublicKey, node: Value) -> Result<TaprootSpendInf
                 let b = process_node(nodes.remove(0))?;
                 NodeInfo::combine(a, b)?
             }
-            _ => bail!(Error::TaprootInvalidNestedTree),
+            _ => bail!(Error::TaprootInvalidScriptBinaryTree),
         })
     }
     Ok(TaprootSpendInfo::from_node_info(
@@ -364,7 +364,7 @@ fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descript
                 let b = process_node(nodes.remove(0))?;
                 TapTree::combine(a, b)
             }
-            _ => bail!(Error::TaprootInvalidNestedTree),
+            _ => bail!(Error::TaprootInvalidScriptBinaryTree),
         })
     }
     let tree = process_node(node)?;

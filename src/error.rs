@@ -182,8 +182,11 @@ pub enum Error {
     #[error("Invalid merkle root hash length: {0} (expected 32)")]
     InvalidMerkleLen(usize),
 
-    #[error("Invalid taproot script tree, nested arrays are expected to have exactly 2 elements")]
-    TaprootInvalidNestedTree,
+    #[error("Invalid taproot binary script tree structure. Expecting a nested array where elements are leaf nodes (with no weights) or a tuple of nodes.")]
+    TaprootInvalidScriptBinaryTree,
+
+    #[error("Invalid taproot script. expecting Policy/Script or an array of them, an empty array, or the merkle root hash")]
+    TaprootInvalidScript,
 
     #[error("UTF-8 error: {0}")]
     Utf8Error(std::string::FromUtf8Error),
