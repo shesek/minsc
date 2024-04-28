@@ -31,13 +31,17 @@ export function findErrorLines (code, errMessage) {
   return { from, to }
 }
 
-export async function loadGist(gist_id) {
+export async function loadGist(identifier) {
+  const [ gist_id, file_index ] = identifier.split(':')
   const resp = await fetch(`https://api.github.com/gists/${encodeURIComponent(gist_id)}`)
       , body = await resp.json()
-  if (!body.files) return Promise.reject('gist not found');
+  if (!body.files) return Promise.reject('gist not found')
 
   const filenames = Object.keys(body.files)
-  let code = body.files[filenames[0]].content
+      , file = body.files[filenames[+file_index || 0]]
+  if (!file) return Promise.reject(`file #${file_index} not found`)
+
+  let code = file.content
 
   // strip off ```hack syntax highlightning
   if (code.startsWith('```hack')) code = code.trim().slice(8, -4)
