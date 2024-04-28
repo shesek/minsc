@@ -12,7 +12,11 @@ DUST_NON_SW = 546;
 NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
 TR_UNSPENDABLE = NUMS, H_POINT = NUMS;
 
-// Array functions
+
+//
+// Array utilities
+//
+
 fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
 fn map($arr_, $cb_) = repeat(len($arr_), |$n_| $cb_($arr_.$n_));
@@ -22,21 +26,52 @@ fn slice($arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $arr.$
 fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 
+
+//
+// Altstack utilities
+//
+
 // ROLL/PICK from the altstack. $n must be known statically (cannot be read from the stack)
-fn rollFromAltStack($n) = `
+fn rollAlt($n) = `
   repeat($n, OP_FROMALTSTACK)
   repeat($n - 1, `OP_SWAP OP_TOALTSTACK`)
 `;
-fn pickFromAltStack($n) = `
+fn pickAlt($n) = `
   repeat($n, OP_FROMALTSTACK)
   OP_DUP OP_TOALTSTACK
   repeat($n - 1, `OP_SWAP OP_TOALTSTACK`)
 `;
+rollFromAltStack=rollAlt, pickFromAltStack=pickAlt;
+
+// Read the top stack item as the number of stack items to send to the altstack
+// stack in: <el1> <el2> .. <elN> <N total>, stack out: (empty)
+// altstack out: <elN> .. <el2> <el1> <N total>
+fn nToAlt($max_iterations) = `
+  OP_DUP // keep a copy of the total number of elements
+  // stack: <el1> <el2> .. <elN> <N total> <N counter>
+  unrollFor($max_iterations, `OP_ROT OP_TOALTSTACK`)
+  OP_TOALTSTACK // send the total number of elements as the final altstack item
+`;
+
+// The reverse of nToAlt() - bring back items from the altstack to the stack
+// stack in: (none), stack out: <el1> <el2> .. <elN> <N total>
+// altstack in: <elN> .. <el2> <el1> <N total>, altstack out: (empty)
+fn nFromAlt($max_iterations) = `
+  OP_FROMALTSTACK
+  OP_DUP // keep a copy of the total number of elements
+  // stack: <N total> <N counter>, alt stack: <el1> <el2> .. <elN>
+  unrollFor($max_iterations, `OP_FROMALTSTACK OP_ROT OP_ROT`)
+`;
+
+
+//
+// Control structure utilities
+//
 
 // Match the item at the top of the stack against the clauses and run the matching script, or abort if there's no match
-// Each clause is a tuple of [ condition_code, body_code ]. For example: switch([ [ `0 OP_EQUAL`, handleFoo ], [ `1 OP_EQUAL`, handleBar ] ])
+// Each clause is a tuple of [ $condition_code, $body_code ]. For example: switch([ [ `0 OP_EQUAL`, handleFoo ], [ `1 OP_EQUAL`, handleBar ] ])
 // Clause conditions are expected to consume the value being matched (e.g. with OP_EQUAL). It will be DUPd for them.
-// The last clause can be provided as a single element `[ body_code ]` with no condition to be used as the default branch.
+// The last clause can be provided as a single element `[ $body_code ]` with no condition to be used as the default branch.
 fn switch($clauses) = `
   map(initial($clauses), |$clause|
     `OP_DUP $clause.0 OP_IF OP_DROP $clause.1 OP_ELSE`)
@@ -54,20 +89,35 @@ fn select($scripts) =
     else switch(map(keys($scripts), |$n| [ `$n OP_EQUAL`, $scripts.$n ]))
 ;
 
-// Loop unrolling
-fn unrollLoop($max_iterations, $condition, $body) = iif($max_iterations > 0,
-  || `
-    $condition OP_IF
-      $body
-      unrollLoop($max_iterations - 1, $condition, $body)
-    OP_ENDIF
-  `,
-  // Fail the script if the condition is still met but we're passed the $max_iterations limit
-  || `$condition OP_NOT OP_VERIFY`
-);
-// e.g. `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
-// example with accumulator: `0 <num> unrollLoop(50, `OP_DUP OP_0NOTEQUAL`, `OP_DUP OP_ROT OP_ADD OP_SWAP OP_1SUB`) OP_DROP` to sum the numbers from <num> to 1
+
+//
+// Looping utilities
+//
+
+// Loop unrolling: run $loop_body as long as $condition is met, up to $max_iterations times
+// $loop_body can be a Script or a Function that accepts the iteration count and returns a Script.
+// For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
 // more advanced example with some comments: https://gist.github.com/shesek/758c25489869d77d4ef624ea43f18c49
+fn unrollLoop($max_iterations, $condition, $loop_body) {
+  $loop_fn = if typeof($loop_body) == "function" then $loop_body else |_| $loop_body;
+
+  fn _unrollLoop($loop_i) =
+    if $max_iterations > $loop_i
+      then `$condition OP_IF $loop_fn($loop_i) _unrollLoop($loop_i+1) OP_ENDIF`
+      else `$condition OP_NOT OP_VERIFY` // fail the script if the condition is still met after $max_iterations
+  ;
+  _unrollLoop(0)
+}
+
+// Read the top stack item as the number of times to run $for_body
+// Example with accumulator: `0 <num> unrollFor(50, `OP_DUP OP_ROT OP_ADD OP_SWAP`)` to sum the numbers from <num> to 1
+fn unrollFor($max_iterations, $for_body) {
+  $for_fn = if typeof($for_body) == "function" then $for_body else |_| $for_body;
+  `
+    unrollLoop($max_iterations, `OP_DUP OP_0NOTEQUAL`, |$for_i| `$for_fn($for_i) OP_1SUB`)
+    OP_DROP // drop the counter (always 0 by now)
+  `
+}
 
 // Function form for assigning execution probabilities
 fn prob($n, $val) = $n@$val;

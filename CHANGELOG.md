@@ -95,10 +95,11 @@
 
   1. `switch(Array<(Script condition, Script body)>) -> Script`
   1. `select(Array<Script body>) -> Script`
-  2. `unrollLoop(Number max_iterations, Script condition, Script body) -> Script`
-  3. `rollFromAltStack(Number) -> Script`
-  4. `pickFromAltStack(Number) -> Script`
-  4. Introspection helpers: `checkSameValue()`, `checkSameAsset()` and `checkSameSpk()` (Elements only)
+  1. `unrollLoop(Number max_iterations, Script condition, Script body) -> Script`
+  1. `unrollFor(Number max_iterations, Script body) -> Script`
+  1. `rollAlt(Number) -> Script`, `pickAlt(Number) -> Script`
+  1. `nToAlt(Number max_iterations)`, `nFromAlt(Number max_iterators)`
+  1. Introspection helpers: `checkSameValue()`, `checkSameAsset()` and `checkSameSpk()` (Elements only)
 
 - New `Bool` type, available as the `true` and `false` variables in the root scope
 
