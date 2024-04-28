@@ -33,9 +33,19 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
             (Some(policy), Some(desc), Some(script), Some(addr), None)
         }
         Value::Descriptor(desc) => {
+            let (script, tapinfo) = if let Descriptor::Tr(_) = desc {
+                // For Taproot descriptors, also show the TaprootSpendInfo as the 'other' result
+                let tapinfo = match desc.clone().at_derivation_index(0).map_err(stringify)? {
+                    Descriptor::Tr(tr) => (*tr.spend_info()).clone(),
+                    _ => unreachable!(),
+                };
+                (None, Some(Value::from(tapinfo)))
+            } else {
+                // Explicit script are only available for non-Taproot descriptors
+                (Some(desc.to_explicit_script().map_err(stringify)?), None)
+            };
             let addr = desc.to_address(network).unwrap();
-            let script = desc.to_explicit_script().map_err(stringify)?;
-            (None, Some(desc), Some(script), Some(addr), None)
+            (None, Some(desc), script, Some(addr), tapinfo)
         }
         Value::PubKey(key) => {
             let desc = Descriptor::new_wpkh(key.clone()).map_err(stringify)?;
@@ -47,6 +57,12 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
             let addr = Address::from_script(&script, network).ok();
             (None, None, Some(script), addr, None)
         }
+        tapinfo @ Value::TapInfo(_) => {
+            let spk = tapinfo.clone().into_spk().unwrap();
+            let addr = Address::from_script(&spk, network).unwrap();
+            (None, None, None, Some(addr), Some(tapinfo))
+        }
+
         Value::Address(addr) => (None, None, None, Some(addr), None),
         other => (None, None, None, None, Some(other)),
     };
