@@ -40,10 +40,6 @@ CodeMirror.defineSimpleMode("bitcoin",{
     },*/
 
     {
-				token: 'atom',
-				regex:/OP_([0-9]{1,2}|FALSE|N(.)A|PUSHDATA(1|2|4){0,1}|1NEGATE|TRUE)(?!\w)/,
-		},
-    {
         token: 'number',
         regex: /\b\d+\b/,
     },
