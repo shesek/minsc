@@ -28,17 +28,20 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
         Value::Policy(policy) => {
             let ms = policy.compile().map_err(stringify)?;
             let desc = Descriptor::new_wsh(ms).map_err(stringify)?;
+            let script = desc.to_explicit_script().map_err(stringify)?;
             let addr = desc.to_address(network).unwrap();
-            (Some(policy), Some(desc), None, Some(addr), None)
+            (Some(policy), Some(desc), Some(script), Some(addr), None)
         }
         Value::Descriptor(desc) => {
             let addr = desc.to_address(network).unwrap();
-            (None, Some(desc), None, Some(addr), None)
+            let script = desc.to_explicit_script().map_err(stringify)?;
+            (None, Some(desc), Some(script), Some(addr), None)
         }
         Value::PubKey(key) => {
             let desc = Descriptor::new_wpkh(key.clone()).map_err(stringify)?;
             let addr = desc.to_address(network).unwrap();
-            (None, Some(desc), None, Some(addr), Some(key.into()))
+            let script = desc.to_explicit_script().map_err(stringify)?;
+            (None, Some(desc), Some(script), Some(addr), Some(key.into()))
         }
         Value::Script(script) => {
             let addr = Address::from_script(&script, network).ok();
@@ -47,13 +50,6 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
         Value::Address(addr) => (None, None, None, Some(addr), None),
         other => (None, None, None, None, Some(other)),
     };
-
-    let script = script
-        .map_or_else(
-            || desc.as_ref().map(|d| d.to_explicit_script()).transpose(),
-            |s| Ok(Some(s)),
-        )
-        .map_err(stringify)?;
 
     Ok(JsValue::from_serde(&PlaygroundResult {
         policy: policy.map(|p| p.to_string()),
