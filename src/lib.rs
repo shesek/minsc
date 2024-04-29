@@ -28,7 +28,7 @@ pub mod wasm;
 use std::convert::TryInto;
 use std::str::FromStr;
 
-pub use ast::{Expr, Ident, Stmts};
+pub use ast::{Expr, Ident, Stmt, Stmts};
 pub use error::{Error, Result};
 pub use runtime::{Evaluate, Number::*, Value};
 pub use scope::Scope;

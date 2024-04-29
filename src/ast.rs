@@ -254,17 +254,10 @@ impl FromStr for Stmts {
 }
 impl_tryfrom_fromstr!(Stmts);
 
-type LalrError = ParseError<usize, lalrpop_util::lexer::Token<'static>, String>;
-
 impl Expr {
-    pub fn bytes_from_hex(s: &str) -> Result<Expr, LalrError> {
+    pub fn bytes_from_hex(s: &str) -> Result<Expr, Error> {
         use miniscript::bitcoin::hashes::hex::FromHex;
-
-        Ok(Expr::Bytes(Vec::from_hex(s).map_err(|e| {
-            ParseError::User {
-                error: format!("Invalid bytes hex string {}: {}", s, e),
-            }
-        })?))
+        Ok(Expr::Bytes(Vec::from_hex(s)?))
     }
 
     /// Expand escape characters in string literals (\", \\, \n, \r and \t)

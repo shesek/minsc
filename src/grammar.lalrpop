@@ -1,10 +1,11 @@
-use crate::ast::{Expr, Stmt, self};
+use std::str::FromStr;
+use crate::{ast, Expr, Stmt, Error};
 use crate::util::concat;
 
 grammar;
 
 extern {
-  type Error = String;
+  type Error = Error;
 }
 
 match {
@@ -85,10 +86,11 @@ Return = {
 //
 
 Number = { Int, Float };
-Int: Expr = <IntInner> => ast::Expr::Int(<>);
-Float: Expr = <FloatInner> => ast::Expr::Float(<>);
-IntInner: i64 = <s:r"-?\d{1,39}"> => <>.parse().unwrap();
-FloatInner: f64 = <s:r"-?\d{1,39}\.\d{1,39}"> => <>.parse().unwrap();
+
+Int: Expr = <s:r"-?\d{1,39}"> =>?
+  Ok(i64::from_str(<>).map_err(Error::from)?.into());
+Float: Expr = <s:r"-?\d{1,39}\.\d{1,39}"> =>?
+  Ok(f64::from_str(<>).map_err(Error::from)?.into());
 
 IdentTerm: ast::Ident = <s:r"[a-zA-Z_$][a-zA-Z0-9_$]{0,38}"> => ast::Ident(<>.into());
 Ident: Expr = IdentTerm => <>.into();
@@ -130,13 +132,13 @@ PubKey: Expr = <s:r"(\[[a-fA-F0-9]{8}(/\d+['h]?)*\])?([a-fA-F0-9]{66}|([xt]pub[0
     Expr::PubKey(<>.into());
 
 Bytes: Expr = {
-  <s:r"0x[a-fA-F0-9]*"> =>? Expr::bytes_from_hex(&<>[2..]),
+  <s:r"0x[a-fA-F0-9]*"> =>? Ok(Expr::bytes_from_hex(&<>[2..])?),
 
   // Bytes are typically constructed with the `0x` prefix, but can be constructed without
   // it if the length is exactly 32 or 20 bytes. This is done for compatibility with the
   // Miniscript Policy syntax for hash and x-only-pubkey literals. The Bytes value will
   // later get coerced into a PubKey/Hash as needed.
-  <s:r"[a-fA-F0-9]{64}|[a-fA-F0-9]{40}"> =>? Expr::bytes_from_hex(&<>),
+  <s:r"[a-fA-F0-9]{64}|[a-fA-F0-9]{40}"> =>? Ok(Expr::bytes_from_hex(&<>)?),
 };
 
 String: Expr = {
@@ -235,7 +237,7 @@ DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
   ast::DateTime(<>.into()).into();
 
 BtcAmount: Expr = <num:SExpr> <denom:BtcDenomination> =>
-  ast::BtcAmount(num.into(), denom.parse().unwrap()).into();
+  ast::BtcAmount(num.into(), denom.parse().expect("must be valid")).into();
 
 BtcDenomination = {
   "BTC", "mBTC", "uBTC",

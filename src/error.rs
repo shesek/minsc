@@ -176,6 +176,12 @@ pub enum Error {
     #[error("IO error: {0:?}")]
     Io(std::io::Error),
 
+    #[error("ParseFloatError: {0}")]
+    ParseFloatError(std::num::ParseFloatError),
+
+    #[error("ParseFloatError: {0}")]
+    ParseIntError(std::num::ParseIntError),
+
     #[error("Bitcoin key error: {0}")]
     BitcoinKey(key::Error),
 
@@ -238,6 +244,8 @@ impl_from_variant!(hashes::FromSliceError, Error, HashError);
 impl_from_variant!(hex::HexToBytesError, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
+impl_from_variant!(std::num::ParseFloatError, Error, ParseFloatError);
+impl_from_variant!(std::num::ParseIntError, Error, ParseIntError);
 impl_from_variant!(key::Error, Error, BitcoinKey);
 impl_from_variant!(bip32::Error, Error, Bip32);
 impl_from_variant!(taproot::TaprootError, Error, TaprootError);
