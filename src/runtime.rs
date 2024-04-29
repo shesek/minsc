@@ -13,7 +13,7 @@ use bitcoin::taproot::TaprootSpendInfo;
 use bitcoin::{
     Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
 };
-use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
+use miniscript::descriptor::{DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, descriptor, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
@@ -645,7 +645,16 @@ impl From<TweakedPublicKey> for Value {
 }
 impl From<ExtendendPubKey> for Value {
     fn from(xpub: ExtendendPubKey) -> Self {
-        Value::PubKey(xpub.to_string().parse().unwrap())
+        Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
+            xkey: xpub,
+            derivation_path: DerivationPath::master(),
+            wildcard: descriptor::Wildcard::Unhardened,
+            origin: if xpub.depth > 0 {
+                Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
+            } else {
+                None
+            },
+        }))
     }
 }
 
