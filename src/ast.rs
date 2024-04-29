@@ -1,10 +1,9 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use lalrpop_util::ParseError;
 use miniscript::bitcoin;
 
-use crate::{grammar, Error};
+use crate::{grammar, Error, ParseError};
 
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]
@@ -255,7 +254,7 @@ impl FromStr for Stmts {
 impl_tryfrom_fromstr!(Stmts);
 
 impl Expr {
-    pub fn bytes_from_hex(s: &str) -> Result<Expr, Error> {
+    pub fn bytes_from_hex(s: &str) -> Result<Expr, ParseError> {
         use miniscript::bitcoin::hashes::hex::FromHex;
         Ok(Expr::Bytes(Vec::from_hex(s)?))
     }

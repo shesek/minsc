@@ -29,7 +29,7 @@ use std::convert::TryInto;
 use std::str::FromStr;
 
 pub use ast::{Expr, Ident, Stmt, Stmts};
-pub use error::{Error, Result};
+pub use error::{Error, ParseError, Result};
 pub use runtime::{Evaluate, Number::*, Value};
 pub use scope::Scope;
 

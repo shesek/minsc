@@ -1,11 +1,11 @@
 use std::str::FromStr;
-use crate::{ast, Expr, Stmt, Error};
+use crate::{ast, Expr, Stmt, ParseError};
 use crate::util::concat;
 
 grammar;
 
 extern {
-  type Error = Error;
+  type Error = ParseError;
 }
 
 match {
@@ -88,9 +88,9 @@ Return = {
 Number = { Int, Float };
 
 Int: Expr = <s:r"-?\d{1,39}"> =>?
-  Ok(i64::from_str(<>).map_err(Error::from)?.into());
+  Ok(i64::from_str(<>).map_err(ParseError::from)?.into());
 Float: Expr = <s:r"-?\d{1,39}\.\d{1,39}"> =>?
-  Ok(f64::from_str(<>).map_err(Error::from)?.into());
+  Ok(f64::from_str(<>).map_err(ParseError::from)?.into());
 
 IdentTerm: ast::Ident = <s:r"[a-zA-Z_$][a-zA-Z0-9_$]{0,38}"> => ast::Ident(<>.into());
 Ident: Expr = IdentTerm => <>.into();

@@ -1,6 +1,3 @@
-use lalrpop_util::ParseError;
-use std::fmt;
-
 use miniscript::bitcoin::{
     self, amount, bip32, hashes, hex, key, network, script, taproot, witness_program,
 };
@@ -99,7 +96,7 @@ pub enum Error {
     InvalidDurationTimeOutOfRange,
 
     #[error("Parser error: {0}")]
-    ParseError(String),
+    LalrParseError(String),
 
     #[error("Invalid arguments")]
     InvalidArguments,
@@ -170,17 +167,8 @@ pub enum Error {
     #[error("Hash error: {0}")]
     HashError(hashes::FromSliceError),
 
-    #[error("Invalid hex: {0}")]
-    HexError(hex::HexToBytesError),
-
     #[error("IO error: {0:?}")]
     Io(std::io::Error),
-
-    #[error("ParseFloatError: {0}")]
-    ParseFloatError(std::num::ParseFloatError),
-
-    #[error("ParseFloatError: {0}")]
-    ParseIntError(std::num::ParseIntError),
 
     #[error("Bitcoin key error: {0}")]
     BitcoinKey(key::Error),
@@ -226,26 +214,12 @@ pub enum Error {
     ParseNetworkError(network::ParseNetworkError),
 }
 
-impl<L, T, E> From<ParseError<L, T, E>> for Error
-where
-    L: fmt::Display,
-    T: fmt::Display,
-    E: fmt::Display,
-{
-    fn from(err: ParseError<L, T, E>) -> Self {
-        Error::ParseError(err.to_string())
-    }
-}
-
 impl_from_variant!(descriptor::ConversionError, Error, DescriptorConversion);
 impl_from_variant!(miniscript::Error, Error, MiniscriptError);
 impl_from_variant!(CompilerError, Error, MiniscriptCompilerError);
 impl_from_variant!(hashes::FromSliceError, Error, HashError);
-impl_from_variant!(hex::HexToBytesError, Error, HexError);
 impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
-impl_from_variant!(std::num::ParseFloatError, Error, ParseFloatError);
-impl_from_variant!(std::num::ParseIntError, Error, ParseIntError);
 impl_from_variant!(key::Error, Error, BitcoinKey);
 impl_from_variant!(bip32::Error, Error, Bip32);
 impl_from_variant!(taproot::TaprootError, Error, TaprootError);
@@ -257,17 +231,41 @@ impl_from_variant!(
     Error,
     DescriptorKeyParse
 );
-
 impl_from_variant!(std::string::FromUtf8Error, Error, Utf8Error);
 impl_from_variant!(std::convert::Infallible, Error, Infallible);
 impl_from_variant!(amount::ParseAmountError, Error, ParseAmountError);
 impl_from_variant!(witness_program::Error, Error, WitnessProgError);
 impl_from_variant!(script::PushBytesError, Error, PushBytesError);
-impl_from_variant!(Box<TranslateErr<Error>>, Error, TranslateError);
 impl_from_variant!(network::ParseNetworkError, Error, ParseNetworkError);
+
+type LalrParseError<'a> =
+    lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token<'a>, ParseError>;
+
+impl<'a> From<LalrParseError<'a>> for Error {
+    fn from(e: LalrParseError<'a>) -> Self {
+        //Error::LalrParseError(Box::new(e))
+        Error::LalrParseError(e.to_string())
+    }
+}
 
 impl From<TranslateErr<Error>> for Error {
     fn from(e: TranslateErr<Error>) -> Self {
-        Box::new(e).into()
+        Error::TranslateError(Box::new(e))
     }
 }
+
+#[derive(thiserror::Error, Debug)]
+pub enum ParseError {
+    #[error("ParseFloatError: {0}")]
+    ParseFloatError(std::num::ParseFloatError),
+
+    #[error("ParseIntError: {0}")]
+    ParseIntError(std::num::ParseIntError),
+
+    #[error("Invalid hex: {0}")]
+    HexError(hex::HexToBytesError),
+}
+
+impl_from_variant!(std::num::ParseFloatError, ParseError, ParseFloatError);
+impl_from_variant!(std::num::ParseIntError, ParseError, ParseIntError);
+impl_from_variant!(hex::HexToBytesError, ParseError, HexError);
