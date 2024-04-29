@@ -191,6 +191,10 @@ pub enum Error {
     #[error("UTF-8 error: {0}")]
     Utf8Error(std::string::FromUtf8Error),
 
+    // needed so that Infallible conversions can be used with `?`
+    #[error("Infallible (can never be constructed)")]
+    Infallible(std::convert::Infallible),
+
     #[error("Witness program error: {0}")]
     WitnessProgError(witness_program::Error),
 
@@ -235,6 +239,7 @@ impl_from_variant!(
 );
 
 impl_from_variant!(std::string::FromUtf8Error, Error, Utf8Error);
+impl_from_variant!(std::convert::Infallible, Error, Infallible);
 impl_from_variant!(amount::ParseAmountError, Error, ParseAmountError);
 impl_from_variant!(witness_program::Error, Error, WitnessProgError);
 impl_from_variant!(script::PushBytesError, Error, PushBytesError);

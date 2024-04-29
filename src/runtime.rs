@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
+use std::str::FromStr;
 
 use bitcoin::bip32::{ChildNumber, DerivationPath, ExtendendPubKey};
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
@@ -13,7 +14,7 @@ use bitcoin::{
     Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
 };
 use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
-use miniscript::{bitcoin, ScriptContext};
+use miniscript::{bitcoin, descriptor, ScriptContext};
 
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
@@ -38,7 +39,6 @@ pub enum Value {
     Descriptor(Descriptor),
     Script(ScriptBuf),
     Address(Address),
-
     TapInfo(TaprootSpendInfo),
 
     Function(Function),
@@ -719,6 +719,14 @@ impl Value {
             Value::TapInfo(_) => "tapinfo",
             Value::Array(_) => "array",
         }
+    }
+}
+
+// Parse & evaluate the string code in the default global scope to produce a Value
+impl FromStr for Value {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        s.parse::<Expr>()?.eval(&Scope::root())
     }
 }
 

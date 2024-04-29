@@ -11,6 +11,18 @@ macro_rules! impl_from_variant {
     };
 }
 
+// Implement TryFrom<&str> for a type that implements FromStr
+macro_rules! impl_tryfrom_fromstr {
+    ($type:ident) => {
+        impl TryFrom<&str> for $type {
+            type Error = <$type as FromStr>::Err;
+            fn try_from(s: &str) -> Result<Self, Self::Error> {
+                s.parse()
+            }
+        }
+    };
+}
+
 macro_rules! ensure {
     ($cond:expr, $e:expr) => {
         if !($cond) {

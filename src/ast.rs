@@ -1,4 +1,10 @@
+use std::convert::TryFrom;
+use std::str::FromStr;
+
+use lalrpop_util::ParseError;
 use miniscript::bitcoin;
+
+use crate::{grammar, Error};
 
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]
@@ -221,7 +227,24 @@ pub struct Stmts {
 
 pub type Library = Stmts;
 
-use lalrpop_util::ParseError;
+impl FromStr for Expr {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parser = grammar::ProgramParser::new();
+        Ok(parser.parse(s)?)
+    }
+}
+impl_tryfrom_fromstr!(Expr);
+
+impl FromStr for Stmts {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parser = grammar::StmtsParser::new();
+        Ok(parser.parse(s)?)
+    }
+}
+impl_tryfrom_fromstr!(Stmts);
+
 type LalrError = ParseError<usize, lalrpop_util::lexer::Token<'static>, String>;
 
 impl Expr {
