@@ -2,7 +2,7 @@ use lalrpop_util::ParseError;
 use std::fmt;
 
 use miniscript::bitcoin::{
-    self, amount, bip32, hashes, hex, key, script, taproot, witness_program,
+    self, amount, bip32, hashes, hex, key, network, script, taproot, witness_program,
 };
 use miniscript::policy::compiler::CompilerError;
 use miniscript::{descriptor, TranslateErr};
@@ -199,6 +199,9 @@ pub enum Error {
 
     #[error("Key translation error: {0:?}")]
     TranslateError(Box<miniscript::TranslateErr<Error>>),
+
+    #[error("Parse network error: {0}")]
+    ParseNetworkError(network::ParseNetworkError),
 }
 
 impl<L, T, E> From<ParseError<L, T, E>> for Error
@@ -236,6 +239,7 @@ impl_from_variant!(amount::ParseAmountError, Error, ParseAmountError);
 impl_from_variant!(witness_program::Error, Error, WitnessProgError);
 impl_from_variant!(script::PushBytesError, Error, PushBytesError);
 impl_from_variant!(Box<TranslateErr<Error>>, Error, TranslateError);
+impl_from_variant!(network::ParseNetworkError, Error, ParseNetworkError);
 
 impl From<TranslateErr<Error>> for Error {
     fn from(e: TranslateErr<Error>) -> Self {
