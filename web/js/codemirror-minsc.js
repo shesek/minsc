@@ -5,7 +5,7 @@ CodeMirror.defineSimpleMode("minsc",{
     // Time durations
     {regex: /\d+(\.\d+)?\s+(years?|months?|weeks?|days?|hours?|min(?:utes?|s)|seconds?)\b/, token: "number"},
     // BTC amounts
-    {regex: /\d+(\.\d+)? (BTC|mBTC|uBTC|bits?|satoshis?|sats?|msats?)\b/, token: "number"},
+    {regex: /(?:BTC|mBTC|uBTC|bits?|satoshis?|sats?|msats?)\b/, token: "builtin"},
     // Block height durations
     {regex: /\d+\s+blocks?\b/, token: "number"},
     // Dates

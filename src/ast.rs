@@ -23,6 +23,7 @@ pub enum Expr {
     FnExpr(FnExpr),
     Infix(Infix),
     Not(Not),
+    BtcAmount(BtcAmount),
 
     PubKey(String),
     Bytes(Vec<u8>),
@@ -31,12 +32,10 @@ pub enum Expr {
     Float(f64),
     Duration(Duration),
     DateTime(DateTime),
-    BtcAmount(bitcoin::SignedAmount),
 }
 
 impl_from_variant!(i64, Expr, Int);
 impl_from_variant!(f64, Expr, Float);
-impl_from_variant!(bitcoin::SignedAmount, Expr, BtcAmount);
 
 /// Statements have side-effects and don't produce a value
 #[derive(Debug, Clone)]
@@ -191,6 +190,11 @@ pub enum DurationPart {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DateTime(pub String);
 impl_from_variant!(DateTime, Expr);
+
+// BTC amounts with denomination
+#[derive(Debug, Clone)]
+pub struct BtcAmount(pub Box<Expr>, pub bitcoin::Denomination);
+impl_from_variant!(BtcAmount, Expr);
 
 /// A function definition statement
 #[derive(Debug, Clone)]

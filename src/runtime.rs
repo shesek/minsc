@@ -419,6 +419,14 @@ impl Evaluate for ast::DateTime {
     }
 }
 
+impl Evaluate for ast::BtcAmount {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let amount_n = self.0.eval(scope)?.into_f64()?;
+        let amount = bitcoin::SignedAmount::from_float_in(amount_n, self.1)?;
+        Ok(Value::from(amount.to_sat()))
+    }
+}
+
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &Scope) -> Result<Value> {
@@ -466,10 +474,10 @@ impl Evaluate for Expr {
             Expr::FnExpr(x) => x.eval(scope)?,
             Expr::Infix(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
+            Expr::BtcAmount(x) => x.eval(scope)?,
 
             Expr::Duration(x) => x.eval(scope)?,
             Expr::DateTime(x) => x.eval(scope)?,
-            Expr::BtcAmount(x) => Value::Number(x.to_sat().into()),
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::String(x) => Value::String(x.clone()),
