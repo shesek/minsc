@@ -240,7 +240,7 @@ impl Evaluate for ast::ArrayAccess {
                 ensure!(index < bytes.len(), Error::ArrayIndexOutOfRange);
                 (bytes.remove(index) as i64).into()
             }
-            other => bail!(Error::NotArray(other)),
+            other => bail!(Error::NoArrayAccess(other)),
         })
     }
 }

@@ -29,6 +29,9 @@ pub enum Error {
     #[error("Expected an array, not {0:?}")]
     NotArray(Value),
 
+    #[error("Accessing by index is possible on Array/Bytes, not {0:?}")]
+    NoArrayAccess(Value),
+
     #[error("Expected a number, not {0:?}")]
     NotNumber(Value),
 
@@ -137,14 +140,14 @@ pub enum Error {
     #[error("{0:?} error: {1}")]
     InfixOpError(InfixOp, Box<Error>),
 
-    #[error("invalid arguments: ({0}, {1})")]
+    #[error("Invalid arguments: ({0}, {1})")]
     InfixOpArgs(Value, Value),
 
     #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
     InfixOpMixedNum(Value, Value),
 
     #[error("Descriptor key parse error: {0}")]
-    DescriptorKeyParse(descriptor::DescriptorKeyParseError),
+    DescKeyParse(descriptor::DescriptorKeyParseError),
 
     #[error("Descriptor conversion error: {0}")]
     DescriptorConversion(descriptor::ConversionError),
@@ -179,7 +182,7 @@ pub enum Error {
     #[error("Bitcoin amount parse error: {0}")]
     ParseAmountError(amount::ParseAmountError),
 
-    #[error("number type conversion failed (likely an unexpected negative number)")]
+    #[error("number type conversion failed (unexpected negative number?)")]
     TryFromInt(std::num::TryFromIntError),
 
     #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
@@ -191,11 +194,8 @@ pub enum Error {
     #[error("Invalid taproot binary script tree structure. Expecting a nested array where elements are leaf nodes (with no weights) or a tuple of nodes.")]
     TaprootInvalidScriptBinaryTree,
 
-    #[error("Invalid taproot script. expecting Policy/Script or an array of them, an empty array, or the merkle root hash")]
+    #[error("Invalid taproot script. Expecting Policy/Script or an array of them, an empty array, or the merkle root hash")]
     TaprootInvalidScript,
-
-    #[error("UTF-8 error: {0}")]
-    Utf8Error(std::string::FromUtf8Error),
 
     // needed so that Infallible conversions can be used with `?`
     #[error("Infallible (can never be constructed)")]
@@ -226,12 +226,7 @@ impl_from_variant!(taproot::TaprootError, Error, TaprootError);
 impl_from_variant!(taproot::TaprootBuilderError, Error, TaprootBuilderError);
 impl_from_variant!(bitcoin::secp256k1::Error, Error, Secp256k1Error);
 impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
-impl_from_variant!(
-    descriptor::DescriptorKeyParseError,
-    Error,
-    DescriptorKeyParse
-);
-impl_from_variant!(std::string::FromUtf8Error, Error, Utf8Error);
+impl_from_variant!(descriptor::DescriptorKeyParseError, Error, DescKeyParse);
 impl_from_variant!(std::convert::Infallible, Error, Infallible);
 impl_from_variant!(amount::ParseAmountError, Error, ParseAmountError);
 impl_from_variant!(witness_program::Error, Error, WitnessProgError);
