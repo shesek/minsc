@@ -80,7 +80,9 @@ Return = {
   "return" <Expr> ";"?,
 };
 
+//
 // Expressions
+//
 
 Number = { Int, Float };
 Int: Expr = <IntInner> => ast::Expr::Int(<>);
@@ -235,12 +237,15 @@ DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
 BtcAmount: Expr = <num:SExpr> <denom:BtcDenomination> =>
   ast::BtcAmount(num.into(), denom.parse().unwrap()).into();
 
-BtcDenomination: &'input str = {
-  "BTC", "mBTC", "uBTC", "bit", "bits", "satoshi", "satoshis", "sat", "sats", "msat", "msats"
+BtcDenomination = {
+  "BTC", "mBTC", "uBTC",
+  "bit", "bits", "satoshi", "satoshis",
+  "sat", "sats", "msat", "msats",
 };
 
-
+//
 // Statements
+//
 
 Assign: Stmt = "let"? <assigns:List1<Assignment, ",">> ";" =>
     ast::Assign(assigns).into();
