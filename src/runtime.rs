@@ -45,19 +45,6 @@ pub enum Value {
     Array(Vec<Value>),
 }
 
-impl_from_variant!(Policy, Value);
-impl_from_variant!(Descriptor, Value);
-impl_from_variant!(DescriptorPublicKey, Value, PubKey);
-impl_from_variant!(ScriptBuf, Value, Script);
-impl_from_variant!(Address, Value);
-impl_from_variant!(Vec<Value>, Value, Array);
-impl_from_variant!(Vec<u8>, Value, Bytes);
-impl_from_variant!(String, Value);
-impl_from_variant!(Network, Value);
-impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
-impl_from_variant!(Number, Value);
-impl_from_variant!(bool, Value, Bool);
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     Int(i64),
@@ -75,6 +62,11 @@ pub trait Evaluate {
 pub trait Execute {
     fn exec(&self, scope: &mut Scope) -> Result<()>;
 }
+
+
+//
+// Execution
+//
 
 impl Execute for ast::Assign {
     fn exec(&self, scope: &mut Scope) -> Result<()> {
@@ -105,7 +97,7 @@ impl Execute for ast::IfStmt {
     }
 }
 
-impl Execute for Stmt {
+impl Execute for ast::Stmt {
     fn exec(&self, scope: &mut Scope) -> Result<()> {
         match self {
             Stmt::FnDef(x) => x.exec(scope),
@@ -114,6 +106,19 @@ impl Execute for Stmt {
         }
     }
 }
+
+impl Execute for ast::Stmts {
+    fn exec(&self, scope: &mut Scope) -> Result<()> {
+        for stmt in &self.stmts {
+            stmt.exec(scope)?;
+        }
+        Ok(())
+    }
+}
+
+//
+// Evaluation
+//
 
 impl Evaluate for ast::Call {
     fn eval(&self, scope: &Scope) -> Result<Value> {
@@ -457,16 +462,6 @@ impl Evaluate for ast::Block {
     }
 }
 
-impl Execute for ast::Stmts {
-    // Execute the statements in the given scope, producing visible side-effects
-    fn exec(&self, scope: &mut Scope) -> Result<()> {
-        for stmt in &self.stmts {
-            stmt.exec(scope)?;
-        }
-        Ok(())
-    }
-}
-
 impl Evaluate for Expr {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         Ok(match self {
@@ -546,7 +541,22 @@ impl<T: Into<Function>> From<T> for Value {
     }
 }
 
-// Simple conversion from Value to the underlying enum inner type, with no specialized type coercion logic
+// From the underlying enum inner type to Value
+impl_from_variant!(Policy, Value);
+impl_from_variant!(Descriptor, Value);
+impl_from_variant!(DescriptorPublicKey, Value, PubKey);
+impl_from_variant!(ScriptBuf, Value, Script);
+impl_from_variant!(Address, Value);
+impl_from_variant!(Vec<Value>, Value, Array);
+impl_from_variant!(Vec<u8>, Value, Bytes);
+impl_from_variant!(String, Value);
+impl_from_variant!(Network, Value);
+impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
+impl_from_variant!(Number, Value);
+impl_from_variant!(bool, Value, Bool);
+
+// From Value to the underlying enum inner type
+// Simple extraction of the enum variant, with no specialized type coercion logic
 macro_rules! impl_simple_into_variant_conv {
     ($type:path, $variant:ident, $into_fn_name:ident, $error:ident) => {
         impl TryFrom<Value> for $type {
@@ -759,6 +769,10 @@ impl_hash_conv!(hashes::sha256d::Hash);
 impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
 impl_hash_conv!(miniscript::hash256::Hash);
+
+//
+// Value methods & traits
+//
 
 impl Value {
     pub fn is_array(&self) -> bool {
