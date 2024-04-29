@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
 use bitcoin::hashes::{sha256, Hash};
 
-use crate::runtime::{Execute, Value};
+use crate::runtime::{Execute, Number, Value};
 use crate::{ast, parse_lib, time, Result, Scope};
 
 pub mod ctv;
@@ -32,8 +32,10 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Functions
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("typeof", fns::r#typeof).unwrap();
-    scope.set_fn("rawscript", fns::rawscript).unwrap();
+    scope.set_fn("int", fns::int).unwrap();
+    scope.set_fn("float", fns::float).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
+    scope.set_fn("rawscript", fns::rawscript).unwrap();
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
@@ -85,6 +87,26 @@ pub mod fns {
     pub fn r#typeof(args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(args[0].type_of().to_string().into())
+    }
+
+    pub fn int(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+
+        let num = match args.remove(0).into_number()? {
+            Number::Int(n) => n,
+            Number::Float(n) if n.is_finite() && n >= i64::MIN as f64 && n <= i64::MAX as f64 => {
+                // non-whole floats are accepted and rounded down, unlike the implicit coercion in TryInto<i64>
+                n as i64
+            }
+            Number::Float(_) => bail!(Error::Overflow),
+        };
+
+        Ok(num.into())
+    }
+
+    pub fn float(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1, Error::InvalidArguments);
+        Ok(args.remove(0).into_f64()?.into())
     }
 
     // rawscript(Bytes) -> Script

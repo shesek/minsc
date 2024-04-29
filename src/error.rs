@@ -35,7 +35,7 @@ pub enum Error {
     #[error("Expected a number, not {0:?}")]
     NotNumber(Value),
 
-    #[error("Expected an integer or a float that can be converted to an integer, not {0:?}")]
+    #[error("Expected an integer or a whole float within integer range, not {0:?}")]
     NotIntLike(f64),
 
     #[error("Expected a boolean, not {0:?}")]
