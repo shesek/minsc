@@ -71,6 +71,7 @@ SExpr: Expr = {
   Bytes,
   String,
   Call,
+  Paren<Expr>,
   BlockExpr,
 };
 
@@ -118,10 +119,9 @@ ArrayCurly: Expr = "{" <e1:Expr> "," <e2:Expr> "}" =>
 
 Array: Expr = { ArraySquare, ArrayCurly }
 
-ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:ArrayAccessRHS> =>
+ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:SExpr> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
 ArrayAccessLHS = { Ident, Call, Array, BlockExpr, Bytes, ArrayAccess };
-ArrayAccessRHS = { SExpr, Paren<Expr> };
 
 // An xpub or compressed standalone public key (uncompressed is unsupported), with optional bip32 origin
 PubKey: Expr = <s:r"(\[[a-fA-F0-9]{8}(/\d+['h]?)*\])?([a-fA-F0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>
@@ -160,7 +160,7 @@ ChildDeriveWildcard = { "/*", "/ *" };
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
   ast::ScriptFrag { fragments }.into();
 ScriptFragPart = { ScriptFragPart_, "<" <SimpleExpr> ">", "<" <Duration> ">" };
-ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes, String, DateTime, BtcAmount, Array };
+ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes, String, DateTime, Array };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();
@@ -211,7 +211,7 @@ DurationTimePart: ast::DurationPart = <n:DurationTimeNum> <i:DurationTimeUnit> =
   (n.into(), i);
 
 // Similar to SExpr, but without BlockExpr which for some reason cannot be contained here directly
-// Paren<Expr> is available instead, which can be a Paren<BlockExpr>
+// Paren<BlockExpr> can be used instead
 DurationTimeNum: Expr = { Number, Call, Ident, Paren<Expr> };
 
 DurationTimeUnit: ast::DurationUnit = {
