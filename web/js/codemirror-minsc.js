@@ -13,7 +13,7 @@ CodeMirror.defineSimpleMode("minsc",{
     // Xpubs, single keys & hashes
     {regex: /\b([a-fA-F0-9]{8}|[a-fA-F0-9]{40,130}|0x[a-fA-F0-9]*|[xt]pub[0-9a-zA-Z]{100,120})\b/, token: "number"},
     // Numbers
-    {regex: /\b-?\d+\b/, token: "number"},
+    {regex: /\b-?\d+(?:\.\d+)?\b/, token: "number"},
     // Strings
     {regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: "string"},
 

@@ -35,6 +35,9 @@ pub enum Error {
     #[error("Expected a number, not {0:?}")]
     NotNumber(Value),
 
+    #[error("Expected an integer or a float that can be converted to an integer, not {0:?}")]
+    NotIntLike(f64),
+
     #[error("Expected a boolean, not {0:?}")]
     NotBool(Value),
 
@@ -68,8 +71,11 @@ pub enum Error {
     #[error("Cannot represent as a scriptPubKey: {0:?}")]
     NotSpkLike(Value),
 
-    #[error("Invalid script fragment {0:?}")]
+    #[error("Invalid script fragment: {0:?}")]
     InvalidScriptFrag(Value),
+
+    #[error("Only integers can be interpolated as script fragments, received a float: {0:?}")]
+    InvalidScriptFragIntOnly(f64),
 
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,

@@ -29,7 +29,7 @@ pub enum Value {
     PubKey(DescriptorPublicKey),
     Bytes(Vec<u8>),
     String(String),
-    Number(i64),
+    Number(Number),
     Bool(bool),
     Network(Network),
 
@@ -55,18 +55,40 @@ impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(String, Value);
 impl_from_variant!(Network, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
-impl_from_variant!(i64, Value, Number);
+impl_from_variant!(Number, Value);
 impl_from_variant!(bool, Value, Bool);
-impl From<usize> for Value {
-    fn from(num: usize) -> Self {
-        Value::Number(num.try_into().unwrap())
-    }
-}
+
 impl<T: Into<Function>> From<T> for Value {
     fn from(f: T) -> Self {
         Value::Function(f.into())
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Number {
+    Int(i64),
+    Float(f64),
+}
+impl_from_variant!(i64, Number, Int);
+impl_from_variant!(f64, Number, Float);
+
+impl From<i64> for Value {
+    fn from(n: i64) -> Value {
+        Number::Int(n).into()
+    }
+}
+impl From<f64> for Value {
+    fn from(n: f64) -> Value {
+        Number::Float(n).into()
+    }
+}
+impl From<usize> for Value {
+    fn from(num: usize) -> Self {
+        // TODO this should use TryFrom
+        Number::Int(num.try_into().unwrap()).into()
+    }
+}
+
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -251,7 +273,7 @@ impl Evaluate for ast::ChildDerive {
             node = match derivation_step.eval(scope)? {
                 // Derive with a BIP 32 child code index number
                 Value::Number(child_num) => {
-                    let child_num = ChildNumber::from_normal_idx(child_num.try_into()?)?;
+                    let child_num = ChildNumber::from_normal_idx(child_num.into_u32()?)?;
                     node.derive_path(&[child_num][..], self.is_wildcard)?
                 }
 
@@ -307,7 +329,7 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
         Value::Script(script) => script,
 
         // As data pushes
-        Value::Number(n) => push_int(n),
+        Value::Number(Number::Int(n)) => push_int(n),
         Value::Bool(val) => push_int(val as i64),
         Value::Bytes(bytes) => push_slice(bytes)?,
         Value::String(string) => push_slice(string.into_bytes())?,
@@ -328,6 +350,7 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
             ScriptBuf::from(scriptbytes)
         }
 
+        Value::Number(Number::Float(n)) => bail!(Error::InvalidScriptFragIntOnly(n)),
         v => bail!(Error::InvalidScriptFrag(v)),
     })
     // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible
@@ -350,29 +373,43 @@ impl Evaluate for ast::Infix {
 impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value) -> Result<Value> {
         use ast::InfixOp::*;
-        use Value::*;
+        use Number::{Float, Int};
+        use Value::{Array, Bytes, Number as Num, Policy, PubKey, Script, String, WithProb};
 
         Ok(match (self, lhs, rhs) {
             // == != for all types
             (Eq, a, b) => (a == b).into(),
             (NotEq, a, b) => (a != b).into(),
-            // < > <= >= for numbers only
-            (Gt, Number(a), Number(b)) => (a > b).into(),
-            (Lt, Number(a), Number(b)) => (a < b).into(),
-            (Gte, Number(a), Number(b)) => (a >= b).into(),
-            (Lte, Number(a), Number(b)) => (a <= b).into(),
-            // + - * for numbers
-            (Add, Number(a), Number(b)) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
-            (Subtract, Number(a), Number(b)) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
-            (Multiply, Number(a), Number(b)) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
+
+            // < > <= >= for numbers (Ints and Floats cannot be mixed)
+            (Gt, Num(Int(a)), Num(Int(b))) => (a > b).into(),
+            (Lt, Num(Int(a)), Num(Int(b))) => (a < b).into(),
+            (Gte, Num(Int(a)), Num(Int(b))) => (a >= b).into(),
+            (Lte, Num(Int(a)), Num(Int(b))) => (a <= b).into(),
+
+            (Gt, Num(Float(a)), Num(Float(b))) => (a > b).into(),
+            (Lt, Num(Float(a)), Num(Float(b))) => (a < b).into(),
+            (Gte, Num(Float(a)), Num(Float(b))) => (a >= b).into(),
+            (Lte, Num(Float(a)), Num(Float(b))) => (a <= b).into(),
+
+            // + - * for numbers (Ints and Floats cannot be mixed)
+            (Add, Num(Int(a)), Num(Int(b))) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
+            (Subtract, Num(Int(a)), Num(Int(b))) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
+            (Multiply, Num(Int(a)), Num(Int(b))) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
+
+            (Add, Num(Float(a)), Num(Float(b))) => (a + b).into(),
+            (Subtract, Num(Float(a)), Num(Float(b))) => (a - b).into(),
+            (Multiply, Num(Float(a)), Num(Float(b))) => (a * b).into(),
+
             // + for arrays
             (Add, Array(a), Array(b)) => [a, b].concat().into(),
             // + for bytes
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             // + for strings
             (Add, String(a), String(b)) => [a, b].concat().into(),
+
             // @ to assign execution probability
-            (Prob, Number(prob), value) => WithProb(prob.try_into()?, value.into()),
+            (Prob, Num(prob), value) => WithProb(prob.into_usize()?, value.into()),
             // + for tap tweak (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
             | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
@@ -392,14 +429,14 @@ impl Evaluate for ast::Duration {
             .clone()
             .into_u32()?;
         let seq_num = time::duration_to_seq(self, block_interval)?;
-        Ok(Value::Number(seq_num as i64))
+        Ok(Value::from(seq_num as i64))
     }
 }
 
 impl Evaluate for ast::DateTime {
     fn eval(&self, _: &Scope) -> Result<Value> {
         let unix_timestamp = time::parse_datetime(&self.0)?;
-        Ok(Value::Number(unix_timestamp as i64))
+        Ok(Value::from(unix_timestamp as i64))
     }
 }
 
@@ -453,11 +490,12 @@ impl Evaluate for Expr {
 
             Expr::Duration(x) => x.eval(scope)?,
             Expr::DateTime(x) => x.eval(scope)?,
-            Expr::BtcAmount(x) => Value::Number(x.to_sat()),
+            Expr::BtcAmount(x) => Value::Number(x.to_sat().into()),
             Expr::PubKey(x) => Value::PubKey(x.parse()?),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::String(x) => Value::String(x.clone()),
-            Expr::Number(x) => Value::Number(*x),
+            Expr::Int(x) => Value::Number(Number::Int(*x)),
+            Expr::Float(x) => Value::Number(Number::Float(*x)),
         })
     }
 }
@@ -503,20 +541,54 @@ macro_rules! impl_simple_into_variant_conv {
     };
 }
 impl_simple_into_variant_conv!(bool, Bool, into_bool, NotBool);
-impl_simple_into_variant_conv!(i64, Number, into_i64, NotNumber);
+impl_simple_into_variant_conv!(Number, Number, into_number, NotNumber);
 impl_simple_into_variant_conv!(Vec<Value>, Array, into_array, NotArray);
 impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
 impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
 impl_simple_into_variant_conv!(String, String, into_string, NotString);
 
-// Conversion from the runtime Number (always an i64) to other number types, with overflow check
-macro_rules! impl_num_conv {
-    ($type:path, $fn_name:ident) => {
+
+impl TryInto<f64> for Value {
+    type Error = Error;
+    fn try_into(self) -> Result<f64> {
+        Ok(match self.into_number()? {
+            Number::Float(n) => n,
+            Number::Int(n) => n as f64, // always safe to convert
+        })
+    }
+}
+
+// Conversion from runtime Value::Number (i64 or f64) to primitive integer types, with overflow checks
+// Automatically coerces floats into integers when they are whole, finite and within the integer type range
+macro_rules! impl_int_num_conv {
+    ($type:ident, $fn_name:ident) => {
+        impl TryFrom<Number> for $type {
+            type Error = Error;
+            fn try_from(number: Number) -> Result<Self> {
+                fn safe_int_from_f64(n: f64) -> bool {
+                    n.is_finite()
+                        && n.fract() == 0.0
+                        && n >= $type::MIN as f64
+                        && n <= $type::MAX as f64
+                }
+                Ok(match number {
+                    Number::Int(n) => n.try_into()?,
+                    Number::Float(n) if safe_int_from_f64(n) => n as $type,
+                    Number::Float(n) => bail!(Error::NotIntLike(n)),
+                })
+            }
+        }
         impl TryFrom<Value> for $type {
             type Error = Error;
             fn try_from(value: Value) -> Result<Self> {
-                Ok(value.into_i64()?.try_into()?)
+                // Delegate to TryFrom above
+                value.into_number()?.try_into()
+            }
+        }
+        impl Number {
+            pub fn $fn_name(self) -> Result<$type> {
+                self.try_into()
             }
         }
         impl Value {
@@ -526,10 +598,11 @@ macro_rules! impl_num_conv {
         }
     };
 }
-impl_num_conv!(usize, into_usize);
-impl_num_conv!(u32, into_u32);
-impl_num_conv!(u64, into_u64);
-impl_num_conv!(i32, into_i32);
+impl_int_num_conv!(i64, into_i64);
+impl_int_num_conv!(usize, into_usize);
+impl_int_num_conv!(u32, into_u32);
+impl_int_num_conv!(u64, into_u64);
+impl_int_num_conv!(i32, into_i32);
 
 impl TryFrom<Value> for Policy {
     type Error = Error;
@@ -677,7 +750,9 @@ impl Value {
     pub fn is_script(&self) -> bool {
         matches!(self, Value::Script(_))
     }
-
+    pub fn into_f64(self) -> Result<f64> {
+        self.try_into()
+    }
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
     }
@@ -765,6 +840,15 @@ impl fmt::Display for Value {
                 }
                 write!(f, " ]")
             }
+        }
+    }
+}
+
+impl fmt::Display for Number {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Number::Int(x) => write!(f, "{}", x),
+            Number::Float(x) => write!(f, "{:?}", x),
         }
     }
 }

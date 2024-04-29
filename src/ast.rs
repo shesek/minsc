@@ -27,13 +27,15 @@ pub enum Expr {
     PubKey(String),
     Bytes(Vec<u8>),
     String(String),
-    Number(i64),
+    Int(i64),
+    Float(f64),
     Duration(Duration),
     DateTime(DateTime),
     BtcAmount(bitcoin::SignedAmount),
 }
 
-impl_from_variant!(i64, Expr, Number);
+impl_from_variant!(i64, Expr, Int);
+impl_from_variant!(f64, Expr, Float);
 impl_from_variant!(bitcoin::SignedAmount, Expr, BtcAmount);
 
 /// Statements have side-effects and don't produce a value

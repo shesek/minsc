@@ -9,7 +9,7 @@ use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 use super::miniscript::into_policies;
 use crate::error::{Error, Result};
 use crate::util::EC;
-use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy, Scope, Value};
+use crate::{DescriptorDpk as Descriptor, Int, PolicyDpk as Policy, Scope, Value};
 
 // XXX mention in header that some miniscript stuff is over here
 pub fn attach_stdlib(scope: &mut Scope) {
@@ -87,7 +87,7 @@ pub mod fns {
             .pop()
             .map_or(Ok(LeafVersion::TapScript), |v| -> Result<_> {
                 let leaf_ver = match v {
-                    Value::Number(num) => num.try_into()?,
+                    Value::Number(Int(num)) => num.try_into()?,
                     Value::Bytes(bytes) if bytes.len() == 1 => bytes[0],
                     _ => bail!(Error::InvalidArguments),
                 };

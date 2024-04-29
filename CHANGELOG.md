@@ -103,6 +103,8 @@
 
 - New `Bool` type, available as the `true` and `false` variables in the root scope
 
+- The `Number` type can now represent floats
+
 - New operators: `+`, `-`, `*`, `!`, `==`, `!=`, `<`, `>`, `<=` and `>=`
 
 - New constants: `MIN_NUMBER`, `MAX_NUMBER`, `H_POINT` (point with unknown discrete logarithm for script-path-only p2tr), `LBTC`, `TLBTC`

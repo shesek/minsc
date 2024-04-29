@@ -30,7 +30,7 @@ use std::str::FromStr;
 
 pub use ast::{Expr, Ident, Stmts};
 pub use error::{Error, Result};
-pub use runtime::{Evaluate, Value};
+pub use runtime::{Evaluate, Number::*, Value};
 pub use scope::Scope;
 
 use miniscript::{descriptor, policy};

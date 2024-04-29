@@ -82,8 +82,11 @@ Return: Expr = {
 
 // Expressions
 
-Number: Expr = <INumber> => ast::Expr::Number(<>);
-INumber: i64 = <s:r"-?\d{1,39}"> => <>.parse().unwrap();
+Number: Expr = { Int, Float };
+Int: Expr = <IntInner> => ast::Expr::Int(<>);
+Float: Expr = <FloatInner> => ast::Expr::Float(<>);
+IntInner: i64 = <s:r"-?\d{1,39}"> => <>.parse().unwrap();
+FloatInner: f64 = <s:r"-?\d{1,39}\.\d{1,39}"> => <>.parse().unwrap();
 
 IdentTerm: ast::Ident = <s:r"[a-zA-Z_$][a-zA-Z0-9_$]{0,38}"> => ast::Ident(<>.into());
 Ident: Expr = IdentTerm => <>.into();
@@ -206,13 +209,13 @@ DurationClock: Expr = <heightwise:"heightwise"?> <parts:DurationClockPart+>  =>
   ast::Duration::BlockTime { parts, heightwise: heightwise.is_some() }.into();
 
 DurationClockPart: ast::DurationPart = {
-  <n:INumber> YearsAliases => ast::DurationPart::Years(n.try_into().unwrap()),
-  <n:INumber> MonthsAliases => ast::DurationPart::Months(n.try_into().unwrap()),
-  <n:INumber> WeeksAliases => ast::DurationPart::Weeks(n.try_into().unwrap()),
-  <n:INumber> DaysAliases => ast::DurationPart::Days(n.try_into().unwrap()),
-  <n:INumber> HoursAliases => ast::DurationPart::Hours(n.try_into().unwrap()),
-  <n:INumber> MinutesAliases => ast::DurationPart::Minutes(n.try_into().unwrap()),
-  <n:INumber> SecondsAliases => ast::DurationPart::Seconds(n.try_into().unwrap()),
+  <n:IntInner> YearsAliases => ast::DurationPart::Years(n.try_into().unwrap()),
+  <n:IntInner> MonthsAliases => ast::DurationPart::Months(n.try_into().unwrap()),
+  <n:IntInner> WeeksAliases => ast::DurationPart::Weeks(n.try_into().unwrap()),
+  <n:IntInner> DaysAliases => ast::DurationPart::Days(n.try_into().unwrap()),
+  <n:IntInner> HoursAliases => ast::DurationPart::Hours(n.try_into().unwrap()),
+  <n:IntInner> MinutesAliases => ast::DurationPart::Minutes(n.try_into().unwrap()),
+  <n:IntInner> SecondsAliases => ast::DurationPart::Seconds(n.try_into().unwrap()),
 }
 YearsAliases: &'input str = { "year", "years" };
 MonthsAliases: &'input str = { "month", "months" };
