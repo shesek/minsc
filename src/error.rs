@@ -137,8 +137,14 @@ pub enum Error {
     #[error("in {0}(): {1}")]
     CallError(Ident, Box<Error>),
 
-    #[error("in {0:?}: {1}")]
-    OpError(InfixOp, Box<Error>),
+    #[error("{0:?} error: {1}")]
+    InfixOpError(InfixOp, Box<Error>),
+
+    #[error("invalid arguments: ({0}, {1})")]
+    InfixOpArgs(Value, Value),
+
+    #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
+    InfixOpMixedNum(Value, Value),
 
     #[error("Descriptor key parse error: {0}")]
     DescriptorKeyParse(descriptor::DescriptorKeyParseError),

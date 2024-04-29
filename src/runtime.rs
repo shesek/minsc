@@ -63,7 +63,6 @@ pub trait Execute {
     fn exec(&self, scope: &mut Scope) -> Result<()>;
 }
 
-
 //
 // Execution
 //
@@ -347,7 +346,7 @@ impl Evaluate for ast::Infix {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         self.op
             .apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?)
-            .map_err(|e| Error::OpError(self.op, e.into()))
+            .map_err(|e| Error::InfixOpError(self.op, e.into()))
     }
 }
 
@@ -400,7 +399,14 @@ impl ast::InfixOp {
                 WithProb(prob.into_usize()?, v.into())
             }
 
-            _ => bail!(Error::InvalidArguments),
+            // Specialized error for mixed-up number types
+            (_, lhs @ Num(Int(_)), rhs @ Num(Float(_)))
+            | (_, lhs @ Num(Float(_)), rhs @ Num(Int(_))) => {
+                bail!(Error::InfixOpMixedNum(lhs, rhs))
+            }
+
+            // Generic error for all other unmatched invocations
+            (_, lhs, rhs) => bail!(Error::InfixOpArgs(lhs, rhs)),
         })
     }
 }
