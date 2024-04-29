@@ -58,12 +58,6 @@ impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl_from_variant!(Number, Value);
 impl_from_variant!(bool, Value, Bool);
 
-impl<T: Into<Function>> From<T> for Value {
-    fn from(f: T) -> Self {
-        Value::Function(f.into())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     Int(i64),
@@ -71,24 +65,6 @@ pub enum Number {
 }
 impl_from_variant!(i64, Number, Int);
 impl_from_variant!(f64, Number, Float);
-
-impl From<i64> for Value {
-    fn from(n: i64) -> Value {
-        Number::Int(n).into()
-    }
-}
-impl From<f64> for Value {
-    fn from(n: f64) -> Value {
-        Number::Float(n).into()
-    }
-}
-impl From<usize> for Value {
-    fn from(num: usize) -> Self {
-        // TODO this should use TryFrom
-        Number::Int(num.try_into().unwrap()).into()
-    }
-}
-
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -381,7 +357,7 @@ impl ast::InfixOp {
             (Eq, a, b) => (a == b).into(),
             (NotEq, a, b) => (a != b).into(),
 
-            // < > <= >= for numbers (Ints and Floats cannot be mixed)
+            // < > <= >= for numbers (integers and floats cannot be mixed)
             (Gt, Num(Int(a)), Num(Int(b))) => (a > b).into(),
             (Lt, Num(Int(a)), Num(Int(b))) => (a < b).into(),
             (Gte, Num(Int(a)), Num(Int(b))) => (a >= b).into(),
@@ -392,7 +368,7 @@ impl ast::InfixOp {
             (Gte, Num(Float(a)), Num(Float(b))) => (a >= b).into(),
             (Lte, Num(Float(a)), Num(Float(b))) => (a <= b).into(),
 
-            // + - * for numbers (Ints and Floats cannot be mixed)
+            // + - * for numbers (integers and floats cannot be mixed)
             (Add, Num(Int(a)), Num(Int(b))) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
             (Subtract, Num(Int(a)), Num(Int(b))) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
             (Multiply, Num(Int(a)), Num(Int(b))) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
@@ -408,13 +384,14 @@ impl ast::InfixOp {
             // + for strings
             (Add, String(a), String(b)) => [a, b].concat().into(),
 
-            // @ to assign execution probability
-            (Prob, Num(prob), value) => WithProb(prob.into_usize()?, value.into()),
             // + for tap tweak (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
             | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
                 stdlib::taproot::tap_tweak(k, s)?
             }
+
+            // @ to assign execution probability
+            (Prob, Num(prob), value) => WithProb(prob.into_usize()?, value.into()),
 
             _ => bail!(Error::InvalidArguments),
         })
@@ -520,8 +497,36 @@ fn eval_exprs<T: Borrow<Expr>>(scope: &Scope, exprs: &[T]) -> Result<Vec<Value>>
     exprs.iter().map(|arg| arg.borrow().eval(scope)).collect()
 }
 
-// Simple conversion, extract the specified variant from the Value or issue an error,
-// with no specialized type conversion logic
+//
+// Value conversions
+//
+
+// From primitive numbers to Value
+impl From<i64> for Value {
+    fn from(n: i64) -> Value {
+        Number::Int(n).into()
+    }
+}
+impl From<f64> for Value {
+    fn from(n: f64) -> Value {
+        Number::Float(n).into()
+    }
+}
+impl From<usize> for Value {
+    fn from(num: usize) -> Self {
+        // TODO this should use TryFrom
+        Number::Int(num.try_into().unwrap()).into()
+    }
+}
+
+// From NativeFunction/UserFunction to Value
+impl<T: Into<Function>> From<T> for Value {
+    fn from(f: T) -> Self {
+        Value::Function(f.into())
+    }
+}
+
+// Simple conversion from Value to the underlying enum inner type, with no specialized type coercion logic
 macro_rules! impl_simple_into_variant_conv {
     ($type:path, $variant:ident, $into_fn_name:ident, $error:ident) => {
         impl TryFrom<Value> for $type {
@@ -548,7 +553,8 @@ impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
 impl_simple_into_variant_conv!(String, String, into_string, NotString);
 
-
+// From Value to f64 primitive, with coercion rules
+// Extracts the f64 out of Number::Float, or casts Value::Int into one
 impl TryInto<f64> for Value {
     type Error = Error;
     fn try_into(self) -> Result<f64> {
@@ -559,7 +565,7 @@ impl TryInto<f64> for Value {
     }
 }
 
-// Conversion from runtime Value::Number (i64 or f64) to primitive integer types, with overflow checks
+// From Value/Number to primitive integer types, with coercion and overflow checks
 // Automatically coerces floats into integers when they are whole, finite and within the integer type range
 macro_rules! impl_int_num_conv {
     ($type:ident, $fn_name:ident) => {
@@ -582,7 +588,7 @@ macro_rules! impl_int_num_conv {
         impl TryFrom<Value> for $type {
             type Error = Error;
             fn try_from(value: Value) -> Result<Self> {
-                // Delegate to TryFrom above
+                // Extract the Value::Number, then delegate to TryFrom<Number> above
                 value.into_number()?.try_into()
             }
         }
@@ -604,6 +610,7 @@ impl_int_num_conv!(u32, into_u32);
 impl_int_num_conv!(u64, into_u64);
 impl_int_num_conv!(i32, into_i32);
 
+// From Value to Bitcoin/Miniscript types
 impl TryFrom<Value> for Policy {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -615,7 +622,6 @@ impl TryFrom<Value> for Policy {
         }
     }
 }
-
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -652,19 +658,6 @@ impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
         Ok(value.into_policy()?.compile()?)
     }
 }
-
-impl TryFrom<Value> for Vec<u8> {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(match value {
-            Value::Bytes(bytes) => bytes,
-            Value::String(string) => string.into_bytes(),
-            Value::Script(script) => script.into_bytes(),
-            v => bail!(Error::NotBytesLike(v)),
-        })
-    }
-}
-
 impl TryFrom<Value> for TaprootSpendInfo {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -679,30 +672,7 @@ impl TryFrom<Value> for TaprootSpendInfo {
     }
 }
 
-macro_rules! impl_hash_conv {
-    ($name:path) => {
-        impl TryFrom<Value> for $name {
-            type Error = Error;
-            fn try_from(value: Value) -> Result<Self> {
-                match value {
-                    Value::Bytes(b) => Ok(Self::from_slice(&b)?),
-                    v => Err(Error::NotHashLike(v)),
-                }
-            }
-        }
-        impl From<$name> for Value {
-            fn from(hash: $name) -> Self {
-                Value::Bytes(hash.to_byte_array().to_vec())
-            }
-        }
-    };
-}
-impl_hash_conv!(hashes::sha256::Hash);
-impl_hash_conv!(hashes::sha256d::Hash);
-impl_hash_conv!(hashes::ripemd160::Hash);
-impl_hash_conv!(hashes::hash160::Hash);
-impl_hash_conv!(miniscript::hash256::Hash);
-
+// From Bitcoin/Miniscript types to Value
 impl From<XOnlyPublicKey> for Value {
     fn from(key: XOnlyPublicKey) -> Self {
         Value::PubKey(DescriptorPublicKey::Single(SinglePub {
@@ -730,6 +700,45 @@ impl From<ExtendendPubKey> for Value {
         }))
     }
 }
+
+// From Value to Vec<u8>
+impl TryFrom<Value> for Vec<u8> {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
+            Value::Bytes(bytes) => bytes,
+            Value::String(string) => string.into_bytes(),
+            Value::Script(script) => script.into_bytes(),
+            v => bail!(Error::NotBytesLike(v)),
+        })
+    }
+}
+
+// From Value to Hash types +
+// From Hash types to Value
+macro_rules! impl_hash_conv {
+    ($name:path) => {
+        impl TryFrom<Value> for $name {
+            type Error = Error;
+            fn try_from(value: Value) -> Result<Self> {
+                match value {
+                    Value::Bytes(b) => Ok(Self::from_slice(&b)?),
+                    v => Err(Error::NotHashLike(v)),
+                }
+            }
+        }
+        impl From<$name> for Value {
+            fn from(hash: $name) -> Self {
+                Value::Bytes(hash.to_byte_array().to_vec())
+            }
+        }
+    };
+}
+impl_hash_conv!(hashes::sha256::Hash);
+impl_hash_conv!(hashes::sha256d::Hash);
+impl_hash_conv!(hashes::ripemd160::Hash);
+impl_hash_conv!(hashes::hash160::Hash);
+impl_hash_conv!(miniscript::hash256::Hash);
 
 impl Value {
     pub fn is_array(&self) -> bool {
