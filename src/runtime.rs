@@ -390,8 +390,10 @@ impl ast::InfixOp {
                 stdlib::taproot::tap_tweak(k, s)?
             }
 
-            // @ to assign execution probability
-            (Prob, Num(prob), value) => WithProb(prob.into_usize()?, value.into()),
+            // @ to assign execution probabilities (to Script/Policy only)
+            (Prob, Num(prob), v @ Policy(_) | v @ Script(_)) => {
+                WithProb(prob.into_usize()?, v.into())
+            }
 
             _ => bail!(Error::InvalidArguments),
         })
