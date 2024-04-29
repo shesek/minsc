@@ -374,7 +374,7 @@ fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descript
 // Get the TR_UNSPENDABLE key from scope. It may be set to false to disable it.
 fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
     // Must exists in scope because its set in the stdlib
-    Ok(match scope.get(&"TR_UNSPENDABLE".into()).unwrap().clone() {
+    Ok(match scope.builtin("TR_UNSPENDABLE").clone() {
         Value::Bool(val) if val == false => None,
         Value::PubKey(val) => Some(val),
         other => bail!(Error::InvalidTrUnspendable(other)),

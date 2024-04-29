@@ -166,9 +166,9 @@ pub struct Not(pub Box<Expr>);
 impl_from_variant!(Not, Expr);
 
 // Duration (relative block height or time)
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Duration {
-    BlockHeight(u32),
+    BlockHeight(Box<Expr>),
     BlockTime {
         parts: Vec<DurationPart>,
         heightwise: bool,
@@ -176,16 +176,19 @@ pub enum Duration {
 }
 impl_from_variant!(Duration, Expr);
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum DurationPart {
-    Years(u32),
-    Months(u32),
-    Weeks(u32),
-    Days(u32),
-    Hours(u32),
-    Minutes(u32),
-    Seconds(u32),
+pub type DurationPart = (Box<Expr>, DurationUnit);
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum DurationUnit {
+    Years,
+    Months,
+    Weeks,
+    Days,
+    Hours,
+    Minutes,
+    Seconds,
 }
+
 // DateTime (YYYY-MM-DD with optional HH:MM)
 #[derive(Debug, Clone, PartialEq)]
 pub struct DateTime(pub String);

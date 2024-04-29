@@ -95,7 +95,7 @@ pub enum Error {
     #[error("Relative by-blockheight timelocks are only supported for up to 65535 blocks (roughly 455 days)")]
     InvalidDurationBlocksOutOfRange,
 
-    #[error("Relative by-blocktime timelocks are only supported for up to 33553920 seconds (roughly 1 year)")]
+    #[error("Relative by-blocktime timelocks are only supported for up to 33553920 seconds (roughly 388 days)")]
     InvalidDurationTimeOutOfRange,
 
     #[error("Parser error: {0}")]

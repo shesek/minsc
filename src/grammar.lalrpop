@@ -1,6 +1,5 @@
-use std::convert::TryInto;
 use crate::ast::{Expr, Stmt, self};
-use crate::util::{concat, parse_str_prefix};
+use crate::util::concat;
 
 grammar;
 
@@ -45,22 +44,22 @@ Expr: Expr = {
   FnExpr,
   Infix,
   Not,
+  Duration,
 };
 
 SimpleExpr: Expr = {
   Number,
   Ident,
+  Bytes,
+  String,
   Call,
-  Thresh,
   BlockExpr,
+  Thresh,
   Array,
   ArrayAccess,
-  Duration,
   DateTime,
   BtcAmount,
   PubKey,
-  Bytes,
-  String,
   ScriptFrag,
   InfixProb,
   Paren<Expr>,
@@ -160,7 +159,7 @@ ChildDeriveWildcard = { "/*", "/ *" };
 
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
   ast::ScriptFrag { fragments }.into();
-ScriptFragPart = { ScriptFragPart_, "<" <SimpleExpr> ">" };
+ScriptFragPart = { ScriptFragPart_, "<" <SimpleExpr> ">", "<" <Duration> ">" };
 ScriptFragPart_ = { Ident, Number, Call, BlockExpr, ArrayAccess, PubKey, Bytes, String, DateTime, BtcAmount, Array };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
@@ -176,7 +175,7 @@ FnExprSignature = {
 Infix: Expr = <lhs:InfixLhs> <op:InfixOp> <rhs:Expr> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
 
-InfixLhs: Expr = { SimpleExpr, ChildDerive };
+InfixLhs: Expr = { SimpleExpr, Duration, ChildDerive };
 
 InfixOp: ast::InfixOp = {
   "+" => ast::InfixOp::Add,
@@ -200,30 +199,35 @@ Not: Expr = "!" <Expr> =>
 
 // Duration and times
 
-Duration = { DurationBlocks, DurationClock };
+Duration = { DurationBlocks, DurationTime };
 
-DurationBlocks: Expr = r"\d+\s+blocks?" =>
-  ast::Duration::BlockHeight(parse_str_prefix(<>)).into();
+DurationBlocks: Expr = <num:SExpr> "blocks" =>
+  ast::Duration::BlockHeight(num.into()).into();
 
-DurationClock: Expr = <heightwise:"heightwise"?> <parts:DurationClockPart+>  =>
+DurationTime: Expr = <heightwise:"heightwise"?> <parts:DurationTimePart+>  =>
   ast::Duration::BlockTime { parts, heightwise: heightwise.is_some() }.into();
 
-DurationClockPart: ast::DurationPart = {
-  <n:IntInner> YearsAliases => ast::DurationPart::Years(n.try_into().unwrap()),
-  <n:IntInner> MonthsAliases => ast::DurationPart::Months(n.try_into().unwrap()),
-  <n:IntInner> WeeksAliases => ast::DurationPart::Weeks(n.try_into().unwrap()),
-  <n:IntInner> DaysAliases => ast::DurationPart::Days(n.try_into().unwrap()),
-  <n:IntInner> HoursAliases => ast::DurationPart::Hours(n.try_into().unwrap()),
-  <n:IntInner> MinutesAliases => ast::DurationPart::Minutes(n.try_into().unwrap()),
-  <n:IntInner> SecondsAliases => ast::DurationPart::Seconds(n.try_into().unwrap()),
+DurationTimePart: ast::DurationPart = <n:DurationTimeNum> <i:DurationTimeUnit> =>
+  (n.into(), i);
+
+// Similar to SExpr, but without BlockExpr which for some reason cannot be contained here directly
+// Paren<Expr> is available instead, which can be a Paren<BlockExpr>
+DurationTimeNum: Expr = { Number, Call, Ident, Paren<Expr> };
+
+DurationTimeUnit: ast::DurationUnit = {
+  "year" => ast::DurationUnit::Years,
+  "years" => ast::DurationUnit::Years,
+  "month" => ast::DurationUnit::Months,
+  "months" => ast::DurationUnit::Months,
+  "day" => ast::DurationUnit::Days,
+  "days" => ast::DurationUnit::Days,
+  "hour" => ast::DurationUnit::Hours,
+  "hours" => ast::DurationUnit::Hours,
+  "minute" => ast::DurationUnit::Minutes,
+  "minutes" => ast::DurationUnit::Minutes,
+  "second" => ast::DurationUnit::Seconds,
+  "seconds" => ast::DurationUnit::Seconds,
 }
-YearsAliases: &'input str = { "year", "years" };
-MonthsAliases: &'input str = { "month", "months" };
-WeeksAliases: &'input str = { "week", "weeks" };
-DaysAliases: &'input str = { "day", "days" };
-HoursAliases: &'input str = { "hour", "hours" };
-MinutesAliases: &'input str = { "mins", "minute", "minutes" };
-SecondsAliases: &'input str = { "second", "seconds" };
 
 DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
   ast::DateTime(<>.into()).into();

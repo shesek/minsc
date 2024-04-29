@@ -402,12 +402,22 @@ impl ast::InfixOp {
 
 impl Evaluate for ast::Duration {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let block_interval = scope
-            .get(&"BLOCK_INTERVAL".into())
-            .expect("built-in var")
-            .clone()
-            .into_u32()?;
-        let seq_num = time::duration_to_seq(self, block_interval)?;
+        let seq_num = match self {
+            ast::Duration::BlockHeight(num_blocks) => {
+                let num_blocks = num_blocks.eval(scope)?.into_u32()?;
+                time::relative_height_to_seq(num_blocks)?
+            }
+            ast::Duration::BlockTime { parts, heightwise } => {
+                let block_interval = scope.builtin("BLOCK_INTERVAL").clone().into_u32()?;
+
+                let time_parts = parts
+                    .into_iter()
+                    .map(|(num, unit)| Ok((num.eval(scope)?.into_f64()?, *unit)))
+                    .collect::<Result<Vec<_>>>()?;
+
+                time::relative_time_to_seq(&time_parts[..], *heightwise, block_interval)?
+            }
+        };
         Ok(Value::from(seq_num as i64))
     }
 }

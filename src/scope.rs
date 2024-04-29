@@ -25,6 +25,11 @@ impl<'a> Scope<'a> {
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
+    /// Get a builtin variable, which must be available in scope
+    pub fn builtin(&self, key: &str) -> &Value {
+        self.get(&key.into()).expect("built-in must exists")
+    }
+
     pub fn set<K: Into<Ident>, V: Into<Value>>(&mut self, key: K, value: V) -> Result<()> {
         let key = key.into();
 
