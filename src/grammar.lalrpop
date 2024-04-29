@@ -29,13 +29,13 @@ Block: Expr = <stmts:Stmt*> <ret:Return> =>
 // Used for library files and for the body of if statements
 pub Stmts: ast::Stmts = <stmts:Stmt*> => ast::Stmts { stmts };
 
-Stmt: Stmt = {
+Stmt = {
   FnDef,
   Assign,
   IfStmt,
 }
 
-Expr: Expr = {
+Expr = {
   SimpleExpr,
   And,
   Or,
@@ -47,7 +47,7 @@ Expr: Expr = {
   Duration,
 };
 
-SimpleExpr: Expr = {
+SimpleExpr = {
   Number,
   Ident,
   Bytes,
@@ -65,7 +65,7 @@ SimpleExpr: Expr = {
   Paren<Expr>,
 };
 
-SExpr: Expr = {
+SExpr = {
   Number,
   Ident,
   Bytes,
@@ -75,14 +75,14 @@ SExpr: Expr = {
   BlockExpr,
 };
 
-Return: Expr = {
+Return = {
   Expr, // the preferred form
   "return" <Expr> ";"?,
 };
 
 // Expressions
 
-Number: Expr = { Int, Float };
+Number = { Int, Float };
 Int: Expr = <IntInner> => ast::Expr::Int(<>);
 Float: Expr = <FloatInner> => ast::Expr::Float(<>);
 IntInner: i64 = <s:r"-?\d{1,39}"> => <>.parse().unwrap();
@@ -97,7 +97,7 @@ Call: Expr = <ident:IdentTerm> "(" <args:List0<Expr, ",">> ")" =>
 IfExpr: Expr = "if" <condition:Expr> <then_val:IfExprThenVal> "else" <else_val:Expr> =>
     ast::IfExpr { condition: condition.into(), then_val: then_val.into(), else_val: else_val.into() }.into();
 
-IfExprThenVal: Expr = { BlockExpr, "then" <Expr> };
+IfExprThenVal = { BlockExpr, "then" <Expr> };
 
 And: Expr = <List2<AndOrBranch, "&&">> => ast::And(<>).into();
 Or: Expr = <List2<AndOrBranch, "||">> => ast::Or(<>).into();
@@ -108,6 +108,8 @@ Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
 
 BlockExpr: Expr = "{" <Block> "}" => <>.into();
 
+Array = { ArraySquare, ArrayCurly }
+
 // Standard square brackets array - [E1, E2, E3, ...]
 ArraySquare: Expr = "[" <List0<Expr, ",">> "]" =>
   ast::Array(<>).into();
@@ -116,8 +118,6 @@ ArraySquare: Expr = "[" <List0<Expr, ",">> "]" =>
 // For compatibility with the BIP386 tr() Output Descriptor syntax for script trees
 ArrayCurly: Expr = "{" <e1:Expr> "," <e2:Expr> "}" =>
   ast::Array(vec![e1, e2]).into();
-
-Array: Expr = { ArraySquare, ArrayCurly }
 
 ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:SExpr> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
@@ -175,7 +175,7 @@ FnExprSignature = {
 Infix: Expr = <lhs:InfixLhs> <op:InfixOp> <rhs:Expr> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
 
-InfixLhs: Expr = { SimpleExpr, Duration, ChildDerive };
+InfixLhs = { SimpleExpr, Duration, ChildDerive };
 
 InfixOp: ast::InfixOp = {
   "+" => ast::InfixOp::Add,
@@ -212,7 +212,7 @@ DurationTimePart: ast::DurationPart = <n:DurationTimeNum> <i:DurationTimeUnit> =
 
 // Similar to SExpr, but without BlockExpr which for some reason cannot be contained here directly
 // Paren<BlockExpr> can be used instead
-DurationTimeNum: Expr = { Number, Call, Ident, Paren<Expr> };
+DurationTimeNum = { Number, Call, Ident, Paren<Expr> };
 
 DurationTimeUnit: ast::DurationUnit = {
   "year" => ast::DurationUnit::Years,
