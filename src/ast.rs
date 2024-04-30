@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use miniscript::bitcoin;
+use miniscript::{bitcoin, DescriptorPublicKey};
 
 use crate::{grammar, Error, ParseError};
 
@@ -24,7 +24,7 @@ pub enum Expr {
     Not(Not),
     BtcAmount(BtcAmount),
 
-    PubKey(String),
+    PubKey(DescriptorPublicKey),
     Bytes(Vec<u8>),
     String(String),
     Int(i64),

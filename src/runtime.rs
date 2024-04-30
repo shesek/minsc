@@ -486,10 +486,10 @@ impl Evaluate for Expr {
             Expr::Infix(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
             Expr::BtcAmount(x) => x.eval(scope)?,
-
             Expr::Duration(x) => x.eval(scope)?,
             Expr::DateTime(x) => x.eval(scope)?,
-            Expr::PubKey(x) => Value::PubKey(x.parse()?),
+
+            Expr::PubKey(x) => Value::PubKey(x.clone()),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::String(x) => Value::String(x.clone()),
             Expr::Int(x) => Value::Number(Number::Int(*x)),

@@ -146,9 +146,6 @@ pub enum Error {
     #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
     InfixOpMixedNum(Value, Value),
 
-    #[error("Descriptor key parse error: {0}")]
-    DescKeyParse(descriptor::DescriptorKeyParseError),
-
     #[error("Descriptor conversion error: {0}")]
     DescriptorConversion(descriptor::ConversionError),
 
@@ -226,7 +223,6 @@ impl_from_variant!(taproot::TaprootError, Error, TaprootError);
 impl_from_variant!(taproot::TaprootBuilderError, Error, TaprootBuilderError);
 impl_from_variant!(bitcoin::secp256k1::Error, Error, Secp256k1Error);
 impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
-impl_from_variant!(descriptor::DescriptorKeyParseError, Error, DescKeyParse);
 impl_from_variant!(std::convert::Infallible, Error, Infallible);
 impl_from_variant!(amount::ParseAmountError, Error, ParseAmountError);
 impl_from_variant!(witness_program::Error, Error, WitnessProgError);
@@ -259,8 +255,16 @@ pub enum ParseError {
 
     #[error("Invalid hex: {0}")]
     HexError(hex::HexToBytesError),
+
+    #[error("Descriptor key parse error: {0}")]
+    DescKeyParse(descriptor::DescriptorKeyParseError),
 }
 
 impl_from_variant!(std::num::ParseFloatError, ParseError, ParseFloatError);
 impl_from_variant!(std::num::ParseIntError, ParseError, ParseIntError);
 impl_from_variant!(hex::HexToBytesError, ParseError, HexError);
+impl_from_variant!(
+    descriptor::DescriptorKeyParseError,
+    ParseError,
+    DescKeyParse
+);
