@@ -121,7 +121,12 @@ impl Execute for ast::Stmts {
 
 impl Evaluate for ast::Call {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call_exprs(scope, &self.ident, &self.args)
+        let ident = self.func.ident_or("_anonymous");
+        let func = self.func.eval(scope)?;
+        let args = eval_exprs(scope, &self.args)?;
+
+        func.call(args, scope)
+            .map_err(|e| Error::CallError(ident, e.into()))
     }
 }
 

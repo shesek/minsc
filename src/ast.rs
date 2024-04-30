@@ -56,7 +56,7 @@ impl_from_variant!(Block, Expr);
 /// A function call expression
 #[derive(Debug, Clone)]
 pub struct Call {
-    pub ident: Ident,
+    pub func: Box<Expr>,
     pub args: Vec<Expr>,
 }
 impl_from_variant!(Call, Expr);
@@ -281,5 +281,12 @@ impl Expr {
             }
             s_new
         })
+    }
+
+    pub fn ident_or(&self, default: &str) -> Ident {
+        match self {
+            Expr::Ident(ident) => ident.clone(),
+            _ => Ident(default.to_string()),
+        }
     }
 }

@@ -100,7 +100,7 @@ impl From<ast::FnDef> for Function {
 impl From<ast::FnExpr> for Function {
     fn from(fn_expr: ast::FnExpr) -> Self {
         UserFunction {
-            ident: "_anon".into(),
+            ident: "_anonymous".into(),
             signature: fn_expr.signature,
             body: *fn_expr.body,
         }
