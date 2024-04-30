@@ -402,6 +402,9 @@ impl ast::InfixOp {
                 WithProb(prob.into_usize()?, v.into())
             }
 
+            // A:B array tuple construction
+            (Colon, a, b) => vec![a, b].into(),
+
             // Specialized error for mixed-up number types
             (_, lhs @ Num(Int(_)), rhs @ Num(Float(_)))
             | (_, lhs @ Num(Float(_)), rhs @ Num(Int(_))) => {

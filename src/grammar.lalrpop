@@ -191,6 +191,7 @@ InfixOp: ast::InfixOp = {
   "<" => ast::InfixOp::Lt,
   ">=" => ast::InfixOp::Gte,
   "<=" => ast::InfixOp::Lte,
+  ":" => ast::InfixOp::Colon,
 };
 
 // This is defined separately from InfixOp with less options for the LHS/RHS, so that

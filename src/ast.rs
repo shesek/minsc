@@ -158,6 +158,7 @@ pub enum InfixOp {
     Gte,
     Lte,
     Prob,
+    Colon,
 }
 
 #[derive(Debug, Clone)]
