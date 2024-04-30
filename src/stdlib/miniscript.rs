@@ -160,7 +160,6 @@ pub mod fns {
     }
 
     /// Policy -> Script witnessScript
-    // XXX to taproot.rs
     pub fn tapscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let policy = args.remove(0).into_policy()?;

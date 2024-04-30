@@ -350,13 +350,13 @@ impl Evaluate for ast::Not {
 impl Evaluate for ast::Infix {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         self.op
-            .apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?)
+            .apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?, scope)
             .map_err(|e| Error::InfixOpError(self.op, e.into()))
     }
 }
 
 impl ast::InfixOp {
-    fn apply(&self, lhs: Value, rhs: Value) -> Result<Value> {
+    fn apply(&self, lhs: Value, rhs: Value, scope: &Scope) -> Result<Value> {
         use ast::InfixOp::*;
         use Number::{Float, Int};
         use Value::{Array, Bytes, Number as Num, Policy, PubKey, Script, String, WithProb};
@@ -386,17 +386,15 @@ impl ast::InfixOp {
             (Subtract, Num(Float(a)), Num(Float(b))) => (a - b).into(),
             (Multiply, Num(Float(a)), Num(Float(b))) => (a * b).into(),
 
-            // + for arrays
+            // + for arrays, bytes and strings
             (Add, Array(a), Array(b)) => [a, b].concat().into(),
-            // + for bytes
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
-            // + for strings
             (Add, String(a), String(b)) => [a, b].concat().into(),
 
-            // + for tap tweak (internal_key+script_tree)
+            // + for taproot construction (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
             | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
-                stdlib::taproot::tap_tweak(k, s)?
+                stdlib::taproot::tr(k, Some(s), scope)?
             }
 
             // @ to assign execution probabilities (to Script/Policy only)

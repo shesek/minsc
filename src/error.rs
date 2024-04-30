@@ -113,17 +113,10 @@ pub enum Error {
     #[error("Standalone keys cannot be derived")]
     NonDeriveableSingle,
 
-    #[error("Invalid derivation child code index. Only numbers and SHA256 hashes are supported.")]
+    #[error(
+        "Invalid derivation index. Only child numbers, hashes and multi-path arrays are supported."
+    )]
     InvalidDerivationCode,
-
-    #[error("Invalid tr() use. Valid invocations are tr(policy) or tr(internal_key, policy)")]
-    InvalidTrUse,
-
-    #[error("Invalid Taproot unspendable key: {0}")]
-    InvalidTrUnspendable(Value),
-
-    #[error("No viable internal key found (TR_UNSPENDABLE was unset)")]
-    TaprootNoViableKey,
 
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
@@ -185,13 +178,22 @@ pub enum Error {
     #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
     InvalidPubKeyLen(usize),
 
-    #[error("Invalid merkle root hash length: {0} (expected 32)")]
-    InvalidMerkleLen(usize),
+    #[error("Invalid merkle root hash: {0}")]
+    InvalidMerkleRoot(hashes::FromSliceError),
+
+    #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash)")]
+    TaprootInvalidTrUse,
+
+    #[error("Invalid Taproot unspendable key: {0}")]
+    InvalidTrUnspendable(Value),
+
+    #[error("No viable taproot internal key found, provide one explicitly")]
+    TaprootNoViableKey,
 
     #[error("Invalid taproot binary script tree structure. Expecting a nested array where elements are leaf nodes (with no weights) or a tuple of nodes.")]
     TaprootInvalidScriptBinaryTree,
 
-    #[error("Invalid taproot script. Expecting Policy/Script or an array of them, an empty array, or the merkle root hash")]
+    #[error("Invalid taproot script, expecting Policy/Script or an array of them")]
     TaprootInvalidScript,
 
     // needed so that Infallible conversions can be used with `?`
