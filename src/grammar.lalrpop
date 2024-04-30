@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::{ast, Expr, Stmt, ParseError};
+use crate::{ast, time, Expr, Stmt, ParseError};
 use crate::util::concat;
 
 grammar;
@@ -229,8 +229,8 @@ DurationTimeUnit: ast::DurationUnit = {
   "seconds" => ast::DurationUnit::Seconds,
 }
 
-DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>
-  ast::DateTime(<>.into()).into();
+DateTime: Expr = r"\d{4}-\d{1,2}-\d{1,2}(\s+\d{1,2}:\d{1,2})?" =>?
+  Ok(Expr::DateTime(time::parse_datetime(<>)?));
 
 BtcAmount: Expr = <num:SExpr> <denom:BtcDenomination> =>
   ast::BtcAmount(num.into(), denom.parse().expect("must be valid")).into();

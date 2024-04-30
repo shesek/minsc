@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, NaiveDateTime};
 
 use crate::ast::DurationUnit;
-use crate::{Error, Result};
+use crate::{Error, ParseError};
 
 // Based on https://github.com/bitcoinjs/bip68, thanks bitcoinjs-lib folks!
 
@@ -18,7 +18,7 @@ const SECONDS_MOD: u32 = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 // The default block interval. Can be overridden in Minsc by setting the `BLOCK_INTERVAL` variable
 pub const BLOCK_INTERVAL: usize = 600;
 
-pub fn relative_height_to_seq(num_blocks: u32) -> Result<u32> {
+pub fn relative_height_to_seq(num_blocks: u32) -> Result<u32, Error> {
     ensure!(
         num_blocks > 0 && num_blocks <= BLOCKS_MAX,
         Error::InvalidDurationBlocksOutOfRange
@@ -30,7 +30,7 @@ pub fn relative_time_to_seq(
     parts: &[(f64, DurationUnit)],
     heightwise: bool,
     block_interval: u32,
-) -> Result<u32> {
+) -> Result<u32, Error> {
     let seconds = parts
         .iter()
         .map(|(n, u)| match u {
@@ -62,13 +62,15 @@ pub fn relative_time_to_seq(
     }
 }
 
-pub fn parse_datetime(s: &str) -> Result<u32> {
-    let ts = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M")
-        .or_else(|_| Ok::<_, Error>(NaiveDate::parse_from_str(s, "%Y-%m-%d")?.and_hms(0, 0, 0)))?
-        .timestamp();
+// XXX add date string to error
+pub fn parse_datetime(s: &str) -> Result<NaiveDateTime, ParseError> {
+    let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M").or_else(|_| {
+        Ok::<_, ParseError>(NaiveDate::parse_from_str(s, "%Y-%m-%d")?.and_hms(0, 0, 0))
+    })?;
+    let ts = dt.timestamp();
     ensure!(
         ts >= LOCKTIME_THRESHOLD as i64 && ts <= u32::max_value() as i64,
-        Error::InvalidDateTimeOutOfRange
+        ParseError::InvalidDateTimeOutOfRange
     );
-    Ok(ts as u32)
+    Ok(dt)
 }

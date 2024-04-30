@@ -30,7 +30,7 @@ pub enum Expr {
     Int(i64),
     Float(f64),
     Duration(Duration),
-    DateTime(DateTime),
+    DateTime(chrono::NaiveDateTime),
 }
 
 impl_from_variant!(i64, Expr, Int);
@@ -188,11 +188,6 @@ pub enum DurationUnit {
     Minutes,
     Seconds,
 }
-
-// DateTime (YYYY-MM-DD with optional HH:MM)
-#[derive(Debug, Clone, PartialEq)]
-pub struct DateTime(pub String);
-impl_from_variant!(DateTime, Expr);
 
 // BTC amounts with denomination
 #[derive(Debug, Clone)]

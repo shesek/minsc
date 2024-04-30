@@ -439,13 +439,6 @@ impl Evaluate for ast::Duration {
     }
 }
 
-impl Evaluate for ast::DateTime {
-    fn eval(&self, _: &Scope) -> Result<Value> {
-        let unix_timestamp = time::parse_datetime(&self.0)?;
-        Ok(Value::from(unix_timestamp as i64))
-    }
-}
-
 impl Evaluate for ast::BtcAmount {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let amount_n = self.0.eval(scope)?.into_f64()?;
@@ -491,15 +484,15 @@ impl Evaluate for Expr {
             Expr::FnExpr(x) => x.eval(scope)?,
             Expr::Infix(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
-            Expr::BtcAmount(x) => x.eval(scope)?,
-            Expr::Duration(x) => x.eval(scope)?,
-            Expr::DateTime(x) => x.eval(scope)?,
+            Expr::BtcAmount(x) => x.eval(scope)?, // eval'd as number
+            Expr::Duration(x) => x.eval(scope)?,  // eval'd as number
 
             Expr::PubKey(x) => Value::PubKey(x.clone()),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::String(x) => Value::String(x.clone()),
             Expr::Int(x) => Value::Number(Number::Int(*x)),
             Expr::Float(x) => Value::Number(Number::Float(*x)),
+            Expr::DateTime(x) => Value::Number(x.timestamp().into()), // eval's as number
         })
     }
 }

@@ -83,12 +83,6 @@ pub enum Error {
     #[error("Function {0} expected {1} arguments, not {2}")]
     ArgumentMismatch(Ident, usize, usize),
 
-    #[error("Invalid datetime string: {0}")]
-    InvalidDateTime(chrono::ParseError),
-
-    #[error("Absolute by-blocktime timelock out of range, supported up to 2106")]
-    InvalidDateTimeOutOfRange,
-
     #[error("Heightwise duration must be divisible by the block interval (typically 10 minutes)")]
     InvalidDurationHeightwise,
 
@@ -217,7 +211,6 @@ impl_from_variant!(descriptor::ConversionError, Error, DescriptorConversion);
 impl_from_variant!(miniscript::Error, Error, MiniscriptError);
 impl_from_variant!(CompilerError, Error, MiniscriptCompilerError);
 impl_from_variant!(hashes::FromSliceError, Error, HashError);
-impl_from_variant!(chrono::ParseError, Error, InvalidDateTime);
 impl_from_variant!(std::io::Error, Error, Io);
 impl_from_variant!(key::Error, Error, BitcoinKey);
 impl_from_variant!(bip32::Error, Error, Bip32);
@@ -260,11 +253,18 @@ pub enum ParseError {
 
     #[error("Descriptor key parse error: {0}")]
     DescKeyParse(descriptor::DescriptorKeyParseError),
+
+    #[error("Invalid datetime string: {0}")]
+    InvalidDateTime(chrono::ParseError),
+
+    #[error("Absolute by-blocktime timelock out of range, supported up to 2106")]
+    InvalidDateTimeOutOfRange,
 }
 
 impl_from_variant!(std::num::ParseFloatError, ParseError, ParseFloatError);
 impl_from_variant!(std::num::ParseIntError, ParseError, ParseIntError);
 impl_from_variant!(hex::HexToBytesError, ParseError, HexError);
+impl_from_variant!(chrono::ParseError, ParseError, InvalidDateTime);
 impl_from_variant!(
     descriptor::DescriptorKeyParseError,
     ParseError,
