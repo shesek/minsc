@@ -30,36 +30,46 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
                 let ms = policy.compile()?;
                 let desc = Descriptor::new_wsh(ms)?;
                 let script = desc.to_explicit_script()?;
-                let addr = desc.to_address(network).unwrap();
+                let addr = desc.to_address(network)?;
                 (Some(policy), Some(desc), Some(script), Some(addr), None)
             }
             Value::Descriptor(desc) => {
-                let (script, tapinfo) = if let Descriptor::Tr(_) = desc {
+                let (addr, script, tapinfo) = if desc.is_multipath() {
+                    (None, None, None)
+                } else if let Descriptor::Tr(_) = desc {
                     // For Taproot descriptors, also show the TaprootSpendInfo as the 'other' result
                     let tapinfo = match desc.clone().at_derivation_index(0)? {
                         Descriptor::Tr(tr) => (*tr.spend_info()).clone(),
                         _ => unreachable!(),
                     };
-                    (None, Some(Value::from(tapinfo)))
+                    (Some(desc.to_address(network)?), None, Some(tapinfo.into()))
                 } else {
-                    // Explicit script are only available for non-Taproot descriptors
-                    (Some(desc.to_explicit_script()?), None)
+                    // Explicit script is only available for non-Taproot descriptors
+                    (
+                        Some(desc.to_address(network)?),
+                        Some(desc.to_explicit_script()?),
+                        None,
+                    )
                 };
-                let addr = desc.to_address(network).unwrap();
-                (None, Some(desc), script, Some(addr), tapinfo)
+                (None, Some(desc), script, addr, tapinfo)
             }
             Value::PubKey(key) => {
                 let desc = Descriptor::new_wpkh(key.clone())?;
-                let addr = desc.to_address(network).unwrap();
-                let script = desc.to_explicit_script()?;
-                (None, Some(desc), Some(script), Some(addr), Some(key.into()))
+                let (addr, script) = if desc.is_multipath() {
+                    (None, None)
+                } else {
+                    let addr = desc.to_address(network)?;
+                    let script = desc.to_explicit_script()?;
+                    (Some(addr), Some(script))
+                };
+                (None, Some(desc), script, addr, Some(key.into()))
             }
             Value::Script(script) => {
                 let addr = Address::from_script(&script, network).ok();
                 (None, None, Some(script), addr, None)
             }
             tapinfo @ Value::TapInfo(_) => {
-                let spk = tapinfo.clone().into_spk().unwrap();
+                let spk = tapinfo.clone().into_spk()?;
                 let addr = Address::from_script(&spk, network).unwrap();
                 (None, None, None, Some(addr), Some(tapinfo))
             }
