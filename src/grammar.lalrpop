@@ -17,25 +17,27 @@ match {
 }
 
 // Top-level program
-// Can have an optional return value (or use the main() function instead)
+// Can have a final return value or use the main() function instead
 pub Program: Expr = <stmts:Stmt*> <ret:Return?> =>
   ast::Block { stmts, return_value: ret.map(Into::into) }.into();
-
-// A block with a return value
-// Used for function bodies and block expressions.
-Block: Expr = <stmts:Stmt*> <ret:Return> =>
-  ast::Block { stmts, return_value: Some(ret.into()) }.into();
 
 // A collection of statements with no return value
 // Used for library files and for the body of if statements
 pub Stmts: ast::Stmts = <stmts:Stmt*> => ast::Stmts { stmts };
 
+Return = {
+  Expr, // the preferred form
+  "return" <Expr> ";"?,
+};
+
+// All possible statements
 Stmt = {
   FnDef,
   Assign,
   IfStmt,
 }
 
+// All possible expressions. Includes SimpleExpr & SExpr
 Expr = {
   SimpleExpr,
   And,
@@ -48,42 +50,31 @@ Expr = {
   Duration,
 };
 
+// A reduce set of expressions for use where Expr cannot be parsed unambiguously
+// Includes SExpr, which can contain any wrapped expression
 SimpleExpr = {
-  WrapExpr,
-  Number,
-  Ident,
-  Bytes,
-  String,
-  Call,
-
-  Array,
-  DateTime,
-  BtcAmount,
-  PubKey,
-  ScriptFrag,
+  SExpr,
   Thresh,
   InfixProb,
   ArrayAccess,
 };
 
+// An even more reduced set of expressions for use where SimpleExpr cannot be parsed unambiguously
 SExpr = {
-  WrapExpr,
   Number,
   Ident,
   Bytes,
   String,
   Call,
-};
+  Array,
+  DateTime,
+  BtcAmount,
+  PubKey,
+  ScriptFrag,
 
-// An expression wrapped within () or {}
-WrapExpr = {
+  // Allow any expression wrapped in () or {}
   Paren<Expr>,
   BlockExpr,
-};
-
-Return = {
-  Expr, // the preferred form
-  "return" <Expr> ";"?,
 };
 
 //
@@ -104,6 +95,8 @@ Call = { CallLiteral, CallExpr };
 CallLiteral: Expr = <func:Ident> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args }.into();
 CallExpr: Expr = <func:WrapExpr> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args }.into();
 
+WrapExpr = { Paren<Expr>, BlockExpr };
+
 IfExpr: Expr = "if" <condition:Expr> <then_val:IfExprThenVal> "else" <else_val:Expr> =>
     ast::IfExpr { condition: condition.into(), then_val: then_val.into(), else_val: else_val.into() }.into();
 
@@ -116,7 +109,9 @@ AndOrBranch = { SimpleExpr, ChildDerive };
 Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
   ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
 
-BlockExpr: Expr = "{" <Block> "}" => <>.into();
+// A { .. } block expression with a final return value
+BlockExpr: Expr = "{" <stmts:Stmt*> <ret:Return> "}" =>
+  ast::Block { stmts, return_value: Some(ret.into()) }.into();
 
 Array = { ArraySquare, ArrayCurly }
 
@@ -147,9 +142,8 @@ Bytes: Expr = {
   <s:r"[a-fA-F0-9]{64}|[a-fA-F0-9]{40}"> =>? Ok(Expr::bytes_from_hex(&<>)?),
 };
 
-String: Expr = {
-  <s:r#""([^\\"]|\\[\\ntr"])*""#> => Expr::string_from_escaped_str(&<>[1..<>.len()-1]),
-};
+String: Expr = <s:r#""([^\\"]|\\[\\ntr"])*""#> =>
+  Expr::string_from_escaped_str(&<>[1..<>.len()-1]);
 
 // BIP32 child key derivation
 ChildDerive: Expr = {
@@ -217,13 +211,8 @@ DurationBlocks: Expr = <num:SExpr> "blocks" =>
 DurationTime: Expr = <heightwise:"heightwise"?> <parts:DurationTimePart+>  =>
   ast::Duration::BlockTime { parts, heightwise: heightwise.is_some() }.into();
 
-DurationTimePart: ast::DurationPart = <n:DurationTimeNum> <i:DurationTimeUnit> =>
-  (n.into(), i);
-
-// Similar to SExpr, but without BlockExpr which for some reason cannot be contained here directly
-// Paren<Expr> or Paren<BlockExpr> can be used instead
+DurationTimePart: ast::DurationPart = <n:DurationTimeNum> <i:DurationTimeUnit> => (n.into(), i);
 DurationTimeNum = { Number, CallLiteral, Ident, Paren<Expr> };
-
 DurationTimeUnit: ast::DurationUnit = {
   "year" => ast::DurationUnit::Years,
   "years" => ast::DurationUnit::Years,
@@ -262,9 +251,9 @@ Assignment: ast::Assignment = <lhs:IdentTerm> "=" <rhs:Expr> =>
     ast::Assignment { lhs, rhs };
 
 FnDef: Stmt = {
-    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "=" <body:Expr> ";" =>
+    "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> "=" <body:Expr> ";" =>
         ast::FnDef { ident, signature, body }.into(),
-    "fn" <ident:IdentTerm> "(" <signature:List0<IdentTerm, ",">> ")" "{" <body:Block> "}" ";"? =>
+    "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> <body:BlockExpr> ";"? =>
         ast::FnDef { ident, signature, body }.into(),
 }
 
