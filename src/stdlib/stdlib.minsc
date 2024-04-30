@@ -121,3 +121,11 @@ fn unrollFor($max_iterations, $for_body) {
 
 // Function form for assigning execution probabilities
 fn prob($n, $val) = $n@$val;
+
+// For compatibility with code that uses the old `iif()` function, which was replaced
+// with if..then..else expressions. Will probably be eventually removed.
+fn iif($condition, $then, $else) {
+  $result = if $condition then $then else $else;
+  if typeof($result) == "function" then $result()
+  else $result
+}

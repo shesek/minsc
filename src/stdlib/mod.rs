@@ -39,7 +39,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
-    scope.set_fn("iif", fns::iif).unwrap();
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
 
@@ -161,20 +160,6 @@ pub mod fns {
                 })
                 .collect::<Result<_>>()?,
         ))
-    }
-
-    /// To be removed, use `if .. then .. else ..` instead
-    pub fn iif(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        ensure!(args.len() == 3, Error::InvalidArguments);
-        let condition = args.remove(0).into_bool()?;
-        let then_val = args.remove(0);
-        let else_val = args.remove(0);
-        let result = if condition { then_val } else { else_val };
-        match result {
-            // then_val/else_val may be provided as thunks to be lazily evaluated
-            Value::Function(f) => f.call(vec![], scope),
-            other => Ok(other),
-        }
     }
 
     pub fn le64(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
