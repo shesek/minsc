@@ -21,7 +21,7 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /\b(of|return|let|heightwise|likely|if|then|else|true|false)\b/, token: "keyword"},
 
     // Function definition
-    {regex: /\b(fn)(\s+)([$a-zA-Z0-9_]\w*)/, token: ["keyword", null, "def"]},
+    {regex: /\b(fn)(\s+)([$a-zA-Z_][$a-zA-Z_0-9:]*)/, token: ["keyword", null, "def"]},
 
     // Assignment
     //{regex: /\b([$a-zA-Z_][$a-zA-Z_0-9]*)\s*(=)/, token: ["variable-3", null]},
@@ -33,11 +33,11 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /[-+\/*<>!;@]|[=!<>]=|&&|\|\|/, token: "operator"},
 
     // Function calls
-    {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*)\s*(\()/, token: ["atom", null]},
+    {regex: /([$a-zA-Z_][$a-zA-Z_0-9:]*)\s*(\()/, token: ["atom", null]},
 
     // Variables
     {regex: /[A-Z$][A-Z0-9_]+\b/, token: "variable-2"},
-    {regex: /[$a-zA-Z_][$a-zA-Z_0-9]*\b/, token: "variable-3"},
+    {regex: /[$a-zA-Z_][$a-zA-Z_0-9:]*\b/, token: "variable-3"},
 
     // Numeric array index
     {regex: /\.\d+\b/, token: "property"},
