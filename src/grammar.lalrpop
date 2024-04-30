@@ -124,9 +124,24 @@ ArraySquare: Expr = "[" <List0<Expr, ",">> "]" =>
 ArrayCurly: Expr = "{" <e1:Expr> "," <e2:Expr> "}" =>
   ast::Array(vec![e1, e2]).into();
 
-ArrayAccess: Expr = <array:ArrayAccessLHS> "." <index:SExpr> =>
+ArrayAccess_: Expr = <array:ArrayAccessLHS> "." <index:ArrayAccessRHS> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
 ArrayAccessLHS = { Ident, CallLiteral, Array, BlockExpr, Bytes, ArrayAccess };
+ArrayAccessRHS = { Int, Ident, Paren<Expr>, BlockExpr };
+
+// Hack :<
+// a.0.1 gets tokenized with 0.1 as a single token (for Float) during the lexer stage. This fixes it
+// by transforming the resulting a.(0.1) to a (a.0).1. Note that two_indices must use the exact
+// same regex as used for floats.
+ArrayAccessFixFloat: Expr = <array:ArrayAccessLHS> "." <two_indices:r"-?\d{1,39}\.\d{1,39}"> =>? {
+  let mut current = array;
+  for index in two_indices.split(".") {
+    let index: i64 = index.parse().map_err(ParseError::from)?;
+    current = ast::ArrayAccess { array: current.into(), index: Expr::Int(index).into() }.into();
+  }
+  Ok(current)
+};
+ArrayAccess = { ArrayAccess_, ArrayAccessFixFloat };
 
 // An xpub or compressed standalone public key (uncompressed is unsupported), with optional bip32 origin
 PubKey: Expr = <s:r"(\[[a-fA-F0-9]{8}(/\d+['h]?)*\])?([a-fA-F0-9]{66}|([xt]pub[0-9a-zA-Z]{100,120}))"> =>?
