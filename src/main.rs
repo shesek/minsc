@@ -1,7 +1,7 @@
-use minsc::{eval, parse, Result};
+use minsc::{eval, parse, Error};
 use std::{env, fs, io};
 
-fn main_() -> Result<()> {
+fn main_() -> Result<(), Error> {
     let mut args = env::args();
     let input = args.nth(1).unwrap_or_else(|| "-".into());
 

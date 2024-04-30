@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
 use crate::ast::Ident;
-use crate::error::{Error, Result};
 use crate::function::NativeFunctionPt;
-use crate::runtime::Value;
+use crate::runtime::{Error, Result, Value};
 use crate::stdlib::attach_stdlib;
 
 #[derive(Default, Debug)]

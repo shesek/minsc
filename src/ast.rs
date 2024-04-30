@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use miniscript::{bitcoin, DescriptorPublicKey};
 
-use crate::{grammar, Error, ParseError};
+use crate::{grammar, ParseError};
 
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]
@@ -232,7 +232,7 @@ pub struct Stmts {
 pub type Library = Stmts;
 
 impl FromStr for Expr {
-    type Err = Error;
+    type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parser = grammar::ProgramParser::new();
         Ok(parser.parse(s)?)
@@ -241,7 +241,7 @@ impl FromStr for Expr {
 impl_tryfrom_fromstr!(Expr);
 
 impl FromStr for Stmts {
-    type Err = Error;
+    type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parser = grammar::StmtsParser::new();
         Ok(parser.parse(s)?)

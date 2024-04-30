@@ -4,8 +4,8 @@ use bitcoin::{
 };
 use miniscript::bitcoin;
 
-use crate::runtime::Execute;
-use crate::{ast, parse_lib, Error, Result, Scope, Value};
+use crate::runtime::{Error, Execute, Result, Scope, Value};
+use crate::{ast, parse_lib};
 
 lazy_static! {
     static ref MINSC_CTV_LIB: ast::Library = parse_lib(

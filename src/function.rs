@@ -1,9 +1,7 @@
 use std::fmt;
 
 use crate::ast::{self, Expr, Ident};
-use crate::error::{Error, Result};
-use crate::runtime::{Evaluate, Value};
-use crate::scope::Scope;
+use crate::runtime::{Error, Evaluate, Result, Scope, Value};
 
 #[derive(Debug, Clone)]
 pub enum Function {

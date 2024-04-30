@@ -7,9 +7,9 @@ use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootS
 use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
 use super::miniscript::into_policies;
-use crate::error::{Error, Result};
+use crate::runtime::{Error, Result, Scope, Value};
 use crate::util::EC;
-use crate::{DescriptorDpk as Descriptor, Int, PolicyDpk as Policy, Scope, Value};
+use crate::{DescriptorDpk as Descriptor, Int, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &mut Scope) {
     // Taproot Descriptor/TaprootSpendInfo construction

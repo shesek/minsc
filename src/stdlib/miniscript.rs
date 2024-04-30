@@ -4,9 +4,9 @@ use std::sync::Arc;
 use miniscript::bitcoin::Sequence;
 use miniscript::AbsLockTime;
 
-use crate::runtime::Value;
+use crate::runtime::{Error, Result, Scope, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
-use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy, Result, Scope};
+use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 const LIKELY_PROB: usize = 10;
 
@@ -54,7 +54,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
-    use crate::Error;
 
     //
     // Miniscript Policy functions

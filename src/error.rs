@@ -7,10 +7,26 @@ use miniscript::{descriptor, TranslateErr};
 use crate::ast::{Ident, InfixOp};
 use crate::runtime::Value;
 
-pub type Result<T> = std::result::Result<T, Error>;
-
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    #[error("Parse error: {0}")]
+    Parse(ParseError),
+
+    #[error("Runtime error: {0}")]
+    Runtime(RuntimeError),
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
+
+impl<T: Into<RuntimeError>> From<T> for Error {
+    fn from(err: T) -> Error {
+        Error::Runtime(err.into())
+    }
+}
+impl_from_variant!(ParseError, Error, Parse);
+
+#[derive(thiserror::Error, Debug)]
+pub enum RuntimeError {
     #[error("Assigned variable name already exists: {0}")]
     AssignedVariableExists(Ident),
 
@@ -92,9 +108,6 @@ pub enum Error {
     #[error("Relative by-blocktime timelocks are only supported for up to 33553920 seconds (roughly 388 days)")]
     InvalidDurationTimeOutOfRange,
 
-    #[error("Parser error: {0}")]
-    LalrParseError(String),
-
     #[error("Invalid arguments")]
     InvalidArguments,
 
@@ -122,10 +135,10 @@ pub enum Error {
     Overflow,
 
     #[error("in {0}(): {1}")]
-    CallError(Ident, Box<Error>),
+    CallError(Ident, Box<RuntimeError>),
 
     #[error("{0:?} error: {1}")]
-    InfixOpError(InfixOp, Box<Error>),
+    InfixOpError(InfixOp, Box<RuntimeError>),
 
     #[error("Invalid arguments: ({0}, {1})")]
     InfixOpArgs(Value, Value),
@@ -201,42 +214,40 @@ pub enum Error {
     PushBytesError(script::PushBytesError),
 
     #[error("Key translation error: {0:?}")]
-    TranslateError(Box<miniscript::TranslateErr<Error>>),
+    TranslateError(Box<miniscript::TranslateErr<RuntimeError>>),
 
     #[error("Parse network error: {0}")]
     ParseNetworkError(network::ParseNetworkError),
 }
 
-impl_from_variant!(descriptor::ConversionError, Error, DescriptorConversion);
-impl_from_variant!(miniscript::Error, Error, MiniscriptError);
-impl_from_variant!(CompilerError, Error, MiniscriptCompilerError);
-impl_from_variant!(hashes::FromSliceError, Error, HashError);
-impl_from_variant!(std::io::Error, Error, Io);
-impl_from_variant!(key::Error, Error, BitcoinKey);
-impl_from_variant!(bip32::Error, Error, Bip32);
-impl_from_variant!(taproot::TaprootError, Error, TaprootError);
-impl_from_variant!(taproot::TaprootBuilderError, Error, TaprootBuilderError);
-impl_from_variant!(bitcoin::secp256k1::Error, Error, Secp256k1Error);
-impl_from_variant!(std::num::TryFromIntError, Error, TryFromInt);
-impl_from_variant!(std::convert::Infallible, Error, Infallible);
-impl_from_variant!(amount::ParseAmountError, Error, ParseAmountError);
-impl_from_variant!(witness_program::Error, Error, WitnessProgError);
-impl_from_variant!(script::PushBytesError, Error, PushBytesError);
-impl_from_variant!(network::ParseNetworkError, Error, ParseNetworkError);
+impl_from_variant!(
+    descriptor::ConversionError,
+    RuntimeError,
+    DescriptorConversion
+);
+impl_from_variant!(miniscript::Error, RuntimeError, MiniscriptError);
+impl_from_variant!(CompilerError, RuntimeError, MiniscriptCompilerError);
+impl_from_variant!(hashes::FromSliceError, RuntimeError, HashError);
+impl_from_variant!(std::io::Error, RuntimeError, Io);
+impl_from_variant!(key::Error, RuntimeError, BitcoinKey);
+impl_from_variant!(bip32::Error, RuntimeError, Bip32);
+impl_from_variant!(taproot::TaprootError, RuntimeError, TaprootError);
+impl_from_variant!(
+    taproot::TaprootBuilderError,
+    RuntimeError,
+    TaprootBuilderError
+);
+impl_from_variant!(bitcoin::secp256k1::Error, RuntimeError, Secp256k1Error);
+impl_from_variant!(std::num::TryFromIntError, RuntimeError, TryFromInt);
+impl_from_variant!(std::convert::Infallible, RuntimeError, Infallible);
+impl_from_variant!(amount::ParseAmountError, RuntimeError, ParseAmountError);
+impl_from_variant!(witness_program::Error, RuntimeError, WitnessProgError);
+impl_from_variant!(script::PushBytesError, RuntimeError, PushBytesError);
+impl_from_variant!(network::ParseNetworkError, RuntimeError, ParseNetworkError);
 
-type LalrParseError<'a> =
-    lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token<'a>, ParseError>;
-
-impl<'a> From<LalrParseError<'a>> for Error {
-    fn from(e: LalrParseError<'a>) -> Self {
-        //Error::LalrParseError(Box::new(e))
-        Error::LalrParseError(e.to_string())
-    }
-}
-
-impl From<TranslateErr<Error>> for Error {
-    fn from(e: TranslateErr<Error>) -> Self {
-        Error::TranslateError(Box::new(e))
+impl From<TranslateErr<RuntimeError>> for RuntimeError {
+    fn from(e: TranslateErr<RuntimeError>) -> Self {
+        RuntimeError::TranslateError(Box::new(e))
     }
 }
 
@@ -259,6 +270,9 @@ pub enum ParseError {
 
     #[error("Absolute by-blocktime timelock out of range, supported up to 2106")]
     InvalidDateTimeOutOfRange,
+
+    #[error("Parser error: {0}")]
+    LalrError(String),
 }
 
 impl_from_variant!(std::num::ParseFloatError, ParseError, ParseFloatError);
@@ -270,3 +284,12 @@ impl_from_variant!(
     ParseError,
     DescKeyParse
 );
+
+pub type LalrParseError<'a> =
+    lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token<'a>, ParseError>;
+
+impl<'a> From<LalrParseError<'a>> for ParseError {
+    fn from(e: LalrParseError<'a>) -> Self {
+        ParseError::LalrError(e.to_string())
+    }
+}

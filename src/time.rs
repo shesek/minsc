@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, NaiveDateTime};
 
 use crate::ast::DurationUnit;
-use crate::{Error, ParseError};
+use crate::error::{ParseError, RuntimeError};
 
 // Based on https://github.com/bitcoinjs/bip68, thanks bitcoinjs-lib folks!
 
@@ -18,10 +18,10 @@ const SECONDS_MOD: u32 = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 // The default block interval. Can be overridden in Minsc by setting the `BLOCK_INTERVAL` variable
 pub const BLOCK_INTERVAL: usize = 600;
 
-pub fn relative_height_to_seq(num_blocks: u32) -> Result<u32, Error> {
+pub fn relative_height_to_seq(num_blocks: u32) -> Result<u32, RuntimeError> {
     ensure!(
         num_blocks > 0 && num_blocks <= BLOCKS_MAX,
-        Error::InvalidDurationBlocksOutOfRange
+        RuntimeError::InvalidDurationBlocksOutOfRange
     );
     Ok(num_blocks)
 }
@@ -30,7 +30,7 @@ pub fn relative_time_to_seq(
     parts: &[(f64, DurationUnit)],
     heightwise: bool,
     block_interval: u32,
-) -> Result<u32, Error> {
+) -> Result<u32, RuntimeError> {
     let seconds = parts
         .iter()
         .map(|(n, u)| match u {
@@ -48,13 +48,13 @@ pub fn relative_time_to_seq(
         let block_interval = block_interval as f64;
         ensure!(
             seconds % block_interval == 0.0,
-            Error::InvalidDurationHeightwise
+            RuntimeError::InvalidDurationHeightwise
         );
         relative_height_to_seq((seconds / block_interval) as u32)
     } else {
         ensure!(
             seconds > 0.0 && seconds <= SECONDS_MAX as f64,
-            Error::InvalidDurationTimeOutOfRange
+            RuntimeError::InvalidDurationTimeOutOfRange
         );
 
         let units = (seconds / SECONDS_MOD as f64).ceil() as u32;

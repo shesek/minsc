@@ -19,8 +19,12 @@ use miniscript::{bitcoin, descriptor, ScriptContext};
 use crate::ast::{self, Expr, Stmt};
 use crate::function::{Call, Function};
 use crate::util::{self, DeriveExt, DescriptorExt, EC};
-use crate::{stdlib, time, Error, Result, Scope};
+use crate::{error, stdlib, time};
 use crate::{DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
+
+pub use crate::error::RuntimeError as Error;
+pub type Result<T> = std::result::Result<T, Error>;
+pub use crate::scope::Scope;
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -856,9 +860,9 @@ impl Value {
 
 // Parse & evaluate the string code in the default global scope to produce a Value
 impl FromStr for Value {
-    type Err = Error;
-    fn from_str(s: &str) -> Result<Self> {
-        s.parse::<Expr>()?.eval(&Scope::root())
+    type Err = error::Error;
+    fn from_str(s: &str) -> error::Result<Self> {
+        Ok(Expr::from_str(s)?.eval(&Scope::root())?)
     }
 }
 

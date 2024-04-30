@@ -6,7 +6,7 @@ use bitcoin::{secp256k1, PublicKey};
 use miniscript::descriptor::{DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, Wildcard};
 use miniscript::{bitcoin, ForEachKey, MiniscriptKey, TranslatePk, Translator};
 
-use crate::{Error, Result, Value};
+use crate::runtime::{Error, Result, Value};
 
 lazy_static! {
     pub static ref EC: secp256k1::Secp256k1<secp256k1::VerifyOnly> =

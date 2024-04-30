@@ -6,7 +6,7 @@ use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 use crate::util::DescriptorExt;
-use crate::{parse, Evaluate, Result, Scope, Value};
+use crate::{parse, Error, Evaluate, Scope, Value};
 
 #[derive(Serialize)]
 pub struct PlaygroundResult {
@@ -20,7 +20,7 @@ pub struct PlaygroundResult {
 
 #[wasm_bindgen]
 pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue, JsValue> {
-    let _run_playground = || -> Result<PlaygroundResult> {
+    let _run_playground = || -> Result<PlaygroundResult, Error> {
         let network = Network::from_str(network)?;
 
         let value = run(code)?;
@@ -91,8 +91,8 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
     Ok(JsValue::from_serde(&result).unwrap())
 }
 
-fn run(code: &str) -> Result<Value> {
-    parse(code)?.eval(&DEMO_SCOPE)
+fn run(code: &str) -> Result<Value, Error> {
+    Ok(parse(code)?.eval(&DEMO_SCOPE)?)
 }
 
 fn get_script_asm(script: &Script) -> String {

@@ -29,9 +29,8 @@ use std::convert::TryInto;
 use std::str::FromStr;
 
 pub use ast::{Expr, Ident, Stmt, Stmts};
-pub use error::{Error, ParseError, Result};
-pub use runtime::{Evaluate, Number::*, Value};
-pub use scope::Scope;
+pub use error::{Error, ParseError, RuntimeError};
+pub use runtime::{Evaluate, Number::*, Scope, Value};
 
 use miniscript::{descriptor, policy};
 
@@ -41,24 +40,24 @@ pub type MiniscriptDpk<Ctx> = miniscript::Miniscript<descriptor::DescriptorPubli
 
 /// Evaluate the given expression in the default global scope
 /// `expr` can be provided as the string code or as a parsed Expr tree
-pub fn eval<T: TryInto<Expr>>(expr: T) -> Result<Value>
+pub fn eval<T: TryInto<Expr>>(expr: T) -> Result<Value, Error>
 where
     Error: From<T::Error>,
 {
-    expr.try_into()?.eval(&Scope::root())
+    Ok(expr.try_into()?.eval(&Scope::root())?)
 }
 
 /// Parse program code into an Expr AST
-pub fn parse(s: &str) -> Result<Expr> {
+pub fn parse(s: &str) -> Result<Expr, ParseError> {
     Expr::from_str(s)
 }
 
 // Parse library code into an Stmts AST
-pub fn parse_lib(s: &str) -> Result<Stmts> {
+pub fn parse_lib(s: &str) -> Result<Stmts, ParseError> {
     Stmts::from_str(s)
 }
 
 #[deprecated = "use eval() instead"]
-pub fn run(s: &str) -> Result<Value> {
+pub fn run(s: &str) -> Result<Value, Error> {
     eval(s)
 }

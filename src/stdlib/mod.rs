@@ -3,8 +3,8 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
 use bitcoin::hashes::{sha256, Hash};
 
-use crate::runtime::{Execute, Number, Value};
-use crate::{ast, parse_lib, time, Result, Scope};
+use crate::runtime::{Error, Execute, Number, Result, Scope, Value};
+use crate::{ast, parse_lib, time};
 
 pub mod ctv;
 pub mod miniscript;
@@ -65,7 +65,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
 pub mod fns {
     use super::*;
     use crate::function::Call;
-    use crate::Error;
 
     // len(Array|Bytes|Script|String) -> Number
     pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
