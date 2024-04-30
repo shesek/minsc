@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, ExtendendPubKey};
+use bitcoin::bip32::{ChildNumber, DerivationPath, Xpub};
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
 use bitcoin::hashes::{self, sha256, Hash};
 use bitcoin::hex::DisplayHex;
@@ -721,8 +721,8 @@ impl From<TweakedPublicKey> for Value {
         key.to_inner().into()
     }
 }
-impl From<ExtendendPubKey> for Value {
-    fn from(xpub: ExtendendPubKey) -> Self {
+impl From<Xpub> for Value {
+    fn from(xpub: Xpub) -> Self {
         Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
             xkey: xpub,
             derivation_path: DerivationPath::master(),
