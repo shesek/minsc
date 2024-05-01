@@ -834,6 +834,7 @@ impl Value {
                 WitnessVersion::V1,
                 &tapinfo.output_key().serialize(),
             )?),
+            Value::Address(addr) => addr.script_pubkey(),
             v => bail!(Error::NotSpkLike(v)),
         })
     }
