@@ -1,0 +1,151 @@
+//! Tagged Lists utilities
+//!
+//! Utilities for parsing the tagged list array structure, where each tagged element identified as a [name, value] tuple
+//!
+//! For example, a tagged transaction can look like:
+//!
+//!     [
+//!       [ "version", 2 ],
+//!       [ "locktime", 0 ],
+//!       [ "inputs", [
+//!         [ [ "txid", ... ], [ "vout", ... ] ],
+//!         ...
+//!       ] ]
+//!     ]
+//!
+//! Or alternatively using the colon tuple syntax (equivalent to the above):
+//!
+//!     [
+//!       "version": 2,
+//!       "locktime": 0,
+//!       "inputs": [
+//!         [ "txid": ..., "vout": ... ],
+//!         ...
+//!       ]
+//!     ]
+
+use std::collections::HashSet;
+use std::convert::{TryFrom, TryInto};
+
+use crate::runtime::{Error, Result, Value};
+
+impl Value {
+    /// Transform a tagged Value::Array into a Vec of tag names and their values
+    pub fn into_tags(self) -> Result<Vec<(String, Value)>> {
+        // handled via the TryFrom<Value> implementations for Vec<T> and (A, B) in runtime.rs
+        self.try_into()
+            .map_err(|e| Error::InvalidTaggedList(Box::new(e)))
+    }
+
+    /// Run a closure over each tag, with automatic TagError wrapping
+    pub fn for_each_tag<F>(self, mut f: F) -> Result<()>
+    where
+        F: FnMut(&str, Value) -> Result<()>,
+    {
+        for (tag, val) in self.into_tags()? {
+            f(&tag, val).map_err(|e| Error::TagError(tag, e.into()))?;
+        }
+        Ok(())
+    }
+
+    /// Run a closure over each unique tag, erroring if there are any duplicates
+    pub fn for_each_unique_tag<F>(self, mut f: F) -> Result<()>
+    where
+        F: FnMut(&str, Value) -> Result<()>,
+    {
+        let mut seen_tags = HashSet::new();
+        self.for_each_tag(|tag, val| {
+            if seen_tags.insert(tag.to_string()) {
+                f(tag, val)
+            } else {
+                Err(Error::TagDuplicated)
+            }
+        })
+    }
+
+    /// Considered to be a tagged list if self is an array, self.0 is too, and self.0.0 is a string
+    /// This could have false positives depending on the alternative non-tagged structure in use.
+    fn has_tags(&self) -> bool {
+        if let Value::Array(array) = self {
+            if let Some(Value::Array(inner_array)) = array.get(0) {
+                if let Some(Value::String(_tag)) = inner_array.get(0) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Parse values that can be either a tuple of (A,B) or a tagged list with `a_tag` and `b_tag`
+    /// For example, tuple_or_tags::<Txid,u32>("txid", "vout") to accept either [$txid,$vout] tuples or tagged ["txid":$txid,"vout":$vout]
+    pub fn tagged_or_tuple<A: TryFrom<Self>, B: TryFrom<Self>>(
+        self,
+        a_tag: &str,
+        b_tag: &str,
+    ) -> Result<(A, B)>
+    where
+        Error: From<A::Error>,
+        Error: From<B::Error>,
+    {
+        if self.has_tags() {
+            self.tagged_into2(a_tag, b_tag)
+        } else {
+            self.into_tuple()
+        }
+    }
+}
+
+/// Defines tagged_intoN() and tagged_intoN_opt() functions that extracts tagged values identified by their tag name
+/// For example, value.tagged_into2::<Txid, u32>("txid", "vout") returns a (Txid, u32) tuple given a [ "txid": $txid, "vout": 0 ] tagged list
+/// Or with the opt version: value.tagged_into2_opt::<Txid, u32>("txid", "vout") to get back (Option<Txid>, Option<u32>)
+macro_rules! impl_tagged_into {
+    ($fn_name:ident, $opt_fn_name:ident, $($t:ident, $tag:ident, $idx:tt),+) => {
+
+        // Implement tagged_intoN_opt(), where each tag value is returned as an Option
+        pub fn $opt_fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
+        -> Result<($(Option<$t>),+)>
+        where
+            $(Error: From<$t::Error>),+
+        {
+            let mut res = ($(None::<$t>),+);
+
+            self.for_each_tag(|tag, val| {
+               $(if tag == $tag {
+                    ensure!(res.$idx.is_none(), Error::TagDuplicated); // could use for_each_unique_tag(), but here we already have `res` so we can avoid allocating the `HashSet<String>` for seen tags
+                    res.$idx = Some(val.try_into()?);
+                    Ok(())
+                } else)+ {
+                    Err(Error::TagUnknown)
+                }
+            })?;
+
+            Ok(res)
+        }
+
+        // Implement tagged_intoN(), requiring all tags to be present
+        pub fn $fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
+        -> Result<($($t),+)>
+        where
+            $(Error: From<$t::Error>),+
+        {
+            // delegate the heavy lifting to tagged_intoN_opt() above
+            match self.$opt_fn_name($($tag),+)? {
+                // match the case where all tags are available, extract their values out of the Option and return them
+                #[allow(non_snake_case)] // type name aliases reused as variable names (e.g. A)
+                ($(Some($t)),+) => Ok(($($t),+)),
+
+                // otherwise, report which tag is missing
+                $(res if res.$idx.is_none() => Err(Error::TagMissing($tag.to_string())),)+
+                _ => unreachable!(),
+            }
+        }
+    };
+}
+
+#[rustfmt::skip]
+impl Value {
+    impl_tagged_into!(tagged_into2, tagged_into2_opt, A, a_tag, 0, B, b_tag, 1);
+    impl_tagged_into!(tagged_into3, tagged_into3_opt, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2);
+    impl_tagged_into!(tagged_into4, tagged_into4_opt, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2, D, d_tag, 3);
+}
+

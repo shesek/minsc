@@ -218,6 +218,24 @@ pub enum RuntimeError {
 
     #[error("Parse network error: {0}")]
     ParseNetworkError(network::ParseNetworkError),
+
+    #[error("Expected a tuple array of 2 elements, not {0:?}")]
+    InvalidTuple(Value),
+
+    #[error("Invalid tagged array structure: {0}")]
+    InvalidTaggedList(Box<RuntimeError>),
+
+    #[error("Error while processing \"{0}\" tag: {1}")]
+    TagError(String, Box<RuntimeError>),
+
+    #[error("Missing expected tag \"{0}\"")]
+    TagMissing(String),
+
+    #[error("Duplicated tag")]
+    TagDuplicated,
+
+    #[error("Unknown tag")]
+    TagUnknown,
 }
 
 impl_from_variant!(

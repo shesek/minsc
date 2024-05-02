@@ -586,7 +586,6 @@ macro_rules! impl_simple_into_variant_conv {
 }
 impl_simple_into_variant_conv!(bool, Bool, into_bool, NotBool);
 impl_simple_into_variant_conv!(Number, Number, into_number, NotNumber);
-impl_simple_into_variant_conv!(Vec<Value>, Array, into_array, NotArray);
 impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
 impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
@@ -779,11 +778,72 @@ impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
 impl_hash_conv!(miniscript::hash256::Hash);
 
+// Generic conversion from Value::Array into a Vec of any convertible type
+impl<T: TryFrom<Value>> TryFrom<Value> for Vec<T>
+where
+    Error: From<T::Error>,
+{
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Vec<T>> {
+        val.map_array(|a| a.try_into().map_err(Error::from))
+    }
+}
+
+// Generic conversion from Value::Array into a 2-tuple of any convertible type
+impl<A: TryFrom<Value>, B: TryFrom<Value>> TryFrom<Value> for (A, B)
+where
+    Error: From<A::Error>,
+    Error: From<B::Error>,
+{
+    type Error = Error;
+    fn try_from(val: Value) -> Result<(A, B)> {
+        ensure!(val.is_array(), Error::InvalidTuple(val));
+        let elements = val.into_array().unwrap();
+
+        ensure!(elements.len() == 2, Error::InvalidTuple(elements.into()));
+        let (a, b) = <[Value; 2]>::try_from(elements).unwrap().into();
+
+        Ok((a.try_into()?, b.try_into()?))
+    }
+}
+
 //
-// Value methods & traits
+// Value methods
 //
 
 impl Value {
+    /// Extract Array elements as a plain Vec<Value>
+    pub fn into_array(self) -> Result<Vec<Value>> {
+        // this doesn't use a TryInto<Vec<Value>> trait like the other into_xyz methods do because
+        // we have a more generic TryInto<Vec<T>> implementation that internally uses into_array()
+        match self {
+            Value::Array(arr) => Ok(arr),
+            other => Err(Error::NotArray(other)),
+        }
+    }
+
+    /// Transform Array elements into a Vec<T> of any convertible type
+    pub fn into_vec_of<T: TryFrom<Value>>(self) -> Result<Vec<T>>
+    where
+        Error: From<T::Error>,
+    {
+        self.try_into()
+    }
+
+    /// Transform an Array of 2 elements into a typed 2-tuple
+    pub fn into_tuple<A: TryFrom<Self>, B: TryFrom<Self>>(self) -> Result<(A, B)>
+    where
+        Error: From<A::Error>,
+        Error: From<B::Error>,
+    {
+        self.try_into()
+    }
+
+    /// Map elements through the provided closure function
+    pub fn map_array<T, F: Fn(Self) -> Result<T>>(self, f: F) -> Result<Vec<T>> {
+        self.into_array()?.into_iter().map(f).collect()
+    }
+
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
@@ -802,6 +862,7 @@ impl Value {
     pub fn is_script(&self) -> bool {
         matches!(self, Value::Script(_))
     }
+
     pub fn into_f64(self) -> Result<f64> {
         self.try_into()
     }

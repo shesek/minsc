@@ -8,6 +8,7 @@ use crate::{ast, parse_lib, time};
 
 pub mod ctv;
 pub mod miniscript;
+pub mod tagged;
 pub mod taproot;
 
 lazy_static! {
