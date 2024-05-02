@@ -10,7 +10,7 @@ use crate::{ast, parse_lib};
 lazy_static! {
     static ref MINSC_CTV_LIB: ast::Library = parse_lib(
         r#"
-        OP_CHECKTEMPLATEVERIFY = rawscript(0xb3);
+        OP_CHECKTEMPLATEVERIFY = script(0xb3);
         OP_CTV = OP_CHECKTEMPLATEVERIFY;
 
         fn ctv($tx) = `ctvHash($tx) OP_CHECKTEMPLATEVERIFY OP_DROP`;

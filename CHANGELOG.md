@@ -51,12 +51,10 @@
 
 - New `Script` runtime data type and new functions for working with it:
 
-  1. `rawscript(Bytes) -> Script` (get a Script for the given raw opcode bytes. e.g. `rawscript(0xb2)` for `OP_CSV`)
-  2. `script_pubkey(Descriptor) -> Script` (get the scriptPubKey to be used in the output)
-  3. `explicit_script(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the redeemScript for P2SH)
+  1. `script(Bytes) -> Script` (get a Script for the given raw opcode bytes. e.g. `script(0xb2)` for `OP_CSV`)
+  2. `scriptPubkey(Descriptor|TapInfo|PubKey|Address|Script) -> Script` (get the scriptPubKey to be used in the output)
+  3. `explicitScript(Descriptor) -> Script` (get the underlying witness script, before any hashing is done. AKA the redeemScript for P2SH)
   4. `bytes(Script) -> Bytes` (get the Bytes representation of the Script opcodes)
-
-  The `script_pubkey`/`explicit_script` functions also accept types that can be coerced into Descriptors as their argument (Policy, Miniscript and PubKey).
 
 - New `String` runtime data type
 

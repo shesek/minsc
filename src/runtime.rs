@@ -890,7 +890,7 @@ impl Value {
                 &tapinfo.output_key().serialize(),
             )?),
             Value::Address(addr) => addr.script_pubkey(),
-            v => bail!(Error::NotSpkLike(v)),
+            v => bail!(Error::NoSpkRepr(v)),
         })
     }
 

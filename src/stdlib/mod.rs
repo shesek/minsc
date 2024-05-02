@@ -36,7 +36,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("int", fns::int).unwrap();
     scope.set_fn("float", fns::float).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
-    scope.set_fn("rawscript", fns::rawscript).unwrap();
+    scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
@@ -108,11 +108,14 @@ pub mod fns {
         Ok(args.remove(0).into_f64()?.into())
     }
 
-    // rawscript(Bytes) -> Script
-    pub fn rawscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+    // script(Script|Bytes) -> Script
+    pub fn script(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let bytes = args.remove(0).into_bytes()?;
-        Ok(ScriptBuf::from(bytes).into())
+        Ok(match args.remove(0) {
+            Value::Script(script) => script.into(),
+            Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
+            other => bail!(Error::InvalidScriptConstructor(other)),
+        })
     }
 
     /// Convert the argument into Bytes
@@ -137,8 +140,9 @@ pub mod fns {
             .into())
     }
 
-    /// Descriptor|TapInfo|PubKey|Script -> Script
+    /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
     ///
+    /// Descriptors are compiled into their scriptPubKey
     /// TapInfo are returned as their V1 witness program
     /// PubKeys are converted into a wpkh() scripts
     /// Scripts are returned as-is

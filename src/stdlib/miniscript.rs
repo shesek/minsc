@@ -27,16 +27,16 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set("TRIVIAL", Policy::Trivial).unwrap();
     scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
 
-    // Descriptor functions
+    // Miniscript Descriptor functions
     scope.set_fn("wpkh", fns::wpkh).unwrap();
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
 
-    // Descriptor utilities
+    // Descriptor functions (non-Miniscript)
+    scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope
         .set_fn("single_descriptors", fns::single_descriptors)
         .unwrap();
-    scope.set_fn("pubkey", fns::pubkey).unwrap();
 
     // Minsc policy functions
     scope.set_fn("all", fns::all).unwrap();

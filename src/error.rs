@@ -84,8 +84,11 @@ pub enum RuntimeError {
     #[error("Expected Script, not {0:?}")]
     NotScript(Value),
 
+    #[error("Expected raw Script or Bytes, not {0:?}. Perhaps you meant to use explicitScript()/scriptPubKey()?")]
+    InvalidScriptConstructor(Value),
+
     #[error("Cannot represent as a scriptPubKey: {0:?}")]
-    NotSpkLike(Value),
+    NoSpkRepr(Value),
 
     #[error("Invalid script fragment: {0:?}")]
     InvalidScriptFrag(Value),
