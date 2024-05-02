@@ -146,47 +146,11 @@ pub enum RuntimeError {
     #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
     InfixOpMixedNum(Value, Value),
 
-    #[error("Descriptor conversion error: {0}")]
-    DescriptorConversion(descriptor::ConversionError),
-
-    #[error("Miniscript error: {0}")]
-    MiniscriptError(miniscript::Error),
-
-    #[error("Miniscript compiler error: {0}")]
-    MiniscriptCompilerError(CompilerError),
-
-    #[error("Taproot error: {0}")]
-    TaprootError(taproot::TaprootError),
-
-    #[error("Taproot builder error: {0}")]
-    TaprootBuilderError(taproot::TaprootBuilderError),
-
-    #[error("Secp256k1 error: {0}")]
-    Secp256k1Error(bitcoin::secp256k1::Error),
-
-    #[error("Hash error: {0}")]
-    HashError(hashes::FromSliceError),
-
-    #[error("IO error: {0:?}")]
-    Io(std::io::Error),
-
-    #[error("Bitcoin key error: {0}")]
-    BitcoinKey(key::Error),
-
-    #[error("BIP 32 error: {0}")]
-    Bip32(bip32::Error),
-
-    #[error("Bitcoin amount parse error: {0}")]
-    ParseAmountError(amount::ParseAmountError),
-
-    #[error("number type conversion failed (unexpected negative number?)")]
-    TryFromInt(std::num::TryFromIntError),
+    #[error("Invalid merkle root hash: {0}")]
+    InvalidMerkleRoot(hashes::FromSliceError),
 
     #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
     InvalidPubKeyLen(usize),
-
-    #[error("Invalid merkle root hash: {0}")]
-    InvalidMerkleRoot(hashes::FromSliceError),
 
     #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash)")]
     TaprootInvalidTrUse,
@@ -202,22 +166,6 @@ pub enum RuntimeError {
 
     #[error("Invalid taproot script, expecting Policy/Script or an array of them")]
     TaprootInvalidScript,
-
-    // needed so that Infallible conversions can be used with `?`
-    #[error("Infallible (can never be constructed)")]
-    Infallible(std::convert::Infallible),
-
-    #[error("Witness program error: {0}")]
-    WitnessProgError(witness_program::Error),
-
-    #[error("Push bytes error: {0}")]
-    PushBytesError(script::PushBytesError),
-
-    #[error("Key translation error: {0:?}")]
-    TranslateError(Box<miniscript::TranslateErr<RuntimeError>>),
-
-    #[error("Parse network error: {0}")]
-    ParseNetworkError(network::ParseNetworkError),
 
     #[error("Expected a tuple array of 2 elements, not {0:?}")]
     InvalidTuple(Value),
@@ -236,32 +184,63 @@ pub enum RuntimeError {
 
     #[error("Unknown tag")]
     TagUnknown,
-}
 
-impl_from_variant!(
-    descriptor::ConversionError,
-    RuntimeError,
-    DescriptorConversion
-);
-impl_from_variant!(miniscript::Error, RuntimeError, MiniscriptError);
-impl_from_variant!(CompilerError, RuntimeError, MiniscriptCompilerError);
-impl_from_variant!(hashes::FromSliceError, RuntimeError, HashError);
-impl_from_variant!(std::io::Error, RuntimeError, Io);
-impl_from_variant!(key::Error, RuntimeError, BitcoinKey);
-impl_from_variant!(bip32::Error, RuntimeError, Bip32);
-impl_from_variant!(taproot::TaprootError, RuntimeError, TaprootError);
-impl_from_variant!(
-    taproot::TaprootBuilderError,
-    RuntimeError,
-    TaprootBuilderError
-);
-impl_from_variant!(bitcoin::secp256k1::Error, RuntimeError, Secp256k1Error);
-impl_from_variant!(std::num::TryFromIntError, RuntimeError, TryFromInt);
-impl_from_variant!(std::convert::Infallible, RuntimeError, Infallible);
-impl_from_variant!(amount::ParseAmountError, RuntimeError, ParseAmountError);
-impl_from_variant!(witness_program::Error, RuntimeError, WitnessProgError);
-impl_from_variant!(script::PushBytesError, RuntimeError, PushBytesError);
-impl_from_variant!(network::ParseNetworkError, RuntimeError, ParseNetworkError);
+    //
+    // Wrapped errors
+    //
+
+    #[error("Descriptor conversion error: {0}")]
+    DescriptorConversion(#[from] descriptor::ConversionError),
+
+    #[error("Miniscript error: {0}")]
+    MiniscriptError(#[from] miniscript::Error),
+
+    #[error("Miniscript compiler error: {0}")]
+    MiniscriptCompilerError(#[from] CompilerError),
+
+    #[error("Taproot error: {0}")]
+    TaprootError(#[from] taproot::TaprootError),
+
+    #[error("Taproot builder error: {0}")]
+    TaprootBuilderError(#[from] taproot::TaprootBuilderError),
+
+    #[error("Secp256k1 error: {0}")]
+    Secp256k1Error(#[from] bitcoin::secp256k1::Error),
+
+    #[error("Hash error: {0}")]
+    HashError(#[from] hashes::FromSliceError),
+
+    #[error("IO error: {0:?}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Bitcoin key error: {0}")]
+    BitcoinKey(#[from] key::Error),
+
+    #[error("BIP 32 error: {0}")]
+    Bip32(#[from] bip32::Error),
+
+    #[error("Bitcoin amount parse error: {0}")]
+    ParseAmountError(#[from] amount::ParseAmountError),
+
+    #[error("Number type conversion failed (unexpected negative number?)")]
+    TryFromInt(#[from] std::num::TryFromIntError),
+
+    // needed so that Infallible conversions can be used with `?`
+    #[error("Infallible (can never be constructed)")]
+    Infallible(#[from] std::convert::Infallible),
+
+    #[error("Witness program error: {0}")]
+    WitnessProgError(#[from] witness_program::Error),
+
+    #[error("Push bytes error: {0}")]
+    PushBytesError(#[from] script::PushBytesError),
+
+    #[error("Parse network error: {0}")]
+    ParseNetworkError(#[from] network::ParseNetworkError),
+
+    #[error("Key translation error: {0:?}")]
+    TranslateError(Box<miniscript::TranslateErr<RuntimeError>>),
+}
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {
     fn from(e: TranslateErr<RuntimeError>) -> Self {
@@ -272,19 +251,19 @@ impl From<TranslateErr<RuntimeError>> for RuntimeError {
 #[derive(thiserror::Error, Debug)]
 pub enum ParseError {
     #[error("ParseFloatError: {0}")]
-    ParseFloatError(std::num::ParseFloatError),
+    ParseFloatError(#[from] std::num::ParseFloatError),
 
     #[error("ParseIntError: {0}")]
-    ParseIntError(std::num::ParseIntError),
+    ParseIntError(#[from] std::num::ParseIntError),
 
     #[error("Invalid hex: {0}")]
-    HexError(hex::HexToBytesError),
+    HexError(#[from] hex::HexToBytesError),
 
     #[error("Descriptor key parse error: {0}")]
-    DescKeyParse(descriptor::DescriptorKeyParseError),
+    DescKeyParse(#[from] descriptor::DescriptorKeyParseError),
 
     #[error("Invalid datetime string: {0}")]
-    InvalidDateTime(chrono::ParseError),
+    InvalidDateTime(#[from] chrono::ParseError),
 
     #[error("Absolute by-blocktime timelock out of range, supported up to 2106")]
     InvalidDateTimeOutOfRange,
@@ -292,16 +271,6 @@ pub enum ParseError {
     #[error("Parser error: {0}")]
     LalrError(String),
 }
-
-impl_from_variant!(std::num::ParseFloatError, ParseError, ParseFloatError);
-impl_from_variant!(std::num::ParseIntError, ParseError, ParseIntError);
-impl_from_variant!(hex::HexToBytesError, ParseError, HexError);
-impl_from_variant!(chrono::ParseError, ParseError, InvalidDateTime);
-impl_from_variant!(
-    descriptor::DescriptorKeyParseError,
-    ParseError,
-    DescKeyParse
-);
 
 pub type LalrParseError<'a> =
     lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token<'a>, ParseError>;
