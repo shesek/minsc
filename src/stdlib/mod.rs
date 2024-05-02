@@ -94,7 +94,7 @@ pub mod fns {
         let num = match args.remove(0).into_number()? {
             Number::Int(n) => n,
             Number::Float(n) if n.is_finite() && n >= i64::MIN as f64 && n <= i64::MAX as f64 => {
-                // non-whole floats are accepted and rounded down, unlike the implicit coercion in TryInto<i64>
+                // rounded down
                 n as i64
             }
             Number::Float(_) => bail!(Error::Overflow),

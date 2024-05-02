@@ -591,35 +591,26 @@ impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
 impl_simple_into_variant_conv!(String, String, into_string, NotString);
 
-// From Value to f64 primitive, with coercion rules
-// Extracts the f64 out of Number::Float, or casts Value::Int into one
+// From Value to f64 primitive, with auto-coercion for integers
 impl TryInto<f64> for Value {
     type Error = Error;
     fn try_into(self) -> Result<f64> {
         Ok(match self.into_number()? {
             Number::Float(n) => n,
-            Number::Int(n) => n as f64, // always safe to convert
+            Number::Int(n) => n as f64,
         })
     }
 }
 
-// From Value/Number to primitive integer types, with coercion and overflow checks
-// Automatically coerces floats into integers when they are whole, finite and within the integer type range
+// From Value to primitive integer types (no coercion)
 macro_rules! impl_int_num_conv {
     ($type:ident, $fn_name:ident) => {
         impl TryFrom<Number> for $type {
             type Error = Error;
             fn try_from(number: Number) -> Result<Self> {
-                fn safe_int_from_f64(n: f64) -> bool {
-                    n.is_finite()
-                        && n.fract() == 0.0
-                        && n >= $type::MIN as f64
-                        && n <= $type::MAX as f64
-                }
                 Ok(match number {
                     Number::Int(n) => n.try_into()?,
-                    Number::Float(n) if safe_int_from_f64(n) => n as $type,
-                    Number::Float(n) => bail!(Error::NotIntLike(n)),
+                    Number::Float(n) => bail!(Error::NotInt(n)),
                 })
             }
         }

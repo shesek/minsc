@@ -51,8 +51,8 @@ pub enum RuntimeError {
     #[error("Expected a number, not {0:?}")]
     NotNumber(Value),
 
-    #[error("Expected an integer or a whole float within integer range, not {0:?}")]
-    NotIntLike(f64),
+    #[error("Expected an integer, not {0:?}")]
+    NotInt(f64),
 
     #[error("Expected a boolean, not {0:?}")]
     NotBool(Value),
