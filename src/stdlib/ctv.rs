@@ -1,7 +1,7 @@
+use std::convert::TryFrom;
+
 use bitcoin::hashes::{sha256, Hash};
-use bitcoin::{
-    absolute::LockTime, transaction::Version, Amount, Sequence, Transaction, TxIn, TxOut,
-};
+use bitcoin::{Transaction, TxIn};
 use miniscript::bitcoin;
 
 use crate::runtime::{Error, Execute, Result, Scope, Value};
@@ -14,13 +14,6 @@ lazy_static! {
         OP_CTV = OP_CHECKTEMPLATEVERIFY;
 
         fn ctv($tx) = `ctvHash($tx) OP_CHECKTEMPLATEVERIFY OP_DROP`;
-
-        // Utility functions for tagged arrays with a more DSL-y syntax
-        fn txVersion($version) = [ "version", $version ];
-        fn txLocktime($locktime) = [ "locktime", $locktime ];
-        fn txInSeq($seq) = [ "input", $seq ];
-        fn txIn() = [ "input" ];
-        fn txOut($spk, $amount) = [ "output", $spk, $amount ];
         "#
     )
     .unwrap();
@@ -39,74 +32,27 @@ pub mod fns {
     /// ctvHash(Array tx_instructions, Number index=0) -> Hash
     ///
     /// Example: ctvHash([ txVersion(1), txOut($bob_pk, 10000), txOut($alice_pk, 25000) ])
-    pub fn ctvHash(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(matches!(args.len(), 1 | 2), Error::InvalidArguments);
-        let tx_instructions = args.remove(0).into_array()?;
-        let input_index = args.pop().map_or(Ok(0), |v| v.into_u32())?;
+    pub fn ctvHash(args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
+        let mut args = args.into_iter();
+        let mut tx = Transaction::try_from(args.next().unwrap())?;
+        let input_index = args.next().map_or(Ok(0), Value::into_u32)?;
 
-        let tx = build_tx(tx_instructions)?;
-        let hash = get_ctv_hash(&tx, input_index);
-
-        Ok(hash.into())
-    }
-}
-
-// Parse tagged array instructions to build a Transaction
-fn build_tx(mut instructions: Vec<Value>) -> Result<Transaction> {
-    let mut tx = Transaction {
-        version: Version(2),
-        lock_time: LockTime::ZERO,
-        input: vec![],
-        output: vec![],
-    };
-
-    // Support short form with just a single output instruction (i.e. ctvHash(txOut($bob_pk)))
-    if let Some(Value::Bytes(_)) = instructions.get(0) {
-        instructions = vec![Value::Array(instructions)];
-    }
-
-    for inst in instructions {
-        let mut inst = inst.into_array()?;
-        ensure!(inst.len() > 0, Error::InvalidArguments);
-        let inst_name = inst.remove(0).into_string()?;
-
-        match (inst_name.as_str(), inst.len()) {
-            ("version", 1) => tx.version = Version(inst.remove(0).into_i32()?),
-            ("locktime", 1) => tx.lock_time = LockTime::from_consensus(inst.remove(0).into_u32()?),
-            ("input", 0 | 1) => tx.input.push(TxIn {
-                previous_output: Default::default(),
-                script_sig: Default::default(),
-                witness: Default::default(),
-                sequence: Sequence(inst.pop().map_or(Ok(u32::MAX), |v| v.into_u32())?),
-            }),
-            ("output", 2) => tx.output.push(TxOut {
-                script_pubkey: inst.remove(0).into_spk()?,
-                value: Amount::from_sat(inst.remove(0).into_u64()?),
-            }),
-            _ => bail!(Error::InvalidArguments),
+        // Add a default input if none exists. The only input field that matters for
+        // the CTV hash is the nSequence.
+        if tx.input.is_empty() {
+            tx.input.push(TxIn::default());
         }
+        ensure!(tx.output.len() > 0, Error::InvalidArguments);
+
+        Ok(get_ctv_hash(&tx, input_index).into())
     }
-
-    ensure!(tx.output.len() > 0, Error::InvalidArguments);
-
-    // Add the default input last, to give the user a chance to add it with a different sequence number
-    if tx.input.len() == 0 {
-        tx.input.push(TxIn {
-            previous_output: Default::default(),
-            script_sig: Default::default(),
-            witness: Default::default(),
-            sequence: Sequence::MAX,
-        })
-    }
-
-    Ok(tx)
 }
 
 // Copied from https://github.com/sapio-lang/sapio/blob/master/sapio-base/src/util.rs
-
-use bitcoin::consensus::encode::Encodable;
-
 fn get_ctv_hash(tx: &Transaction, input_index: u32) -> sha256::Hash {
+    use bitcoin::consensus::encode::Encodable;
+
     let mut ctv_hash = sha256::Hash::engine();
     tx.version.consensus_encode(&mut ctv_hash).unwrap();
     tx.lock_time.consensus_encode(&mut ctv_hash).unwrap();
