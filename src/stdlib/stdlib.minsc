@@ -19,13 +19,15 @@ TR_UNSPENDABLE = NUMS, H_POINT = NUMS;
 
 fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
-fn map($arr_, $cb_) = repeat(len($arr_), |$n_| $cb_($arr_.$n_));
 fn range($start, $end) = repeat(($end-$start)+1, |$n| $start+$n);
 fn keys($arr) = range(0, len($arr) - 1);
 fn slice($arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $arr.$n);
 fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 
+fn flatMap($arr, $$fn) = reduce($arr, [], |$acc, $el| $acc + $$fn($el));
+fn map($arr, $$fn) = flatMap($arr, |$el| [ $$fn($el) ]);
+fn filter($arr, $$fn) = flatMap($arr, |$el| if $$fn($el) then [ $el ] else [ ]);
 
 //
 // Altstack utilities

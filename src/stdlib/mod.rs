@@ -31,15 +31,16 @@ pub fn attach_stdlib(scope: &mut Scope) {
         .unwrap();
 
     // Functions
-    scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("typeof", fns::r#typeof).unwrap();
+    scope.set_fn("len", fns::len).unwrap();
+    scope.set_fn("reduce", fns::reduce).unwrap();
+    scope.set_fn("repeat", fns::repeat).unwrap();
     scope.set_fn("int", fns::int).unwrap();
     scope.set_fn("float", fns::float).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
-    scope.set_fn("repeat", fns::repeat).unwrap();
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
 
@@ -106,6 +107,17 @@ pub mod fns {
     pub fn float(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(args.remove(0).into_f64()?.into())
+    }
+
+    pub fn reduce(args: Vec<Value>, scope: &Scope) -> Result<Value> {
+        ensure!(args.len() == 3, Error::InvalidArguments);
+        let (array, mut current_val, callback) = <[Value; 3]>::try_from(args).unwrap().into();
+        let callback = callback.into_fn()?;
+
+        for element in array.into_array()? {
+            current_val = callback.call(vec![current_val, element], scope)?;
+        }
+        Ok(current_val)
     }
 
     // script(Script|Bytes) -> Script
