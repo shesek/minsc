@@ -95,13 +95,13 @@ impl Value {
     }
 }
 
-/// Defines tagged_intoN() and tagged_intoN_opt() functions that extracts tagged values identified by their tag name
+/// Defines tagged_intoN(), tagged_intoN_opt() and tagged_intoN_default() functions to extract tagged values identified by their tag name
 /// For example, value.tagged_into2::<Txid, u32>("txid", "vout") returns a (Txid, u32) tuple given a [ "txid": $txid, "vout": 0 ] tagged list
-/// Or with the opt version: value.tagged_into2_opt::<Txid, u32>("txid", "vout") to get back (Option<Txid>, Option<u32>)
+/// Or with the optional version: value.tagged_into2_opt::<Txid, u32>("txid", "vout") to get back (Option<Txid>, Option<u32>)
 macro_rules! impl_tagged_into {
-    ($fn_name:ident, $opt_fn_name:ident, $($t:ident, $tag:ident, $idx:tt),+) => {
+    ($fn_name:ident, $opt_fn_name:ident, $default_fn_name:ident, $($t:ident, $tag:ident, $idx:tt),+) => {
 
-        // Implement tagged_intoN_opt(), where each tag value is returned as an Option
+        // Implement tagged_intoN_opt(), where tags are optional and returned as an Option
         pub fn $opt_fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
         -> Result<($(Option<$t>),+)>
         where
@@ -139,13 +139,126 @@ macro_rules! impl_tagged_into {
                 _ => unreachable!(),
             }
         }
+
+        // Implement tagged_intoN_default(), using the Default value for missing tags
+        pub fn $default_fn_name<$($t: TryFrom<Self> + Default),+>(self, $($tag: &str),+)
+        -> Result<($($t),+)>
+        where
+            $(Error: From<$t::Error>),+
+        {
+            let res = self.$opt_fn_name($($tag),+)?;
+            Ok(( $(res.$idx.unwrap_or_default()),+))
+        }
     };
 }
 
 #[rustfmt::skip]
 impl Value {
-    impl_tagged_into!(tagged_into2, tagged_into2_opt, A, a_tag, 0, B, b_tag, 1);
-    impl_tagged_into!(tagged_into3, tagged_into3_opt, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2);
-    impl_tagged_into!(tagged_into4, tagged_into4_opt, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2, D, d_tag, 3);
+    impl_tagged_into!(tagged_into2, tagged_into2_opt, tagged_into2_default, A, a_tag, 0, B, b_tag, 1);
+    impl_tagged_into!(tagged_into3, tagged_into3_opt, tagged_into3_default, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2);
+    impl_tagged_into!(tagged_into4, tagged_into4_opt, tagged_into4_default, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2, D, d_tag, 3);
 }
 
+//
+// Parsers for common Bitcoin data types
+//
+use ::miniscript::bitcoin;
+use bitcoin::absolute::LockTime;
+use bitcoin::{transaction::Version, Amount, OutPoint, Sequence, Transaction, TxIn, TxOut, Txid};
+
+// From [ "version": $version, "locktime": $locktime, "inputs": [ .. ], "outputs": [ .. ] ]
+impl TryFrom<Value> for Transaction {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        let mut tx = Transaction {
+            version: Version(2),
+            lock_time: LockTime::ZERO,
+            input: vec![],
+            output: vec![],
+        };
+
+        value.for_each_unique_tag(|tag, val| {
+            match tag {
+                "version" => tx.version = Version::try_from(val)?,
+                "locktime" => tx.lock_time = LockTime::try_from(val)?,
+                "inputs" => tx.input = val.into_vec_of()?,
+                "outputs" => tx.output = val.into_vec_of()?,
+                _ => bail!(Error::TagUnknown),
+            }
+            Ok(())
+        })?;
+
+        Ok(tx)
+    }
+}
+
+// From [ "prevout": $txid:$vout, "sequence": $sequence ] or just the $txid:vout
+impl TryFrom<Value> for TxIn {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        let (previous_output, sequence) = if value.is_empty_array() {
+            Default::default()
+        } else if value.has_tags() {
+            value.tagged_into2_default("prevout", "sequence")?
+        } else {
+            (OutPoint::try_from(value)?, Sequence::default())
+        };
+        Ok(TxIn {
+            previous_output,
+            sequence,
+            ..Default::default()
+        })
+    }
+}
+
+// From $address:$amount or [ "scriptPubKey": $address, "amount": $amount ]
+impl TryFrom<Value> for TxOut {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        let (spk, amount) = val.tagged_or_tuple::<Value, Amount>("scriptPubKey", "amount")?;
+        Ok(TxOut {
+            script_pubkey: spk.into_spk()?,
+            value: amount,
+        })
+    }
+}
+
+// From $txid:$vout or [ "txid": $txid, "vout": $vout ]
+impl TryFrom<Value> for OutPoint {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        let (txid, vout) = val.tagged_or_tuple("txid", "vout")?;
+        Ok(OutPoint::new(txid, vout))
+    }
+}
+
+impl TryFrom<Value> for Txid {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Txid::from_raw_hash(val.try_into()?))
+    }
+}
+impl TryFrom<Value> for Amount {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Amount::from_sat(val.into_u64()?))
+    }
+}
+impl TryFrom<Value> for LockTime {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(LockTime::from_consensus(val.into_u32()?))
+    }
+}
+impl TryFrom<Value> for Version {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Version(val.into_i32()?))
+    }
+}
+impl TryFrom<Value> for Sequence {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Sequence(val.into_u32()?))
+    }
+}

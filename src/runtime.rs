@@ -862,6 +862,9 @@ impl Value {
     pub fn is_script(&self) -> bool {
         matches!(self, Value::Script(_))
     }
+    pub fn is_empty_array(&self) -> bool {
+        matches!(self, Value::Array(elements) if elements.is_empty())
+    }
 
     pub fn into_f64(self) -> Result<f64> {
         self.try_into()
