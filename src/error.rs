@@ -96,8 +96,8 @@ pub enum RuntimeError {
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,
 
-    #[error("Function {0} expected {1} arguments, not {2}")]
-    ArgumentMismatch(Ident, usize, usize),
+    #[error("Expected {1} arguments, not {0}")]
+    ArgumentMismatch(usize, usize),
 
     #[error("Heightwise duration must be divisible by the block interval (typically 10 minutes)")]
     InvalidDurationHeightwise,
@@ -188,7 +188,6 @@ pub enum RuntimeError {
     //
     // Wrapped errors
     //
-
     #[error("Descriptor conversion error: {0}")]
     DescriptorConversion(#[from] descriptor::ConversionError),
 

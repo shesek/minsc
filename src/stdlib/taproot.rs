@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
@@ -42,19 +42,21 @@ pub mod fns {
     /// tr(PubKey, Script|Array<Script>) -> TaprootSpendInfo
     /// tr(Script|Array<Script>) -> TaprootSpendInfo
     /// tr(PubKey, Hash) -> TaprootSpendInfo
-    pub fn tr(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
+    pub fn tr(args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        super::tr(args.remove(0), args.pop(), scope)
+        let mut args = args.into_iter();
+        super::tr(args.next().unwrap(), args.next(), scope)
     }
 
     /// tapLeaf(Script, version=0xc0) -> Hash
     ///
     /// Compute the leaf hash of the given script
-    pub fn tapLeaf(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(matches!(args.len(), 1 | 2), Error::InvalidArguments);
-        let script = args.remove(0).into_script()?;
+    pub fn tapLeaf(args: Vec<Value>, _: &Scope) -> Result<Value> {
+        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
+        let mut args = args.into_iter();
+        let script = args.next().unwrap().into_script()?;
         let leaf_ver = args
-            .pop()
+            .next()
             .map_or(Ok(LeafVersion::TapScript), |v| -> Result<_> {
                 let leaf_ver = match v {
                     Value::Number(Int(num)) => num.try_into()?,
@@ -70,13 +72,11 @@ pub mod fns {
     /// tapBranch(Hash node_a, Hash node_b) -> Hash
     ///
     /// Combine two nodes to create a new TapBranch parent
-    pub fn tapBranch(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn tapBranch(args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidArguments);
+        let (a, b) = <[Value; 2]>::try_from(args).unwrap().into();
 
-        let a = args.remove(0).try_into()?;
-        let b = args.remove(0).try_into()?;
-
-        let branch = branch_hash(&a, &b);
+        let branch = branch_hash(&a.try_into()?, &b.try_into()?);
 
         Ok(Value::Bytes(branch.to_byte_array().to_vec()))
     }

@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
 use bitcoin::hashes::{sha256, Hash};
@@ -126,11 +126,11 @@ pub mod fns {
 
     /// Generate an address
     /// address(Script|Descriptor|Miniscript|Policy|PubKey) -> Address
-    pub fn address(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn address(args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-
-        let spk = args.remove(0).into_spk()?;
-        let network = args.pop().map_or(Ok(Network::Signet), TryInto::try_into)?;
+        let mut args = args.into_iter();
+        let spk = args.next().unwrap().into_spk()?;
+        let network = args.next().map_or(Ok(Network::Signet), TryInto::try_into)?;
 
         Ok(Address::from_script(&spk, network)
             .map_err(|_| Error::NotAddressable(spk))?
@@ -148,10 +148,11 @@ pub mod fns {
         Ok(script.into())
     }
 
-    pub fn repeat(mut args: Vec<Value>, scope: &Scope) -> Result<Value> {
+    pub fn repeat(args: Vec<Value>, scope: &Scope) -> Result<Value> {
         ensure!(args.len() == 2, Error::InvalidArguments);
-        let num = args.remove(0).into_usize()?;
-        let producer = args.remove(0);
+        let (num, producer) = <[Value; 2]>::try_from(args).unwrap().into();
+        let num = num.into_usize()?;
+
         Ok(Value::Array(
             (0..num)
                 .map(|n| match &producer {

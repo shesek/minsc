@@ -48,10 +48,9 @@ impl Call for Function {
 impl Call for UserFunction {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
         if self.signature.len() != args.len() {
-            return Err(Error::ArgumentMismatch(
+            return Err(Error::CallError(
                 self.ident.clone(),
-                self.signature.len(),
-                args.len(),
+                Error::ArgumentMismatch(args.len(), self.signature.len()).into(),
             ));
         }
         let mut scope = scope.child();
