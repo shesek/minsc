@@ -27,7 +27,7 @@
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
 
-use crate::runtime::{Error, Result, Value};
+use crate::runtime::{Error, FromOptValue, Result, Value};
 
 impl Value {
     /// Transform a tagged Value::Array into a Vec of tag names and their values
@@ -88,22 +88,37 @@ impl Value {
         Error: From<B::Error>,
     {
         if self.has_tags() {
-            self.tagged_into2(a_tag, b_tag)
+            Ok(self.tagged_into2_req(a_tag, b_tag)?)
         } else {
             self.into_tuple()
         }
     }
 }
 
-/// Defines tagged_intoN(), tagged_intoN_opt() and tagged_intoN_default() functions to extract tagged values identified by their tag name
-/// For example, value.tagged_into2::<Txid, u32>("txid", "vout") returns a (Txid, u32) tuple given a [ "txid": $txid, "vout": 0 ] tagged list
-/// Or with the optional version: value.tagged_into2_opt::<Txid, u32>("txid", "vout") to get back (Option<Txid>, Option<u32>)
+/// Defines tagged_intoN(), tagged_intoN_optional(), tagged_intoN_required() and tagged_intoN_default() functions
+/// to extract tagged values identified by their tag name (e.g. [ "txid": $txid, "vout": 0 ]) and automatically
+/// convert them into any type that implements TryFrom<Value>.
 macro_rules! impl_tagged_into {
-    ($fn_name:ident, $opt_fn_name:ident, $default_fn_name:ident, $($t:ident, $tag:ident, $idx:tt),+) => {
+    ($fn_name:ident, $opt_fn_name:ident, $req_fn_name:ident, $default_fn_name:ident, $($t:ident, $tag:ident, $idx:tt),+) => {
 
-        // Implement tagged_intoN_opt(), where tags are optional and returned as an Option
+        // Implement tagged_intoN(), supporting both required and optional fields
+        // For example: value.tagged_into2::<Txid, Option<u32>>("txid", "vout") to get back (Txid, Option<u32>)
+        pub fn $fn_name<$($t: FromOptValue<$t>),+>(self, $($tag: &str),+)
+            -> Result<($($t),+)>
+        {
+            // Use tagged_intoN_opt() to get the found fields as `Value`s, without converting them (yet)
+            let res = self.$opt_fn_name($($tag),+)?; // (Option<Value>, Option<Value>, ..)
+
+            // Convert the Option<Value>s into the requested type, via the FromOptValue trait.
+            // This will error if the field is not present and the requested type was not specified as an Option.
+            Ok(($( $t::from_opt_val(res.$idx)
+                .map_err(|e| Error::TagError($tag.to_string(), e.into()))? ),+))
+        }
+
+        // Implement tagged_intoN_optional(), where all fields are optional and returned as an Option
+        // For example: valued.tagged_into2_optional::<Txid, u32>("txid", "vout") to get back (Option<Txid>, Option<u32>)
         pub fn $opt_fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
-        -> Result<($(Option<$t>),+)>
+            -> Result<($(Option<$t>),+)>
         where
             $(Error: From<$t::Error>),+
         {
@@ -122,20 +137,20 @@ macro_rules! impl_tagged_into {
             Ok(res)
         }
 
-        // Implement tagged_intoN(), requiring all tags to be present
-        pub fn $fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
+        // Implement tagged_intoN_required(), requiring all tags to be present
+        // For example: valued.tagged_into2_required::<Txid, u32>("txid", "vout") to get back (Txid, u32)
+        pub fn $req_fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
         -> Result<($($t),+)>
         where
             $(Error: From<$t::Error>),+
         {
-            // delegate the heavy lifting to tagged_intoN_opt() above
             match self.$opt_fn_name($($tag),+)? {
                 // match the case where all tags are available, extract their values out of the Option and return them
                 #[allow(non_snake_case)] // type name aliases reused as variable names (e.g. A)
                 ($(Some($t)),+) => Ok(($($t),+)),
 
                 // otherwise, report which tag is missing
-                $(res if res.$idx.is_none() => Err(Error::TagMissing($tag.to_string())),)+
+                $(res if res.$idx.is_none() => Err(Error::TagError($tag.to_string(), Error::MissingValue.into())),)+
                 _ => unreachable!(),
             }
         }
@@ -147,16 +162,16 @@ macro_rules! impl_tagged_into {
             $(Error: From<$t::Error>),+
         {
             let res = self.$opt_fn_name($($tag),+)?;
-            Ok(( $(res.$idx.unwrap_or_default()),+))
+            Ok(($( res.$idx.unwrap_or_default() ),+))
         }
     };
 }
 
 #[rustfmt::skip]
 impl Value {
-    impl_tagged_into!(tagged_into2, tagged_into2_opt, tagged_into2_default, A, a_tag, 0, B, b_tag, 1);
-    impl_tagged_into!(tagged_into3, tagged_into3_opt, tagged_into3_default, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2);
-    impl_tagged_into!(tagged_into4, tagged_into4_opt, tagged_into4_default, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2, D, d_tag, 3);
+    impl_tagged_into!(tagged_into2, tagged_into2_opt, tagged_into2_req, tagged_into2_default, A, a_tag, 0, B, b_tag, 1);
+    impl_tagged_into!(tagged_into3, tagged_into3_opt, tagged_into3_req, tagged_into3_default, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2);
+    impl_tagged_into!(tagged_into4, tagged_into4_opt, tagged_into4_req, tagged_into4_default, A, a_tag, 0, B, b_tag, 1, C, c_tag, 2, D, d_tag, 3);
 }
 
 //

@@ -798,6 +798,41 @@ where
     }
 }
 
+// Generic conversion from an Option<Value> into T or Option<T>
+// This is used by into_tagged() to return types that can be either required or optional.
+// Cannot use TryFrom<Option<Value>> because it would violate the orphan rule.
+pub trait FromOptValue<T> {
+    fn from_opt_val(value: Option<Value>) -> Result<T>;
+}
+
+impl<T> FromOptValue<T> for T
+where
+    T: TryFrom<Value> + OptValueMarker,
+    Error: From<T::Error>,
+{
+    fn from_opt_val(value: Option<Value>) -> Result<T> {
+        // Convert from Option<Value> to a T, erroring if there's no Value
+        Ok(value.ok_or(Error::MissingValue)?.try_into()?)
+    }
+}
+
+impl<T> FromOptValue<Option<T>> for Option<T>
+where
+    T: TryFrom<Value> + OptValueMarker,
+    Error: From<T::Error>,
+{
+    fn from_opt_val(value: Option<Value>) -> Result<Option<T>> {
+        // Convert from Option<Value> to an Option<T>, keeping `None`s
+        Ok(value.map(Value::try_into).transpose()?)
+    }
+}
+
+// The above FromOptValue impls cannot be implemented for any TryFrom<Value> because they would conflict with each-other
+// (due to a blanket trait implementations in the stdlib?). The OptValueMarker trait restricts the supported types to
+// our own types, which are identified by virtue of using our runtime::Error for their TryFrom conversion.
+pub trait OptValueMarker {}
+impl<T: TryFrom<Value, Error=Error>> OptValueMarker for T{}
+
 //
 // Value methods
 //
