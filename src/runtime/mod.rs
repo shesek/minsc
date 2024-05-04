@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::convert::TryFrom;
 
 use bitcoin::bip32::{ChildNumber, DerivationPath};
