@@ -13,6 +13,7 @@ impl Array {
     pub fn into_iter(self) -> vec::IntoIter<Value> {
         self.0.into_iter()
     }
+
     pub fn check_len(self, expected_len: usize) -> Result<Self> {
         ensure!(
             self.len() == expected_len,
@@ -22,11 +23,15 @@ impl Array {
         Ok(self)
     }
     pub fn check_varlen(self, min_len: usize, max_len: usize) -> Result<Self> {
-        ensure!(
-            self.len() >= min_len && self.len() <= max_len,
-            Error::InvalidVarLength(self.len(), min_len, max_len)
-        );
-        Ok(self)
+        if min_len == max_len {
+            self.check_len(min_len)
+        } else {
+            ensure!(
+                self.len() >= min_len && self.len() <= max_len,
+                Error::InvalidVarLength(self.len(), min_len, max_len)
+            );
+            Ok(self)
+        }
     }
 }
 
@@ -65,26 +70,34 @@ impl<T: FromValue> TryFrom<Array> for Vec<T> {
 impl<A: FromValue> TryFrom<Array> for (A,) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A,)> {
-        let a = arr.check_len(1)?.remove(0);
-        Ok((A::from_value(a)?,))
+        let min_len = A::is_required() as usize;
+        let mut arr = arr.check_varlen(min_len, 1)?;
+
+        let a = A::from_opt_value(arr.pop())?;
+        Ok((a,))
     }
 }
 impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A, B)> {
-        let mut iter = arr.check_len(2)?.into_iter();
-        let a = A::from_value(iter.next().unwrap())?;
-        let b = B::from_value(iter.next().unwrap())?;
+        let min_len = A::is_required() as usize + B::is_required() as usize;
+        let mut iter = arr.check_varlen(min_len, 2)?.into_iter();
+
+        let a = A::from_opt_value(iter.next())?;
+        let b = B::from_opt_value(iter.next())?;
         Ok((a, b))
     }
 }
 impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A, B, C)> {
-        let mut iter = arr.check_len(3)?.into_iter();
-        let a = A::from_value(iter.next().unwrap())?;
-        let b = B::from_value(iter.next().unwrap())?;
-        let c = C::from_value(iter.next().unwrap())?;
+        let min_len =
+            A::is_required() as usize + B::is_required() as usize + C::is_required() as usize;
+        let mut iter = arr.check_varlen(min_len, 3)?.into_iter();
+
+        let a = A::from_opt_value(iter.next())?;
+        let b = B::from_opt_value(iter.next())?;
+        let c = C::from_opt_value(iter.next())?;
         Ok((a, b, c))
     }
 }

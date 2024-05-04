@@ -320,12 +320,16 @@ impl<A: FromValue, B: FromValue> TryFrom<Value> for (A, B) {
     }
 }
 
-// Generic conversion from an Option<Value> into T or Option<T>
+// Generic conversion from a Value/Option<Value> into T/Option<T>
 // Used to support types that can be either required or optional (for example by into_tagged())
 // Must use a new trait because TryFrom<Option<Value>> would violate the orphan rule.
 pub trait FromValue: Sized {
     fn from_value(value: Value) -> Result<Self>;
     fn from_opt_value(value: Option<Value>) -> Result<Self>;
+    fn is_optional() -> bool;
+    fn is_required() -> bool {
+        !Self::is_optional()
+    }
 }
 
 impl<T> FromValue for T
@@ -336,10 +340,12 @@ where
     fn from_value(value: Value) -> Result<T> {
         Ok(value.try_into()?)
     }
-
     fn from_opt_value(value: Option<Value>) -> Result<T> {
         // Convert from Option<Value> to a T, erroring if there's no Value
         Ok(value.ok_or(Error::MissingValue)?.try_into()?)
+    }
+    fn is_optional() -> bool {
+        false
     }
 }
 
@@ -351,10 +357,12 @@ where
     fn from_value(value: Value) -> Result<Option<T>> {
         Ok(Some(value.try_into()?))
     }
-
     fn from_opt_value(value: Option<Value>) -> Result<Option<T>> {
         // Convert from Option<Value> to an Option<T>, keeping `None`s
         Ok(value.map(Value::try_into).transpose()?)
+    }
+    fn is_optional() -> bool {
+        true
     }
 }
 
