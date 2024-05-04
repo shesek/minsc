@@ -27,7 +27,7 @@
 use std::collections::HashSet;
 use std::convert::{TryFrom, TryInto};
 
-use crate::runtime::{Error, FromOptValue, Result, Value};
+use crate::runtime::{Error, FromValue, Result, Value};
 
 impl Value {
     /// Transform a tagged Value::Array into a Vec of tag names and their values
@@ -78,15 +78,11 @@ impl Value {
 
     /// Parse values that can be either a tuple of (A,B) or a tagged list with `a_tag` and `b_tag`
     /// For example, tuple_or_tags::<Txid,u32>("txid", "vout") to accept either [$txid,$vout] tuples or tagged ["txid":$txid,"vout":$vout]
-    pub fn tagged_or_tuple<A: TryFrom<Self>, B: TryFrom<Self>>(
+    pub fn tagged_or_tuple<A: FromValue, B: FromValue>(
         self,
         a_tag: &str,
         b_tag: &str,
-    ) -> Result<(A, B)>
-    where
-        Error: From<A::Error>,
-        Error: From<B::Error>,
-    {
+    ) -> Result<(A, B)> {
         if self.has_tags() {
             Ok(self.tagged_into2_req(a_tag, b_tag)?)
         } else {
@@ -103,7 +99,7 @@ macro_rules! impl_tagged_into {
 
         // Implement tagged_intoN(), supporting both required and optional fields
         // For example: value.tagged_into2::<Txid, Option<u32>>("txid", "vout") to get back (Txid, Option<u32>)
-        pub fn $fn_name<$($t: FromOptValue<$t>),+>(self, $($tag: &str),+)
+        pub fn $fn_name<$($t: FromValue),+>(self, $($tag: &str),+)
             -> Result<($($t),+)>
         {
             // Use tagged_intoN_opt() to get the found fields as `Value`s, without converting them (yet)
@@ -111,23 +107,21 @@ macro_rules! impl_tagged_into {
 
             // Convert the Option<Value>s into the requested type, via the FromOptValue trait.
             // This will error if the field is not present and the requested type was not specified as an Option.
-            Ok(($( $t::from_opt_val(res.$idx)
+            Ok(($( $t::from_opt_value(res.$idx)
                 .map_err(|e| Error::TagError($tag.to_string(), e.into()))? ),+))
         }
 
         // Implement tagged_intoN_optional(), where all fields are optional and returned as an Option
         // For example: valued.tagged_into2_optional::<Txid, u32>("txid", "vout") to get back (Option<Txid>, Option<u32>)
-        pub fn $opt_fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
+        pub fn $opt_fn_name<$($t: FromValue),+>(self, $($tag: &str),+)
             -> Result<($(Option<$t>),+)>
-        where
-            $(Error: From<$t::Error>),+
         {
             let mut res = ($(None::<$t>),+);
 
             self.for_each_tag(|tag, val| {
                $(if tag == $tag {
                     ensure!(res.$idx.is_none(), Error::TagDuplicated); // could use for_each_unique_tag(), but here we already have `res` so we can avoid allocating the `HashSet<String>` for seen tags
-                    res.$idx = Some(val.try_into()?);
+                    res.$idx = Some($t::from_value(val)?);
                     Ok(())
                 } else)+ {
                     Err(Error::TagUnknown)
@@ -139,10 +133,8 @@ macro_rules! impl_tagged_into {
 
         // Implement tagged_intoN_required(), requiring all tags to be present
         // For example: valued.tagged_into2_required::<Txid, u32>("txid", "vout") to get back (Txid, u32)
-        pub fn $req_fn_name<$($t: TryFrom<Self>),+>(self, $($tag: &str),+)
+        pub fn $req_fn_name<$($t: FromValue),+>(self, $($tag: &str),+)
         -> Result<($($t),+)>
-        where
-            $(Error: From<$t::Error>),+
         {
             match self.$opt_fn_name($($tag),+)? {
                 // match the case where all tags are available, extract their values out of the Option and return them
@@ -156,10 +148,8 @@ macro_rules! impl_tagged_into {
         }
 
         // Implement tagged_intoN_default(), using the Default value for missing tags
-        pub fn $default_fn_name<$($t: TryFrom<Self> + Default),+>(self, $($tag: &str),+)
+        pub fn $default_fn_name<$($t: FromValue + Default),+>(self, $($tag: &str),+)
         -> Result<($($t),+)>
-        where
-            $(Error: From<$t::Error>),+
         {
             let res = self.$opt_fn_name($($tag),+)?;
             Ok(($( res.$idx.unwrap_or_default() ),+))

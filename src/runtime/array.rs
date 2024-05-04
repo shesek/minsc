@@ -1,7 +1,7 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::{fmt, ops, vec};
 
-use crate::runtime::{Error, Result, Value};
+use crate::runtime::{Error, FromValue, Result, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);
@@ -53,70 +53,41 @@ impl ops::DerefMut for Array {
 }
 
 // Generic conversion from Array into a Vec of any convertible type
-impl<T: TryFrom<Value>> TryFrom<Array> for Vec<T>
-where
-    Error: From<T::Error>,
-{
+impl<T: FromValue> TryFrom<Array> for Vec<T> {
     type Error = Error;
     fn try_from(arr: Array) -> Result<Vec<T>> {
-        arr.0
-            .into_iter()
-            .map(|a| a.try_into().map_err(Error::from))
-            .collect()
+        arr.0.into_iter().map(T::from_value).collect()
     }
 }
 
 // Generic conversion from Array into tuples of any convertible type
 // Currently supports 1-tuples, 2-tuples and 3-tuples
-impl<A: TryFrom<Value>> TryFrom<Array> for (A,)
-where
-    Error: From<A::Error>,
-{
+impl<A: FromValue> TryFrom<Array> for (A,) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A,)> {
         let a = arr.check_len(1)?.remove(0);
-        Ok((a.try_into()?,))
+        Ok((A::from_value(a)?,))
     }
 }
-impl<A: TryFrom<Value>, B: TryFrom<Value>> TryFrom<Array> for (A, B)
-where
-    Error: From<A::Error>,
-    Error: From<B::Error>,
-{
+impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A, B)> {
         let mut iter = arr.check_len(2)?.into_iter();
-        let a = iter.next().unwrap().try_into()?;
-        let b = iter.next().unwrap().try_into()?;
+        let a = A::from_value(iter.next().unwrap())?;
+        let b = B::from_value(iter.next().unwrap())?;
         Ok((a, b))
     }
 }
-impl<A: TryFrom<Value>, B: TryFrom<Value>, C: TryFrom<Value>> TryFrom<Array> for (A, B, C)
-where
-    Error: From<A::Error>,
-    Error: From<B::Error>,
-    Error: From<C::Error>,
-{
+impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A, B, C)> {
         let mut iter = arr.check_len(3)?.into_iter();
-        let a = iter.next().unwrap().try_into()?;
-        let b = iter.next().unwrap().try_into()?;
-        let c = iter.next().unwrap().try_into()?;
+        let a = A::from_value(iter.next().unwrap())?;
+        let b = B::from_value(iter.next().unwrap())?;
+        let c = C::from_value(iter.next().unwrap())?;
         Ok((a, b, c))
     }
 }
-
-/*
-impl<A: FromOptValue<A>, B: FromOptValue<B>> TryFrom<Array> for (A, B) {
-    type Error = Error;
-    fn try_from(arr: Array) -> Result<(A, B)> {
-        ensure!(arr.len() <= 2, Error::InvalidArguments);
-        let mut iter = arr.into_iter();
-        Ok((A::from_opt_val(iter.next())?, B::from_opt_val(iter.next())?))
-    }
-}
-*/
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

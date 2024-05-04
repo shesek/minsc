@@ -21,7 +21,7 @@ pub mod value;
 pub use array::Array;
 pub use function::{Call, Function};
 pub use scope::Scope;
-pub use value::{FromOptValue, Number, Value};
+pub use value::{FromValue, Number, Value};
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {

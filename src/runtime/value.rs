@@ -305,10 +305,7 @@ impl_hash_conv!(hashes::hash160::Hash);
 impl_hash_conv!(miniscript::hash256::Hash);
 
 // Generic conversion from Value::Array into a Vec of any convertible type
-impl<T: TryFrom<Value>> TryFrom<Value> for Vec<T>
-where
-    Error: From<T::Error>,
-{
+impl<T: FromValue> TryFrom<Value> for Vec<T> {
     type Error = Error;
     fn try_from(val: Value) -> Result<Vec<T>> {
         val.into_array()?.try_into()
@@ -316,11 +313,7 @@ where
 }
 
 // Generic conversion from Value::Array into a 2-tuple of any convertible type
-impl<A: TryFrom<Value>, B: TryFrom<Value>> TryFrom<Value> for (A, B)
-where
-    Error: From<A::Error>,
-    Error: From<B::Error>,
-{
+impl<A: FromValue, B: FromValue> TryFrom<Value> for (A, B) {
     type Error = Error;
     fn try_from(val: Value) -> Result<(A, B)> {
         val.into_array()?.try_into()
@@ -328,39 +321,49 @@ where
 }
 
 // Generic conversion from an Option<Value> into T or Option<T>
-// This is used by into_tagged() to return types that can be either required or optional.
-// Cannot use TryFrom<Option<Value>> because it would violate the orphan rule.
-pub trait FromOptValue<T> {
-    fn from_opt_val(value: Option<Value>) -> Result<T>;
+// Used to support types that can be either required or optional (for example by into_tagged())
+// Must use a new trait because TryFrom<Option<Value>> would violate the orphan rule.
+pub trait FromValue: Sized {
+    fn from_value(value: Value) -> Result<Self>;
+    fn from_opt_value(value: Option<Value>) -> Result<Self>;
 }
 
-impl<T> FromOptValue<T> for T
+impl<T> FromValue for T
 where
-    T: TryFrom<Value> + OptValueMarker,
+    T: TryFrom<Value> + FromValueMarker,
     Error: From<T::Error>,
 {
-    fn from_opt_val(value: Option<Value>) -> Result<T> {
+    fn from_value(value: Value) -> Result<T> {
+        Ok(value.try_into()?)
+    }
+
+    fn from_opt_value(value: Option<Value>) -> Result<T> {
         // Convert from Option<Value> to a T, erroring if there's no Value
         Ok(value.ok_or(Error::MissingValue)?.try_into()?)
     }
 }
 
-impl<T> FromOptValue<Option<T>> for Option<T>
+impl<T> FromValue for Option<T>
 where
-    T: TryFrom<Value> + OptValueMarker,
+    T: TryFrom<Value> + FromValueMarker,
     Error: From<T::Error>,
 {
-    fn from_opt_val(value: Option<Value>) -> Result<Option<T>> {
+    fn from_value(value: Value) -> Result<Option<T>> {
+        Ok(Some(value.try_into()?))
+    }
+
+    fn from_opt_value(value: Option<Value>) -> Result<Option<T>> {
         // Convert from Option<Value> to an Option<T>, keeping `None`s
         Ok(value.map(Value::try_into).transpose()?)
     }
 }
 
-// The above FromOptValue impls cannot be implemented for any TryFrom<Value> because they would conflict with each-other
-// (due to a blanket trait implementations in the stdlib?). The OptValueMarker trait restricts the supported types to
-// our own types, which are identified by virtue of using our runtime::Error for their TryFrom conversion.
-pub trait OptValueMarker {}
-impl<T: TryFrom<Value, Error = Error>> OptValueMarker for T {}
+// The above FromValue impls cannot be implemented for any TryFrom<Value> because they would conflict with each-other
+// (due to a blanket trait implementations in the stdlib?). The FromValueMarker trait restricts the supported types
+// to our own types, which are identified by virtue of using our runtime::Error for their TryFrom conversion.
+pub trait FromValueMarker {}
+impl<T: TryFrom<Value, Error = Error>> FromValueMarker for T {}
+impl FromValueMarker for Value {}
 
 //
 // Value methods
@@ -390,19 +393,12 @@ impl Value {
     }
 
     /// Transform Array elements into a Vec<T> of any convertible type
-    pub fn into_vec_of<T: TryFrom<Value>>(self) -> Result<Vec<T>>
-    where
-        Error: From<T::Error>,
-    {
+    pub fn into_vec_of<T: FromValue>(self) -> Result<Vec<T>> {
         self.try_into()
     }
 
     /// Transform an Array of 2 elements into a typed 2-tuple
-    pub fn into_tuple<A: TryFrom<Self>, B: TryFrom<Self>>(self) -> Result<(A, B)>
-    where
-        Error: From<A::Error>,
-        Error: From<B::Error>,
-    {
+    pub fn into_tuple<A: FromValue, B: FromValue>(self) -> Result<(A, B)> {
         self.try_into()
     }
 
