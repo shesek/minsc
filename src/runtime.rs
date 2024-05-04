@@ -77,7 +77,7 @@ impl Execute for ast::Stmt {
 
 impl Execute for ast::Stmts {
     fn exec(&self, scope: &mut Scope) -> Result<()> {
-        for stmt in &self.stmts {
+        for stmt in &self.0 {
             stmt.exec(scope)?;
         }
         Ok(())

@@ -23,7 +23,7 @@ pub Program: Expr = <stmts:Stmt*> <ret:Return?> =>
 
 // A collection of statements with no return value
 // Used for library files and for the body of if statements
-pub Stmts: ast::Stmts = <stmts:Stmt*> => ast::Stmts { stmts };
+pub Stmts: ast::Stmts = <stmts:Stmt*> => ast::Stmts(stmts);
 
 Return = {
   Expr, // the preferred form

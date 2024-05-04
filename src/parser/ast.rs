@@ -222,13 +222,11 @@ impl_from_variant!(IfStmt, Stmt, If);
 /// A collection of statements with no return value
 /// Used for library files and as the body of if statements
 #[derive(Debug, Clone)]
-pub struct Stmts {
-    pub stmts: Vec<Stmt>,
-}
+pub struct Stmts(pub Vec<Stmt>);
 
 impl Expr {
     pub fn bytes_from_hex(s: &str) -> Result<Expr, ParseError> {
-        use miniscript::bitcoin::hashes::hex::FromHex;
+        use bitcoin::hashes::hex::FromHex;
         Ok(Expr::Bytes(Vec::from_hex(s)?))
     }
 
