@@ -1,9 +1,6 @@
-use std::convert::TryFrom;
-use std::str::FromStr;
-
 use miniscript::{bitcoin, DescriptorPublicKey};
 
-use crate::{grammar, ParseError};
+use crate::parser::ParseError;
 
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]
@@ -228,26 +225,6 @@ impl_from_variant!(IfStmt, Stmt, If);
 pub struct Stmts {
     pub stmts: Vec<Stmt>,
 }
-
-pub type Library = Stmts;
-
-impl FromStr for Expr {
-    type Err = ParseError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parser = grammar::ProgramParser::new();
-        Ok(parser.parse(s)?)
-    }
-}
-impl_tryfrom_fromstr!(Expr);
-
-impl FromStr for Stmts {
-    type Err = ParseError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parser = grammar::StmtsParser::new();
-        Ok(parser.parse(s)?)
-    }
-}
-impl_tryfrom_fromstr!(Stmts);
 
 impl Expr {
     pub fn bytes_from_hex(s: &str) -> Result<Expr, ParseError> {

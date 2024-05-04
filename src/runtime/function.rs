@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ast::{self, Expr, Ident};
+use crate::parser::{ast, Expr, Ident};
 use crate::runtime::{Error, Evaluate, Result, Scope, Value};
 
 #[derive(Debug, Clone)]

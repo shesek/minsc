@@ -4,7 +4,7 @@ use miniscript::bitcoin::{
 use miniscript::policy::compiler::CompilerError;
 use miniscript::{descriptor, TranslateErr};
 
-use crate::ast::{Ident, InfixOp};
+use crate::parser::ast::{Ident, InfixOp};
 use crate::runtime::Value;
 
 #[derive(thiserror::Error, Debug)]

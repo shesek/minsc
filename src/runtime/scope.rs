@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use crate::ast::Ident;
-use crate::function::NativeFunctionPt;
-use crate::runtime::{Error, Result, Value};
+use crate::parser::Ident;
+use crate::runtime::{function::NativeFunctionPt, Error, Result, Value};
 use crate::stdlib::attach_stdlib;
 
 #[derive(Default, Debug)]
@@ -13,6 +12,7 @@ pub struct Scope<'a> {
 
 impl<'a> Scope<'a> {
     pub fn root() -> Self {
+        // TODO cache
         let mut scope = Self::default();
         attach_stdlib(&mut scope);
         scope

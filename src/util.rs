@@ -320,10 +320,3 @@ pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
     );
     c
 }
-
-pub fn concat<T>(mut list: Vec<T>, val: Option<T>) -> Vec<T> {
-    if let Some(val) = val {
-        list.push(val);
-    }
-    list
-}

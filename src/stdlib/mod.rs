@@ -4,7 +4,7 @@ use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
 use bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Value};
-use crate::{ast, parse_lib, time};
+use crate::{parser, time};
 
 pub mod ctv;
 pub mod miniscript;
@@ -12,8 +12,8 @@ pub mod tagged;
 pub mod taproot;
 
 lazy_static! {
-    static ref MINSC_STDLIB: ast::Library = parse_lib(include_str!("stdlib.minsc")).unwrap();
-    static ref ELEMENTS_STDLIB: ast::Library = parse_lib(include_str!("elements.minsc")).unwrap();
+    static ref MINSC_STDLIB: parser::Library = include_str!("stdlib.minsc").parse().unwrap();
+    static ref ELEMENTS_STDLIB: parser::Library = include_str!("elements.minsc").parse().unwrap();
 }
 
 /// Attach built-in functions and variables to the Minsc runtime environment
@@ -66,7 +66,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
-    use crate::function::Call;
+    use crate::runtime::Call;
 
     // len(Array|Bytes|Script|String) -> Number
     pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {

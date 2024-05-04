@@ -4,18 +4,11 @@ extern crate lalrpop_util;
 #[macro_use]
 extern crate lazy_static;
 
-lalrpop_mod!(
-    #[allow(clippy::all)]
-    grammar
-);
-
 #[macro_use]
 mod macros;
-pub mod ast;
 pub mod error;
-pub mod function;
+pub mod parser;
 pub mod runtime;
-pub mod scope;
 pub mod stdlib;
 pub mod time;
 pub mod util;
@@ -28,8 +21,8 @@ pub mod wasm;
 use std::convert::TryInto;
 use std::str::FromStr;
 
-pub use ast::{Expr, Ident, Stmt, Stmts};
 pub use error::{Error, ParseError, RuntimeError};
+pub use parser::{Expr, Ident, Stmt, Stmts};
 pub use runtime::{Evaluate, Number::*, Scope, Value};
 
 use miniscript::{descriptor, policy};

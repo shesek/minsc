@@ -1,6 +1,6 @@
 use std::str::FromStr;
-use crate::{ast, time, Expr, Stmt, ParseError};
-use crate::util::concat;
+use crate::time;
+use crate::parser::{ast, concat, Expr, Stmt, ParseError};
 
 grammar;
 
@@ -27,7 +27,7 @@ pub Stmts: ast::Stmts = <stmts:Stmt*> => ast::Stmts { stmts };
 
 Return = {
   Expr, // the preferred form
-  "return" <Expr> ";"?,
+  "return" <Expr> ";"?, // if you insist
 };
 
 // All possible statements

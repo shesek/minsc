@@ -1,21 +1,18 @@
-use std::convert::TryFrom;
-
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::{Transaction, TxIn};
 use miniscript::bitcoin;
 
+use crate::parser;
 use crate::runtime::{Error, Execute, Result, Scope, Value};
-use crate::{ast, parse_lib};
 
 lazy_static! {
-    static ref MINSC_CTV_LIB: ast::Library = parse_lib(
-        r#"
+    static ref MINSC_CTV_LIB: parser::Library = r#"
         OP_CHECKTEMPLATEVERIFY = script(0xb3);
         OP_CTV = OP_CHECKTEMPLATEVERIFY;
 
         fn ctv($tx) = `ctvHash($tx) OP_CHECKTEMPLATEVERIFY OP_DROP`;
-        "#
-    )
+    "#
+    .parse()
     .unwrap();
 }
 
