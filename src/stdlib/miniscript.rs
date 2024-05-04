@@ -71,7 +71,7 @@ pub mod fns {
         let thresh_n = args.remove(0).into_usize()?;
         // Support thresh(n, $array) as well as thresh(n, pol1, pol2, ...) invocations
         let policies = if args.len() == 1 && args[0].is_array() {
-            into_policies(args.remove(0).into_array()?)?
+            into_policies(args.remove(0).into_array_elements()?)?
         } else {
             into_policies(args)?
         };
@@ -175,11 +175,12 @@ pub mod fns {
     }
 
     /// Descriptor<Multi> -> Array<Descriptor<Single>>
+    /// XXX rename descriptors() or singleDescriptors?
     pub fn single_descriptors(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         let desc = args.remove(0).into_desc()?;
         let descs = desc.into_single_descriptors()?;
-        Ok(Value::Array(
+        Ok(Value::array(
             descs.into_iter().map(Value::Descriptor).collect(),
         ))
     }
@@ -196,14 +197,14 @@ pub mod fns {
     // Turn `[A,B,C]` array into an `A && B && C` policy
     pub fn all(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = into_policies(args.remove(0).into_array()?)?;
+        let policies = into_policies(args.remove(0).into_array_elements()?)?;
         Ok(Policy::Threshold(policies.len(), policies).into())
     }
 
     // Turn `[A,B,C]` array into an `A || B || C` policy
     pub fn any(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = into_policies(args.remove(0).into_array()?)?;
+        let policies = into_policies(args.remove(0).into_array_elements()?)?;
         Ok(Policy::Threshold(1, policies).into())
     }
 }

@@ -131,11 +131,11 @@ pub mod fns {
                 let script = script_ver.0.clone();
                 let version = vec![script_ver.1.to_consensus()];
                 let ctrl = tapinfo.control_block(script_ver).unwrap().serialize();
-                Value::Array(vec![script.into(), version.into(), ctrl.into()])
+                Value::array(vec![script.into(), version.into(), ctrl.into()])
             })
             .collect();
 
-        Ok(Value::Array(scripts_ctrls))
+        Ok(Value::array(scripts_ctrls))
     }
 
     /// tapInfo(Descriptor|TapInfo) -> TapInfo
@@ -189,14 +189,14 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         // of Scripts/Policies to automatically construct a tree. Policies are merged together with OR and compiled into a
         // tree using rust-miniscript. Scripts can have probability weights associated with them to construct a huffman tree.
         (Value::PubKey(pk), Some(Value::Array(nodes))) => {
-            tr_from_array(Some(pk), None, nodes)?.into()
+            tr_from_array(Some(pk), None, nodes.0)?.into()
         }
 
         // tr(Array<Policy>) -> Descriptor
         // Create a Taproot descriptor for the given Policies, extracting the internal key or using TR_UNSPENDABLE
         // tr(Array<Script>) -> TaprootSpendInfo
         // Create a TaprootSpendInfo for the given Scripts, using TR_UNSPEDABLE as the internal key
-        (Value::Array(nodes), None) => tr_from_array(None, tr_unspendable(scope)?, nodes)?.into(),
+        (Value::Array(nodes), None) => tr_from_array(None, tr_unspendable(scope)?, nodes.0)?.into(),
 
         _ => bail!(Error::TaprootInvalidTrUse),
     })
@@ -245,7 +245,7 @@ fn tapinfo_from_array(
 
     if scripts.len() == 2 && (scripts[0].is_array() || scripts[1].is_array()) {
         // Nested arrays of length 2 are treated as a binary tree of scripts (e.g. [ A, [ [ B, C ], D ] ])
-        tapinfo_from_tree(dpk, Value::Array(scripts))
+        tapinfo_from_tree(dpk, Value::array(scripts))
     } else {
         // Other arrays are expected to be flat and are built into a huffman tree
         // Scripts may include weights (e.g. [ 10@`$pk OP_CHECSIG`, 1@`OP_ADD 2 OP_EQUAL` ] )
@@ -330,7 +330,7 @@ fn descriptor_from_array(
     if policies.len() == 2 && (policies[0].is_array() || policies[1].is_array()) {
         // Nested arrays of length 2 are treated as a binary tree of policies (e.g. [ A, [ [ B, C ], D ] ])
         let internal_key = pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?;
-        descriptor_from_tree(internal_key, Value::Array(policies))
+        descriptor_from_tree(internal_key, Value::array(policies))
     } else {
         // Other arrays are expected to be flat and are compiled into a thresh(1, POLICIES) policy
         let policy = Policy::Threshold(1, into_policies(policies)?);

@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
 use bitcoin::hashes::{sha256, Hash};
 
-use crate::runtime::{Error, Execute, Number, Result, Scope, Value};
+use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Value};
 use crate::{ast, parse_lib, time};
 
 pub mod ctv;
@@ -72,7 +72,7 @@ pub mod fns {
     pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
         ensure!(args.len() == 1, Error::InvalidArguments);
         Ok(match args.remove(0) {
-            Value::Array(elements) => elements.len(),
+            Value::Array(array) => array.len(),
             Value::Bytes(bytes) => bytes.len(),
             Value::String(string) => string.len(),
             Value::Script(script) => script.into_bytes().len(),
@@ -114,7 +114,7 @@ pub mod fns {
         let (array, mut current_val, callback) = <[Value; 3]>::try_from(args).unwrap().into();
         let callback = callback.into_fn()?;
 
-        for element in array.into_array()? {
+        for element in array.into_array_elements()? {
             current_val = callback.call(vec![current_val, element], scope)?;
         }
         Ok(current_val)
@@ -169,7 +169,7 @@ pub mod fns {
         let (num, producer) = <[Value; 2]>::try_from(args).unwrap().into();
         let num = num.into_usize()?;
 
-        Ok(Value::Array(
+        Ok(Value::array(
             (0..num)
                 .map(|n| match &producer {
                     Value::Function(callback) => callback.call(vec![n.into()], scope),

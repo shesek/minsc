@@ -26,6 +26,9 @@ pub use crate::error::RuntimeError as Error;
 pub type Result<T> = std::result::Result<T, Error>;
 pub use crate::scope::Scope;
 
+mod array;
+pub use array::Array;
+
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
 #[derive(Debug, Clone, PartialEq)]
@@ -45,8 +48,8 @@ pub enum Value {
     Address(Address),
     TapInfo(TaprootSpendInfo),
 
+    Array(Array),
     Function(Function),
-    Array(Vec<Value>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -241,9 +244,9 @@ impl Evaluate for ast::ArrayAccess {
         let value = self.array.eval(scope)?;
         let index = self.index.eval(scope)?.into_usize()?;
         Ok(match value {
-            Value::Array(mut elements) => {
-                ensure!(index < elements.len(), Error::ArrayIndexOutOfRange);
-                elements.remove(index)
+            Value::Array(mut array) => {
+                ensure!(index < array.len(), Error::ArrayIndexOutOfRange);
+                array.remove(index)
             }
             Value::Bytes(mut bytes) => {
                 ensure!(index < bytes.len(), Error::ArrayIndexOutOfRange);
@@ -302,7 +305,7 @@ impl Evaluate for ast::FnExpr {
 impl Evaluate for ast::ScriptFrag {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let frags = eval_exprs(scope, &self.fragments)?;
-        Ok(script_frag(Value::Array(frags))?.into())
+        Ok(script_frag(Value::array(frags))?.into())
     }
 }
 
@@ -391,7 +394,7 @@ impl ast::InfixOp {
             (Multiply, Num(Float(a)), Num(Float(b))) => (a * b).into(),
 
             // + for arrays, bytes and strings
-            (Add, Array(a), Array(b)) => [a, b].concat().into(),
+            (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             (Add, String(a), String(b)) => [a, b].concat().into(),
 
@@ -537,7 +540,7 @@ impl From<f64> for Value {
     }
 }
 impl From<usize> for Value {
-    fn from(num: usize) -> Self {
+    fn from(num: usize) -> Value {
         // TODO this should use TryFrom
         Number::Int(num.try_into().unwrap()).into()
     }
@@ -556,13 +559,18 @@ impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(ScriptBuf, Value, Script);
 impl_from_variant!(Address, Value);
-impl_from_variant!(Vec<Value>, Value, Array);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(String, Value);
 impl_from_variant!(Network, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl_from_variant!(Number, Value);
 impl_from_variant!(bool, Value, Bool);
+impl_from_variant!(Array, Value, Array);
+impl From<Vec<Value>> for Value {
+    fn from(vec: Vec<Value>) -> Value {
+        Value::Array(Array(vec))
+    }
+}
 
 // From Value to the underlying enum inner type
 // Simple extraction of the enum variant, with no specialized type coercion logic
@@ -586,6 +594,7 @@ macro_rules! impl_simple_into_variant_conv {
 }
 impl_simple_into_variant_conv!(bool, Bool, into_bool, NotBool);
 impl_simple_into_variant_conv!(Number, Number, into_number, NotNumber);
+impl_simple_into_variant_conv!(Array, Array, into_array, NotArray);
 impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
 impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
@@ -776,7 +785,7 @@ where
 {
     type Error = Error;
     fn try_from(val: Value) -> Result<Vec<T>> {
-        val.map_array(|a| a.try_into().map_err(Error::from))
+        val.into_array()?.try_into()
     }
 }
 
@@ -788,13 +797,7 @@ where
 {
     type Error = Error;
     fn try_from(val: Value) -> Result<(A, B)> {
-        ensure!(val.is_array(), Error::InvalidTuple(val));
-        let elements = val.into_array().unwrap();
-
-        ensure!(elements.len() == 2, Error::InvalidTuple(elements.into()));
-        let (a, b) = <[Value; 2]>::try_from(elements).unwrap().into();
-
-        Ok((a.try_into()?, b.try_into()?))
+        val.into_array()?.try_into()
     }
 }
 
@@ -831,21 +834,16 @@ where
 // (due to a blanket trait implementations in the stdlib?). The OptValueMarker trait restricts the supported types to
 // our own types, which are identified by virtue of using our runtime::Error for their TryFrom conversion.
 pub trait OptValueMarker {}
-impl<T: TryFrom<Value, Error=Error>> OptValueMarker for T{}
+impl<T: TryFrom<Value, Error = Error>> OptValueMarker for T {}
 
 //
 // Value methods
 //
 
 impl Value {
-    /// Extract Array elements as a plain Vec<Value>
-    pub fn into_array(self) -> Result<Vec<Value>> {
-        // this doesn't use a TryInto<Vec<Value>> trait like the other into_xyz methods do because
-        // we have a more generic TryInto<Vec<T>> implementation that internally uses into_array()
-        match self {
-            Value::Array(arr) => Ok(arr),
-            other => Err(Error::NotArray(other)),
-        }
+    /// Extract Array elements as plain Vec<Value>
+    pub fn into_array_elements(self) -> Result<Vec<Value>> {
+        Ok(self.into_array()?.inner())
     }
 
     /// Transform Array elements into a Vec<T> of any convertible type
@@ -863,11 +861,6 @@ impl Value {
         Error: From<B::Error>,
     {
         self.try_into()
-    }
-
-    /// Map elements through the provided closure function
-    pub fn map_array<T, F: Fn(Self) -> Result<T>>(self, f: F) -> Result<Vec<T>> {
-        self.into_array()?.into_iter().map(f).collect()
     }
 
     pub fn is_array(&self) -> bool {
@@ -889,7 +882,7 @@ impl Value {
         matches!(self, Value::Script(_))
     }
     pub fn is_empty_array(&self) -> bool {
-        matches!(self, Value::Array(elements) if elements.is_empty())
+        matches!(self, Value::Array(arr) if arr.is_empty())
     }
 
     pub fn into_f64(self) -> Result<f64> {
@@ -947,6 +940,10 @@ impl Value {
             Value::Array(_) => "array",
         }
     }
+
+    pub fn array(elements: Vec<Value>) -> Self {
+        Value::Array(Array(elements))
+    }
 }
 
 // Parse & evaluate the string code in the default global scope to produce a Value
@@ -965,6 +962,7 @@ impl fmt::Display for Value {
             Value::Bool(x) => write!(f, "{}", x),
             Value::Bytes(x) => write!(f, "0x{}", x.to_lower_hex_string()),
             Value::String(x) => write!(f, "\"{}\"", escape_str(x)),
+            Value::Array(x) => write!(f, "{}", x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
             Value::Descriptor(x) => write!(f, "{}", x),
@@ -973,16 +971,6 @@ impl fmt::Display for Value {
             Value::Function(x) => write!(f, "{:?}", x),
             Value::Network(x) => write!(f, "{}", x),
             Value::TapInfo(x) => write!(f, "{:?}", x),
-            Value::Array(elements) => {
-                write!(f, "[ ")?;
-                for (i, element) in elements.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", element)?;
-                }
-                write!(f, " ]")
-            }
         }
     }
 }

@@ -6,7 +6,7 @@ use bitcoin::{secp256k1, PublicKey};
 use miniscript::descriptor::{DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, Wildcard};
 use miniscript::{bitcoin, ForEachKey, MiniscriptKey, TranslatePk, Translator};
 
-use crate::runtime::{Error, Result, Value};
+use crate::runtime::{Array, Error, Result, Value};
 
 lazy_static! {
     pub static ref EC: secp256k1::Secp256k1<secp256k1::VerifyOnly> =
@@ -223,19 +223,22 @@ impl DeriveExt for Value {
         }
     }
 }
-impl DeriveExt for Vec<Value> {
+
+impl DeriveExt for Array {
     fn derive_path<P: DerivePath>(self, path: P, is_wildcard: bool) -> Result<Self> {
-        self.into_iter()
-            .map(|v| v.derive_path(path.clone(), is_wildcard))
-            .collect::<Result<_>>()
+        Ok(Array(
+            self.into_iter()
+                .map(|v| v.derive_path(path.clone(), is_wildcard))
+                .collect::<Result<_>>()?,
+        ))
     }
-
     fn derive_multi<P: DerivePath>(self, paths: &[P], is_wildcard: bool) -> Result<Self> {
-        self.into_iter()
-            .map(|v| v.derive_multi(paths, is_wildcard))
-            .collect::<Result<_>>()
+        Ok(Array(
+            self.into_iter()
+                .map(|v| v.derive_multi(paths, is_wildcard))
+                .collect::<Result<_>>()?,
+        ))
     }
-
     fn is_deriveable(&self) -> bool {
         self.iter().any(|v| v.is_deriveable())
     }

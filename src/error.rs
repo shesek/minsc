@@ -99,8 +99,14 @@ pub enum RuntimeError {
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,
 
-    #[error("Missing required value")]
+    #[error("Missing required parameter")]
     MissingValue,
+
+    #[error("Expected length {1}, not {0}")]
+    InvalidLength(usize, usize),
+
+    #[error("Expected length {1} to {2}, not {0}")]
+    InvalidVarLength(usize, usize, usize),
 
     #[error("Expected {1} arguments, not {0}")]
     ArgumentMismatch(usize, usize),
