@@ -99,7 +99,7 @@ pub enum RuntimeError {
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,
 
-    #[error("Missing required parameter")]
+    #[error("Required value missing")]
     MissingValue,
 
     #[error("Expected length {1}, not {0}")]
@@ -188,7 +188,7 @@ pub enum RuntimeError {
     #[error("Invalid tagged array structure: {0}")]
     InvalidTaggedList(Box<RuntimeError>),
 
-    #[error("\"{0}\" tag error: {1}")]
+    #[error("\"{0}\" tag: {1}")]
     TagError(String, Box<RuntimeError>),
 
     #[error("Duplicated tag")]

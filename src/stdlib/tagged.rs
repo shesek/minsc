@@ -65,7 +65,7 @@ impl Value {
 
     /// Considered to be a tagged list if self is an array, self.0 is too, and self.0.0 is a string
     /// This could have false positives depending on the alternative non-tagged structure in use.
-    fn has_tags(&self) -> bool {
+    pub fn is_tagged_array(&self) -> bool {
         if let Value::Array(array) = self {
             if let Some(Value::Array(inner_array)) = array.get(0) {
                 if let Some(Value::String(_tag)) = inner_array.get(0) {
@@ -76,6 +76,10 @@ impl Value {
         false
     }
 
+    pub fn is_tagged_or_empty(&self) -> bool {
+        self.is_empty_array() || self.is_tagged_array()
+    }
+
     /// Parse values that can be either a tuple of (A,B) or a tagged list with `a_tag` and `b_tag`
     /// For example, tuple_or_tags::<Txid,u32>("txid", "vout") to accept either [$txid,$vout] tuples or tagged ["txid":$txid,"vout":$vout]
     pub fn tagged_or_tuple<A: FromValue, B: FromValue>(
@@ -83,7 +87,8 @@ impl Value {
         a_tag: &str,
         b_tag: &str,
     ) -> Result<(A, B)> {
-        if self.has_tags() {
+        if self.is_tagged_or_empty() {
+            // the empty case is handled here too get pretty error messages with the missing tag name
             Ok(self.tagged_into2_req(a_tag, b_tag)?)
         } else {
             self.into_tuple()
@@ -151,8 +156,13 @@ macro_rules! impl_tagged_into {
         pub fn $default_fn_name<$($t: FromValue + Default),+>(self, $($tag: &str),+)
         -> Result<($($t),+)>
         {
-            let res = self.$opt_fn_name($($tag),+)?;
-            Ok(($( res.$idx.unwrap_or_default() ),+))
+            if self.is_empty_array() {
+                // Optimize the case of an empty tagged list. Would've worked through the else branch too.
+                Ok(Default::default())
+            } else {
+                let res = self.$opt_fn_name($($tag),+)?;
+                Ok(($( res.$idx.unwrap_or_default() ),+))
+            }
         }
     };
 }
@@ -201,13 +211,12 @@ impl TryFrom<Value> for Transaction {
 impl TryFrom<Value> for TxIn {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        let (previous_output, sequence) = if value.is_empty_array() {
-            Default::default()
-        } else if value.has_tags() {
+        let (previous_output, sequence) = if value.is_tagged_or_empty() {
             value.tagged_into2_default("prevout", "sequence")?
         } else {
             (OutPoint::try_from(value)?, Sequence::default())
         };
+
         Ok(TxIn {
             previous_output,
             sequence,
@@ -220,7 +229,7 @@ impl TryFrom<Value> for TxIn {
 impl TryFrom<Value> for TxOut {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        let (spk, amount) = val.tagged_or_tuple::<Value, Amount>("scriptPubKey", "amount")?;
+        let (spk, amount): (Value, Amount) = val.tagged_or_tuple("scriptPubKey", "amount")?;
         Ok(TxOut {
             script_pubkey: spk.into_spk()?,
             value: amount,
