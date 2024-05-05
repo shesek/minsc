@@ -1,10 +1,9 @@
-use std::convert::TryInto;
 use std::sync::Arc;
 
 use miniscript::bitcoin::Sequence;
 use miniscript::AbsLockTime;
 
-use crate::runtime::{Error, Result, Scope, Value};
+use crate::runtime::{Array, Error, Result, Scope, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
@@ -54,77 +53,75 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
+    use crate::runtime::ValueIter;
+    use miniscript::DescriptorPublicKey;
 
     //
     // Miniscript Policy functions
     //
 
-    pub fn or(args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn or(args: Array, _: &Scope) -> Result<Value> {
         Ok(Policy::Or(into_prob_policies(args)?).into())
     }
 
-    pub fn and(args: Vec<Value>, _: &Scope) -> Result<Value> {
+    pub fn and(args: Array, _: &Scope) -> Result<Value> {
         Ok(Policy::And(into_policies(args)?).into())
     }
 
-    pub fn thresh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        let thresh_n = args.remove(0).into_usize()?;
-        // Support thresh(n, $array) as well as thresh(n, pol1, pol2, ...) invocations
-        let policies = if args.len() == 1 && args[0].is_array() {
-            into_policies(args.remove(0).into_array_elements()?)?
+    pub fn thresh(args: Array, _: &Scope) -> Result<Value> {
+        let args = args.check_varlen(2, usize::MAX)?;
+        let is_array_call = args.len() == 2 && args[1].is_array();
+        let mut args_iter = args.into_iter();
+        let thresh_n: usize = args_iter.next_into()?;
+
+        let policies = if is_array_call {
+            // Called as thresh($n, $policies_array)
+            into_policies(args_iter.next_into::<Array>()?)?
         } else {
-            into_policies(args)?
+            // Called as thresh($n, $policy1, $policy2, ...)
+            into_policies(Array(args_iter.collect()))?
         };
+
         Ok(Policy::Threshold(thresh_n, policies).into())
     }
 
-    pub fn older(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let locktime = args.remove(0).into_u32()?;
+    pub fn older(args: Array, _: &Scope) -> Result<Value> {
+        let locktime: u32 = args.arg_into()?;
         Ok(Policy::Older(Sequence(locktime)).into())
     }
 
-    pub fn after(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let locktime = args.remove(0).into_u32()?;
+    pub fn after(args: Array, _: &Scope) -> Result<Value> {
+        let locktime: u32 = args.arg_into()?;
         Ok(Policy::After(AbsLockTime::from_consensus(locktime).into()).into())
     }
 
-    pub fn pk(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Key(args.remove(0).into_key()?).into())
+    pub fn pk(args: Array, _: &Scope) -> Result<Value> {
+        Ok(Policy::Key(args.arg_into()?).into())
     }
 
-    pub fn sha256(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Sha256(args.remove(0).try_into()?).into())
+    pub fn sha256(args: Array, _: &Scope) -> Result<Value> {
+        Ok(Policy::Sha256(args.arg_into()?).into())
     }
-    pub fn hash256(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Hash256(args.remove(0).try_into()?).into())
+    pub fn hash256(args: Array, _: &Scope) -> Result<Value> {
+        Ok(Policy::Hash256(args.arg_into()?).into())
     }
 
-    pub fn ripemd160(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Ripemd160(args.remove(0).try_into()?).into())
+    pub fn ripemd160(args: Array, _: &Scope) -> Result<Value> {
+        Ok(Policy::Ripemd160(args.arg_into()?).into())
     }
-    pub fn hash160(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Policy::Hash160(args.remove(0).try_into()?).into())
+    pub fn hash160(args: Array, _: &Scope) -> Result<Value> {
+        Ok(Policy::Hash160(args.arg_into()?).into())
     }
 
     // Key -> Descriptor::Wpkh
-    pub fn wpkh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(Descriptor::new_wpkh(args.remove(0).into_key()?)?.into())
+    pub fn wpkh(args: Array, _: &Scope) -> Result<Value> {
+        Ok(Descriptor::new_wpkh(args.arg_into()?)?.into())
     }
 
     /// wsh(Policy|Miniscript) -> Descriptor::Wsh
     /// wsh(Script witnessScript) -> Script scriptPubKey
-    pub fn wsh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-
-        Ok(match args.remove(0) {
+    pub fn wsh(args: Array, _: &Scope) -> Result<Value> {
+        Ok(match args.arg_into()? {
             Value::Policy(policy) => {
                 let miniscript = policy.compile()?;
                 Descriptor::new_wsh(miniscript)?.into()
@@ -135,9 +132,8 @@ pub mod fns {
     }
 
     /// Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
-    pub fn sh(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(match args.remove(0) {
+    pub fn sh(args: Array, _: &Scope) -> Result<Value> {
+        Ok(match args.arg_into()? {
             Value::Descriptor(desc) => match desc {
                 Descriptor::Wsh(wsh) => Descriptor::new_sh_with_wsh(wsh),
                 Descriptor::Wpkh(wpkh) => Descriptor::new_sh_with_wpkh(wpkh),
@@ -149,36 +145,29 @@ pub mod fns {
     }
 
     /// Descriptor -> Script witnessScript
-    pub fn explicitScript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(
-            args.len() == 1 && args[0].is_desc(),
-            Error::InvalidArguments
-        );
-        let descriptor = args.remove(0).into_desc()?;
+    pub fn explicitScript(args: Array, _: &Scope) -> Result<Value> {
+        let descriptor: Descriptor = args.arg_into()?;
         Ok(descriptor.to_explicit_script()?.into())
     }
 
     /// Policy -> Script witnessScript
-    pub fn tapscript(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let policy = args.remove(0).into_policy()?;
+    pub fn tapscript(args: Array, _: &Scope) -> Result<Value> {
+        let policy: Policy = args.arg_into()?;
         let miniscript = policy.compile::<miniscript::Tap>()?;
         Ok(miniscript.derive_keys()?.encode().into())
     }
 
     /// Policy -> Script witnessScript
-    pub fn segwitv0(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let policy = args.remove(0).into_policy()?;
+    pub fn segwitv0(args: Array, _: &Scope) -> Result<Value> {
+        let policy: Policy = args.arg_into()?;
         let miniscript = policy.compile::<miniscript::Segwitv0>()?;
         Ok(miniscript.derive_keys()?.encode().into())
     }
 
     /// Descriptor<Multi> -> Array<Descriptor<Single>>
     /// XXX rename descriptors() or singleDescriptors?
-    pub fn single_descriptors(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let desc = args.remove(0).into_desc()?;
+    pub fn single_descriptors(args: Array, _: &Scope) -> Result<Value> {
+        let desc: Descriptor = args.arg_into()?;
         let descs = desc.into_single_descriptors()?;
         Ok(Value::array(
             descs.into_iter().map(Value::Descriptor).collect(),
@@ -188,34 +177,31 @@ pub mod fns {
     /// Cast 32/33 long Bytes into a Single DescriptorPubKey
     /// PubKeys are returned as-is
     /// pubkey(Bytes|PubKey) -> PubKey
-    pub fn pubkey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let pubkey = args.remove(0).into_key()?;
+    pub fn pubkey(args: Array, _: &Scope) -> Result<Value> {
+        let pubkey: DescriptorPublicKey = args.arg_into()?;
         Ok(pubkey.into())
     }
 
     // Turn `[A,B,C]` array into an `A && B && C` policy
-    pub fn all(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = into_policies(args.remove(0).into_array_elements()?)?;
+    pub fn all(args: Array, _: &Scope) -> Result<Value> {
+        let policies = into_policies(args.arg_into()?)?;
         Ok(Policy::Threshold(policies.len(), policies).into())
     }
 
     // Turn `[A,B,C]` array into an `A || B || C` policy
-    pub fn any(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let policies = into_policies(args.remove(0).into_array_elements()?)?;
+    pub fn any(args: Array, _: &Scope) -> Result<Value> {
+        let policies = into_policies(args.arg_into()?)?;
         Ok(Policy::Threshold(1, policies).into())
     }
 }
 
-pub fn into_policies(args: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
+pub fn into_policies(args: Array) -> Result<Vec<Arc<Policy>>> {
     args.into_iter()
-        .map(|v| Ok(Arc::new(Value::into_policy(v)?)))
+        .map(|v| Ok(Arc::new(v.into_policy()?)))
         .collect()
 }
 
-fn into_prob_policies(values: Vec<Value>) -> Result<Vec<(usize, Arc<Policy>)>> {
+fn into_prob_policies(values: Array) -> Result<Vec<(usize, Arc<Policy>)>> {
     values
         .into_iter()
         .map(|arg| {

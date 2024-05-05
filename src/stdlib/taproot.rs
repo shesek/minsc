@@ -7,7 +7,7 @@ use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootS
 use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
 use super::miniscript::into_policies;
-use crate::runtime::{Error, Result, Scope, Value};
+use crate::runtime::{Array, Error, Result, Scope, Value};
 use crate::util::EC;
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
@@ -44,29 +44,23 @@ pub mod fns {
     /// tr(PubKey, Script|Array<Script>) -> TaprootSpendInfo
     /// tr(Script|Array<Script>) -> TaprootSpendInfo
     /// tr(PubKey, Hash) -> TaprootSpendInfo
-    pub fn tr(args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        let mut args = args.into_iter();
-        super::tr(args.next().unwrap(), args.next(), scope)
+    pub fn tr(args: Array, scope: &Scope) -> Result<Value> {
+        let (a, b): (Value, Option<Value>) = args.args_into()?;
+        super::tr(a, b, scope)
     }
 
     /// tapLeaf(Script, version=0xc0) -> Hash
     ///
     /// Compute the leaf hash of the given script
-    pub fn tapLeaf(args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        let mut args = args.into_iter();
-        let script = args.next().unwrap().into_script()?;
-        let leaf_ver = args
-            .next()
-            .map_or(Ok(LeafVersion::TapScript), |v| -> Result<_> {
-                let leaf_ver = match v {
-                    Value::Number(Int(num)) => num.try_into()?,
-                    Value::Bytes(bytes) if bytes.len() == 1 => bytes[0],
-                    _ => bail!(Error::InvalidArguments),
-                };
-                Ok(LeafVersion::from_consensus(leaf_ver)?)
-            })?;
+    pub fn tapLeaf(args: Array, _: &Scope) -> Result<Value> {
+        let (script, leaf_var): (ScriptBuf, Option<Value>) = args.args_into()?;
+        let leaf_ver = leaf_var.map_or(Ok(LeafVersion::TapScript), |ver| -> Result<_> {
+            Ok(LeafVersion::from_consensus(match ver {
+                Value::Number(Int(num)) => num.try_into()?,
+                Value::Bytes(bytes) if bytes.len() == 1 => bytes[0],
+                _ => bail!(Error::InvalidArguments),
+            })?)
+        })?;
         let leaf_hash = TapLeafHash::from_script(&script, leaf_ver);
         Ok(Value::Bytes(leaf_hash.to_byte_array().to_vec()))
     }
@@ -74,11 +68,9 @@ pub mod fns {
     /// tapBranch(Hash node_a, Hash node_b) -> Hash
     ///
     /// Combine two nodes to create a new TapBranch parent
-    pub fn tapBranch(args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 2, Error::InvalidArguments);
-        let (a, b) = <[Value; 2]>::try_from(args).unwrap().into();
-
-        let branch = branch_hash(&a.try_into()?, &b.try_into()?);
+    pub fn tapBranch(args: Array, _: &Scope) -> Result<Value> {
+        let (a_hash, b_hash) = args.args_into()?;
+        let branch = branch_hash(&a_hash, &b_hash);
 
         Ok(Value::Bytes(branch.to_byte_array().to_vec()))
     }
@@ -86,9 +78,8 @@ pub mod fns {
     /// tapInternalKey(TapInfo) -> PubKey
     ///
     /// Get the internal x-only key of the given TapInfo
-    pub fn tapInternalKey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let tapinfo = args.remove(0).into_tapinfo()?;
+    pub fn tapInternalKey(args: Array, _: &Scope) -> Result<Value> {
+        let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         Ok(tapinfo.internal_key().into())
     }
@@ -96,22 +87,19 @@ pub mod fns {
     /// tapOutputKey(TapInfo) -> (PubKey, Number parity)
     ///
     /// Get the output key and parity of the given TapInfo as a tuple of [ key, parity ]
-    pub fn tapOutputKey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let tapinfo = args.remove(0).into_tapinfo()?;
-
+    pub fn tapOutputKey(args: Array, _: &Scope) -> Result<Value> {
+        let tapinfo: TaprootSpendInfo = args.arg_into()?;
         let key = tapinfo.output_key();
         let parity = tapinfo.output_key_parity().to_u8() as i64;
 
-        Ok(Value::Array(vec![key.into(), parity.into()]))
+        Ok(Value::array(vec![key.into(), parity.into()]))
     }
 
     /// tapMerkleRoot(TapInfo) -> Hash
     ///
     /// Get the merkle root hash of the given TapInfo
-    pub fn tapMerkleRoot(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let tapinfo = args.remove(0).into_tapinfo()?;
+    pub fn tapMerkleRoot(args: Array, _: &Scope) -> Result<Value> {
+        let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         Ok(Value::Bytes(match tapinfo.merkle_root() {
             None => vec![], // empty byte vector signifies an empty script tree
@@ -122,9 +110,8 @@ pub mod fns {
     /// tapScripts(TapInfo) -> Array<(Script, Bytes version, Bytes control_block)>
     ///
     /// Get the scripts in this TapInfo with their control blocks
-    pub fn tapScripts(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let tapinfo = args.remove(0).into_tapinfo()?;
+    pub fn tapScripts(args: Array, _: &Scope) -> Result<Value> {
+        let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         let scripts_ctrls = tapinfo
             .script_map()
@@ -143,9 +130,8 @@ pub mod fns {
     /// tapInfo(Descriptor|TapInfo) -> TapInfo
     ///
     /// Convert the Tr Descriptor into a TapInfo (or return TapInfo as-is)
-    pub fn tapInfo(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let tapinfo = args.remove(0).into_tapinfo()?;
+    pub fn tapInfo(args: Array, _: &Scope) -> Result<Value> {
+        let tapinfo: TaprootSpendInfo = args.arg_into()?;
         Ok(tapinfo.into())
     }
 }
@@ -335,7 +321,7 @@ fn descriptor_from_array(
         descriptor_from_tree(internal_key, Value::array(policies))
     } else {
         // Other arrays are expected to be flat and are compiled into a thresh(1, POLICIES) policy
-        let policy = Policy::Threshold(1, into_policies(policies)?);
+        let policy = Policy::Threshold(1, into_policies(Array(policies))?);
         descriptor_from_policy(pk, unspendable, policy)
     }
 }

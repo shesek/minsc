@@ -1,5 +1,3 @@
-use std::convert::{TryFrom, TryInto};
-
 use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
 use bitcoin::hashes::{sha256, Hash};
 
@@ -66,12 +64,11 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
-    use crate::runtime::Call;
+    use crate::runtime::{Call, Function};
 
     // len(Array|Bytes|Script|String) -> Number
-    pub fn len(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(match args.remove(0) {
+    pub fn len(args: Array, _: &Scope) -> Result<Value> {
+        Ok(match args.arg_into()? {
             Value::Array(array) => array.len(),
             Value::Bytes(bytes) => bytes.len(),
             Value::String(string) => string.len(),
@@ -84,15 +81,13 @@ pub mod fns {
     /// Get the argument type as a string
     /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array
     /// typeof(Value) -> String
-    pub fn r#typeof(args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(args[0].type_of().to_string().into())
+    pub fn r#typeof(args: Array, _: &Scope) -> Result<Value> {
+        let type_of = args.arg_into::<Value>()?.type_of();
+        Ok(type_of.to_string().into())
     }
 
-    pub fn int(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-
-        let num = match args.remove(0).into_number()? {
+    pub fn int(args: Array, _: &Scope) -> Result<Value> {
+        let num = match args.arg_into()? {
             Number::Int(n) => n,
             Number::Float(n) if n.is_finite() && n >= i64::MIN as f64 && n <= i64::MAX as f64 => {
                 // rounded down
@@ -104,26 +99,25 @@ pub mod fns {
         Ok(num.into())
     }
 
-    pub fn float(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(args.remove(0).into_f64()?.into())
+    pub fn float(args: Array, _: &Scope) -> Result<Value> {
+        let num_float: f64 = args.arg_into()?;
+        //let num_val: Value = args.arg_into()?;
+        //let num_float: f64 = num_val.try_into()?;
+        Ok(num_float.into())
     }
 
-    pub fn reduce(args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        ensure!(args.len() == 3, Error::InvalidArguments);
-        let (array, mut current_val, callback) = <[Value; 3]>::try_from(args).unwrap().into();
-        let callback = callback.into_fn()?;
+    pub fn reduce(args: Array, scope: &Scope) -> Result<Value> {
+        let (array, mut current_val, callback): (Array, Value, Function) = args.args_into()?;
 
-        for element in array.into_array_elements()? {
+        for element in array.into_iter() {
             current_val = callback.call(vec![current_val, element], scope)?;
         }
         Ok(current_val)
     }
 
     // script(Script|Bytes) -> Script
-    pub fn script(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        Ok(match args.remove(0) {
+    pub fn script(args: Array, _: &Scope) -> Result<Value> {
+        Ok(match args.arg_into()? {
             Value::Script(script) => script.into(),
             Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
             other => bail!(Error::InvalidScriptConstructor(other)),
@@ -133,19 +127,17 @@ pub mod fns {
     /// Convert the argument into Bytes
     /// Scripts are serialized, Bytes are returned as-is
     /// bytes(Script|Bytes|String) -> Bytes
-    pub fn bytes(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let bytes = args.remove(0).into_bytes()?;
+    pub fn bytes(args: Array, _: &Scope) -> Result<Value> {
+        let bytes: Vec<u8> = args.arg_into()?;
         Ok(bytes.into())
     }
 
     /// Generate an address
     /// address(Script|Descriptor|Miniscript|Policy|PubKey) -> Address
-    pub fn address(args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        let mut args = args.into_iter();
-        let spk = args.next().unwrap().into_spk()?;
-        let network = args.next().map_or(Ok(Network::Signet), TryInto::try_into)?;
+    pub fn address(args: Array, _: &Scope) -> Result<Value> {
+        let (spk, network): (Value, Option<Network>) = args.args_into()?;
+        let spk = spk.into_spk()?;
+        let network = network.unwrap_or(Network::Signet);
 
         Ok(Address::from_script(&spk, network)
             .map_err(|_| Error::NotAddressable(spk))?
@@ -158,17 +150,13 @@ pub mod fns {
     /// TapInfo are returned as their V1 witness program
     /// PubKeys are converted into a wpkh() scripts
     /// Scripts are returned as-is
-    pub fn scriptPubKey(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let script = args.remove(0).into_spk()?;
-        Ok(script.into())
+    pub fn scriptPubKey(args: Array, _: &Scope) -> Result<Value> {
+        let spk = args.arg_into::<Value>()?.into_spk()?;
+        Ok(spk.into())
     }
 
-    pub fn repeat(args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        ensure!(args.len() == 2, Error::InvalidArguments);
-        let (num, producer) = <[Value; 2]>::try_from(args).unwrap().into();
-        let num = num.into_usize()?;
-
+    pub fn repeat(args: Array, scope: &Scope) -> Result<Value> {
+        let (num, producer): (usize, Value) = args.args_into()?;
         Ok(Value::array(
             (0..num)
                 .map(|n| match &producer {
@@ -179,9 +167,8 @@ pub mod fns {
         ))
     }
 
-    pub fn le64(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let num = args.remove(0).into_i64()?;
+    pub fn le64(args: Array, _: &Scope) -> Result<Value> {
+        let num: i64 = args.arg_into()?;
         Ok(num.to_le_bytes().to_vec().into())
     }
 
@@ -190,9 +177,8 @@ pub mod fns {
     /// Hash some data with SHA256
     /// Named in upper-case to avoid a conflict with the Miniscript sha256(Bytes) policy function
     /// (Yes, this is awfully confusing and requires a better solution. :<)
-    pub fn SHA256(mut args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1, Error::InvalidArguments);
-        let bytes = args.remove(0).into_bytes()?;
+    pub fn SHA256(args: Array, _: &Scope) -> Result<Value> {
+        let bytes: Vec<u8> = args.arg_into()?;
         let hash = sha256::Hash::hash(&bytes);
         Ok(hash.into())
     }

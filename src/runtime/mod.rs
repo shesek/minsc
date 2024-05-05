@@ -18,7 +18,7 @@ pub mod array;
 pub mod function;
 pub mod scope;
 pub mod value;
-pub use array::Array;
+pub use array::{Array, ValueIter};
 pub use function::{Call, Function};
 pub use scope::Scope;
 pub use value::{FromValue, Number, Number::*, Value};

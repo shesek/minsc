@@ -108,6 +108,9 @@ pub enum RuntimeError {
     #[error("Expected length {1} to {2}, not {0}")]
     InvalidVarLength(usize, usize, usize), // (actual, min, max)
 
+    #[error("Invalid arguments: {0}")]
+    InvalidArgumentsError(Box<RuntimeError>),
+
     #[error("Expected {1} arguments, not {0}")]
     ArgumentMismatch(usize, usize),
 

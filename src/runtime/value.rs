@@ -127,10 +127,10 @@ impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
 impl_simple_into_variant_conv!(String, String, into_string, NotString);
 
 // From Value to f64 primitive, with auto-coercion for integers
-impl TryInto<f64> for Value {
+impl TryFrom<Value> for f64 {
     type Error = Error;
-    fn try_into(self) -> Result<f64> {
-        Ok(match self.into_number()? {
+    fn try_from(value: Value) -> Result<f64> {
+        Ok(match value.into_number()? {
             Number::Float(n) => n,
             Number::Int(n) => n as f64,
         })
@@ -396,11 +396,6 @@ impl Value {
             Value::Address(addr) => addr.script_pubkey(),
             v => bail!(Error::NoSpkRepr(v)),
         })
-    }
-
-    /// Extract Array elements as plain Vec<Value>
-    pub fn into_array_elements(self) -> Result<Vec<Value>> {
-        Ok(self.into_array()?.inner())
     }
 
     /// Transform Array elements into a Vec<T> of any convertible type

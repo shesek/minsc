@@ -25,15 +25,13 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
+    use crate::runtime::Array;
 
-    /// ctvHash(Array tx_instructions, Number index=0) -> Hash
+    /// ctvHash(Array tx, Number input_index=0) -> Hash
     ///
-    /// Example: ctvHash([ txVersion(1), txOut($bob_pk, 10000), txOut($alice_pk, 25000) ])
-    pub fn ctvHash(args: Vec<Value>, _: &Scope) -> Result<Value> {
-        ensure!(args.len() == 1 || args.len() == 2, Error::InvalidArguments);
-        let mut args = args.into_iter();
-        let mut tx = Transaction::try_from(args.next().unwrap())?;
-        let input_index = args.next().map_or(Ok(0), Value::into_u32)?;
+    /// Example: ctvHash([ "version": 1, "outputs": [ $bob_pk: 10000 sats, $alice_pk: 25000 sats ] ])
+    pub fn ctvHash(args: Array, _: &Scope) -> Result<Value> {
+        let (mut tx, input_index): (Transaction, Option<u32>) = args.args_into()?;
 
         // Add a default input if none exists. The only input field that matters for
         // the CTV hash is the nSequence.
@@ -42,7 +40,8 @@ pub mod fns {
         }
         ensure!(tx.output.len() > 0, Error::InvalidArguments);
 
-        Ok(get_ctv_hash(&tx, input_index).into())
+        let hash = get_ctv_hash(&tx, input_index.unwrap_or(0));
+        Ok(hash.into())
     }
 }
 

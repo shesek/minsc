@@ -33,6 +33,21 @@ impl Array {
             Ok(self)
         }
     }
+
+    /// Unpack function arguments into a tuple or vec. Like try_into(), but with a
+    /// wrapper error type to indicate the error was related to argument parsing.
+    pub fn args_into<T: TryFrom<Array>>(self) -> Result<T>
+    where
+        Error: From<T::Error>,
+    {
+        self.try_into()
+            .map_err(|e| Error::InvalidArgumentsError(Error::from(e).into()))
+    }
+
+    // Get a single argument, ensuring there were no more
+    pub fn arg_into<T: FromValue>(self) -> Result<T> {
+        Ok(self.args_into::<(T,)>()?.0)
+    }
 }
 
 impl From<Vec<Value>> for Array {

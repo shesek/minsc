@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::parser::{ast, Expr, Ident};
-use crate::runtime::{Error, Evaluate, Result, Scope, Value};
+use crate::runtime::{Array, Error, Evaluate, Result, Scope, Value};
 
 #[derive(Debug, Clone)]
 pub enum Function {
@@ -22,7 +22,7 @@ impl_from_variant!(UserFunction, Function, User);
 #[derive(Clone)]
 pub struct NativeFunction(pub NativeFunctionPt);
 
-pub type NativeFunctionPt = fn(Vec<Value>, &Scope) -> Result<Value>;
+pub type NativeFunctionPt = fn(Array, &Scope) -> Result<Value>;
 
 impl_from_variant!(NativeFunction, Function, Native);
 
@@ -76,7 +76,7 @@ impl Call for UserFunction {
 
 impl Call for NativeFunction {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        (self.0)(args, scope)
+        (self.0)(Array(args), scope)
     }
 }
 
