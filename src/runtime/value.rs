@@ -320,9 +320,12 @@ impl<A: FromValue, B: FromValue> TryFrom<Value> for (A, B) {
     }
 }
 
-// Generic conversion from a Value/Option<Value> into T/Option<T>
-// Used to support types that can be either required or optional (for example by into_tagged())
-// Must use a new trait because TryFrom<Option<Value>> would violate the orphan rule.
+/// Generic conversion from a Value/Option<Value> into a T/Option<T> of any FromValue type.
+///
+/// Used to support types that can be either required or optional (for example by into_tagged()).
+/// Must use a new trait because TryFrom<Option<Value>> would violate the orphan rule.
+/// This is blanket-implemented for types that implement TryFrom<Value>, which should be preferred
+/// over using FromValue directly unless necessary.
 pub trait FromValue: Sized {
     fn from_value(value: Value) -> Result<Self>;
     fn from_opt_value(value: Option<Value>) -> Result<Self>;

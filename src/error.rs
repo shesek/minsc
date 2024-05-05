@@ -103,10 +103,10 @@ pub enum RuntimeError {
     MissingValue,
 
     #[error("Expected length {1}, not {0}")]
-    InvalidLength(usize, usize),
+    InvalidLength(usize, usize), // (actual, expected)
 
     #[error("Expected length {1} to {2}, not {0}")]
-    InvalidVarLength(usize, usize, usize),
+    InvalidVarLength(usize, usize, usize), // (actual, min, max)
 
     #[error("Expected {1} arguments, not {0}")]
     ArgumentMismatch(usize, usize),

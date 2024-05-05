@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, NaiveDateTime};
 
-use crate::parser::ast::DurationUnit;
 use crate::error::{ParseError, RuntimeError};
+use crate::parser::ast::DurationUnit;
 
 // Based on https://github.com/bitcoinjs/bip68, thanks bitcoinjs-lib folks!
 

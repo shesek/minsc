@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 use std::sync::Arc;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
@@ -9,7 +9,7 @@ use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 use super::miniscript::into_policies;
 use crate::runtime::{Error, Result, Scope, Value};
 use crate::util::EC;
-use crate::{DescriptorDpk as Descriptor, Int, PolicyDpk as Policy};
+use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &mut Scope) {
     // Taproot Descriptor/TaprootSpendInfo construction
@@ -32,6 +32,8 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
+    use crate::runtime::{Array, Int};
+    use bitcoin::ScriptBuf;
 
     /// Construct a tr() descriptor:
     /// tr(PubKey) -> Descriptor

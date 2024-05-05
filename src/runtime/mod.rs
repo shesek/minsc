@@ -21,7 +21,7 @@ pub mod value;
 pub use array::Array;
 pub use function::{Call, Function};
 pub use scope::Scope;
-pub use value::{FromValue, Number, Value};
+pub use value::{FromValue, Number, Number::*, Value};
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -328,7 +328,6 @@ impl Evaluate for ast::Infix {
 impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value, scope: &Scope) -> Result<Value> {
         use ast::InfixOp::*;
-        use Number::{Float, Int};
         use Value::{Array, Bytes, Number as Num, Policy, PubKey, Script, String, WithProb};
 
         Ok(match (self, lhs, rhs) {

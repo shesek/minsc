@@ -105,7 +105,7 @@ macro_rules! impl_tagged_into {
             // Use tagged_intoN_opt() to get the found fields as `Value`s, without converting them (yet)
             let res = self.$opt_fn_name($($tag),+)?; // (Option<Value>, Option<Value>, ..)
 
-            // Convert the Option<Value>s into the requested type, via the FromOptValue trait.
+            // Convert the Option<Value>s into the requested type using the FromValue trait.
             // This will error if the field is not present and the requested type was not specified as an Option.
             Ok(($( $t::from_opt_value(res.$idx)
                 .map_err(|e| Error::TagError($tag.to_string(), e.into()))? ),+))

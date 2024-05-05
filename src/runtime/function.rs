@@ -47,12 +47,13 @@ impl Call for Function {
 
 impl Call for UserFunction {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        if self.signature.len() != args.len() {
-            return Err(Error::CallError(
-                self.ident.clone(),
-                Error::ArgumentMismatch(args.len(), self.signature.len()).into(),
-            ));
-        }
+        ensure!(
+            self.signature.len() == args.len(),
+            Error::InvalidArgumentsError(
+                Error::InvalidLength(args.len(), self.signature.len()).into(),
+            )
+        );
+
         let mut scope = scope.child();
         for (index, value) in args.into_iter().enumerate() {
             let ident = self.signature.get(index).unwrap();
