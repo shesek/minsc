@@ -254,10 +254,10 @@ impl Expr {
         })
     }
 
-    pub fn ident_or(&self, default: &str) -> Ident {
+    pub fn as_ident(&self) -> Option<&Ident> {
         match self {
-            Expr::Ident(ident) => ident.clone(),
-            _ => Ident(default.to_string()),
+            Expr::Ident(ident) => Some(ident),
+            _ => None,
         }
     }
 }

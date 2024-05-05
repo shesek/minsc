@@ -91,12 +91,16 @@ impl Execute for ast::Stmts {
 
 impl Evaluate for ast::Call {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        let ident = self.func.ident_or("_anonymous");
-        let func = self.func.eval(scope)?;
+        let func = self.func.eval(scope)?.into_fn()?;
         let args = eval_exprs(scope, &self.args)?;
 
-        func.call(args, scope)
-            .map_err(|e| Error::CallError(ident, e.into()))
+        func.call(args, scope).map_err(|e| {
+            // Use the function name used by the caller if the function was accessed using a simple
+            // identifier. Otherwise, use the name associated with the Function itself (only available
+            // for user functions defined using a named fn statement, not for closures or native).
+            let ident = self.func.as_ident().or_else(|| func.ident());
+            Error::CallError(ident.cloned(), e.into())
+        })
     }
 }
 
@@ -478,7 +482,7 @@ fn call_args(scope: &Scope, ident: &ast::Ident, args: Vec<Value>) -> Result<Valu
         .ok_or_else(|| Error::FnNotFound(ident.clone()))?;
 
     func.call(args, scope)
-        .map_err(|e| Error::CallError(ident.clone(), e.into()))
+        .map_err(|e| Error::CallError(Some(ident.clone()), e.into()))
 }
 
 /// Evaluate a list of expressions to produce a list of values

@@ -146,8 +146,8 @@ pub enum RuntimeError {
     #[error("Number operation overflowed")]
     Overflow,
 
-    #[error("in {0}(): {1}")]
-    CallError(Ident, Box<RuntimeError>),
+    #[error("in {}(): {1}", .0.as_ref().unwrap_or(&"_anonymous".into()))]
+    CallError(Option<Ident>, Box<RuntimeError>),
 
     #[error("{0:?} error: {1}")]
     InfixOpError(InfixOp, Box<RuntimeError>),

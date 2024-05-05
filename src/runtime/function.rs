@@ -12,7 +12,7 @@ pub enum Function {
 /// A user-defined function implemented in Minsc
 #[derive(Debug, Clone)]
 pub struct UserFunction {
-    pub ident: Ident,
+    pub ident: Option<Ident>,
     pub signature: Vec<Ident>,
     pub body: Expr,
 }
@@ -29,6 +29,17 @@ impl_from_variant!(NativeFunction, Function, Native);
 impl fmt::Debug for NativeFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("NativeFunction")
+    }
+}
+
+impl Function {
+    /// Get the name associated with the function. Only available for user functions
+    /// defined using a named fn statement.
+    pub fn ident(&self) -> Option<&Ident> {
+        match self {
+            Function::User(f) => f.ident.as_ref(),
+            Function::Native(_) => None,
+        }
     }
 }
 
@@ -87,7 +98,7 @@ impl From<NativeFunctionPt> for Function {
 impl From<ast::FnDef> for Function {
     fn from(fn_def: ast::FnDef) -> Self {
         UserFunction {
-            ident: fn_def.ident,
+            ident: Some(fn_def.ident),
             signature: fn_def.signature,
             body: fn_def.body,
         }
@@ -98,7 +109,7 @@ impl From<ast::FnDef> for Function {
 impl From<ast::FnExpr> for Function {
     fn from(fn_expr: ast::FnExpr) -> Self {
         UserFunction {
-            ident: "_anonymous".into(),
+            ident: None,
             signature: fn_expr.signature,
             body: *fn_expr.body,
         }
