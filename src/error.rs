@@ -60,6 +60,9 @@ pub enum RuntimeError {
     #[error("Expected a pubkey, not {0:?}")]
     NotPubKey(Value),
 
+    #[error("Expected an address, not {0:?}")]
+    NotAddress(Value),
+
     #[error("Expected hash bytes, not {0:?}")]
     NotHashLike(Value),
 
@@ -251,6 +254,9 @@ pub enum RuntimeError {
 
     #[error("Key translation error: {0:?}")]
     TranslateError(Box<miniscript::TranslateErr<RuntimeError>>),
+
+    #[error("Invalid address: {0}")]
+    AddressError(#[from] bitcoin::address::ParseError),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {
@@ -270,6 +276,9 @@ pub enum ParseError {
     #[error("Invalid hex: {0}")]
     HexError(#[from] hex::HexToBytesError),
 
+    #[error("Invalid address: {0}")]
+    AddressError(#[from] bitcoin::address::ParseError),
+
     #[error("Descriptor key parse error: {0}")]
     DescKeyParse(#[from] descriptor::DescriptorKeyParseError),
 
@@ -279,7 +288,7 @@ pub enum ParseError {
     #[error("Absolute by-blocktime timelock out of range, supported up to 2106")]
     InvalidDateTimeOutOfRange,
 
-    #[error("Parser error: {0}")]
+    #[error("{0}")]
     LalrError(String),
 }
 

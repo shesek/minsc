@@ -146,7 +146,7 @@ pub mod fns {
     }
 
     /// Generate an address
-    /// address(Script|Descriptor|Miniscript|Policy|PubKey) -> Address
+    /// address(Script|Descriptor|PubKey|TapInfo|String|Address) -> Address
     pub fn address(args: Array, _: &Scope) -> Result<Value> {
         let (spk, network): (Value, Option<Network>) = args.args_into()?;
         let spk = spk.into_spk()?;

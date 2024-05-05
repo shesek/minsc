@@ -8,7 +8,7 @@ use bitcoin::hex::DisplayHex;
 use bitcoin::key::TweakedPublicKey;
 use bitcoin::taproot::TaprootSpendInfo;
 use bitcoin::{
-    Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
+    address, Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
 };
 use miniscript::descriptor::{DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, descriptor, ScriptContext};
@@ -234,6 +234,20 @@ impl TryFrom<Value> for TaprootSpendInfo {
         })
     }
 }
+impl TryFrom<Value> for Address {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
+            Value::Address(address) => address,
+            Value::String(addr_str) => {
+                let addr: Address<address::NetworkUnchecked> = addr_str.parse()?;
+                // XXX avoid assume_checked? we don't always know the network at the time the address is parsed.
+                addr.assume_checked()
+            }
+            v => bail!(Error::NotAddress(v)),
+        })
+    }
+}
 
 // From Bitcoin/Miniscript types to Value
 impl From<XOnlyPublicKey> for Value {
@@ -393,7 +407,8 @@ impl Value {
                 WitnessVersion::V1,
                 &tapinfo.output_key().serialize(),
             )?),
-            Value::Address(addr) => addr.script_pubkey(),
+            // Addresses can be provided as an Address or String
+            v @ Value::Address(_) | v @ Value::String(_) => v.into_address()?.script_pubkey(),
             v => bail!(Error::NoSpkRepr(v)),
         })
     }
@@ -437,6 +452,9 @@ impl Value {
         self.try_into()
     }
     pub fn into_bytes(self) -> Result<Vec<u8>> {
+        self.try_into()
+    }
+    pub fn into_address(self) -> Result<Address> {
         self.try_into()
     }
     pub fn into_desc(self) -> Result<Descriptor> {

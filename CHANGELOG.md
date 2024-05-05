@@ -62,6 +62,8 @@
 
 - Support child derivation with a hash as the child code index using [Sapio's `hash_to_child_vec` conversion](https://learn.sapio-lang.org/ch05-01-ctv-emulator.html#how-it-works). For example: `pub6AhbqJtv4PXnPfjiFdES7acWysWeaiCQCXeyhAh9KuEMRSNhAUHq9s3Xwu85SbXmt8wAZwpRZFQqWBstcbcvVunvATag4FbmxYYjfRcXZkp/0xd47769f0eab20cd97ad3df71d7849ed21a3c8f49c87e1742635db7d30d8a191f`
 
+- Support Bech32/Base58 addresses format directly in source code (no quoting or explicit `address()` necessary)
+
 - New utility functions:
   1. `len(Array|Bytes|Script) -> Number`
   1. `typeof(Value) -> String`

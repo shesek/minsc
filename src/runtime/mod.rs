@@ -460,6 +460,7 @@ impl Evaluate for Expr {
             Expr::BtcAmount(x) => x.eval(scope)?, // eval'd as number
             Expr::Duration(x) => x.eval(scope)?,  // eval'd as number
 
+            Expr::Address(x) => Value::Address(x.clone().assume_checked()),
             Expr::PubKey(x) => Value::PubKey(x.clone()),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::String(x) => Value::String(x.clone()),

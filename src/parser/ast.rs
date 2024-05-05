@@ -1,3 +1,4 @@
+use bitcoin::address::{self, Address};
 use miniscript::{bitcoin, DescriptorPublicKey};
 
 use crate::parser::ParseError;
@@ -19,9 +20,11 @@ pub enum Expr {
     FnExpr(FnExpr),
     Infix(Infix),
     Not(Not),
-    BtcAmount(BtcAmount),
 
+    BtcAmount(BtcAmount),
+    Address(Address<address::NetworkUnchecked>),
     PubKey(DescriptorPublicKey),
+
     Bytes(Vec<u8>),
     String(String),
     Int(i64),

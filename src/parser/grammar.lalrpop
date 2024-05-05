@@ -69,6 +69,7 @@ SExpr = {
   Array,
   DateTime,
   BtcAmount,
+  Address,
   PubKey,
   ScriptFrag,
 
@@ -83,9 +84,9 @@ SExpr = {
 
 Number = { Int, Float };
 
-Int: Expr = <s:r"-?\d{1,39}"> =>?
+Int: Expr = <s:r"-?\d{1,25}"> =>? // i64::MAX_NUMBER is 19 digits long
   Ok(i64::from_str(<>).map_err(ParseError::from)?.into());
-Float: Expr = <s:r"-?\d{1,39}\.\d{1,39}"> =>?
+Float: Expr = <s:r"-?\d{1,25}\.\d{1,25}"> =>? // f64 provides precision for up to approx 17 decimal digits
   Ok(f64::from_str(<>).map_err(ParseError::from)?.into());
 
 IdentTerm: ast::Ident = <s:r"[a-zA-Z_$][a-zA-Z0-9_$]{0,38}(?:::[a-zA-Z0-9_$]+)*"> => ast::Ident(<>.into());
@@ -133,7 +134,7 @@ ArrayAccessRHS = { Int, Ident, Paren<Expr>, BlockExpr };
 // a.0.1 gets tokenized with 0.1 as a single token (for Float) during the lexer stage. This fixes it
 // by transforming the resulting a.(0.1) to a (a.0).1. Note that two_indices must use the exact
 // same regex as used for floats.
-ArrayAccessFixFloat: Expr = <array:ArrayAccessLHS> "." <two_indices:r"-?\d{1,39}\.\d{1,39}"> =>? {
+ArrayAccessFixFloat: Expr = <array:ArrayAccessLHS> "." <two_indices:r"-?\d{1,25}\.\d{1,25}"> =>? {
   let mut current = array;
   for index in two_indices.split(".") {
     let index: i64 = index.parse().map_err(ParseError::from)?;
@@ -156,6 +157,15 @@ Bytes: Expr = {
   // later get coerced into a PubKey/Hash as needed.
   <s:r"[a-fA-F0-9]{64}|[a-fA-F0-9]{40}"> =>? Ok(Expr::bytes_from_hex(&<>)?),
 };
+
+// Addresses in Bech32 or Base58check encoding
+// Supports the 1/2/3 prefixes for Base58 and bc/tb/bcr for Bech32 (mainnet, signet, testnet and regtest)
+//
+// Bech32 addresses are only supported up to 63 characters. This is OK for Segwit v0/v1 (always 42/62),
+// but may not be sufficient for future versions which can be up to 74 characters long.
+// Supporting them requires resolving the ambiguity with 64-characters long hexadecimal strings.
+Address: Expr = <s:r"[123][0-9a-zA-Z]{25,34}|((bc|tb|bcrt)1[0-9a-z]{38,60}|(BC|TB|BCRT)1[0-9A-Z]{38,60})"> =>?
+    Ok(Expr::Address(<>.parse().map_err(ParseError::from)?));
 
 String: Expr = <s:r#""([^\\"]|\\[\\ntr"])*""#> =>
   Expr::string_from_escaped_str(&<>[1..<>.len()-1]);
