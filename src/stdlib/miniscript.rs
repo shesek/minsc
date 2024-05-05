@@ -53,7 +53,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
-    use crate::runtime::ValueIter;
+    use crate::runtime::IterValueInto;
     use miniscript::DescriptorPublicKey;
 
     //

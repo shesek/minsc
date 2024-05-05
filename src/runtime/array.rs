@@ -1,5 +1,5 @@
 use std::convert::{TryFrom, TryInto};
-use std::{fmt, ops, vec};
+use std::{fmt, iter, ops, vec};
 
 use crate::runtime::{Error, FromValue, Result, Value};
 
@@ -71,7 +71,8 @@ impl ops::DerefMut for Array {
 impl<T: FromValue> TryFrom<Array> for Vec<T> {
     type Error = Error;
     fn try_from(arr: Array) -> Result<Vec<T>> {
-        arr.0.into_iter().map(T::from_value).collect()
+        // Handled by the FromIterator<Value> implementation
+        arr.into_iter().collect()
     }
 }
 
@@ -106,14 +107,21 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
     }
 }
 
-pub trait ValueIter: Iterator<Item = Value> {
+pub trait IterValueInto: Iterator<Item = Value> + Sized {
     /// Get the next Value converted into any FromValue type. The type can be an Option to get
     /// back a None when iteration is finished, or a non-Option to back an an Error.
     fn next_into<T: FromValue>(&mut self) -> Result<T> {
         T::from_opt_value(self.next())
     }
 }
-impl<I: Iterator<Item = Value>> ValueIter for I {}
+impl<I: Iterator<Item = Value>> IterValueInto for I {}
+
+// Allows collect()ing an Iterator over Values into a Vec of any FromValue type
+impl<T: FromValue> iter::FromIterator<Value> for Result<Vec<T>> {
+    fn from_iter<I: iter::IntoIterator<Item = Value>>(iter: I) -> Self {
+        iter.into_iter().map(T::from_value).collect()
+    }
+}
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
