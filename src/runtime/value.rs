@@ -23,23 +23,22 @@ use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
 /// and assigned to variables.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    PubKey(DescriptorPublicKey),
-    Bytes(Vec<u8>),
-    String(String),
-    Number(Number),
     Bool(bool),
-    Network(Network),
-
-    Policy(Policy),
-    WithProb(usize, Box<Value>),
-
-    Descriptor(Descriptor),
-    Script(ScriptBuf),
-    Address(Address),
-    TapInfo(TaprootSpendInfo),
-
+    Number(Number),
+    String(String),
+    Bytes(Vec<u8>),
     Array(Array),
     Function(Function),
+
+    // Bitcoin stuff
+    Script(ScriptBuf),
+    Address(Address),
+    Network(Network),
+    PubKey(DescriptorPublicKey),
+    Policy(Policy),
+    Descriptor(Descriptor),
+    TapInfo(TaprootSpendInfo),
+    WithProb(usize, Box<Value>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,18 +79,18 @@ impl<T: Into<Function>> From<T> for Value {
 }
 
 // From the underlying enum inner type to Value
+impl_from_variant!(bool, Value, Bool);
+impl_from_variant!(Number, Value);
+impl_from_variant!(String, Value);
+impl_from_variant!(Vec<u8>, Value, Bytes);
+impl_from_variant!(Array, Value, Array);
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(ScriptBuf, Value, Script);
 impl_from_variant!(Address, Value);
-impl_from_variant!(Vec<u8>, Value, Bytes);
-impl_from_variant!(String, Value);
 impl_from_variant!(Network, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
-impl_from_variant!(Number, Value);
-impl_from_variant!(bool, Value, Bool);
-impl_from_variant!(Array, Value, Array);
 impl From<Vec<Value>> for Value {
     fn from(vec: Vec<Value>) -> Value {
         Value::Array(Array(vec))
@@ -137,7 +136,7 @@ impl TryFrom<Value> for f64 {
     }
 }
 
-// From Value to primitive integer types (no coercion)
+// From Value to primitive integer types, with no auto-coercion for floats
 macro_rules! impl_int_num_conv {
     ($type:ident, $fn_name:ident) => {
         impl TryFrom<Number> for $type {
@@ -304,23 +303,7 @@ impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
 impl_hash_conv!(miniscript::hash256::Hash);
 
-// Generic conversion from Value::Array into a Vec of any convertible type
-impl<T: FromValue> TryFrom<Value> for Vec<T> {
-    type Error = Error;
-    fn try_from(val: Value) -> Result<Vec<T>> {
-        val.into_array()?.try_into()
-    }
-}
-
-// Generic conversion from Value::Array into a 2-tuple of any convertible type
-impl<A: FromValue, B: FromValue> TryFrom<Value> for (A, B) {
-    type Error = Error;
-    fn try_from(val: Value) -> Result<(A, B)> {
-        val.into_array()?.try_into()
-    }
-}
-
-/// Generic conversion from a Value/Option<Value> into a T/Option<T> of any FromValue type.
+/// Generic conversion from a Value/Option<Value> into T/Option<T> of any FromValue type.
 ///
 /// Used to support types that can be either required or optional (for example by into_tagged()).
 /// Must use a new trait because TryFrom<Option<Value>> would violate the orphan rule.
@@ -376,8 +359,25 @@ pub trait FromValueMarker {}
 impl<T: TryFrom<Value, Error = Error>> FromValueMarker for T {}
 impl FromValueMarker for Value {}
 
+// Generic conversion from Value::Array into a Vec of any convertible type
+impl<T: FromValue> TryFrom<Value> for Vec<T> {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Vec<T>> {
+        val.into_array()?.try_into()
+    }
+}
+
+// Generic conversion from Value::Array into a 2-tuple of any convertible type
+// Other tuple lengths are supported on the inner Array.
+impl<A: FromValue, B: FromValue> TryFrom<Value> for (A, B) {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<(A, B)> {
+        val.into_array()?.try_into()
+    }
+}
+
 //
-// Value methods
+// Value implementation
 //
 
 impl Value {
@@ -396,16 +396,6 @@ impl Value {
             Value::Address(addr) => addr.script_pubkey(),
             v => bail!(Error::NoSpkRepr(v)),
         })
-    }
-
-    /// Transform Array elements into a Vec<T> of any convertible type
-    pub fn into_vec_of<T: FromValue>(self) -> Result<Vec<T>> {
-        self.try_into()
-    }
-
-    /// Transform an Array of 2 elements into a typed 2-tuple
-    pub fn into_tuple<A: FromValue, B: FromValue>(self) -> Result<(A, B)> {
-        self.try_into()
     }
 
     pub fn type_of(&self) -> &'static str {
@@ -427,30 +417,14 @@ impl Value {
         }
     }
 
-    pub fn is_array(&self) -> bool {
-        matches!(self, Value::Array(_))
-    }
-    pub fn is_bool(&self) -> bool {
-        matches!(self, Value::Bool(_))
-    }
-    pub fn is_bytes(&self) -> bool {
-        matches!(self, Value::Bytes(_))
-    }
-    pub fn is_policy(&self) -> bool {
-        matches!(self, Value::Policy(_))
-    }
-    pub fn is_desc(&self) -> bool {
-        matches!(self, Value::Descriptor(_))
-    }
     pub fn is_script(&self) -> bool {
         matches!(self, Value::Script(_))
     }
+    pub fn is_array(&self) -> bool {
+        matches!(self, Value::Array(_))
+    }
     pub fn is_empty_array(&self) -> bool {
         matches!(self, Value::Array(arr) if arr.is_empty())
-    }
-
-    pub fn array(elements: Vec<Value>) -> Self {
-        Value::Array(Array(elements))
     }
 
     pub fn into_f64(self) -> Result<f64> {
@@ -473,6 +447,20 @@ impl Value {
     }
     pub fn into_tapinfo(self) -> Result<TaprootSpendInfo> {
         self.try_into()
+    }
+
+    /// Transform Array elements into a Vec<T> of any FromValue type
+    pub fn into_vec_of<T: FromValue>(self) -> Result<Vec<T>> {
+        self.try_into()
+    }
+
+    /// Transform an Array of 2 elements into a typed 2-tuple of FromValue types
+    pub fn into_tuple<A: FromValue, B: FromValue>(self) -> Result<(A, B)> {
+        self.try_into()
+    }
+
+    pub fn array(elements: Vec<Value>) -> Self {
+        Value::Array(Array(elements))
     }
 }
 

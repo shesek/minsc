@@ -33,12 +33,15 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("reduce", fns::reduce).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
+
     scope.set_fn("int", fns::int).unwrap();
     scope.set_fn("float", fns::float).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
-    scope.set_fn("script", fns::script).unwrap();
+
     scope.set_fn("address", fns::address).unwrap();
+    scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
+
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
 
@@ -66,7 +69,15 @@ pub mod fns {
     use super::*;
     use crate::runtime::{Call, Function};
 
-    // len(Array|Bytes|Script|String) -> Number
+    /// Get the argument type as a string
+    /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array
+    /// typeof(Value) -> String
+    pub fn r#typeof(args: Array, _: &Scope) -> Result<Value> {
+        let type_of = args.arg_into::<Value>()?.type_of();
+        Ok(type_of.to_string().into())
+    }
+
+    /// len(Array|Bytes|Script|String) -> Number
     pub fn len(args: Array, _: &Scope) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Array(array) => array.len(),
@@ -78,12 +89,32 @@ pub mod fns {
         .into())
     }
 
-    /// Get the argument type as a string
-    /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array
-    /// typeof(Value) -> String
-    pub fn r#typeof(args: Array, _: &Scope) -> Result<Value> {
-        let type_of = args.arg_into::<Value>()?.type_of();
-        Ok(type_of.to_string().into())
+    /// reduce(Array, Value, Function) -> Value
+    pub fn reduce(args: Array, scope: &Scope) -> Result<Value> {
+        let (array, mut current_val, callback): (Array, Value, Function) = args.args_into()?;
+
+        for element in array.into_iter() {
+            current_val = callback.call(vec![current_val, element], scope)?;
+        }
+        Ok(current_val)
+    }
+
+    /// repeat(Number, Value) -> Array<Value>
+    /// Return an array of the specified size filled with Values
+    ///
+    /// repeat(Number, Function) -> Array<Value>
+    /// Return an array of the specified size, using the callback function to produce values
+    pub fn repeat(args: Array, scope: &Scope) -> Result<Value> {
+        let (num, producer): (usize, Value) = args.args_into()?;
+        Ok(Value::array(
+            (0..num)
+                .map(|n| match &producer {
+                    // The callback is called with the iteration index as an argument
+                    Value::Function(callback) => callback.call(vec![n.into()], scope),
+                    other => Ok(other.clone()),
+                })
+                .collect::<Result<_>>()?,
+        ))
     }
 
     pub fn int(args: Array, _: &Scope) -> Result<Value> {
@@ -104,28 +135,10 @@ pub mod fns {
         //let num_val: Value = args.arg_into()?;
         //let num_float: f64 = num_val.try_into()?;
         Ok(num_float.into())
+
     }
-
-    pub fn reduce(args: Array, scope: &Scope) -> Result<Value> {
-        let (array, mut current_val, callback): (Array, Value, Function) = args.args_into()?;
-
-        for element in array.into_iter() {
-            current_val = callback.call(vec![current_val, element], scope)?;
-        }
-        Ok(current_val)
-    }
-
-    // script(Script|Bytes) -> Script
-    pub fn script(args: Array, _: &Scope) -> Result<Value> {
-        Ok(match args.arg_into()? {
-            Value::Script(script) => script.into(),
-            Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
-            other => bail!(Error::InvalidScriptConstructor(other)),
-        })
-    }
-
     /// Convert the argument into Bytes
-    /// Scripts are serialized, Bytes are returned as-is
+    /// Scripts are serialized, Strings are converted to Bytes, Bytes are returned as-is
     /// bytes(Script|Bytes|String) -> Bytes
     pub fn bytes(args: Array, _: &Scope) -> Result<Value> {
         let bytes: Vec<u8> = args.arg_into()?;
@@ -144,6 +157,15 @@ pub mod fns {
             .into())
     }
 
+    /// script(Script|Bytes) -> Script
+    pub fn script(args: Array, _: &Scope) -> Result<Value> {
+        Ok(match args.arg_into()? {
+            Value::Script(script) => script.into(),
+            Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
+            other => bail!(Error::InvalidScriptConstructor(other)),
+        })
+    }
+
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
     ///
     /// Descriptors are compiled into their scriptPubKey
@@ -155,18 +177,9 @@ pub mod fns {
         Ok(spk.into())
     }
 
-    pub fn repeat(args: Array, scope: &Scope) -> Result<Value> {
-        let (num, producer): (usize, Value) = args.args_into()?;
-        Ok(Value::array(
-            (0..num)
-                .map(|n| match &producer {
-                    Value::Function(callback) => callback.call(vec![n.into()], scope),
-                    other => Ok(other.clone()),
-                })
-                .collect::<Result<_>>()?,
-        ))
-    }
-
+    /// le64(Number) -> Bytes
+    /// Encode 64-bit signed integers as little-endian bytes
+    /// Matches the format used by Elements Script
     pub fn le64(args: Array, _: &Scope) -> Result<Value> {
         let num: i64 = args.arg_into()?;
         Ok(num.to_le_bytes().to_vec().into())

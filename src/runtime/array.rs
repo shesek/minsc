@@ -6,10 +6,24 @@ use crate::runtime::{Error, FromValue, Result, Value};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);
 
-impl Array {
-    pub fn inner(self) -> Vec<Value> {
-        self.0
+impl From<Vec<Value>> for Array {
+    fn from(vec: Vec<Value>) -> Array {
+        Array(vec)
     }
+}
+impl ops::Deref for Array {
+    type Target = Vec<Value>;
+    fn deref(&self) -> &Vec<Value> {
+        &self.0
+    }
+}
+impl ops::DerefMut for Array {
+    fn deref_mut(&mut self) -> &mut Vec<Value> {
+        &mut self.0
+    }
+}
+
+impl Array {
     pub fn into_iter(self) -> vec::IntoIter<Value> {
         self.0.into_iter()
     }
@@ -36,6 +50,7 @@ impl Array {
 
     /// Unpack function arguments into a tuple or vec. Like try_into(), but with a
     /// wrapper error type to indicate the error was related to argument parsing.
+    /// Supports optional arguments by specifying an Option<T> as the return type.
     pub fn args_into<T: TryFrom<Array>>(self) -> Result<T>
     where
         Error: From<T::Error>,
@@ -44,26 +59,25 @@ impl Array {
             .map_err(|e| Error::InvalidArgumentsError(Error::from(e).into()))
     }
 
-    // Get a single argument, ensuring there were no more
+    /// Get a single argument, ensuring there were no more
     pub fn arg_into<T: FromValue>(self) -> Result<T> {
         Ok(self.args_into::<(T,)>()?.0)
     }
 }
 
-impl From<Vec<Value>> for Array {
-    fn from(vec: Vec<Value>) -> Array {
-        Array(vec)
+/// Iterator method to get the next Value converted into any FromValue type. The type can be an
+/// Option to get back a None when iteration is finished, or a non-Option to back an an Error.
+pub trait IterValueInto: Iterator<Item = Value> + Sized {
+    fn next_into<T: FromValue>(&mut self) -> Result<T> {
+        T::from_opt_value(self.next())
     }
 }
-impl ops::Deref for Array {
-    type Target = Vec<Value>;
-    fn deref(&self) -> &Vec<Value> {
-        &self.0
-    }
-}
-impl ops::DerefMut for Array {
-    fn deref_mut(&mut self) -> &mut Vec<Value> {
-        &mut self.0
+impl<I: Iterator<Item = Value>> IterValueInto for I {}
+
+// Allows collect()ing an Iterator over Values into a Vec of any FromValue type
+impl<T: FromValue> iter::FromIterator<Value> for Result<Vec<T>> {
+    fn from_iter<I: iter::IntoIterator<Item = Value>>(iter: I) -> Self {
+        iter.into_iter().map(T::from_value).collect()
     }
 }
 
@@ -71,7 +85,7 @@ impl ops::DerefMut for Array {
 impl<T: FromValue> TryFrom<Array> for Vec<T> {
     type Error = Error;
     fn try_from(arr: Array) -> Result<Vec<T>> {
-        // Handled by the FromIterator<Value> implementation
+        // handled by the FromIterator<Value> implementation above
         arr.into_iter().collect()
     }
 }
@@ -104,22 +118,6 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
         let mut iter = arr.check_varlen(min_len, 3)?.into_iter();
 
         Ok((iter.next_into()?, iter.next_into()?, iter.next_into()?))
-    }
-}
-
-pub trait IterValueInto: Iterator<Item = Value> + Sized {
-    /// Get the next Value converted into any FromValue type. The type can be an Option to get
-    /// back a None when iteration is finished, or a non-Option to back an an Error.
-    fn next_into<T: FromValue>(&mut self) -> Result<T> {
-        T::from_opt_value(self.next())
-    }
-}
-impl<I: Iterator<Item = Value>> IterValueInto for I {}
-
-// Allows collect()ing an Iterator over Values into a Vec of any FromValue type
-impl<T: FromValue> iter::FromIterator<Value> for Result<Vec<T>> {
-    fn from_iter<I: iter::IntoIterator<Item = Value>>(iter: I) -> Self {
-        iter.into_iter().map(T::from_value).collect()
     }
 }
 
