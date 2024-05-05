@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::{fmt, ops, vec};
 
 use crate::runtime::{Error, FromValue, Result, Value};
@@ -40,11 +40,6 @@ impl From<Vec<Value>> for Array {
         Array(vec)
     }
 }
-//impl From<Array> for Vec<Value> {
-//    fn from(array: Array) -> Vec<Value> {
-//        array.0
-//    }
-//}
 impl ops::Deref for Array {
     type Target = Vec<Value>;
     fn deref(&self) -> &Vec<Value> {
@@ -71,10 +66,9 @@ impl<A: FromValue> TryFrom<Array> for (A,) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A,)> {
         let min_len = A::is_required() as usize;
-        let mut arr = arr.check_varlen(min_len, 1)?;
+        let mut iter = arr.check_varlen(min_len, 1)?.into_iter();
 
-        let a = A::from_opt_value(arr.pop())?;
-        Ok((a,))
+        Ok((iter.next_into()?,))
     }
 }
 impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
@@ -83,9 +77,7 @@ impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
         let min_len = A::is_required() as usize + B::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 2)?.into_iter();
 
-        let a = A::from_opt_value(iter.next())?;
-        let b = B::from_opt_value(iter.next())?;
-        Ok((a, b))
+        Ok((iter.next_into()?, iter.next_into()?))
     }
 }
 impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
@@ -95,12 +87,18 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
             A::is_required() as usize + B::is_required() as usize + C::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 3)?.into_iter();
 
-        let a = A::from_opt_value(iter.next())?;
-        let b = B::from_opt_value(iter.next())?;
-        let c = C::from_opt_value(iter.next())?;
-        Ok((a, b, c))
+        Ok((iter.next_into()?, iter.next_into()?, iter.next_into()?))
     }
 }
+
+pub trait ValueIter: Iterator<Item = Value> {
+    /// Get the next Value converted into any FromValue type. The type can be an Option to get
+    /// back a None when iteration is finished, or a non-Option to back an an Error.
+    fn next_into<T: FromValue>(&mut self) -> Result<T> {
+        T::from_opt_value(self.next())
+    }
+}
+impl<I: Iterator<Item = Value>> ValueIter for I {}
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
