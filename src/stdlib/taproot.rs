@@ -136,7 +136,11 @@ pub mod fns {
     }
 }
 
-pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
+pub fn tr(mut a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
+    if a.is_bytes() {
+        // Support providing the internal pubkey as raw Bytes, for compatibility with the Miniscirpt Policy tr() syntax
+        a = Value::PubKey(a.try_into()?);
+    }
     Ok(match (a, b) {
         // tr(Policy) -> Descriptor
         // Single policy, compiled into a script tree
