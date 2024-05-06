@@ -65,8 +65,9 @@ impl Array {
     }
 
     pub fn no_args(self) -> Result<()> {
-        self.check_len(0)?;
-        Ok(())
+        self.check_len(0)
+            .map_err(|e| Error::InvalidArgumentsError(e.into()))
+            .map(|_| ())
     }
 }
 

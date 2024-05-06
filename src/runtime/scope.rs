@@ -61,19 +61,19 @@ impl<'a> Scope<'a> {
     }
 
     /// Get the entire env from the local and parent scopes
-    pub fn env(&self) -> Vec<(&Ident, &Value)> {
+    pub fn env(&self, include_root: bool) -> Vec<(&Ident, &Value)> {
         // env returned as a Vec to retain order, with variables from inner scopes appearing first
         let mut env = vec![];
         let mut seen_keys = HashSet::new();
+        let mut scope = self;
+        loop {
+            env.extend(scope.local.iter().filter(|(i, _)| seen_keys.insert(*i)));
 
-        let mut curr_scope = Some(self);
-        while let Some(scope) = curr_scope {
-            for (ident, val) in &scope.local {
-                if seen_keys.insert(ident) {
-                    env.push((ident, val))
-                }
-            }
-            curr_scope = scope.parent;
+            scope = match scope.parent {
+                None => break,
+                Some(scope) if !include_root && scope.parent.is_none() => break,
+                Some(scope) => scope,
+            };
         }
         env
     }

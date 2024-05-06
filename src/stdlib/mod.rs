@@ -172,10 +172,10 @@ pub mod fns {
     }
 
     /// Get the entire env from the local and parent scopes
-    /// env() -> Array<(String, Value)>
+    /// env(include_root=false) -> Array<(String, Value)>
     pub fn env(args: Array, scope: &Scope) -> Result<Value> {
-        args.no_args()?;
-        Ok(Array(scope.env().into_iter().map(format_var).collect()).into())
+        let inc_root = args.arg_into::<Option<bool>>()?.unwrap_or_default();
+        Ok(Array(scope.env(inc_root).into_iter().map(format_var).collect()).into())
     }
 
     fn format_var((ident, val): (&Ident, &Value)) -> Value {
