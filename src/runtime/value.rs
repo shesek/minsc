@@ -35,6 +35,9 @@ pub enum Value {
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
     WithProb(usize, Box<Value>),
+
+    // A unique Symbol
+    Symbol(Symbol),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +47,12 @@ pub enum Number {
 }
 impl_from_variant!(i64, Number, Int);
 impl_from_variant!(f64, Number, Float);
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Symbol {
+    id: usize,
+    name: Option<String>,
+}
 
 //
 // Value conversions
@@ -79,7 +88,8 @@ impl_from_variant!(bool, Value, Bool);
 impl_from_variant!(Number, Value);
 impl_from_variant!(String, Value);
 impl_from_variant!(Vec<u8>, Value, Bytes);
-impl_from_variant!(Array, Value, Array);
+impl_from_variant!(Array, Value);
+impl_from_variant!(Symbol, Value);
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
@@ -305,6 +315,7 @@ impl Value {
             Value::Network(_) => "network",
             Value::TapInfo(_) => "tapinfo",
             Value::Array(_) => "array",
+            Value::Symbol(_) => "symbol",
         }
     }
 
@@ -358,6 +369,8 @@ impl FromStr for Value {
     }
 }
 
+// Display
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -395,4 +408,36 @@ fn escape_str(str: &str) -> String {
         .flat_map(core::ascii::escape_default)
         .map(char::from)
         .collect()
+}
+
+// Symbol
+//
+// A value type guarantee to be unique. Symbols don't have any special meaning on the Rust side, but are used
+// in Minsc code for various purposes (like `null` and `_`). Symbols can be created at runtime using Symbol().
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+static SYMBOL_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
+impl Symbol {
+    pub fn new(name: Option<String>) -> Self {
+        let id = SYMBOL_COUNTER.fetch_add(1, Ordering::Relaxed);
+        Symbol { id, name }
+    }
+}
+impl fmt::Debug for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.name {
+            Some(name) => write!(f, "Symbol({}, \"{}\")", self.id, name),
+            None => write!(f, "Symbol({})", self.id),
+        }
+    }
+}
+impl fmt::Display for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.name {
+            Some(name) => write!(f, "{}", name),
+            // Some(name) => write!(f, "Symbol({})", name),
+            None => write!(f, "Symbol"),
+        }
+    }
 }

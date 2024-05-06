@@ -161,7 +161,7 @@ fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
             // Otherwise, only if the LHS and RHS are of different types
             (
                 lhs @ (Bytes(_) | Script(_) | Address(_) | PubKey(_) | Policy(_) | Descriptor(_)
-                | TapInfo(_) | WithProb(..)),
+                | TapInfo(_) | WithProb(..) | Symbol(_)),
                 rhs,
             ) => mem::discriminant(lhs) != mem::discriminant(rhs),
         }

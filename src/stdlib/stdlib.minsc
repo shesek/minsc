@@ -4,6 +4,11 @@ OP_PUSHDATA1 = script(0x4c), OP_PUSHDATA2 = script(0x4d), OP_PUSHDATA4 = script(
 OP_CHECKSEQUENCEVERIFY = OP_CSV;
 OP_FALSE = `0`, OP_TRUE = `1`;
 
+// Built-in unique Symbols
+// These don't have any special meaning on the Rust side, but are used in Minsc code for various purposes
+null = Symbol("null");
+_ = Symbol("_");
+
 // Some useful constants
 DUST_AMOUNT = 294;
 DUST_NON_SW = 546;

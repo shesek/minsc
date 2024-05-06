@@ -1,6 +1,6 @@
 use ::miniscript::bitcoin::hashes::{sha256, Hash};
 
-use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Value};
+use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Symbol, Value};
 use crate::{parser, time, Ident};
 
 pub mod btc;
@@ -30,10 +30,12 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("float", fns::float).unwrap();
     scope.set_fn("str", fns::r#str).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
+    scope.set_fn("Symbol", fns::Symbol).unwrap();
 
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
 
+    // Development utilities
     scope.set_fn("debug", fns::debug).unwrap();
     scope.set_fn("env", fns::env).unwrap();
     scope.set_fn("locals", fns::locals).unwrap();
@@ -136,6 +138,13 @@ pub mod fns {
             other => other.to_string(),
         }
         .into())
+    }
+
+    /// Create a new unique Symbol
+    /// Symbol(String=None) -> Symbol
+    pub fn Symbol(args: Array, _: &Scope) -> Result<Value> {
+        let name = args.arg_into()?;
+        Ok(Symbol::new(name).into())
     }
 
     /// Convert the argument into Bytes
