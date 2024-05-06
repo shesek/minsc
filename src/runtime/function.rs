@@ -26,11 +26,6 @@ pub type NativeFunctionPt = fn(Array, &Scope) -> Result<Value>;
 
 impl_from_variant!(NativeFunction, Function, Native);
 
-impl fmt::Debug for NativeFunction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("NativeFunction")
-    }
-}
 
 impl Function {
     /// Get the name associated with the function. Only available for user functions
@@ -129,5 +124,34 @@ impl PartialEq for Function {
                 unimplemented!("user defined functions cannot be compared")
             }
         }
+    }
+}
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Function::User(func) => write!(f, "{}", func),
+            Function::Native(func) => write!(f, "{:?}", func),
+        }
+    }
+}
+impl fmt::Display for UserFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "fn ")?;
+        if let Some(ident) = &self.ident {
+            write!(f, "{}", ident)?;
+        }
+        write!(f, "(")?;
+        for (i, arg_name) in self.signature.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", arg_name)?;
+        }
+        write!(f, ")")
+    }
+}
+impl fmt::Debug for NativeFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "fn ([native])")
     }
 }
