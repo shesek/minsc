@@ -158,10 +158,10 @@ pub enum RuntimeError {
     #[error("in {}(): {1}", .0.as_ref().unwrap_or(&"_anonymous".into()))]
     CallError(Option<Ident>, Box<RuntimeError>),
 
-    #[error("{0:?} error: {1}")]
+    #[error("{0:?} operator error: {1}")]
     InfixOpError(InfixOp, Box<RuntimeError>),
 
-    #[error("Invalid arguments: ({0}, {1})")]
+    #[error("Invalid operands: ({0}, {1})")]
     InfixOpArgs(Value, Value),
 
     #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
