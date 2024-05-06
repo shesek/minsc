@@ -1,9 +1,9 @@
-use ::miniscript::bitcoin::{self, Address, Network, ScriptBuf};
-use bitcoin::hashes::{sha256, Hash};
+use ::miniscript::bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Value};
 use crate::{parser, time};
 
+pub mod btc;
 pub mod ctv;
 pub mod miniscript;
 pub mod tagged;
@@ -20,14 +20,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set("true", true).unwrap();
     scope.set("false", false).unwrap();
 
-    // Network types
-    scope.set("signet", Network::Signet).unwrap();
-    scope.set("testnet", Network::Testnet).unwrap();
-    scope.set("regtest", Network::Regtest).unwrap();
-    scope
-        .set("_$$_RECKLESSLY_RISK_MY_BITCOINS_$$_", Network::Bitcoin)
-        .unwrap();
-
     // Functions
     scope.set_fn("typeof", fns::r#typeof).unwrap();
     scope.set_fn("len", fns::len).unwrap();
@@ -38,10 +30,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("float", fns::float).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
 
-    scope.set_fn("address", fns::address).unwrap();
-    scope.set_fn("script", fns::script).unwrap();
-    scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
-
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
 
@@ -49,6 +37,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
     scope.set("MAX_NUMBER", i64::MAX).unwrap();
     scope.set("MIN_NUMBER", i64::MIN).unwrap();
+
+    // Bitcoin related functions
+    self::btc::attach_stdlib(scope);
 
     // Miniscript related functions
     self::miniscript::attach_stdlib(scope);
@@ -143,38 +134,6 @@ pub mod fns {
     pub fn bytes(args: Array, _: &Scope) -> Result<Value> {
         let bytes: Vec<u8> = args.arg_into()?;
         Ok(bytes.into())
-    }
-
-    /// Generate an address
-    /// address(Script|Descriptor|PubKey|TapInfo|String|Address) -> Address
-    pub fn address(args: Array, _: &Scope) -> Result<Value> {
-        let (spk, network): (Value, Option<Network>) = args.args_into()?;
-        let spk = spk.into_spk()?;
-        let network = network.unwrap_or(Network::Signet);
-
-        Ok(Address::from_script(&spk, network)
-            .map_err(|_| Error::NotAddressable(spk))?
-            .into())
-    }
-
-    /// script(Script|Bytes) -> Script
-    pub fn script(args: Array, _: &Scope) -> Result<Value> {
-        Ok(match args.arg_into()? {
-            Value::Script(script) => script.into(),
-            Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
-            other => bail!(Error::InvalidScriptConstructor(other)),
-        })
-    }
-
-    /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
-    ///
-    /// Descriptors are compiled into their scriptPubKey
-    /// TapInfo are returned as their V1 witness program
-    /// PubKeys are converted into a wpkh() scripts
-    /// Scripts are returned as-is
-    pub fn scriptPubKey(args: Array, _: &Scope) -> Result<Value> {
-        let spk = args.arg_into::<Value>()?.into_spk()?;
-        Ok(spk.into())
     }
 
     /// le64(Number) -> Bytes

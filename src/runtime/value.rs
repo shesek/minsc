@@ -2,20 +2,13 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
-use bitcoin::bip32::{DerivationPath, Xpub};
-use bitcoin::hashes::{self, Hash};
-use bitcoin::hex::DisplayHex;
-use bitcoin::key::TweakedPublicKey;
-use bitcoin::taproot::TaprootSpendInfo;
 use bitcoin::{
-    address, Address, Network, PublicKey, ScriptBuf, WitnessProgram, WitnessVersion, XOnlyPublicKey,
+    hashes, hashes::Hash, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, ScriptBuf,
 };
-use miniscript::descriptor::{DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
-use miniscript::{bitcoin, descriptor, ScriptContext};
+use miniscript::{bitcoin, DescriptorPublicKey};
 
 use crate::parser::Expr;
-use crate::util::DescriptorExt;
-use crate::{error, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
+use crate::{error, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
 
@@ -99,7 +92,7 @@ impl From<Vec<Value>> for Value {
 
 // From Value to the underlying enum inner type
 // Simple extraction of the enum variant, with no specialized type coercion logic
-macro_rules! impl_simple_into_variant_conv {
+macro_rules! impl_simple_into_variant {
     ($type:path, $variant:ident, $into_fn_name:ident, $error:ident) => {
         impl TryFrom<Value> for $type {
             type Error = Error;
@@ -117,13 +110,13 @@ macro_rules! impl_simple_into_variant_conv {
         }
     };
 }
-impl_simple_into_variant_conv!(bool, Bool, into_bool, NotBool);
-impl_simple_into_variant_conv!(Number, Number, into_number, NotNumber);
-impl_simple_into_variant_conv!(Array, Array, into_array, NotArray);
-impl_simple_into_variant_conv!(Network, Network, into_network, NotNetwork);
-impl_simple_into_variant_conv!(Function, Function, into_fn, NotFn);
-impl_simple_into_variant_conv!(ScriptBuf, Script, into_script, NotScript);
-impl_simple_into_variant_conv!(String, String, into_string, NotString);
+impl_simple_into_variant!(bool, Bool, into_bool, NotBool);
+impl_simple_into_variant!(Number, Number, into_number, NotNumber);
+impl_simple_into_variant!(Array, Array, into_array, NotArray);
+impl_simple_into_variant!(Function, Function, into_fn, NotFn);
+impl_simple_into_variant!(String, String, into_string, NotString);
+impl_simple_into_variant!(ScriptBuf, Script, into_script, NotScript);
+impl_simple_into_variant!(Network, Network, into_network, NotNetwork);
 
 // From Value to f64 primitive, with auto-coercion for integers
 impl TryFrom<Value> for f64 {
@@ -172,111 +165,6 @@ impl_int_num_conv!(usize, into_usize);
 impl_int_num_conv!(u32, into_u32);
 impl_int_num_conv!(u64, into_u64);
 impl_int_num_conv!(i32, into_i32);
-
-// From Value to Bitcoin/Miniscript types
-impl TryFrom<Value> for Policy {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Policy(policy) => Ok(policy),
-            // Pubkeys are coerced into a pk() policy
-            Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
-            v => Err(Error::NotPolicyLike(v)),
-        }
-    }
-}
-impl TryFrom<Value> for DescriptorPublicKey {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::PubKey(x) => Ok(x),
-            // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
-            Value::Bytes(bytes) => {
-                let key = match bytes.len() {
-                    33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
-                    32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
-                    // uncompressed keys are currently unsupported
-                    len => bail!(Error::InvalidPubKeyLen(len)),
-                };
-                Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
-            }
-            v => Err(Error::NotPubKey(v)),
-        }
-    }
-}
-impl TryFrom<Value> for Descriptor {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Descriptor(x) => Ok(x),
-            // PubKeys are coerced into a wpkh() descriptor
-            Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
-            v => Err(Error::NotDescriptorLike(v)),
-        }
-    }
-}
-impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(value.into_policy()?.compile()?)
-    }
-}
-impl TryFrom<Value> for TaprootSpendInfo {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(match value {
-            Value::TapInfo(tapinfo) => tapinfo,
-            Value::Descriptor(desc) => match desc.at_derivation_index(0)? {
-                miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
-                _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc))),
-            },
-            v => bail!(Error::NotTapInfoLike(v)),
-        })
-    }
-}
-impl TryFrom<Value> for Address {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(match value {
-            Value::Address(address) => address,
-            Value::String(addr_str) => {
-                let addr: Address<address::NetworkUnchecked> = addr_str.parse()?;
-                // XXX avoid assume_checked? we don't always know the network at the time the address is parsed.
-                addr.assume_checked()
-            }
-            v => bail!(Error::NotAddress(v)),
-        })
-    }
-}
-
-// From Bitcoin/Miniscript types to Value
-impl From<XOnlyPublicKey> for Value {
-    fn from(key: XOnlyPublicKey) -> Self {
-        Value::PubKey(DescriptorPublicKey::Single(SinglePub {
-            key: SinglePubKey::XOnly(key),
-            origin: None,
-        }))
-    }
-}
-impl From<TweakedPublicKey> for Value {
-    fn from(key: TweakedPublicKey) -> Self {
-        key.to_inner().into()
-    }
-}
-impl From<Xpub> for Value {
-    fn from(xpub: Xpub) -> Self {
-        Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
-            xkey: xpub,
-            derivation_path: DerivationPath::master(),
-            wildcard: descriptor::Wildcard::Unhardened,
-            origin: if xpub.depth > 0 {
-                Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
-            } else {
-                None
-            },
-        }))
-    }
-}
 
 // From Value to Vec<u8>
 impl TryFrom<Value> for Vec<u8> {
@@ -391,28 +279,10 @@ impl<A: FromValue, B: FromValue> TryFrom<Value> for (A, B) {
 }
 
 //
-// Value implementation
+// Value impl
 //
 
 impl Value {
-    /// Get the scriptPubKey representation of this Value
-    pub fn into_spk(self) -> Result<ScriptBuf> {
-        Ok(match self {
-            // Raw scripts are returned as-is
-            Value::Script(script) => script,
-            // Descriptors (or values coercible into them) are converted into their scriptPubKey
-            v @ Value::Descriptor(_) | v @ Value::PubKey(_) => v.into_desc()?.to_script_pubkey()?,
-            // TapInfo returns the output V1 witness program of the output key
-            Value::TapInfo(tapinfo) => ScriptBuf::new_witness_program(&WitnessProgram::new(
-                WitnessVersion::V1,
-                &tapinfo.output_key().serialize(),
-            )?),
-            // Addresses can be provided as an Address or String
-            v @ Value::Address(_) | v @ Value::String(_) => v.into_address()?.script_pubkey(),
-            v => bail!(Error::NoSpkRepr(v)),
-        })
-    }
-
     pub fn type_of(&self) -> &'static str {
         match self {
             Value::PubKey(_) => "pubkey",
@@ -432,9 +302,6 @@ impl Value {
         }
     }
 
-    pub fn is_script(&self) -> bool {
-        matches!(self, Value::Script(_))
-    }
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
@@ -445,25 +312,8 @@ impl Value {
     pub fn into_f64(self) -> Result<f64> {
         self.try_into()
     }
-    pub fn into_policy(self) -> Result<Policy> {
-        self.try_into()
-    }
-    pub fn into_key(self) -> Result<DescriptorPublicKey> {
-        self.try_into()
-    }
+
     pub fn into_bytes(self) -> Result<Vec<u8>> {
-        self.try_into()
-    }
-    pub fn into_address(self) -> Result<Address> {
-        self.try_into()
-    }
-    pub fn into_desc(self) -> Result<Descriptor> {
-        self.try_into()
-    }
-    pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<Miniscript<Ctx>> {
-        self.try_into()
-    }
-    pub fn into_tapinfo(self) -> Result<TaprootSpendInfo> {
         self.try_into()
     }
 

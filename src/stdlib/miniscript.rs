@@ -1,11 +1,15 @@
+use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use miniscript::bitcoin::Sequence;
-use miniscript::AbsLockTime;
+use bitcoin::bip32::{DerivationPath, Xpub};
+use bitcoin::key::TweakedPublicKey;
+use bitcoin::{PublicKey, Sequence, XOnlyPublicKey};
+use miniscript::descriptor::{self, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
+use miniscript::{bitcoin, AbsLockTime, ScriptContext};
 
 use crate::runtime::{Array, Error, Result, Scope, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
-use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::{DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 const LIKELY_PROB: usize = 10;
 
@@ -211,4 +215,98 @@ fn into_prob_policies(values: Array) -> Result<Vec<(usize, Arc<Policy>)>> {
             })
         })
         .collect()
+}
+
+// Convert from Miniscript types to Value
+
+impl From<XOnlyPublicKey> for Value {
+    fn from(key: XOnlyPublicKey) -> Self {
+        Value::PubKey(DescriptorPublicKey::Single(SinglePub {
+            key: SinglePubKey::XOnly(key),
+            origin: None,
+        }))
+    }
+}
+impl From<TweakedPublicKey> for Value {
+    fn from(key: TweakedPublicKey) -> Self {
+        key.to_inner().into()
+    }
+}
+impl From<Xpub> for Value {
+    fn from(xpub: Xpub) -> Self {
+        Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
+            xkey: xpub,
+            derivation_path: DerivationPath::master(),
+            wildcard: descriptor::Wildcard::Unhardened,
+            origin: if xpub.depth > 0 {
+                Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
+            } else {
+                None
+            },
+        }))
+    }
+}
+
+// Convert from Value to Miniscript types
+impl TryFrom<Value> for Policy {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Policy(policy) => Ok(policy),
+            // Pubkeys are coerced into a pk() policy
+            Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
+            v => Err(Error::NotPolicyLike(v)),
+        }
+    }
+}
+impl TryFrom<Value> for DescriptorPublicKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::PubKey(x) => Ok(x),
+            // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
+            Value::Bytes(bytes) => {
+                let key = match bytes.len() {
+                    33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
+                    32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
+                    // uncompressed keys are currently unsupported
+                    len => bail!(Error::InvalidPubKeyLen(len)),
+                };
+                Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
+            }
+            v => Err(Error::NotPubKey(v)),
+        }
+    }
+}
+impl TryFrom<Value> for Descriptor {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::Descriptor(x) => Ok(x),
+            // PubKeys are coerced into a wpkh() descriptor
+            Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
+            v => Err(Error::NotDescriptorLike(v)),
+        }
+    }
+}
+impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(value.into_policy()?.compile()?)
+    }
+}
+
+impl Value {
+    pub fn into_policy(self) -> Result<Policy> {
+        self.try_into()
+    }
+    pub fn into_key(self) -> Result<DescriptorPublicKey> {
+        self.try_into()
+    }
+    pub fn into_desc(self) -> Result<Descriptor> {
+        self.try_into()
+    }
+    pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<Miniscript<Ctx>> {
+        self.try_into()
+    }
 }
