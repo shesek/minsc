@@ -230,7 +230,7 @@ impl TryFrom<Value> for Sequence {
     }
 }
 
-pub fn fmt_script(f: &mut fmt::Formatter, script: &Script, wrap_backticks: bool) -> fmt::Result {
+pub fn fmt_script<W: fmt::Write>(f: &mut W, script: &Script, wrap_backticks: bool) -> fmt::Result {
     use bitcoin::opcodes::{Class, ClassifyContext};
     use bitcoin::script::Instruction;
 
