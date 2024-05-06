@@ -28,6 +28,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     scope.set_fn("int", fns::int).unwrap();
     scope.set_fn("float", fns::float).unwrap();
+    scope.set_fn("str", fns::r#str).unwrap();
     scope.set_fn("bytes", fns::bytes).unwrap();
 
     scope.set_fn("le64", fns::le64).unwrap();
@@ -117,17 +118,22 @@ pub mod fns {
             }
             Number::Float(_) => bail!(Error::Overflow),
         };
-
         Ok(num.into())
     }
 
     pub fn float(args: Array, _: &Scope) -> Result<Value> {
-        let num_float: f64 = args.arg_into()?;
-        //let num_val: Value = args.arg_into()?;
-        //let num_float: f64 = num_val.try_into()?;
-        Ok(num_float.into())
-
+        let num: f64 = args.arg_into()?;
+        Ok(num.into())
     }
+
+    pub fn r#str(args: Array, _: &Scope) -> Result<Value> {
+        Ok(match args.arg_into()? {
+            Value::String(string) => string,
+            other => other.to_string(),
+        }
+        .into())
+    }
+
     /// Convert the argument into Bytes
     /// Scripts are serialized, Strings are converted to Bytes, Bytes are returned as-is
     /// bytes(Script|Bytes|String) -> Bytes

@@ -69,6 +69,7 @@
   1. `typeof(Value) -> String`
   1. `int(Float) -> Integer`
   1. `float(Int) -> Float`
+  1. `str(Value) -> String`
   1. `keys(Array) -> Array<Number>`
   2. `first(Array) -> Any`
   3. `last(Array) -> Any`
