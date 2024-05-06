@@ -123,13 +123,25 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[ ")?;
-        for (i, element) in self.0.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
+        if self.0.len() == 2 && !should_avoid_colon_format(&self.0[0]) {
+            // Display 2-tuples using the A:B colon construction syntax
+            // XXX avoid colons for the top-level array display?
+            let space = iif!(self.0[0].is_string(), " ", "");
+            write!(f, "{}:{}{}", self.0[0], space, self.0[1])
+        } else {
+            write!(f, "[ ")?;
+            for (i, element) in self.0.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}", element)?;
             }
-            write!(f, "{}", element)?;
+            write!(f, " ]")
         }
-        write!(f, " ]")
     }
+}
+
+fn should_avoid_colon_format(lhs: &Value) -> bool {
+    use Value::*;
+    matches!(lhs, Array(_) | Function(_) | TapInfo(_) | Transaction(_))
 }

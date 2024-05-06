@@ -307,6 +307,15 @@ impl Value {
         }
     }
 
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Value::Bool(_))
+    }
+    pub fn is_number(&self) -> bool {
+        matches!(self, Value::Number(_))
+    }
+    pub fn is_string(&self) -> bool {
+        matches!(self, Value::String(_))
+    }
     pub fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
