@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::parser::Ident;
 use crate::runtime::{function::NativeFunctionPt, Error, Result, Value};
@@ -24,11 +24,6 @@ impl<'a> Scope<'a> {
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
-    /// Get a builtin variable, which must be available in scope
-    pub fn builtin(&self, key: &str) -> &Value {
-        self.get(&key.into()).expect("built-in must exists")
-    }
-
     pub fn set<K: Into<Ident>, V: Into<Value>>(&mut self, key: K, value: V) -> Result<()> {
         let key = key.into();
 
@@ -48,10 +43,38 @@ impl<'a> Scope<'a> {
         self.set(key, f)
     }
 
+    /// Get a builtin variable, which must be available in scope
+    pub fn builtin(&self, key: &str) -> &Value {
+        self.get(&key.into()).expect("built-in must exists")
+    }
+
     pub fn child(&'a self) -> Self {
         Scope {
             parent: Some(&self),
             local: HashMap::new(),
         }
+    }
+
+    /// Get variables from the local scope
+    pub fn locals(&self) -> &HashMap<Ident, Value> {
+        &self.local
+    }
+
+    /// Get the entire env from the local and parent scopes
+    pub fn env(&self) -> Vec<(&Ident, &Value)> {
+        // env returned as a Vec to retain order, with variables from inner scopes appearing first
+        let mut env = vec![];
+        let mut seen_keys = HashSet::new();
+
+        let mut curr_scope = Some(self);
+        while let Some(scope) = curr_scope {
+            for (ident, val) in &scope.local {
+                if seen_keys.insert(ident) {
+                    env.push((ident, val))
+                }
+            }
+            curr_scope = scope.parent;
+        }
+        env
     }
 }

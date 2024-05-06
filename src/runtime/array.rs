@@ -63,6 +63,11 @@ impl Array {
     pub fn arg_into<T: FromValue>(self) -> Result<T> {
         Ok(self.args_into::<(T,)>()?.0)
     }
+
+    pub fn no_args(self) -> Result<()> {
+        self.check_len(0)?;
+        Ok(())
+    }
 }
 
 /// Iterator method to get the next Value converted into any FromValue type. The type can be an

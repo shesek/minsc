@@ -1,7 +1,7 @@
 use ::miniscript::bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Value};
-use crate::{parser, time};
+use crate::{parser, time, Ident};
 
 pub mod btc;
 pub mod ctv;
@@ -33,6 +33,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
+
+    scope.set_fn("env", fns::env).unwrap();
+    scope.set_fn("locals", fns::locals).unwrap();
 
     // Constants
     scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
@@ -159,5 +162,23 @@ pub mod fns {
         let bytes: Vec<u8> = args.arg_into()?;
         let hash = sha256::Hash::hash(&bytes);
         Ok(hash.into())
+    }
+
+    /// Get variables from the local scope
+    /// locals() -> Array<(String, Value)>
+    pub fn locals(args: Array, scope: &Scope) -> Result<Value> {
+        args.no_args()?;
+        Ok(Array(scope.locals().into_iter().map(format_var).collect()).into())
+    }
+
+    /// Get the entire env from the local and parent scopes
+    /// env() -> Array<(String, Value)>
+    pub fn env(args: Array, scope: &Scope) -> Result<Value> {
+        args.no_args()?;
+        Ok(Array(scope.env().into_iter().map(format_var).collect()).into())
+    }
+
+    fn format_var((ident, val): (&Ident, &Value)) -> Value {
+        vec![Value::String(ident.0.clone()), val.clone()].into()
     }
 }
