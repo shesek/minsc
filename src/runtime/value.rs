@@ -9,8 +9,7 @@ use bitcoin::{
 use miniscript::{bitcoin, DescriptorPublicKey};
 
 use crate::parser::Expr;
-use crate::stdlib::btc::fmt_script;
-use crate::{error, DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
 
@@ -382,13 +381,14 @@ impl fmt::Display for Value {
             Value::Array(x) => write!(f, "{}", x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Descriptor(x) => write!(f, "{}", x), // not round-trip-able
+            Value::Descriptor(x) => write!(f, "{}", x), // not round-trip-able for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
             Value::Address(x) => write!(f, "{}", x),
-            Value::Script(x) => fmt_script(f, x, true),
-            Value::Function(x) => write!(f, "{}", x), // not round-trip-able
+            Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Transaction(x) => write!(f, "{:?}", x), // not round-trip-able
             Value::Network(x) => write!(f, "{}", x),
-            Value::TapInfo(x) => write!(f, "{:?}", x), // not round-trip-able
+            Value::Symbol(x) => write!(f, "{}", x),
+            Value::Script(x) => stdlib::btc::fmt_script(f, x, true),
+            Value::TapInfo(x) => stdlib::taproot::fmt_tapinfo(f, x), // not round-trip-able for >2 scripts
         }
     }
 }

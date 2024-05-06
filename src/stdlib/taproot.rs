@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::fmt;
 use std::sync::Arc;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
@@ -9,7 +10,7 @@ use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 use super::miniscript::into_policies;
 use crate::runtime::{Array, Error, Result, Scope, Value};
 use crate::util::EC;
-use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::{stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &mut Scope) {
     // Taproot Descriptor/TaprootSpendInfo construction
@@ -361,4 +362,33 @@ fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
     Ok(XOnlyPublicKey::from(
         pk.at_derivation_index(0)?.derive_public_key(&EC)?.inner,
     ))
+}
+
+pub fn fmt_tapinfo<W: fmt::Write>(f: &mut W, tapinfo: &TaprootSpendInfo) -> fmt::Result {
+    write!(f, "tr(0x{}", tapinfo.internal_key())?;
+    let script_map = tapinfo.script_map();
+    if !script_map.is_empty() {
+        write!(f, ", ",)?;
+        if script_map.len() > 1 {
+            write!(f, "[",)?;
+        }
+        for (i, ((script, _leaf_ver), _)) in script_map.into_iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            //write!(f, "{:?}:", leaf_ver)?;
+            stdlib::btc::fmt_script(f, script, true)?;
+        }
+        if script_map.len() > 1 {
+            write!(f, "]")?;
+            if script_map.len() > 2 {
+                // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
+                // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
+                // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
+                // FIXME deduct the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
+                write!(f, "(not tree)")?;
+            }
+        }
+    }
+    write!(f, ")")
 }
