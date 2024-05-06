@@ -129,35 +129,26 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Called with is_root_array=true to avoid the colon syntax for top-level arrays,
-        // then recurses internally without it.
-        fmt_array(f, self, true)
-    }
-}
-
-fn fmt_array(f: &mut fmt::Formatter, arr: &Array, is_root_array: bool) -> fmt::Result {
-    if should_use_colon_syntax(is_root_array, &arr.0) {
-        // Display 2-tuples using the A:B colon construction syntax
-        let space = iif!(arr.0[0].is_string(), " ", "");
-        write!(f, "{}:{}{}", arr.0[0], space, arr.0[1])
-    } else {
-        write!(f, "[ ")?;
-        for (i, element) in arr.0.iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
+        if should_use_colon_syntax(&self.0) {
+            // Display 2-tuples using the A:B colon construction syntax
+            let space = iif!(self.0[0].is_string(), " ", "");
+            write!(f, "{}:{}{}", self.0[0], space, self.0[1])
+        } else {
+            write!(f, "[ ")?;
+            for (i, element) in self.0.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{}", element)?;
             }
-            match element {
-                Value::Array(arr) => fmt_array(f, arr, false)?,
-                other => write!(f, "{}", other)?,
-            }
+            write!(f, " ]")
         }
-        write!(f, " ]")
     }
 }
 
-fn should_use_colon_syntax(is_root_array:bool, elements: &Vec<Value>) -> bool {
+fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
     use Value::*;
-    if !is_root_array && elements.len() == 2 {
+    if elements.len() == 2 {
         match (&elements[0], &elements[1]) {
             // Never if the LHS is one of these (not typically used with colon tuple construction syntax)
             (Bool(_) | Number(_) | Array(_) | Function(_) | Transaction(_) | Network(_), _) => {
