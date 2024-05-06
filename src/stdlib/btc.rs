@@ -1,9 +1,10 @@
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
 
 use miniscript::bitcoin::{
-    self, absolute::LockTime, address, taproot::TaprootSpendInfo, transaction::Version, Address,
-    Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, WitnessProgram,
-    WitnessVersion,
+    self, absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo,
+    transaction::Version, Address, Amount, Network, OutPoint, Script, ScriptBuf, Sequence,
+    Transaction, TxIn, TxOut, Txid, WitnessProgram, WitnessVersion,
 };
 
 use crate::util::DescriptorExt;
@@ -227,4 +228,36 @@ impl TryFrom<Value> for Sequence {
     fn try_from(val: Value) -> Result<Self> {
         Ok(Sequence(val.into_u32()?))
     }
+}
+
+pub fn fmt_script(f: &mut fmt::Formatter, script: &Script, wrap_backticks: bool) -> fmt::Result {
+    use bitcoin::opcodes::{Class, ClassifyContext};
+    use bitcoin::script::Instruction;
+
+    if wrap_backticks {
+        write!(f, "`")?;
+    }
+    for (i, inst) in script.instructions().enumerate() {
+        if i > 0 {
+            write!(f, " ")?;
+        }
+        match inst {
+            Ok(Instruction::PushBytes(push)) => {
+                if push.is_empty() {
+                    write!(f, "<0>")?;
+                } else {
+                    write!(f, "<0x{}>", push.as_bytes().to_lower_hex_string())?;
+                }
+            }
+            Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
+                Class::PushNum(num) => write!(f, "<{}>", num)?,
+                _ => write!(f, "{:?}", opcode)?,
+            },
+            Err(e) => write!(f, "Err({})", e)?,
+        }
+    }
+    if wrap_backticks {
+        write!(f, "`")?;
+    }
+    Ok(())
 }

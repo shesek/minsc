@@ -263,6 +263,9 @@ pub enum RuntimeError {
 
     #[error("Encoding error: {0}")]
     EncodeError(#[from] bitcoin::consensus::encode::Error),
+
+    #[error("Script error: {0}")]
+    ScriptError(#[from] bitcoin::script::Error),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {
