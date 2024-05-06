@@ -1,8 +1,8 @@
 use std::convert::{TryFrom, TryInto};
 
 use miniscript::bitcoin::{
-    absolute::LockTime, address, taproot::TaprootSpendInfo, transaction::Version, Address, Amount,
-    Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, WitnessProgram,
+    self, absolute::LockTime, address, taproot::TaprootSpendInfo, transaction::Version, Address,
+    Amount, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, WitnessProgram,
     WitnessVersion,
 };
 
@@ -20,6 +20,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
     // Functions
     scope.set_fn("address", fns::address).unwrap();
+    scope.set_fn("transaction", fns::transaction).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
 }
@@ -39,13 +40,19 @@ pub mod fns {
             .into())
     }
 
-    /// script(Script|Bytes) -> Script
+    /// script(Bytes|Address) -> Script
     pub fn script(args: Array, _: &Scope) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Script(script) => script.into(),
             Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
             other => bail!(Error::InvalidScriptConstructor(other)),
         })
+    }
+
+    /// transaction(Bytes|TaggedArray|Transaction) -> Transaction
+    pub fn transaction(args: Array, _: &Scope) -> Result<Value> {
+        let tx: Transaction = args.arg_into()?;
+        Ok(tx.into())
     }
 
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
@@ -119,29 +126,36 @@ impl TryFrom<Value> for Address {
     }
 }
 
-// From tagged [ "version": $version, "locktime": $locktime, "inputs": [ .. ], "outputs": [ .. ] ]
 impl TryFrom<Value> for Transaction {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        let mut tx = Transaction {
-            version: Version(2),
-            lock_time: LockTime::ZERO,
-            input: vec![],
-            output: vec![],
-        };
+        Ok(match value {
+            Value::Transaction(tx) => tx,
+            Value::Bytes(bytes) => bitcoin::consensus::deserialize(&bytes)?,
 
-        value.for_each_unique_tag(|tag, val| {
-            match tag {
-                "version" => tx.version = Version::try_from(val)?,
-                "locktime" => tx.lock_time = LockTime::try_from(val)?,
-                "inputs" => tx.input = val.into_vec_of()?,
-                "outputs" => tx.output = val.into_vec_of()?,
-                _ => bail!(Error::TagUnknown),
+            // From tagged [ "version": $version, "locktime": $locktime, "inputs": [ .. ], "outputs": [ .. ] ]
+            Value::Array(_) => {
+                let mut tx = Transaction {
+                    version: Version(2),
+                    lock_time: LockTime::ZERO,
+                    input: vec![],
+                    output: vec![],
+                };
+                value.for_each_unique_tag(|tag, val| {
+                    match tag {
+                        "version" => tx.version = Version::try_from(val)?,
+                        "locktime" => tx.lock_time = LockTime::try_from(val)?,
+                        "inputs" => tx.input = val.into_vec_of()?,
+                        "outputs" => tx.output = val.into_vec_of()?,
+                        _ => bail!(Error::TagUnknown),
+                    }
+                    Ok(())
+                })?;
+                tx
             }
-            Ok(())
-        })?;
 
-        Ok(tx)
+            other => bail!(Error::NotTxLike(other)),
+        })
     }
 }
 

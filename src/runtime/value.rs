@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use bitcoin::{
     hashes, hashes::Hash, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, ScriptBuf,
+    Transaction,
 };
 use miniscript::{bitcoin, DescriptorPublicKey};
 
@@ -26,6 +27,7 @@ pub enum Value {
     // Bitcoin stuff
     Script(ScriptBuf),
     Address(Address),
+    Transaction(Transaction),
     Network(Network),
     PubKey(DescriptorPublicKey),
     Policy(Policy),
@@ -83,6 +85,7 @@ impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(ScriptBuf, Value, Script);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Network, Value);
+impl_from_variant!(Transaction, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl From<Vec<Value>> for Value {
     fn from(vec: Vec<Value>) -> Value {
@@ -174,6 +177,7 @@ impl TryFrom<Value> for Vec<u8> {
             Value::Bytes(bytes) => bytes,
             Value::String(string) => string.into_bytes(),
             Value::Script(script) => script.into_bytes(),
+            Value::Transaction(tx) => bitcoin::consensus::serialize(&tx),
             v => bail!(Error::NotBytesLike(v)),
         })
     }
@@ -295,6 +299,7 @@ impl Value {
             Value::Descriptor(_) => "descriptor",
             Value::Address(_) => "address",
             Value::Script(_) => "script",
+            Value::Transaction(_) => "transaction",
             Value::Function(_) => "function",
             Value::Network(_) => "network",
             Value::TapInfo(_) => "tapinfo",
@@ -355,6 +360,7 @@ impl fmt::Display for Value {
             Value::Address(x) => write!(f, "{}", x),
             Value::Script(x) => write!(f, "{:?}", x),
             Value::Function(x) => write!(f, "{:?}", x),
+            Value::Transaction(x) => write!(f, "{:?}", x),
             Value::Network(x) => write!(f, "{}", x),
             Value::TapInfo(x) => write!(f, "{:?}", x),
         }

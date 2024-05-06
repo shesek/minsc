@@ -87,6 +87,9 @@ pub enum RuntimeError {
     #[error("Expected Script, not {0:?}")]
     NotScript(Value),
 
+    #[error("Expected a transaction as object, raw bytes or tagged list, not {0:?}")]
+    NotTxLike(Value),
+
     #[error("Expected raw Script or Bytes, not {0:?}. Perhaps you meant to use explicitScript()/scriptPubKey()?")]
     InvalidScriptConstructor(Value),
 
@@ -257,6 +260,9 @@ pub enum RuntimeError {
 
     #[error("Invalid address: {0}")]
     AddressError(#[from] bitcoin::address::ParseError),
+
+    #[error("Encoding error: {0}")]
+    EncodeError(#[from] bitcoin::consensus::encode::Error),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {

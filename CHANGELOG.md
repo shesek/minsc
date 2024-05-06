@@ -58,6 +58,8 @@
 
 - New `String` runtime data type
 
+- New `Transaction` runtime data type, constructable via `transaction()` from bytes or tagged arrays.
+
 - New syntax for BTC amounts: `0.5 BTC`. Evaluates to the amount in satoshis. Supports all the [denominations in rust-bitcoin](https://docs.rs/bitcoin/latest/bitcoin/util/amount/enum.Denomination.html) (`BTC`, `mBTC`, `uBTC`, `bits`, `satoshi`/`sat`, `msat`).
 
 - Support child derivation with a hash as the child code index using [Sapio's `hash_to_child_vec` conversion](https://learn.sapio-lang.org/ch05-01-ctv-emulator.html#how-it-works). For example: `pub6AhbqJtv4PXnPfjiFdES7acWysWeaiCQCXeyhAh9KuEMRSNhAUHq9s3Xwu85SbXmt8wAZwpRZFQqWBstcbcvVunvATag4FbmxYYjfRcXZkp/0xd47769f0eab20cd97ad3df71d7849ed21a3c8f49c87e1742635db7d30d8a191f`
@@ -81,6 +83,7 @@
   8. `concat(Array, Array) -> Array`
   9. `le64(Number) -> Bytes` (encode the number as 64 bit little-endian)
   10. `pubkey(Bytes) -> PubKey` (cast a 32/33 long Bytes into a single PubKey)
+  10. `transaction(Bytes|Array) -> Transaction`
   11. `repeat(Number, Function|Value) -> Array`
 
      The second parameter can be a value to fill the array with,
