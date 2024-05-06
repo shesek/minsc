@@ -129,36 +129,50 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if should_use_colon_syntax(&self.0) {
-            // Display 2-tuples using the A:B colon construction syntax
-            let space = iif!(self.0[0].is_string(), " ", "");
-            write!(f, "{}:{}{}", self.0[0], space, self.0[1])
-        } else {
-            write!(f, "[ ")?;
-            for (i, element) in self.0.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{}", element)?;
-            }
-            write!(f, " ]")
-        }
+        // Called with is_root_array=true to avoid the colon syntax for top-level arrays,
+        // then recurses internally without it.
+        fmt_array(f, self, true)
     }
 }
 
-fn should_use_colon_syntax(items: &Vec<Value>) -> bool {
-    // XXX avoid for top-level lists?
+fn fmt_array(f: &mut fmt::Formatter, arr: &Array, is_root_array: bool) -> fmt::Result {
+    if should_use_colon_syntax(is_root_array, &arr.0) {
+        // Display 2-tuples using the A:B colon construction syntax
+        let space = iif!(arr.0[0].is_string(), " ", "");
+        write!(f, "{}:{}{}", arr.0[0], space, arr.0[1])
+    } else {
+        write!(f, "[ ")?;
+        for (i, element) in arr.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            match element {
+                Value::Array(arr) => fmt_array(f, arr, false)?,
+                other => write!(f, "{}", other)?,
+            }
+        }
+        write!(f, " ]")
+    }
+}
+
+fn should_use_colon_syntax(is_root_array:bool, elements: &Vec<Value>) -> bool {
     use Value::*;
-    if items.len() == 2 {
-        let (lhs, rhs) = (&items[0], &items[1]);
-        match lhs {
+    if !is_root_array && elements.len() == 2 {
+        match (&elements[0], &elements[1]) {
             // Never if the LHS is one of these (not typically used with colon tuple construction syntax)
-            Bool(_) | Number(_) | Array(_) | Function(_) | Transaction(_) | Network(_) => false,
+            (Bool(_) | Number(_) | Array(_) | Function(_) | Transaction(_) | Network(_), _) => {
+                false
+            }
+
             // Always if the LHS is a string (typically used as a key name for tagged lists)
-            String(_) => true,
-            // Only if the LHS and RHS are of different types
-            Bytes(_) | Script(_) | Address(_) | PubKey(_) | Policy(_) | Descriptor(_)
-            | TapInfo(_) | WithProb(..) => mem::discriminant(lhs) != mem::discriminant(rhs),
+            (String(_), _) => true,
+
+            // Otherwise, only if the LHS and RHS are of different types
+            (
+                lhs @ (Bytes(_) | Script(_) | Address(_) | PubKey(_) | Policy(_) | Descriptor(_)
+                | TapInfo(_) | WithProb(..)),
+                rhs,
+            ) => mem::discriminant(lhs) != mem::discriminant(rhs),
         }
     } else {
         false
