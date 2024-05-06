@@ -1,5 +1,5 @@
 use std::convert::{TryFrom, TryInto};
-use std::{fmt, iter, ops, vec};
+use std::{fmt, iter, mem, ops, vec};
 
 use crate::runtime::{Error, FromValue, Result, Value};
 
@@ -129,9 +129,8 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.0.len() == 2 && !should_avoid_colon_format(&self.0[0]) {
+        if should_use_colon_syntax(&self.0) {
             // Display 2-tuples using the A:B colon construction syntax
-            // XXX avoid colons for the top-level array display?
             let space = iif!(self.0[0].is_string(), " ", "");
             write!(f, "{}:{}{}", self.0[0], space, self.0[1])
         } else {
@@ -147,7 +146,21 @@ impl fmt::Display for Array {
     }
 }
 
-fn should_avoid_colon_format(lhs: &Value) -> bool {
+fn should_use_colon_syntax(items: &Vec<Value>) -> bool {
+    // XXX avoid for top-level lists?
     use Value::*;
-    matches!(lhs, Array(_) | Function(_) | TapInfo(_) | Transaction(_))
+    if items.len() == 2 {
+        let (lhs, rhs) = (&items[0], &items[1]);
+        match lhs {
+            // Never if the LHS is one of these (not typically used with colon tuple construction syntax)
+            Bool(_) | Number(_) | Array(_) | Function(_) | Transaction(_) | Network(_) => false,
+            // Always if the LHS is a string (typically used as a key name for tagged lists)
+            String(_) => true,
+            // Only if the LHS and RHS are of different types
+            Bytes(_) | Script(_) | Address(_) | PubKey(_) | Policy(_) | Descriptor(_)
+            | TapInfo(_) | WithProb(..) => mem::discriminant(lhs) != mem::discriminant(rhs),
+        }
+    } else {
+        false
+    }
 }
