@@ -34,6 +34,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
 
+    scope.set_fn("debug", fns::debug).unwrap();
     scope.set_fn("env", fns::env).unwrap();
     scope.set_fn("locals", fns::locals).unwrap();
 
@@ -162,6 +163,11 @@ pub mod fns {
         let bytes: Vec<u8> = args.arg_into()?;
         let hash = sha256::Hash::hash(&bytes);
         Ok(hash.into())
+    }
+
+    /// Get the Debug representation of the Value
+    pub fn debug(args: Array, _: &Scope) -> Result<Value> {
+        Ok(format!("{:?}", args.arg_into::<Value>()?).into())
     }
 
     /// Get variables from the local scope
