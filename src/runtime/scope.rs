@@ -82,6 +82,7 @@ impl<'a> Scope<'a> {
             }
             scope = match scope.parent {
                 None => break,
+                // skip the top-level root scope when max_depth==-1
                 Some(scope) if max_depth == -1 && scope.parent.is_none() => break,
                 Some(scope) => scope,
             };

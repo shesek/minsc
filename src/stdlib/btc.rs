@@ -30,7 +30,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 pub mod fns {
     use super::*;
     /// Generate an address
-    /// address(Script|Descriptor|PubKey|TapInfo|String|Address) -> Address
+    /// address(Script|Descriptor|PubKey|TapInfo|String|Address, Network=Signet) -> Address
     pub fn address(args: Array, _: &Scope) -> Result<Value> {
         let (spk, network): (Value, Option<Network>) = args.args_into()?;
         let spk = spk.into_spk()?;
@@ -75,21 +75,24 @@ impl Value {
             // Raw scripts are returned as-is
             Value::Script(script) => script,
             // Descriptors (or values coercible into them) are converted into their scriptPubKey
-            v @ Value::Descriptor(_) | v @ Value::PubKey(_) => v.into_desc()?.to_script_pubkey()?,
+            Value::Descriptor(_) | Value::PubKey(_) => self.into_desc()?.to_script_pubkey()?,
             // TapInfo returns the output V1 witness program of the output key
             Value::TapInfo(tapinfo) => ScriptBuf::new_witness_program(&WitnessProgram::new(
                 WitnessVersion::V1,
                 &tapinfo.output_key().serialize(),
             )?),
             // Addresses can be provided as an Address or String
-            v @ Value::Address(_) | v @ Value::String(_) => v.into_address()?.script_pubkey(),
-            v => bail!(Error::NoSpkRepr(v)),
+            Value::Address(_) | Value::String(_) => self.into_address()?.script_pubkey(),
+            other => bail!(Error::NoSpkRepr(other)),
         })
     }
     pub fn into_address(self) -> Result<Address> {
         self.try_into()
     }
     pub fn into_tapinfo(self) -> Result<TaprootSpendInfo> {
+        self.try_into()
+    }
+    pub fn into_tx(self) -> Result<Transaction> {
         self.try_into()
     }
     pub fn is_script(&self) -> bool {
@@ -257,7 +260,7 @@ pub fn fmt_script<W: fmt::Write>(f: &mut W, script: &Script, wrap_backticks: boo
                 if push.is_empty() {
                     write!(f, "<0>")?;
                 } else {
-                    write!(f, "<0x{}>", push.as_bytes().to_lower_hex_string())?;
+                    write!(f, "<0x{}>", push.as_bytes().as_hex())?;
                 }
             }
             Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
@@ -297,7 +300,7 @@ pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
             if !input.witness.is_empty() {
                 write!(f, r#", "witness": "#)?;
                 fmt_list(f, &mut input.witness.iter(), |f, wit_item: &[u8]| {
-                    write!(f, "0x{}", wit_item.to_lower_hex_string())
+                    write!(f, "0x{}", wit_item.as_hex())
                 })?;
             }
             Ok(())

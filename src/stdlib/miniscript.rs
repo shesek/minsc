@@ -34,6 +34,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("wpkh", fns::wpkh).unwrap();
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
+    // tr() is also available, defined in taproot.rs
 
     // Descriptor functions (non-Miniscript)
     scope.set_fn("pubkey", fns::pubkey).unwrap();
@@ -67,11 +68,9 @@ pub mod fns {
     pub fn or(args: Array, _: &Scope) -> Result<Value> {
         Ok(Policy::Or(into_prob_policies(args)?).into())
     }
-
     pub fn and(args: Array, _: &Scope) -> Result<Value> {
         Ok(Policy::And(into_policies(args)?).into())
     }
-
     pub fn thresh(args: Array, _: &Scope) -> Result<Value> {
         let args = args.check_varlen(2, usize::MAX)?;
         let is_array_call = args.len() == 2 && args[1].is_array();
@@ -90,13 +89,12 @@ pub mod fns {
     }
 
     pub fn older(args: Array, _: &Scope) -> Result<Value> {
-        let locktime: u32 = args.arg_into()?;
-        Ok(Policy::Older(Sequence(locktime)).into())
+        let locktime = Sequence(args.arg_into()?);
+        Ok(Policy::Older(locktime).into())
     }
-
     pub fn after(args: Array, _: &Scope) -> Result<Value> {
-        let locktime: u32 = args.arg_into()?;
-        Ok(Policy::After(AbsLockTime::from_consensus(locktime).into()).into())
+        let locktime = AbsLockTime::from_consensus(args.arg_into()?);
+        Ok(Policy::After(locktime).into())
     }
 
     pub fn pk(args: Array, _: &Scope) -> Result<Value> {
@@ -109,7 +107,6 @@ pub mod fns {
     pub fn hash256(args: Array, _: &Scope) -> Result<Value> {
         Ok(Policy::Hash256(args.arg_into()?).into())
     }
-
     pub fn ripemd160(args: Array, _: &Scope) -> Result<Value> {
         Ok(Policy::Ripemd160(args.arg_into()?).into())
     }
@@ -117,7 +114,7 @@ pub mod fns {
         Ok(Policy::Hash160(args.arg_into()?).into())
     }
 
-    // Key -> Descriptor::Wpkh
+    // wpkh(PubKey) -> Descriptor::Wpkh
     pub fn wpkh(args: Array, _: &Scope) -> Result<Value> {
         Ok(Descriptor::new_wpkh(args.arg_into()?)?.into())
     }

@@ -97,7 +97,7 @@ impl Evaluate for ast::Call {
         func.call(args, scope).map_err(|e| {
             // Use the function name used by the caller if the function was accessed using a simple
             // identifier. Otherwise, use the name associated with the Function itself (only available
-            // for user functions defined using a named fn statement, not for closures or native).
+            // for user functions defined using a named fn statement, not for anonymous or native).
             let ident = self.func.as_ident().or_else(|| func.ident());
             Error::CallError(ident.cloned(), e.into())
         })

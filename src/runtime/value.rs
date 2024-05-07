@@ -33,7 +33,7 @@ pub enum Value {
     Policy(Policy),
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
-    WithProb(usize, Box<Value>),
+    WithProb(usize, Box<Value>), // Policy/Script with an associated execution probability (the `@` operator)
 
     // A unique Symbol
     Symbol(Symbol),
@@ -220,7 +220,7 @@ impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
 impl_hash_conv!(miniscript::hash256::Hash);
 
-/// Generic conversion from a Value/Option<Value> into T/Option<T> of any FromValue type.
+/// Generic conversion from a Value/Option<Value> into T/Option<T> of any TryFrom<Value> type.
 ///
 /// Used to support types that can be either required or optional (for example by into_tagged()).
 /// Must use a new trait because TryFrom<Option<Value>> would violate the orphan rule.
@@ -381,7 +381,7 @@ impl fmt::Display for Value {
             Value::PubKey(x) => write!(f, "{}", x),
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
-            Value::Bytes(x) => write!(f, "0x{}", x.to_lower_hex_string()),
+            Value::Bytes(x) => write!(f, "0x{}", x.as_hex()),
             Value::String(x) => write!(f, "\"{}\"", escape_str(x)),
             Value::Array(x) => write!(f, "{}", x),
             Value::Policy(x) => write!(f, "{}", x),

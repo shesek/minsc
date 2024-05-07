@@ -27,7 +27,7 @@ pub mod fns {
     use super::*;
     use crate::runtime::Array;
 
-    /// ctvHash(Array tx, Number input_index=0) -> Hash
+    /// ctvHash(Array|Transaction tx, Number input_index=0) -> Hash
     ///
     /// Example: ctvHash([ "version": 1, "outputs": [ $bob_pk: 10000 sats, $alice_pk: 25000 sats ] ])
     pub fn ctvHash(args: Array, _: &Scope) -> Result<Value> {
