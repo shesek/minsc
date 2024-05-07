@@ -370,12 +370,12 @@ pub fn fmt_tapinfo<W: fmt::Write>(f: &mut W, tapinfo: &TaprootSpendInfo) -> fmt:
     if !script_map.is_empty() {
         write!(f, ", ",)?;
         if script_map.len() > 1 {
-            fmt_list(f, script_map.into_iter(), |f, ((script, _leaf_ver), _)| {
+            fmt_list(f, script_map.into_iter(), true, |f, ((script, _), _)| {
                 //write!(f, "{:?}:", leaf_ver)?;
                 stdlib::btc::fmt_script(f, script, true)
             })?;
         } else {
-            let ((script, _leaf_ver), _) = script_map.first_key_value().unwrap();
+            let ((script, _), _) = script_map.first_key_value().unwrap();
             stdlib::btc::fmt_script(f, script, true)?;
         }
         if script_map.len() > 2 {

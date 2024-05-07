@@ -323,23 +323,31 @@ pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
 }
 
 /// Utility for formatting comma-separated lists of things
-pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, f: F) -> fmt::Result
+pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, as_array: bool, f: F) -> fmt::Result
 where
     W: fmt::Write,
     I: Iterator<Item = T>,
     F: Fn(&mut W, T) -> fmt::Result,
 {
     let mut was_empty = true;
-    write!(w, "[ ")?;
+    if as_array {
+        write!(w, "[ ")?;
+    }
     for (i, item) in iter.enumerate() {
         if i > 0 {
-            write!(w, ", ")?;
+            if as_array {
+                write!(w, ",")?;
+            }
+            write!(w, " ")?;
         }
         f(w, item)?;
         was_empty = false;
     }
-    if !was_empty {
-        write!(w, " ")?;
+    if as_array {
+        if !was_empty {
+            write!(w, " ")?;
+        }
+        write!(w, "]")?;
     }
-    write!(w, "]")
+    Ok(())
 }

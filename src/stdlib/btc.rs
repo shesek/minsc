@@ -251,25 +251,20 @@ pub fn fmt_script<W: fmt::Write>(f: &mut W, script: &Script, wrap_backticks: boo
     if wrap_backticks {
         write!(f, "`")?;
     }
-    for (i, inst) in script.instructions().enumerate() {
-        if i > 0 {
-            write!(f, " ")?;
-        }
-        match inst {
-            Ok(Instruction::PushBytes(push)) => {
-                if push.is_empty() {
-                    write!(f, "<0>")?;
-                } else {
-                    write!(f, "<0x{}>", push.as_bytes().as_hex())?;
-                }
+    fmt_list(f, script.instructions(), false, |f, inst| match inst {
+        Ok(Instruction::PushBytes(push)) => {
+            if push.is_empty() {
+                write!(f, "<0>")
+            } else {
+                write!(f, "<0x{}>", push.as_bytes().as_hex())
             }
-            Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
-                Class::PushNum(num) => write!(f, "<{}>", num)?,
-                _ => write!(f, "{:?}", opcode)?,
-            },
-            Err(e) => write!(f, "Err({})", e)?,
         }
-    }
+        Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
+            Class::PushNum(num) => write!(f, "<{}>", num),
+            _ => write!(f, "{:?}", opcode),
+        },
+        Err(e) => write!(f, "Err({})", e),
+    })?;
     if wrap_backticks {
         write!(f, "`")?;
     }
@@ -282,7 +277,7 @@ pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
         r#"Transaction([ "version": {}, "locktime": {}, "inputs": "#,
         tx.version.0, tx.lock_time
     )?;
-    fmt_list(f, &mut tx.input.iter(), |f, input| {
+    fmt_list(f, &mut tx.input.iter(), true, |f, input| {
         if input.sequence == Sequence::default()
             && input.script_sig == ScriptBuf::default()
             && input.witness.is_empty()
@@ -299,7 +294,7 @@ pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
             }
             if !input.witness.is_empty() {
                 write!(f, r#", "witness": "#)?;
-                fmt_list(f, &mut input.witness.iter(), |f, wit_item: &[u8]| {
+                fmt_list(f, &mut input.witness.iter(), true, |f, wit_item: &[u8]| {
                     write!(f, "0x{}", wit_item.as_hex())
                 })?;
             }
@@ -307,7 +302,7 @@ pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
         }
     })?;
     write!(f, r#", "outputs": "#)?;
-    fmt_list(f, tx.output.iter(), |f, output| {
+    fmt_list(f, tx.output.iter(), true, |f, output| {
         if let Ok(address) = Address::from_script(&output.script_pubkey, Network::Signet) {
             // FIXME always uses the Signet version bytes
             write!(f, "{}", address)?;
