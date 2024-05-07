@@ -160,20 +160,24 @@ impl TryFrom<Value> for Transaction {
     }
 }
 
-// From tagged [ "prevout": $txid:$vout, "sequence": $sequence ] or just the $txid:vout
+// From tagged [ "prevout": $txid:$vout, "sequence": $sequence, "script_sig": `0x00 0x01`, "witness": [ .. ] ]
+//  or just the $txid:vout
 impl TryFrom<Value> for TxIn {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        let (previous_output, sequence) = if value.is_tagged_or_empty() {
-            value.tagged_into2_default("prevout", "sequence")?
+        use Default as D;
+
+        let (previous_output, sequence, script_sig, witness) = if value.is_tagged_or_empty() {
+            value.tagged_into4_default("prevout", "sequence", "script_sig", "witness")?
         } else {
-            (OutPoint::try_from(value)?, Sequence::default())
+            (value.try_into()?, D::default(), D::default(), D::default())
         };
 
         Ok(TxIn {
             previous_output,
             sequence,
-            ..Default::default()
+            script_sig,
+            witness,
         })
     }
 }
@@ -227,6 +231,13 @@ impl TryFrom<Value> for Sequence {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(Sequence(val.into_u32()?))
+    }
+}
+impl TryFrom<Value> for bitcoin::Witness {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        let items = val.map_array(Value::into_bytes)?;
+        Ok(bitcoin::Witness::from_slice(&items))
     }
 }
 
