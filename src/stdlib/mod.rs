@@ -23,7 +23,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Functions
     scope.set_fn("typeof", fns::r#typeof).unwrap();
     scope.set_fn("len", fns::len).unwrap();
-    scope.set_fn("reduce", fns::reduce).unwrap();
+    scope.set_fn("fold", fns::fold).unwrap();
     scope.set_fn("repeat", fns::repeat).unwrap();
 
     scope.set_fn("int", fns::int).unwrap();
@@ -86,14 +86,16 @@ pub mod fns {
         .into())
     }
 
-    /// reduce(Array, Value, Function) -> Value
-    pub fn reduce(args: Array, scope: &Scope) -> Result<Value> {
-        let (array, mut current_val, callback): (Array, Value, Function) = args.args_into()?;
+    /// fold(Array, Value, Function) -> Value
+    /// Fold each element in the Array through the Function, starting with Value as the initial value
+    pub fn fold(args: Array, scope: &Scope) -> Result<Value> {
+        let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
+        let mut accumlator = init_val;
 
         for element in array.into_iter() {
-            current_val = callback.call(vec![current_val, element], scope)?;
+            accumlator = callback.call(vec![accumlator, element], scope)?;
         }
-        Ok(current_val)
+        Ok(accumlator)
     }
 
     /// repeat(Number, Value) -> Array<Value>
