@@ -7,7 +7,7 @@ use miniscript::bitcoin::{
     Transaction, TxIn, TxOut, Txid, WitnessProgram, WitnessVersion,
 };
 
-use crate::util::DescriptorExt;
+use crate::util::{fmt_list, DescriptorExt};
 
 use crate::runtime::{Array, Error, Result, Scope, Value};
 pub fn attach_stdlib(scope: &mut Scope) {
@@ -271,4 +271,47 @@ pub fn fmt_script<W: fmt::Write>(f: &mut W, script: &Script, wrap_backticks: boo
         write!(f, "`")?;
     }
     Ok(())
+}
+
+pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
+    write!(
+        f,
+        r#"Transaction([ "version": {}, "locktime": {}, "inputs": "#,
+        tx.version.0, tx.lock_time
+    )?;
+    fmt_list(f, &mut tx.input.iter(), |f, input| {
+        if input.sequence == Sequence::default()
+            && input.script_sig == ScriptBuf::default()
+            && input.witness.is_empty()
+        {
+            write!(f, "{}", input.previous_output)
+        } else {
+            write!(f, r#"[ "prevout": {}"#, input.previous_output)?;
+            if input.sequence != Sequence::default() {
+                write!(f, r#", "sequence": {}"#, input.sequence)?;
+            }
+            if input.script_sig != ScriptBuf::default() {
+                write!(f, r#", "script_sig": "#)?;
+                fmt_script(f, &input.script_sig, true)?;
+            }
+            if !input.witness.is_empty() {
+                write!(f, r#", "witness": "#)?;
+                fmt_list(f, &mut input.witness.iter(), |f, wit_item: &[u8]| {
+                    write!(f, "0x{}", wit_item.to_lower_hex_string())
+                })?;
+            }
+            Ok(())
+        }
+    })?;
+    write!(f, r#", "outputs": "#)?;
+    fmt_list(f, tx.output.iter(), |f, output| {
+        if let Ok(address) = Address::from_script(&output.script_pubkey, Network::Signet) {
+            // FIXME always uses the Signet version bytes
+            write!(f, "{}", address)?;
+        } else {
+            fmt_script(f, &output.script_pubkey, true)?;
+        }
+        write!(f, r#": {} BTC"#, output.value.to_btc())
+    })?;
+    write!(f, " ])")
 }

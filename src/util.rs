@@ -1,3 +1,4 @@
+use std::fmt;
 use std::marker::PhantomData;
 
 use bitcoin::bip32::{ChildNumber, IntoDerivationPath};
@@ -319,4 +320,26 @@ pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
             .into(),
     );
     c
+}
+
+/// Utility for formatting comma-separated lists of things
+pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, f: F) -> fmt::Result
+where
+    W: fmt::Write,
+    I: Iterator<Item = T>,
+    F: Fn(&mut W, T) -> fmt::Result,
+{
+    let mut was_empty = true;
+    write!(w, "[ ")?;
+    for (i, item) in iter.enumerate() {
+        if i > 0 {
+            write!(w, ", ")?;
+        }
+        f(w, item)?;
+        was_empty = false;
+    }
+    if !was_empty {
+        write!(w, " ")?;
+    }
+    write!(w, "]")
 }

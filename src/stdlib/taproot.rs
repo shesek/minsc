@@ -9,7 +9,7 @@ use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
 use super::miniscript::into_policies;
 use crate::runtime::{Array, Error, Result, Scope, Value};
-use crate::util::EC;
+use crate::util::{fmt_list, EC};
 use crate::{stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &mut Scope) {
@@ -370,24 +370,20 @@ pub fn fmt_tapinfo<W: fmt::Write>(f: &mut W, tapinfo: &TaprootSpendInfo) -> fmt:
     if !script_map.is_empty() {
         write!(f, ", ",)?;
         if script_map.len() > 1 {
-            write!(f, "[",)?;
-        }
-        for (i, ((script, _leaf_ver), _)) in script_map.into_iter().enumerate() {
-            if i > 0 {
-                write!(f, ", ")?;
-            }
-            //write!(f, "{:?}:", leaf_ver)?;
+            fmt_list(f, script_map.into_iter(), |f, ((script, _leaf_ver), _)| {
+                //write!(f, "{:?}:", leaf_ver)?;
+                stdlib::btc::fmt_script(f, script, true)
+            })?;
+        } else {
+            let ((script, _leaf_ver), _) = script_map.first_key_value().unwrap();
             stdlib::btc::fmt_script(f, script, true)?;
         }
-        if script_map.len() > 1 {
-            write!(f, "]")?;
-            if script_map.len() > 2 {
-                // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
-                // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
-                // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
-                // FIXME deduct the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
-                write!(f, "(not tree)")?;
-            }
+        if script_map.len() > 2 {
+            // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
+            // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
+            // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
+            // FIXME deduce the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
+            write!(f, "(not tree)")?;
         }
     }
     write!(f, ")")

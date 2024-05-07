@@ -345,6 +345,10 @@ impl Value {
         self.try_into()
     }
 
+    pub fn map_array<T, F: Fn(Value) -> Result<T>>(self, f: F) -> Result<Vec<T>> {
+        self.into_array()?.into_iter().map(f).collect()
+    }
+
     /// Transform Array elements into a Vec<T> of any FromValue type
     pub fn into_vec_of<T: FromValue>(self) -> Result<Vec<T>> {
         self.try_into()
@@ -384,9 +388,9 @@ impl fmt::Display for Value {
             Value::Descriptor(x) => write!(f, "{}", x), // not round-trip-able for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
             Value::Address(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
-            Value::Transaction(x) => write!(f, "{:?}", x), // not round-trip-able
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
+            Value::Transaction(x) => stdlib::btc::fmt_tx(f, x),
             Value::Script(x) => stdlib::btc::fmt_script(f, x, true),
             Value::TapInfo(x) => stdlib::taproot::fmt_tapinfo(f, x), // not round-trip-able for >2 scripts
         }
