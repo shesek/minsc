@@ -38,7 +38,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Development utilities
     scope.set_fn("debug", fns::debug).unwrap();
     scope.set_fn("env", fns::env).unwrap();
-    scope.set_fn("locals", fns::locals).unwrap();
 
     // Constants
     scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
@@ -176,21 +175,19 @@ pub mod fns {
 
     /// Get the Debug representation of the Value
     pub fn debug(args: Array, _: &Scope) -> Result<Value> {
-        Ok(format!("{:?}", args.arg_into::<Value>()?).into())
+        let debug_str = format!("{:?}", args.arg_into::<Value>()?);
+        // Uses Symbol as a hack to enable syntax highlighting for debug_str in the web playground.
+        // This works because the Value's Display returns Symbol strings as-is, with no quoting or escaping.
+        // This is a serious misuse of what Symbols are meant for, but I guess it works >.<
+        Ok(Symbol::new(Some(debug_str)).into())
     }
 
-    /// Get variables from the local scope
-    /// locals() -> Array<(String, Value)>
-    pub fn locals(args: Array, scope: &Scope) -> Result<Value> {
-        args.no_args()?;
-        Ok(Array(scope.locals().into_iter().map(format_var).collect()).into())
-    }
-
-    /// Get the entire env from the local and parent scopes
-    /// env(include_root=false) -> Array<(String, Value)>
+    /// Get env vars from the local and parent scopes
+    /// env(max_depth=1) -> Array<(String, Value)>
     pub fn env(args: Array, scope: &Scope) -> Result<Value> {
-        let inc_root = args.arg_into::<Option<bool>>()?.unwrap_or_default();
-        Ok(Array(scope.env(inc_root).into_iter().map(format_var).collect()).into())
+        // Set to -1 by default, which will return everything but the root scope
+        let max_depth = args.arg_into::<Option<isize>>()?.unwrap_or(-1);
+        Ok(Array(scope.env(max_depth).into_iter().map(format_var).collect()).into())
     }
 
     fn format_var((ident, val): (&Ident, &Value)) -> Value {

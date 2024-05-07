@@ -18,12 +18,14 @@ impl<'a> Scope<'a> {
         scope
     }
 
+    /// Search the local and parent scope recursively for `key`
     pub fn get(&self, key: &Ident) -> Option<&Value> {
         self.local
             .get(key)
             .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
     }
 
+    /// Set a local variable
     pub fn set<K: Into<Ident>, V: Into<Value>>(&mut self, key: K, value: V) -> Result<()> {
         let key = key.into();
 
@@ -55,23 +57,32 @@ impl<'a> Scope<'a> {
         }
     }
 
-    /// Get variables from the local scope
-    pub fn locals(&self) -> &HashMap<Ident, Value> {
-        &self.local
-    }
-
     /// Get the entire env from the local and parent scopes
-    pub fn env(&self, include_root: bool) -> Vec<(&Ident, &Value)> {
-        // env returned as a Vec to retain order, with variables from inner scopes appearing first
+    ///
+    /// max_depth can be set to limit the number of scopes included. It may be set to 0
+    /// to return everything or to -1 to return everything but the top-level global scope.
+    pub fn env(&self, max_depth: isize) -> Vec<(&Ident, &Value)> {
+        // env returned as a Vec to retain order, with variables from inner scopes appearing first,
+        // then sorted by key name to retain deterministic order
         let mut env = vec![];
+        let mut depth = 0;
         let mut seen_keys = HashSet::new();
         let mut scope = self;
         loop {
-            env.extend(scope.local.iter().filter(|(i, _)| seen_keys.insert(*i)));
+            // Collect new vars from the current scope
+            let locals = scope.local.iter();
+            let mut new_vars: Vec<_> = locals.filter(|(key, _)| seen_keys.insert(*key)).collect();
+            new_vars.sort_unstable_by_key(|&(key, _)| key);
+            env.append(&mut new_vars);
 
+            // Continue to the parent scope, unless the max_depth limit was reached
+            depth += 1;
+            if depth == max_depth {
+                break;
+            }
             scope = match scope.parent {
                 None => break,
-                Some(scope) if !include_root && scope.parent.is_none() => break,
+                Some(scope) if max_depth == -1 && scope.parent.is_none() => break,
                 Some(scope) => scope,
             };
         }

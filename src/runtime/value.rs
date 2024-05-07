@@ -173,11 +173,12 @@ macro_rules! impl_int_num_conv {
         }
     };
 }
-impl_int_num_conv!(i64, into_i64);
-impl_int_num_conv!(usize, into_usize);
 impl_int_num_conv!(u32, into_u32);
 impl_int_num_conv!(u64, into_u64);
+impl_int_num_conv!(usize, into_usize);
 impl_int_num_conv!(i32, into_i32);
+impl_int_num_conv!(i64, into_i64);
+impl_int_num_conv!(isize, into_isize);
 
 // From Value to Vec<u8>
 impl TryFrom<Value> for Vec<u8> {

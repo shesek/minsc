@@ -88,7 +88,7 @@ pub struct Thresh {
 impl_from_variant!(Thresh, Expr);
 
 /// A terminal word expression
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Ident(pub String);
 impl_from_variant!(Ident, Expr);
 impl From<&str> for Ident {
