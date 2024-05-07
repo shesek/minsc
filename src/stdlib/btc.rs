@@ -186,7 +186,7 @@ impl TryFrom<Value> for TxIn {
 impl TryFrom<Value> for TxOut {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        let (spk, amount): (Value, Amount) = val.tagged_or_tuple("scriptPubKey", "amount")?;
+        let (spk, amount): (Value, Amount) = val.tagged_or_tuple("script_pubkey", "amount")?;
         Ok(TxOut {
             script_pubkey: spk.into_spk()?,
             value: amount,
