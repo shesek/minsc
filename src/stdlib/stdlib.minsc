@@ -28,13 +28,13 @@ fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
 fn range($start, $end) = repeat(($end-$start)+1, |$n| $start+$n);
 fn keys($arr) = range(0, len($arr) - 1);
-fn slice($arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $arr.$n);
+fn slice($sl$arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $sl$arr.$n);
 fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 
-fn flatMap($arr, $$fn) = reduce($arr, [], |$acc, $el| $acc + $$fn($el));
-fn map($arr, $$fn) = flatMap($arr, |$el| [ $$fn($el) ]);
-fn filter($arr, $$fn) = flatMap($arr, |$el| if $$fn($el) then [ $el ] else [ ]);
+fn flatMap($arr, $flatmap$fn) = reduce($arr, [], |$acc, $el| $acc + $flatmap$fn($el));
+fn map($arr, $map$fn) = flatMap($arr, |$el| [ $map$fn($el) ]);
+fn filter($arr, $filter$fn) = flatMap($arr, |$el| if $filter$fn($el) then [ $el ] else [ ]);
 
 //
 // Altstack utilities
