@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use ::miniscript::bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Symbol, Value};
@@ -24,6 +26,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("typeof", fns::r#typeof).unwrap();
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("fold", fns::fold).unwrap();
+    scope.set_fn("foldUntil", fns::foldUntil).unwrap();
     scope.set_fn("fillArray", fns::fillArray).unwrap();
 
     scope.set_fn("int", fns::int).unwrap();
@@ -94,6 +97,24 @@ pub mod fns {
 
         for element in array.into_iter() {
             accumlator = callback.call(vec![accumlator, element], scope)?;
+        }
+        Ok(accumlator)
+    }
+
+    /// foldUntil(Array, Value, Function) -> Value
+    /// Like fold(), with support for early termination. The callback can return a `false:$new_val` tuple
+    /// to update the accumulated value and continue, or `true:$new_val` to return `$new_val` immediately.
+    pub fn foldUntil(args: Array, scope: &Scope) -> Result<Value> {
+        let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
+        let mut accumlator = init_val;
+
+        for element in array.into_iter() {
+            let callback_ret = callback.call(vec![accumlator, element], scope)?;
+            let (found, new_val): (bool, _) = callback_ret.try_into()?;
+            accumlator = new_val;
+            if found {
+                break;
+            }
         }
         Ok(accumlator)
     }
