@@ -49,7 +49,7 @@ impl Array {
     }
 
     /// Unpack function arguments into a tuple or vec. Like try_into(), but with a
-    /// wrapper error type to indicate the error was related to argument parsing.
+    /// wrapper error type to indicate the error was related to the arguments.
     /// Supports optional arguments by specifying an Option<T> as the return type.
     pub fn args_into<T: TryFrom<Array>>(self) -> Result<T>
     where
@@ -77,13 +77,24 @@ pub trait IterValueInto: Iterator<Item = Value> + Sized {
     fn next_into<T: FromValue>(&mut self) -> Result<T> {
         T::from_opt_value(self.next())
     }
+
+    /// Wraps errors with Error::NthContext to tell which argument/element index they originated from.
+    /// Note this always returns the next value like next_into(), `index` is purely for error display.
+    fn nth_into<T: FromValue>(&mut self, index: usize) -> Result<T> {
+        self.next_into()
+            .map_err(|e| Error::NthContext(index, e.into()))
+    }
 }
 impl<I: Iterator<Item = Value>> IterValueInto for I {}
 
 // Allows collect()ing an Iterator over Values into a Vec of any FromValue type
 impl<T: FromValue> iter::FromIterator<Value> for Result<Vec<T>> {
     fn from_iter<I: iter::IntoIterator<Item = Value>>(iter: I) -> Self {
-        iter.into_iter().map(T::from_value).collect()
+        iter.into_iter()
+            .enumerate()
+            .map(|(i, val)| T::from_value(val).map_err(|e| Error::NthContext(i, e.into())))
+            .collect()
+        //iter.into_iter().map(T::from_value).collect()
     }
 }
 
@@ -104,7 +115,7 @@ impl<A: FromValue> TryFrom<Array> for (A,) {
         let min_len = A::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 1)?.into_iter();
 
-        Ok((iter.next_into()?,))
+        Ok((iter.nth_into(0)?,))
     }
 }
 impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
@@ -113,7 +124,7 @@ impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
         let min_len = A::is_required() as usize + B::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 2)?.into_iter();
 
-        Ok((iter.next_into()?, iter.next_into()?))
+        Ok((iter.nth_into(0)?, iter.nth_into(1)?))
     }
 }
 impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
@@ -123,7 +134,7 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
             A::is_required() as usize + B::is_required() as usize + C::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 3)?.into_iter();
 
-        Ok((iter.next_into()?, iter.next_into()?, iter.next_into()?))
+        Ok((iter.nth_into(0)?, iter.nth_into(1)?, iter.nth_into(2)?))
     }
 }
 
