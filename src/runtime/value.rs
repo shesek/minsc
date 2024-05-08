@@ -412,11 +412,17 @@ impl fmt::Display for Number {
 }
 
 fn escape_str(str: &str) -> String {
-    str.bytes()
-        .into_iter()
-        .flat_map(core::ascii::escape_default)
-        .map(char::from)
-        .collect()
+    let mut escaped = String::with_capacity(str.len());
+    for char in str.chars() {
+        match char {
+            '\r' => escaped.push_str("\\r"),
+            '\n' => escaped.push_str("\\n"),
+            '\t' => escaped.push_str("\\t"),
+            '"' => escaped.push_str("\\\""),
+            _ => escaped.push(char),
+        };
+    }
+    escaped
 }
 
 // Symbol
