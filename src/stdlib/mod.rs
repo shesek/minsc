@@ -126,15 +126,14 @@ pub mod fns {
     /// Return an array of the specified size, using the callback function to produce values
     pub fn fillArray(args: Array, scope: &Scope) -> Result<Value> {
         let (num, producer): (usize, Value) = args.args_into()?;
-        Ok(Value::array(
-            (0..num)
-                .map(|n| match &producer {
-                    // The callback is called with the iteration index as an argument
-                    Value::Function(callback) => callback.call(vec![n.into()], scope),
-                    other => Ok(other.clone()),
-                })
-                .collect::<Result<_>>()?,
-        ))
+        Ok(match producer {
+            Value::Function(callback) => Value::array(
+                (0..num)
+                    .map(|n| callback.call(vec![n.into()], scope))
+                    .collect::<Result<_>>()?,
+            ),
+            other => vec![other; num].into(),
+        })
     }
 
     pub fn int(args: Array, _: &Scope) -> Result<Value> {
