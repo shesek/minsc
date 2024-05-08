@@ -350,6 +350,10 @@ impl Value {
         self.into_array()?.into_iter().map(f).collect()
     }
 
+    pub fn into_vec(self) -> Result<Vec<Value>> {
+        Ok(self.into_array()?.0)
+    }
+
     /// Transform Array elements into a Vec<T> of any FromValue type
     pub fn into_vec_of<T: FromValue>(self) -> Result<Vec<T>> {
         self.try_into()

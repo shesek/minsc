@@ -24,6 +24,10 @@ impl ops::DerefMut for Array {
 }
 
 impl Array {
+    pub fn into_inner(self) -> Vec<Value> {
+        self.0
+    }
+
     pub fn into_iter(self) -> vec::IntoIter<Value> {
         self.0.into_iter()
     }

@@ -109,30 +109,30 @@ impl Evaluate for ast::IfExpr {
 
 impl Evaluate for ast::Or {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor(&self.0, scope, true, "or", 1)
+        eval_andor(&self.0, scope, AndOr::Or)
     }
 }
-
 impl Evaluate for ast::And {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        eval_andor(&self.0, scope, false, "and", self.0.len())
+        eval_andor(&self.0, scope, AndOr::And)
     }
 }
 
-fn eval_andor(
-    operands: &[Expr],
-    scope: &Scope,
-    bool_stop_on: bool,
-    desc_op: &str,
-    desc_thresh_n: usize,
-) -> Result<Value> {
+pub enum AndOr {
+    And,
+    Or,
+}
+
+fn eval_andor(operands: &[Expr], scope: &Scope, andor: AndOr) -> Result<Value> {
     // Peek at the first operand to determine if its an operation between booleans or between policies.
-    // All the other operands are expected to have the same type.
+    // All the other operands are expected to be of the same type. We don't pre-evaluate all of them
+    // so that eval_bool_andor() may do so lazily.
     let first_operand = operands[0].eval(scope)?;
-    match &first_operand {
-        Value::Bool(_) => eval_bool_andor(first_operand, &operands[1..], scope, bool_stop_on),
-        Value::Policy(_) | Value::WithProb(_, _) | Value::PubKey(_) | Value::Array(_) => {
-            eval_policy_andor(desc_op, desc_thresh_n, first_operand, &operands[1..], scope)
+    match first_operand {
+        Value::Bool(first_bool) => eval_bool_andor(first_bool, &operands[1..], scope, andor),
+        Value::Policy(_) | Value::WithProb(_, _) | Value::PubKey(_) => {
+            let policies = [&[first_operand], &eval_exprs(scope, &operands[1..])?[..]].concat();
+            stdlib::miniscript::multi_andor(andor, policies)
         }
         _ => Err(Error::InvalidArguments),
     }
@@ -140,41 +140,25 @@ fn eval_andor(
 
 // Evaluate && / || for booleans (lazily evaluated)
 fn eval_bool_andor(
-    first_operand: Value,
-    other_exprs: &[Expr],
+    first_operand: bool,
+    other_operands_exprs: &[Expr],
     scope: &Scope,
-    stop_on: bool,
+    andor: AndOr,
 ) -> Result<Value> {
-    if first_operand.into_bool()? == stop_on {
+    let stop_on = match andor {
+        AndOr::Or => true,
+        AndOr::And => false,
+    };
+    if first_operand == stop_on {
         return Ok(stop_on.into());
     }
-    for expr in other_exprs {
+    for expr in other_operands_exprs {
         let operand = expr.eval(scope)?;
         if operand.into_bool()? == stop_on {
             return Ok(stop_on.into());
         }
     }
     Ok((!stop_on).into())
-}
-
-// Evaluate && / || for combining policies, using the or()/and()/thres() policy functions
-fn eval_policy_andor(
-    op_name: &str,
-    thresh_n: usize,
-    first_policy: Value,
-    other_policies: &[Expr],
-    scope: &Scope,
-) -> Result<Value> {
-    let policies = [&[first_policy], &eval_exprs(scope, other_policies)?[..]].concat();
-    if policies.len() == 2 {
-        // delegate to or()/and() when there are exactly 2 subpolicies
-        call_args(scope, &op_name.into(), policies)
-    } else {
-        // delegate to thresh() when there are more
-        let mut args = vec![thresh_n.into()];
-        args.extend(policies);
-        call_args(scope, &"thresh".into(), args)
-    }
 }
 
 impl Evaluate for ast::Ident {
@@ -346,25 +330,6 @@ impl Evaluate for Expr {
             Expr::DateTime(x) => Value::Number(x.timestamp().into()), // eval's as number
         })
     }
-}
-
-/// Call the function with the given expressions evaluated into values
-pub fn call_exprs<T: Borrow<Expr>>(
-    scope: &Scope,
-    ident: &ast::Ident,
-    exprs: &[T],
-) -> Result<Value> {
-    call_args(scope, ident, eval_exprs(scope, exprs)?)
-}
-
-/// Call the function with the given argument values (already evaluated)
-fn call_args(scope: &Scope, ident: &ast::Ident, args: Vec<Value>) -> Result<Value> {
-    let func = scope
-        .get(ident)
-        .ok_or_else(|| Error::FnNotFound(ident.clone()))?;
-
-    func.call(args, scope)
-        .map_err(|e| Error::CallError(Some(ident.clone()), e.into()))
 }
 
 /// Evaluate a list of expressions to produce a list of values

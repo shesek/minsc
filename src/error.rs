@@ -146,6 +146,9 @@ pub enum RuntimeError {
     )]
     InvalidDerivationCode,
 
+    #[error("Policy probabilities are only supported for OR with 2 branches")]
+    InvalidProb,
+
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 

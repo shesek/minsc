@@ -7,7 +7,7 @@ use bitcoin::{PublicKey, Sequence, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, AbsLockTime, ScriptContext};
 
-use crate::runtime::{call_exprs, Array, Error, Evaluate, Result, Scope, Value};
+use crate::runtime::{AndOr, Array, Error, Evaluate, Result, Scope, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
@@ -48,8 +48,29 @@ pub fn attach_stdlib(scope: &mut Scope) {
 
 impl Evaluate for ast::Thresh {
     fn eval(&self, scope: &Scope) -> Result<Value> {
-        call_exprs(scope, &"thresh".into(), &[&*self.thresh, &*self.policies])
+        let thresh_n = self.thresh.eval(scope)?.into_usize()?;
+        let policies = into_policies(self.policies.eval(scope)?.into_vec()?)?;
+        Ok(Policy::Threshold(thresh_n, policies).into())
     }
+}
+
+// AND/OR for policies, with support for >2 policies using thresh()
+pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Value> {
+    Ok(if policies.len() == 2 {
+        // Use Miniscript's and()/or() when there are exactly 2 policies (more are not supported)
+        match andor {
+            AndOr::And => Policy::And(into_policies(policies)?),
+            AndOr::Or => Policy::Or(into_prob_policies(policies)?),
+        }
+    } else {
+        // Otherwise, simulate it through thresh(). This works similarly, except for not supporting execution probabilities.
+        let thresh_n = match andor {
+            AndOr::And => policies.len(),
+            AndOr::Or => 1,
+        };
+        Policy::Threshold(thresh_n, into_policies(policies)?)
+    }
+    .into())
 }
 
 #[allow(non_snake_case)]
@@ -63,10 +84,10 @@ pub mod fns {
     //
 
     pub fn or(args: Array, _: &Scope) -> Result<Value> {
-        Ok(Policy::Or(into_prob_policies(args)?).into())
+        Ok(Policy::Or(into_prob_policies(args.into_inner())?).into())
     }
     pub fn and(args: Array, _: &Scope) -> Result<Value> {
-        Ok(Policy::And(into_policies(args)?).into())
+        Ok(Policy::And(into_policies(args.into_inner())?).into())
     }
     pub fn thresh(args: Array, _: &Scope) -> Result<Value> {
         let args = args.check_varlen(2, usize::MAX)?;
@@ -76,10 +97,10 @@ pub mod fns {
 
         let policies = if is_array_call {
             // Called as thresh($n, $policies_array)
-            into_policies(args_iter.next_into::<Array>()?)?
+            into_policies(args_iter.next_into()?)?
         } else {
             // Called as thresh($n, $policy1, $policy2, ...)
-            into_policies(Array(args_iter.collect()))?
+            into_policies(args_iter.collect())?
         };
 
         Ok(Policy::Threshold(thresh_n, policies).into())
@@ -181,13 +202,17 @@ pub mod fns {
     }
 }
 
-pub fn into_policies(args: Array) -> Result<Vec<Arc<Policy>>> {
-    args.into_iter()
-        .map(|v| Ok(Arc::new(v.into_policy()?)))
+pub fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
+    values
+        .into_iter()
+        .map(|v| match v {
+            Value::WithProb(_, _) => Err(Error::InvalidProb),
+            _ => Ok(Arc::new(v.into_policy()?)),
+        })
         .collect()
 }
 
-fn into_prob_policies(values: Array) -> Result<Vec<(usize, Arc<Policy>)>> {
+fn into_prob_policies(values: Vec<Value>) -> Result<Vec<(usize, Arc<Policy>)>> {
     values
         .into_iter()
         .map(|arg| {

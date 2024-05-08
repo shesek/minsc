@@ -8,7 +8,7 @@ use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootS
 use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
 use super::miniscript::into_policies;
-use crate::runtime::{Array, Error, Result, Scope, Value};
+use crate::runtime::{Error, Result, Scope, Value};
 use crate::util::{fmt_list, EC};
 use crate::{stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
@@ -326,7 +326,7 @@ fn descriptor_from_array(
         descriptor_from_tree(internal_key, Value::array(policies))
     } else {
         // Other arrays are expected to be flat and are compiled into a thresh(1, POLICIES) policy
-        let policy = Policy::Threshold(1, into_policies(Array(policies))?);
+        let policy = Policy::Threshold(1, into_policies(policies)?);
         descriptor_from_policy(pk, unspendable, policy)
     }
 }
