@@ -11,8 +11,6 @@ use crate::runtime::{Array, Error, Result, Scope, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
 use crate::{DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
-const LIKELY_PROB: usize = 10;
-
 pub fn attach_stdlib(scope: &mut Scope) {
     // Miniscript Policy functions exposed in the Minsc runtime
     scope.set_fn("or", fns::or).unwrap();
@@ -26,33 +24,26 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("ripemd160", fns::ripemd160).unwrap();
     scope.set_fn("hash160", fns::hash160).unwrap();
 
-    // Expose TRIVIAL (always true) and UNSATISFIABLE (always false) policies
-    scope.set("TRIVIAL", Policy::Trivial).unwrap();
-    scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
-
     // Miniscript Descriptor functions
     scope.set_fn("wpkh", fns::wpkh).unwrap();
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
     // tr() is also available, defined in taproot.rs
 
-    // Descriptor functions (non-Miniscript)
+    // Expose TRIVIAL (always true) and UNSATISFIABLE (always false) policies
+    scope.set("TRIVIAL", Policy::Trivial).unwrap();
+    scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
+
+    // Descriptor utility functions
     scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope
         .set_fn("single_descriptors", fns::single_descriptors)
         .unwrap();
 
-    // Minsc policy functions
-    scope.set_fn("all", fns::all).unwrap();
-    scope.set_fn("any", fns::any).unwrap();
-
     // Compile descriptor/policy to script
     scope.set_fn("explicitScript", fns::explicitScript).unwrap();
     scope.set_fn("tapscript", fns::tapscript).unwrap();
     scope.set_fn("segwitv0", fns::segwitv0).unwrap();
-
-    // `likely` as an alias for 10 (i.e. `likely@pk(A) || pk(B)`)
-    scope.set("likely", LIKELY_PROB).unwrap();
 }
 
 #[allow(non_snake_case)]
@@ -181,18 +172,6 @@ pub mod fns {
     pub fn pubkey(args: Array, _: &Scope) -> Result<Value> {
         let pubkey: DescriptorPublicKey = args.arg_into()?;
         Ok(pubkey.into())
-    }
-
-    // Turn `[A,B,C]` array into an `A && B && C` policy
-    pub fn all(args: Array, _: &Scope) -> Result<Value> {
-        let policies = into_policies(args.arg_into()?)?;
-        Ok(Policy::Threshold(policies.len(), policies).into())
-    }
-
-    // Turn `[A,B,C]` array into an `A || B || C` policy
-    pub fn any(args: Array, _: &Scope) -> Result<Value> {
-        let policies = into_policies(args.arg_into()?)?;
-        Ok(Policy::Threshold(1, policies).into())
     }
 }
 
