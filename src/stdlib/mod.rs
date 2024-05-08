@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Symbol, Value};
-use crate::{parser, time, Ident};
+use crate::{time, Ident, Library};
 
 pub mod btc;
 pub mod ctv;
@@ -12,8 +12,8 @@ pub mod tagged;
 pub mod taproot;
 
 lazy_static! {
-    static ref MINSC_STDLIB: parser::Library = include_str!("stdlib.minsc").parse().unwrap();
-    static ref ELEMENTS_STDLIB: parser::Library = include_str!("elements.minsc").parse().unwrap();
+    static ref MINSC_STDLIB: Library = include_str!("stdlib.minsc").parse().unwrap();
+    static ref ELEMENTS_STDLIB: Library = include_str!("elements.minsc").parse().unwrap();
 }
 
 /// Attach built-in functions and variables to the Minsc runtime environment

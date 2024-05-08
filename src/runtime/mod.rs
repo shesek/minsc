@@ -1,15 +1,8 @@
 use std::borrow::Borrow;
-use std::convert::{TryFrom, TryInto};
-
-use bitcoin::bip32::{ChildNumber, DerivationPath};
-use bitcoin::blockdata::script::Builder as ScriptBuilder;
-use bitcoin::hashes::{sha256, Hash};
-use bitcoin::script::{PushBytesBuf, ScriptBuf};
-use miniscript::bitcoin;
+use std::convert::TryInto;
 
 use crate::parser::{ast, Expr, Stmt};
-use crate::util::{self, DeriveExt, EC};
-use crate::{stdlib, time};
+use crate::stdlib;
 
 pub use crate::error::RuntimeError as Error;
 pub type Result<T> = std::result::Result<T, Error>;
@@ -184,12 +177,6 @@ fn eval_policy_andor(
     }
 }
 
-impl Evaluate for ast::Thresh {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        call_exprs(scope, &"thresh".into(), &[&*self.thresh, &*self.policies])
-    }
-}
-
 impl Evaluate for ast::Ident {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         scope
@@ -224,95 +211,10 @@ impl Evaluate for ast::ArrayAccess {
     }
 }
 
-impl Evaluate for ast::ChildDerive {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        let mut node = self.parent.eval(scope)?;
-
-        for derivation_step in &self.path {
-            node = match derivation_step.eval(scope)? {
-                // Derive with a BIP 32 child code index number
-                Value::Number(child_num) => {
-                    let child_num = ChildNumber::from_normal_idx(child_num.into_u32()?)?;
-                    node.derive_path(&[child_num][..], self.is_wildcard)?
-                }
-
-                // Derive with a hash converted into a series of BIP32 non-hardened derivations using hash_to_child_vec()
-                Value::Bytes(bytes) => {
-                    let hash = sha256::Hash::from_slice(&bytes)?;
-                    node.derive_path(util::hash_to_child_vec(hash), self.is_wildcard)?
-                }
-
-                // Derive a BIP389 Multipath descriptor
-                Value::Array(child_nums) => {
-                    let child_paths = child_nums
-                        .into_iter()
-                        .map(|c| {
-                            // XXX this doesn't support hashes
-                            let child_num = ChildNumber::from_normal_idx(c.into_u32()?)?;
-                            Ok(DerivationPath::from(&[child_num][..]))
-                        })
-                        .collect::<Result<Vec<_>>>()?;
-
-                    node.derive_multi(&child_paths, self.is_wildcard)?
-                }
-
-                _ => bail!(Error::InvalidDerivationCode),
-            }
-        }
-        Ok(node)
-    }
-}
-
 impl Evaluate for ast::FnExpr {
     fn eval(&self, _scope: &Scope) -> Result<Value> {
         Ok(Function::from(self.clone()).into())
     }
-}
-
-impl Evaluate for ast::ScriptFrag {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        let frags = eval_exprs(scope, &self.fragments)?;
-        Ok(script_frag(Value::array(frags))?.into())
-    }
-}
-
-fn script_frag(value: Value) -> Result<ScriptBuf> {
-    let push_int = |num| ScriptBuilder::new().push_int(num).into_script();
-    let push_slice = |slice| -> Result<_> {
-        Ok(ScriptBuilder::new()
-            .push_slice(PushBytesBuf::try_from(slice)?)
-            .into_script())
-    };
-    Ok(match value {
-        // As script code
-        Value::Script(script) => script,
-
-        // As data pushes
-        Value::Number(Number::Int(n)) => push_int(n),
-        Value::Bool(val) => push_int(val as i64),
-        Value::Bytes(bytes) => push_slice(bytes)?,
-        Value::String(string) => push_slice(string.into_bytes())?,
-        Value::PubKey(desc_pubkey) => {
-            let pubkey = desc_pubkey.at_derivation_index(0)?.derive_public_key(&EC)?;
-            ScriptBuilder::new().push_key(&pubkey).into_script()
-        }
-
-        // Flatten arrays
-        Value::Array(elements) => {
-            let scriptbytes = elements
-                .into_iter()
-                .map(|val| Ok(script_frag(val)?.into_bytes()))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .collect::<Vec<u8>>();
-            ScriptBuf::from(scriptbytes)
-        }
-
-        Value::Number(Number::Float(n)) => bail!(Error::InvalidScriptFragIntOnly(n)),
-        v => bail!(Error::InvalidScriptFrag(v)),
-    })
-    // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible
 }
 
 impl Evaluate for ast::Not {
@@ -395,36 +297,6 @@ impl ast::InfixOp {
     }
 }
 
-impl Evaluate for ast::Duration {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        let seq_num = match self {
-            ast::Duration::BlockHeight(num_blocks) => {
-                let num_blocks = num_blocks.eval(scope)?.into_u32()?;
-                time::relative_height_to_seq(num_blocks)?
-            }
-            ast::Duration::BlockTime { parts, heightwise } => {
-                let block_interval = scope.builtin("BLOCK_INTERVAL").clone().into_u32()?;
-
-                let time_parts = parts
-                    .into_iter()
-                    .map(|(num, unit)| Ok((num.eval(scope)?.into_f64()?, *unit)))
-                    .collect::<Result<Vec<_>>>()?;
-
-                time::relative_time_to_seq(&time_parts[..], *heightwise, block_interval)?
-            }
-        };
-        Ok(Value::from(seq_num as i64))
-    }
-}
-
-impl Evaluate for ast::BtcAmount {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        let amount_n = self.0.eval(scope)?.into_f64()?;
-        let amount = bitcoin::SignedAmount::from_float_in(amount_n, self.1)?;
-        Ok(Value::from(amount.to_sat()))
-    }
-}
-
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &Scope) -> Result<Value> {
@@ -477,7 +349,11 @@ impl Evaluate for Expr {
 }
 
 /// Call the function with the given expressions evaluated into values
-fn call_exprs<T: Borrow<Expr>>(scope: &Scope, ident: &ast::Ident, exprs: &[T]) -> Result<Value> {
+pub fn call_exprs<T: Borrow<Expr>>(
+    scope: &Scope,
+    ident: &ast::Ident,
+    exprs: &[T],
+) -> Result<Value> {
     call_args(scope, ident, eval_exprs(scope, exprs)?)
 }
 
@@ -492,6 +368,6 @@ fn call_args(scope: &Scope, ident: &ast::Ident, args: Vec<Value>) -> Result<Valu
 }
 
 /// Evaluate a list of expressions to produce a list of values
-fn eval_exprs<T: Borrow<Expr>>(scope: &Scope, exprs: &[T]) -> Result<Vec<Value>> {
+pub fn eval_exprs<T: Borrow<Expr>>(scope: &Scope, exprs: &[T]) -> Result<Vec<Value>> {
     exprs.iter().map(|arg| arg.borrow().eval(scope)).collect()
 }

@@ -7,9 +7,9 @@ use bitcoin::{PublicKey, Sequence, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, AbsLockTime, ScriptContext};
 
-use crate::runtime::{Array, Error, Result, Scope, Value};
+use crate::runtime::{call_exprs, Array, Error, Evaluate, Result, Scope, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
-use crate::{DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
+use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &mut Scope) {
     // Miniscript Policy functions exposed in the Minsc runtime
@@ -44,6 +44,12 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("explicitScript", fns::explicitScript).unwrap();
     scope.set_fn("tapscript", fns::tapscript).unwrap();
     scope.set_fn("segwitv0", fns::segwitv0).unwrap();
+}
+
+impl Evaluate for ast::Thresh {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        call_exprs(scope, &"thresh".into(), &[&*self.thresh, &*self.policies])
+    }
 }
 
 #[allow(non_snake_case)]

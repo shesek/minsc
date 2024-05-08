@@ -2,11 +2,11 @@ use bitcoin::hashes::{sha256, Hash};
 use bitcoin::{Transaction, TxIn};
 use miniscript::bitcoin;
 
-use crate::parser;
+use crate::parser::Library;
 use crate::runtime::{Error, Execute, Result, Scope, Value};
 
 lazy_static! {
-    static ref MINSC_CTV_LIB: parser::Library = r#"
+    static ref MINSC_CTV_LIB: Library = r#"
         OP_CHECKTEMPLATEVERIFY = script(0xb3);
         OP_CTV = OP_CHECKTEMPLATEVERIFY;
 

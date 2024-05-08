@@ -1,15 +1,19 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
+use bitcoin::bip32::{ChildNumber, DerivationPath};
+use bitcoin::hashes::{sha256, sha256d, Hash};
+use bitcoin::script::{Builder as ScriptBuilder, PushBytesBuf, Script, ScriptBuf};
+use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use miniscript::bitcoin::{
-    self, absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo,
-    transaction::Version, Address, Amount, Network, OutPoint, Script, ScriptBuf, Sequence,
-    Transaction, TxIn, TxOut, Txid, WitnessProgram, WitnessVersion,
+    self, absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
+    Network, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
 
-use crate::util::{fmt_list, DescriptorExt};
+use crate::runtime::{eval_exprs, Array, Error, Evaluate, Float, Int, Result, Scope, Value};
+use crate::util::{fmt_list, hash_to_child_vec, DeriveExt, DescriptorExt, EC};
+use crate::{ast, time};
 
-use crate::runtime::{Array, Error, Result, Scope, Value};
 pub fn attach_stdlib(scope: &mut Scope) {
     // Network types
     scope.set("signet", Network::Signet).unwrap();
@@ -24,6 +28,121 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("transaction", fns::transaction).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
+}
+
+impl Evaluate for ast::BtcAmount {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let amount_n = self.0.eval(scope)?.into_f64()?;
+        let amount = SignedAmount::from_float_in(amount_n, self.1)?;
+        Ok(Value::from(amount.to_sat()))
+    }
+}
+
+impl Evaluate for ast::ScriptFrag {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let frags = eval_exprs(scope, &self.fragments)?;
+        Ok(script_frag(Value::array(frags))?.into())
+    }
+}
+
+fn script_frag(value: Value) -> Result<ScriptBuf> {
+    let push_int = |num| ScriptBuilder::new().push_int(num).into_script();
+    let push_slice = |slice| -> Result<_> {
+        Ok(ScriptBuilder::new()
+            .push_slice(PushBytesBuf::try_from(slice)?)
+            .into_script())
+    };
+    Ok(match value {
+        // As script code
+        Value::Script(script) => script,
+
+        // As data pushes
+        Value::Number(Int(n)) => push_int(n),
+        Value::Bool(val) => push_int(val as i64),
+        Value::Bytes(bytes) => push_slice(bytes)?,
+        Value::String(string) => push_slice(string.into_bytes())?,
+        Value::PubKey(desc_pubkey) => {
+            let pubkey = desc_pubkey.at_derivation_index(0)?.derive_public_key(&EC)?;
+            ScriptBuilder::new().push_key(&pubkey).into_script()
+        }
+
+        // Flatten arrays
+        Value::Array(elements) => {
+            let scriptbytes = elements
+                .into_iter()
+                .map(|val| Ok(script_frag(val)?.into_bytes()))
+                .collect::<Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect::<Vec<u8>>();
+            ScriptBuf::from(scriptbytes)
+        }
+
+        Value::Number(Float(n)) => bail!(Error::InvalidScriptFragIntOnly(n)),
+        v => bail!(Error::InvalidScriptFrag(v)),
+    })
+    // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible
+}
+
+impl Evaluate for ast::ChildDerive {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let mut node = self.parent.eval(scope)?;
+
+        for derivation_step in &self.path {
+            node = match derivation_step.eval(scope)? {
+                // Derive with a BIP 32 child code index number
+                Value::Number(child_num) => {
+                    let child_num = ChildNumber::from_normal_idx(child_num.into_u32()?)?;
+                    node.derive_path(&[child_num][..], self.is_wildcard)?
+                }
+
+                // Derive with a hash converted into a series of BIP32 non-hardened derivations using hash_to_child_vec()
+                Value::Bytes(bytes) => {
+                    let hash = sha256::Hash::from_slice(&bytes)?;
+                    node.derive_path(hash_to_child_vec(hash), self.is_wildcard)?
+                }
+
+                // Derive a BIP389 Multipath descriptor
+                Value::Array(child_nums) => {
+                    let child_paths = child_nums
+                        .into_iter()
+                        .map(|c| {
+                            // XXX this doesn't support hashes
+                            let child_num = ChildNumber::from_normal_idx(c.into_u32()?)?;
+                            Ok(DerivationPath::from(&[child_num][..]))
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+
+                    node.derive_multi(&child_paths, self.is_wildcard)?
+                }
+
+                _ => bail!(Error::InvalidDerivationCode),
+            }
+        }
+        Ok(node)
+    }
+}
+
+impl Evaluate for ast::Duration {
+    fn eval(&self, scope: &Scope) -> Result<Value> {
+        let seq_num = match self {
+            ast::Duration::BlockHeight(num_blocks) => {
+                let num_blocks = num_blocks.eval(scope)?.into_u32()?;
+                time::relative_height_to_seq(num_blocks)?
+            }
+            ast::Duration::BlockTime { parts, heightwise } => {
+                let block_interval = scope.builtin("BLOCK_INTERVAL").clone().into_u32()?;
+
+                let time_parts = parts
+                    .into_iter()
+                    .map(|(num, unit)| Ok((num.eval(scope)?.into_f64()?, *unit)))
+                    .collect::<Result<Vec<_>>>()?;
+
+                time::relative_time_to_seq(&time_parts[..], *heightwise, block_interval)?
+            }
+        };
+        Ok(Value::from(seq_num as i64))
+    }
 }
 
 #[allow(non_snake_case)]
@@ -209,7 +328,6 @@ impl TryFrom<Value> for OutPoint {
 impl TryFrom<Value> for Txid {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        use bitcoin::hashes::{sha256d, Hash};
         // Bitcoin's txid bytes needs to be reversed to match how they're commonly presented
         // XXX Could this result in the wrong behavior?
         let mut bytes = val.into_bytes()?;
