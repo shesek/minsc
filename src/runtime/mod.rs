@@ -1,5 +1,5 @@
 use std::borrow::Borrow;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use bitcoin::bip32::{ChildNumber, DerivationPath};
 use bitcoin::blockdata::script::Builder as ScriptBuilder;
@@ -368,6 +368,11 @@ impl ast::InfixOp {
             (Add, k @ PubKey(_), s)
             | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
                 stdlib::taproot::tr(k, Some(s), scope)?
+            }
+
+            // * to repeat script fragments
+            (Multiply, s @ Script(_), Num(Int(n))) | (Multiply, Num(Int(n)), s @ Script(_)) => {
+                vec![s; n.try_into()?].into()
             }
 
             // @ to assign execution probabilities (to Script/Policy only)
