@@ -24,7 +24,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("typeof", fns::r#typeof).unwrap();
     scope.set_fn("len", fns::len).unwrap();
     scope.set_fn("fold", fns::fold).unwrap();
-    scope.set_fn("repeat", fns::repeat).unwrap();
+    scope.set_fn("fillArray", fns::fillArray).unwrap();
 
     scope.set_fn("int", fns::int).unwrap();
     scope.set_fn("float", fns::float).unwrap();
@@ -98,12 +98,12 @@ pub mod fns {
         Ok(accumlator)
     }
 
-    /// repeat(Number, Value) -> Array<Value>
-    /// Return an array of the specified size filled with Values
+    /// fillArray(Number, Value) -> Array
+    /// Return an array of the specified size filled with copies of Value
     ///
-    /// repeat(Number, Function) -> Array<Value>
+    /// fillArray(Number, Function) -> Array
     /// Return an array of the specified size, using the callback function to produce values
-    pub fn repeat(args: Array, scope: &Scope) -> Result<Value> {
+    pub fn fillArray(args: Array, scope: &Scope) -> Result<Value> {
         let (num, producer): (usize, Value) = args.args_into()?;
         Ok(Value::array(
             (0..num)
