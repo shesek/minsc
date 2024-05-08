@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Write};
 use std::marker::PhantomData;
 
 use bitcoin::bip32::{ChildNumber, IntoDerivationPath};
@@ -323,19 +323,19 @@ pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
 }
 
 /// Utility for formatting comma-separated lists of things
-pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, as_array: bool, f: F) -> fmt::Result
+pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, array_like: bool, f: F) -> fmt::Result
 where
     W: fmt::Write,
     I: Iterator<Item = T>,
     F: Fn(&mut W, T) -> fmt::Result,
 {
     let mut was_empty = true;
-    if as_array {
+    if array_like {
         write!(w, "[ ")?;
     }
     for (i, item) in iter.enumerate() {
         if i > 0 {
-            if as_array {
+            if array_like {
                 write!(w, ",")?;
             }
             write!(w, " ")?;
@@ -343,11 +343,86 @@ where
         f(w, item)?;
         was_empty = false;
     }
-    if as_array {
+    if array_like {
         if !was_empty {
             write!(w, " ")?;
         }
         write!(w, "]")?;
     }
     Ok(())
+}
+
+/// A Write wrapper that allows up the `limit` bytes to be written through it to the inner `writer`.
+/// If the limit is reached, an fmt::Error is raised. This is used as an optimization by PrettyDisplay.
+pub struct LimitedWriter<'a, W: fmt::Write + ?Sized> {
+    writer: &'a mut W,
+    limit: usize,
+    total: usize,
+}
+impl<'a, W: fmt::Write + ?Sized> LimitedWriter<'a, W> {
+    pub fn new(writer: &'a mut W, limit: usize) -> Self {
+        LimitedWriter {
+            writer,
+            limit,
+            total: 0,
+        }
+    }
+}
+impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
+    fn write_str(&mut self, buf: &str) -> fmt::Result {
+        self.total += buf.len();
+        if self.total > self.limit {
+            Err(fmt::Error)
+        } else {
+            self.writer.write_str(buf)
+        }
+    }
+}
+
+pub trait PrettyDisplay: fmt::Display + Sized {
+    /// The one-liner Display representation is used below this size limit
+    const MAX_ONELINER_LENGTH: usize = 130;
+
+    /// Use the one-liner Display if its short enough, or PrettyDisplay::multiline_fmt() otherwise
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result {
+        // Try formatting into a buffer using Display first, to determine whether it exceeds the length limit.
+        // The LimitedWriter will reject writes once the limit is reached, terminating the Display process midway through.
+        let mut one_liner = String::new();
+        let mut lwriter = LimitedWriter::new(&mut one_liner, Self::MAX_ONELINER_LENGTH);
+        if write!(lwriter, "{}", self).is_ok() {
+            // Display fits in ONELINER_LIMIT, forward the buffered string to the outer `f` formatter
+            write!(f, "{}", one_liner)
+        } else {
+            // The one-liner was too long, use multi-line pretty formatting instead
+            self.multiline_fmt(f, indent)
+        }
+    }
+
+    /// Format with multi-line and indentation. This is the only method that needs to be implemented.
+    fn multiline_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result;
+
+    /// Get back a Display-able struct with pretty-formatting
+    fn pretty(&self, indent: usize) -> PrettyDisplayer<Self> {
+        PrettyDisplayer {
+            inner: &self,
+            indent,
+        }
+    }
+
+    /// Pretty format as a String
+    fn pretty_str(&self) -> String {
+        self.pretty(0).to_string()
+    }
+}
+
+/// A wrapper type implementing Display that delegates to the inner PrettyDisplay
+#[derive(Debug)]
+pub struct PrettyDisplayer<'a, T: PrettyDisplay> {
+    inner: &'a T,
+    indent: usize,
+}
+impl<'a, T: PrettyDisplay> fmt::Display for PrettyDisplayer<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.inner.pretty_fmt(f, self.indent)
+    }
 }

@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::stdlib::btc::fmt_script;
 use crate::util::DescriptorExt;
-use crate::{parse, Error, Evaluate, Scope, Value};
+use crate::{parse, Error, Evaluate, PrettyDisplay, Scope, Value};
 
 #[derive(Serialize)]
 pub struct PlaygroundResult {
@@ -85,7 +85,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
             //script_hex: script.as_ref().map(|s| s.to_hex()),
             script_asm: script.as_ref().map(get_script_asm),
             address: addr.map(|a| a.to_string()),
-            other: other.map(|o| o.to_string()),
+            other: other.map(|o| o.pretty_str()),
         })
     };
     let result = _run_playground().map_err(|e| e.to_string())?;

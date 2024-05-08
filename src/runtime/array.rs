@@ -2,6 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::{fmt, iter, mem, ops, vec};
 
 use crate::runtime::{Error, FromValue, Result, Value};
+use crate::util::{fmt_list, PrettyDisplay};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);
@@ -142,25 +143,38 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
     }
 }
 
+// Standard Display, with no newlines or indentation
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if should_use_colon_syntax(&self.0) {
             // Display 2-tuples using the A:B colon construction syntax
-            let space = iif!(self.0[0].is_string(), " ", "");
-            write!(f, "{}:{}{}", self.0[0], space, self.0[1])
+            write!(f, "{}{}{}", self.0[0], colon_separator(&self.0), self.0[1])
         } else {
-            write!(f, "[ ")?;
-            for (i, element) in self.0.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{}", element)?;
-            }
-            write!(f, " ]")
+            fmt_list(f, self.0.iter(), true, |f, el| write!(f, "{}", el))
         }
     }
 }
 
+// Multi-line display with indentation
+impl PrettyDisplay for Array {
+    fn multiline_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result {
+        if should_use_colon_syntax(&self.0) {
+            let separator = colon_separator(&self.0);
+            write!(f, "{}{}{}", self.0[0], separator, self.0[1].pretty(indent))
+        } else {
+            write!(f, "[\n")?;
+            for (i, e) in self.0.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ",\n")?;
+                }
+                write!(f, "{:i$}{}", "", e.pretty(indent + 1), i = (indent + 1) * 2)?;
+            }
+            write!(f, "\n{:i$}]", "", i = indent * 2)
+        }
+    }
+}
+
+// Heuristic to decide whether to format 2-tuple arrays using the : colon syntax
 fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
     use Value::*;
     if elements.len() == 2 {
@@ -180,5 +194,16 @@ fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
         }
     } else {
         false
+    }
+}
+// Heuristic to pick whether space should be used for the colon separator
+// (no space for tuple values like $txid:$vout, with it for key-value-like structures)
+fn colon_separator(elements: &Vec<Value>) -> &str {
+    use Value::*;
+    // Assumes `elements` was already checked to be a 2-tuple
+    match (&elements[0], &elements[1]) {
+        (String(_) | PubKey(_) | Policy(_) | Script(_) | Descriptor(_) | TapInfo(_), _) => ": ",
+        (_, Array(_)) => ": ",
+        _ => ":",
     }
 }

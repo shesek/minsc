@@ -1,4 +1,4 @@
-use minsc::{eval, parse, Error};
+use minsc::{eval, parse, Error, PrettyDisplay};
 use std::{env, fs, io};
 
 fn main_() -> Result<(), Error> {
@@ -21,7 +21,7 @@ fn main_() -> Result<(), Error> {
         println!("{:#?}", parse(&code)?);
     } else {
         let res = eval(parse(&code)?)?;
-        println!("{}", res);
+        println!("{}", res.pretty(0));
         if debug {
             println!("\n\n{:#?}", res);
         }

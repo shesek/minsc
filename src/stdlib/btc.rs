@@ -421,7 +421,7 @@ pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
                     write!(f, "0x{}", wit_item.as_hex())
                 })?;
             }
-            Ok(())
+            write!(f, r#" ]"#)
         }
     })?;
     write!(f, r#", "outputs": "#)?;
