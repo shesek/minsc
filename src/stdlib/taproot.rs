@@ -59,15 +59,19 @@ pub mod fns {
         Ok(tapinfo.internal_key().into())
     }
 
-    /// tr::outputKey(TapInfo) -> (PubKey, Number parity)
+    /// tr::outputKey(TapInfo) -> PubKey | (PubKey, Number)
     ///
-    /// Get the output key and parity of the given TapInfo as a tuple of [ key, parity ]
+    /// Get the output key of the given TapInfo, optionally with the parity as a tuple of (key, parity)
     pub fn outputKey(args: Array, _: &Scope) -> Result<Value> {
-        let tapinfo: TaprootSpendInfo = args.arg_into()?;
+        let (tapinfo, with_parity): (TaprootSpendInfo, Option<bool>) = args.args_into()?;
         let key = tapinfo.output_key();
-        let parity = tapinfo.output_key_parity().to_u8() as i64;
 
-        Ok(Value::array(vec![key.into(), parity.into()]))
+        if with_parity.unwrap_or(false) {
+            let parity = tapinfo.output_key_parity().to_u8() as i64;
+            Ok(Value::array(vec![key.into(), parity.into()]))
+        } else {
+            Ok(key.into())
+        }
     }
 
     /// tr::merkleRoot(TapInfo) -> Hash
