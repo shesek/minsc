@@ -186,10 +186,15 @@ ChildDerivePart: Expr = {
 // Allow `xpub/ *` so that it doesn't look like a comment.
 ChildDeriveWildcard = { "/*", "/ *" };
 
-ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" =>
-  ast::ScriptFrag { fragments }.into();
-ScriptFragPart = { ScriptFragPart_, "<" <SimpleExpr> ">", "<" <Duration> ">" };
-ScriptFragPart_ = { Ident, Number, CallLiteral, BlockExpr, ArrayAccess, PubKey, Bytes, String, DateTime, Array };
+ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
+ScriptFragPart = { ScriptFragPart_, ScriptFragPart_Infix };
+ScriptFragPart_ = {
+  Ident, Number, String, Bytes, PubKey, DateTime, CallLiteral, ArrayAccess, Array,
+  BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
+};
+// Cannot allow all Infix operators because < > conflicts
+ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart_> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_> =>
+   ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();
@@ -206,18 +211,27 @@ Infix: Expr = <lhs:InfixLhs> <op:InfixOp> <rhs:Expr> =>
 
 InfixLhs = { SimpleExpr, Duration, ChildDerive };
 
-InfixOp: ast::InfixOp = {
+InfixOp: ast::InfixOp = { InfixOpScriptSafe, InfixOpNonScript };
+
+// Can be used everywhere
+InfixOpScriptSafe: ast::InfixOp = {
   "+" => ast::InfixOp::Add,
   "-" => ast::InfixOp::Subtract,
   "*" => ast::InfixOp::Multiply,
   "==" => ast::InfixOp::Eq,
   "!=" => ast::InfixOp::NotEq,
-  ">" => ast::InfixOp::Gt,
-  "<" => ast::InfixOp::Lt,
-  ">=" => ast::InfixOp::Gte,
-  "<=" => ast::InfixOp::Lte,
   ":" => ast::InfixOp::Colon,
 };
+// Cannot be used within a ScriptFrag
+InfixOpNonScript: ast::InfixOp = {
+  // > and < conflict with the <$data> syntax
+  ">" => ast::InfixOp::Gt,
+  "<" => ast::InfixOp::Lt,
+  // could be allowed in ScriptFrag but seems weird to
+  ">=" => ast::InfixOp::Gte,
+  "<=" => ast::InfixOp::Lte,
+};
+
 
 // This is defined separately from InfixOp with less options for the LHS/RHS, so that
 // it can be used unambiguously as an AndOrBranch element without requiring parenthesis.
