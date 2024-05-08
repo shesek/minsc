@@ -209,7 +209,12 @@ impl TryFrom<Value> for OutPoint {
 impl TryFrom<Value> for Txid {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        Ok(Txid::from_raw_hash(val.try_into()?))
+        use bitcoin::hashes::{sha256d, Hash};
+        // Bitcoin's txid bytes needs to be reversed to match how they're commonly presented
+        // XXX Could this result in the wrong behavior?
+        let mut bytes = val.into_bytes()?;
+        bytes.reverse();
+        Ok(Txid::from_raw_hash(sha256d::Hash::from_slice(&bytes)?))
     }
 }
 impl TryFrom<Value> for Amount {
