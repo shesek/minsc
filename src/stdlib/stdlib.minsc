@@ -23,19 +23,25 @@ Script=script, Transaction=transaction, Address=address, PubKey=pubkey, Bytes=by
 //
 // Array utilities
 //
+// len(), fillArray(), fold() & foldUntil() are Rust-provided builtins, everything else is built on top of them.
 
 fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
 fn range($start, $end) = fillArray(($end-$start)+1, |$n| $start+$n);
 fn keys($arr) = range(0, len($arr) - 1);
-fn slice($sl$arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $sl$arr.$n);
+fn slice($sl_arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $sl_arr.$n);
 fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
-
-fn flatMap($arr, $flatmap$fn) = reduce($arr, [], |$acc, $el| $acc + $flatmap$fn($el));
-fn map($arr, $map$fn) = flatMap($arr, |$el| [ $map$fn($el) ]);
-fn filter($arr, $filter$fn) = flatMap($arr, |$el| if $filter$fn($el) then [ $el ] else [ ]);
+fn isEmpty($arr) = len($arr) == 0;
 repeat = fillArray; // alias name for a common fillArray use-case, to repeat Script fragments
+
+fn flatMap($arr_, $fn_) = fold($arr_, [], |$acc_, $el_| $acc_ + $fn_($el_));
+fn map($arr_, $fn_)     = fold($arr_, [], |$acc_, $el_| $acc_ + [ $fn_($el_) ]);
+fn filter($arr_, $fn_)  = fold($arr_, [], |$acc_, $el_| $acc_ + if $fn_($el_) then [ $el_ ] else [ ]);
+
+fn find($arr_, $fn_)  = foldUntil($arr_, null,  |$acc_, $el_| if $fn_($el_)  then true:$el_  else false:null);
+
+fn reduce($arr_, $fn_) = if !isEmpty($arr_) then fold(tail($arr_), $arr_.0, $fn_) else null;
 
 //
 // Altstack utilities
