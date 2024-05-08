@@ -17,17 +17,17 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("tr", fns::tr).unwrap();
 
     // Functions for extracting information out of Descriptors/TaprootSpendInfo
-    scope.set_fn("tapInternalKey", fns::tapInternalKey).unwrap();
-    scope.set_fn("tapOutputKey", fns::tapOutputKey).unwrap();
-    scope.set_fn("tapMerkleRoot", fns::tapMerkleRoot).unwrap();
-    scope.set_fn("tapScripts", fns::tapScripts).unwrap();
+    scope.set_fn("tr::internalKey", fns::internalKey).unwrap();
+    scope.set_fn("tr::outputKey", fns::outputKey).unwrap();
+    scope.set_fn("tr::merkleRoot", fns::merkleRoot).unwrap();
+    scope.set_fn("tr::scripts", fns::scripts).unwrap();
 
     // Convert a tr() descriptor into a TaprootSpendInfo
-    scope.set_fn("tapInfo", fns::tapInfo).unwrap();
+    scope.set_fn("tr::tapInfo", fns::tapInfo).unwrap();
 
     // Low-level leaf/branch hash calculation. Shouldn't be used directly typically.
-    scope.set_fn("tapLeaf", fns::tapLeaf).unwrap();
-    scope.set_fn("tapBranch", fns::tapBranch).unwrap();
+    scope.set_fn("tr::tapLeaf", fns::tapLeaf).unwrap();
+    scope.set_fn("tr::tapBranch", fns::tapBranch).unwrap();
 }
 
 #[allow(non_snake_case)]
@@ -50,45 +50,19 @@ pub mod fns {
         super::tr(a, b, scope)
     }
 
-    /// tapLeaf(Script, version=0xc0) -> Hash
-    ///
-    /// Compute the leaf hash of the given script
-    pub fn tapLeaf(args: Array, _: &Scope) -> Result<Value> {
-        let (script, leaf_var): (ScriptBuf, Option<Value>) = args.args_into()?;
-        let leaf_ver = leaf_var.map_or(Ok(LeafVersion::TapScript), |ver| -> Result<_> {
-            Ok(LeafVersion::from_consensus(match ver {
-                Value::Number(Int(num)) => num.try_into()?,
-                Value::Bytes(bytes) if bytes.len() == 1 => bytes[0],
-                _ => bail!(Error::InvalidArguments),
-            })?)
-        })?;
-        let leaf_hash = TapLeafHash::from_script(&script, leaf_ver);
-        Ok(Value::Bytes(leaf_hash.to_byte_array().to_vec()))
-    }
-
-    /// tapBranch(Hash node_a, Hash node_b) -> Hash
-    ///
-    /// Combine two nodes to create a new TapBranch parent
-    pub fn tapBranch(args: Array, _: &Scope) -> Result<Value> {
-        let (a_hash, b_hash) = args.args_into()?;
-        let branch = branch_hash(&a_hash, &b_hash);
-
-        Ok(Value::Bytes(branch.to_byte_array().to_vec()))
-    }
-
-    /// tapInternalKey(TapInfo) -> PubKey
+    /// tr::internalKey(TapInfo) -> PubKey
     ///
     /// Get the internal x-only key of the given TapInfo
-    pub fn tapInternalKey(args: Array, _: &Scope) -> Result<Value> {
+    pub fn internalKey(args: Array, _: &Scope) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         Ok(tapinfo.internal_key().into())
     }
 
-    /// tapOutputKey(TapInfo) -> (PubKey, Number parity)
+    /// tr::outputKey(TapInfo) -> (PubKey, Number parity)
     ///
     /// Get the output key and parity of the given TapInfo as a tuple of [ key, parity ]
-    pub fn tapOutputKey(args: Array, _: &Scope) -> Result<Value> {
+    pub fn outputKey(args: Array, _: &Scope) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
         let key = tapinfo.output_key();
         let parity = tapinfo.output_key_parity().to_u8() as i64;
@@ -96,10 +70,10 @@ pub mod fns {
         Ok(Value::array(vec![key.into(), parity.into()]))
     }
 
-    /// tapMerkleRoot(TapInfo) -> Hash
+    /// tr::merkleRoot(TapInfo) -> Hash
     ///
     /// Get the merkle root hash of the given TapInfo
-    pub fn tapMerkleRoot(args: Array, _: &Scope) -> Result<Value> {
+    pub fn merkleRoot(args: Array, _: &Scope) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         Ok(Value::Bytes(match tapinfo.merkle_root() {
@@ -108,10 +82,10 @@ pub mod fns {
         }))
     }
 
-    /// tapScripts(TapInfo) -> Array<(Script, Bytes version, Bytes control_block)>
+    /// tr::scripts(TapInfo) -> Array<(Script, Bytes version, Bytes control_block)>
     ///
     /// Get the scripts in this TapInfo with their control blocks
-    pub fn tapScripts(args: Array, _: &Scope) -> Result<Value> {
+    pub fn scripts(args: Array, _: &Scope) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         let scripts_ctrls = tapinfo
@@ -128,12 +102,37 @@ pub mod fns {
         Ok(Value::array(scripts_ctrls))
     }
 
-    /// tapInfo(Descriptor|TapInfo) -> TapInfo
+    /// tr::tapInfo(Descriptor|TapInfo) -> TapInfo
     ///
     /// Convert the Tr Descriptor into a TapInfo (or return TapInfo as-is)
     pub fn tapInfo(args: Array, _: &Scope) -> Result<Value> {
-        let tapinfo: TaprootSpendInfo = args.arg_into()?;
-        Ok(tapinfo.into())
+        Ok(Value::TapInfo(args.arg_into()?))
+    }
+
+    /// tr::tapLeaf(Script, version=0xc0) -> Hash
+    ///
+    /// Compute the leaf hash of the given script
+    pub fn tapLeaf(args: Array, _: &Scope) -> Result<Value> {
+        let (script, leaf_var): (ScriptBuf, Option<Value>) = args.args_into()?;
+        let leaf_ver = leaf_var.map_or(Ok(LeafVersion::TapScript), |ver| -> Result<_> {
+            Ok(LeafVersion::from_consensus(match ver {
+                Value::Number(Int(num)) => num.try_into()?,
+                Value::Bytes(bytes) if bytes.len() == 1 => bytes[0],
+                _ => bail!(Error::InvalidArguments),
+            })?)
+        })?;
+        let leaf_hash = TapLeafHash::from_script(&script, leaf_ver);
+        Ok(Value::Bytes(leaf_hash.to_byte_array().to_vec()))
+    }
+
+    /// tr::tapBranch(Hash node_a, Hash node_b) -> Hash
+    ///
+    /// Combine two nodes to create a new TapBranch parent
+    pub fn tapBranch(args: Array, _: &Scope) -> Result<Value> {
+        let (a_hash, b_hash) = args.args_into()?;
+        let branch = branch_hash(&a_hash, &b_hash);
+
+        Ok(Value::Bytes(branch.to_byte_array().to_vec()))
     }
 }
 
