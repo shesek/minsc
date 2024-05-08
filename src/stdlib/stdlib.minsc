@@ -7,7 +7,7 @@ OP_FALSE = `0`, OP_TRUE = `1`;
 // Built-in unique Symbols
 // These don't have any special meaning on the Rust side, but are used in Minsc code for various purposes
 null = Symbol("null");
-_ = Symbol("_");
+default = Symbol("default");
 
 // Some useful constants
 DUST_AMOUNT = 294;
@@ -20,6 +20,10 @@ TR_UNSPENDABLE = NUMS, H_POINT = NUMS;
 // Some aliases until I figure out what I like best
 Script=script, Transaction=transaction, Address=address, PubKey=pubkey, Bytes=bytes, String=str, Int=int, Float=float, tx=Transaction;
 
+// Common type checks
+fn isArray($x) = typeof($x) == "array";
+fn isFunction($x) = typeof($x) == "function";
+
 //
 // Array utilities
 //
@@ -29,7 +33,7 @@ fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
 fn range($start, $end) = fillArray(($end-$start)+1, |$n| $start+$n);
 fn keys($arr) = range(0, len($arr) - 1);
-fn slice($sl_arr, $start, $len) = map(range($start, $start + $len - 1), |$n| $sl_arr.$n);
+fn slice($arr, $start, $len) = fillArray($len, |$n| $arr.($start+$n));
 fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 fn isEmpty($arr) = len($arr) == 0;
@@ -39,9 +43,9 @@ fn flatMap($arr_, $fn_) = fold($arr_, [], |$acc_, $el_| $acc_ + $fn_($el_));
 fn map($arr_, $fn_)     = fold($arr_, [], |$acc_, $el_| $acc_ + [ $fn_($el_) ]);
 fn filter($arr_, $fn_)  = fold($arr_, [], |$acc_, $el_| $acc_ + if $fn_($el_) then [ $el_ ] else [ ]);
 
-fn find($arr_, $fn_)  = foldUntil($arr_, null,  |$acc_, $el_| if $fn_($el_)  then true:$el_  else false:null);
-
+fn find($arr_, $fn_) = foldUntil($arr_, null,  |$acc_, $el_| if $fn_($el_)  then true:$el_  else false:null);
 fn reduce($arr_, $fn_) = if !isEmpty($arr_) then fold(tail($arr_), $arr_.0, $fn_) else null;
+fn mapValues($xs_, $fn_v) = map($xs_, |$x_| $x_.0: $fn_v($x_.1));
 
 //
 // Altstack utilities
@@ -70,8 +74,8 @@ fn nToAlt($max_iterations) = `
 `;
 
 // The reverse of nToAlt() - bring back items from the altstack to the stack
-// stack in: (none), stack out: <el1> <el2> .. <elN> <N total>
 // altstack in: <elN> .. <el2> <el1> <N total>, altstack out: (empty)
+// stack in: (none), stack out: <el1> <el2> .. <elN> <N total>
 fn nFromAlt($max_iterations) = `
   OP_FROMALTSTACK
   OP_DUP // keep a copy of the total number of elements
@@ -84,25 +88,60 @@ fn nFromAlt($max_iterations) = `
 // Control structure utilities
 //
 
-// Match the item at the top of the stack against the clauses and run the matching script, or abort if there's no match
-// Each clause is a tuple of [ $condition_code, $body_code ]. For example: switch([ [ `0 OP_EQUAL`, handleFoo ], [ `1 OP_EQUAL`, handleBar ] ])
-// Clause conditions are expected to consume the value being matched (e.g. with OP_EQUAL). It will be DUPd for them.
-// The last clause can be provided as a single element `[ $body_code ]` with no condition to be used as the default branch.
-fn switch($clauses) = `
-  map(initial($clauses), |$clause|
-    `OP_DUP $clause.0 OP_IF OP_DROP $clause.1 OP_ELSE`)
-  // Using OP_VERIFY instead of another IF..ELSE for the last fragment saves 4 bytes
-  last($clauses).0 {if len(last($clauses)) == 2 then `OP_VERIFY last($clauses).1` else ``}
+
+// Check a series of OP_IF..OP_ELSE conditions, running the script associated with the first match
+// or the optional final `default` branch. If there's no match and no `default`, execution fails.
+//
+// For example, to match a number on the stack and run some code accordingly:
+// ifelseif([
+//   `OP_DUP 0 OP_EQUAL`: `OP_DROP $alice_pk OP_CHECKSIG`,
+//   `OP_DUP 1 OP_EQUAL`: `OP_DROP <6 months> OP_CSV OP_DROP`,
+//   default:             `OP_DROP $bob_pk OP_CHECKSIG`
+// ])
+fn ifelseif($clauses) = if isEmpty($clauses) then `` else `
+  // Check all clauses but the last, running the first one that matches
+  map(initial($clauses), |$clause| `$clause.0 OP_IF $clause.1 OP_ELSE`)
+
+  // The last clause is checked using OP_VERIFY instead of another IF..ELSE to save some bytes.
+  { if last($clauses).0 != default then `last($clauses).0 OP_VERIFY` else ``}
+  last($clauses).1
+
   repeat(len($clauses) - 1, OP_ENDIF)
 `;
 
-// Pop an index number off the stack and execute the script branch with that index
-// For example select([ handleFoo, handleBar ]) to run `handleFoo` if the top stack
-// element is 0, `handleBar` if its 1, or fail the script if its neither
+// Match the item at the top of the stack against the clauses and run the matching script,
+// keeping the item being matched around as necessary. For example:
+// match([
+//   `0 OP_EQUAL`: `$alice_pk OP_CHECKSIG`,
+//   `1 OP_EQUAL`: `<6 months> OP_CSV OP_DROP`,
+// ])
+fn match($clauses) = if isEmpty($clauses) then `` else
+  ifelseif(
+    // DUP the value being matched to keep it available for the next clause, while allowing condition
+    // scripts to consume it (with e.g. OP_EQUAL). It will be removed before the matching script is run.
+    map(initial($clauses), |$clause| `OP_DUP $clause.0`: `OP_DROP $clause.1`)
+
+    // The last clause doesn't need to DUP/DROP as there are no more conditions that need the value.
+    // In the case of a `default` branch, the value will remain available on stack.
+    + [ last($clauses) ]
+  );
+
+// Match the item at the top of the stack for equality.
+// For example: switch([ 0: `$alice_pk OP_CHECKSIG`, 1: `<6 months> OP_CSV OP_DROP` ])
+fn switch($clauses) = match(map($clauses, |$clause| {
+  $condition = if $clause.0 != default then `$clause.0 OP_EQUAL` else default;
+  $condition: $clause.1
+}));
+
+// Pop an index number off the stack and execute the `$scripts` branch with that index.
+// This can typically be better accomplished with separate Taproot leaves for the script
+// branches, but branching within a single Script may be preferable for some simple cases.
+// Does not support a `default` branch.
+// For example: select([ `$alice_pk OP_CHECKSIG`, `<6 months> OP_CSV OP_DROP` ])
 fn select($scripts) =
-  if len($scripts) == 2 // special case optimization for 2 branches
+  if len($scripts) == 2 // special-case optimization for 2 branches (MINIMALIF enforces 0/1 only)
     then `OP_IF $scripts.0 OP_ELSE $scripts.1 OP_ENDIF`
-    else switch(map(keys($scripts), |$n| [ `$n OP_EQUAL`, $scripts.$n ]))
+    else switch(map(keys($scripts), |$index| $index: $scripts.$index))
 ;
 
 
@@ -115,7 +154,7 @@ fn select($scripts) =
 // For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
 // more advanced example with some comments: https://gist.github.com/shesek/758c25489869d77d4ef624ea43f18c49
 fn unrollLoop($max_iterations, $condition, $loop_body) {
-  $loop_fn = if typeof($loop_body) == "function" then $loop_body else |_| $loop_body;
+  $loop_fn = if isFunction($loop_body) then $loop_body else |_| $loop_body;
 
   fn _unrollLoop($loop_i) =
     if $max_iterations > $loop_i
@@ -128,12 +167,19 @@ fn unrollLoop($max_iterations, $condition, $loop_body) {
 // Read the top stack item as the number of times to run $for_body
 // Example with accumulator: `0 <num> unrollFor(50, `OP_DUP OP_ROT OP_ADD OP_SWAP`)` to sum the numbers from <num> to 1
 fn unrollFor($max_iterations, $for_body) {
-  $for_fn = if typeof($for_body) == "function" then $for_body else |_| $for_body;
+  $for_fn = if isFunction($for_body) then $for_body else |_| $for_body;
   `
     unrollLoop($max_iterations, `OP_DUP OP_0NOTEQUAL`, |$for_i| `$for_fn($for_i) OP_1SUB`)
     OP_DROP // drop the counter (always 0 by now)
   `
 }
+
+//
+// General utilities
+//
+
+// env() with debug() formatting
+fn env::debug() = mapValues(env(), |$v| if !isFunction($v) then debug($v) else $v);
 
 // Function form for assigning execution probabilities
 fn prob($n, $val) = $n@$val;

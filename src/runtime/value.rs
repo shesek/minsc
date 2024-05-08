@@ -417,8 +417,8 @@ fn escape_str(str: &str) -> String {
 
 // Symbol
 //
-// A value type guarantee to be unique. Symbols don't have any special meaning on the Rust side, but are used
-// in Minsc code for various purposes (like `null` and `_`). Symbols can be created at runtime using Symbol().
+// A Value type guaranteed to be unique. Symbols don't have any special meaning on the Rust side, but are used in
+// Minsc code for various purposes (like `null` and `default`). Symbols can be created at runtime using Symbol().
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 static SYMBOL_COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -441,7 +441,6 @@ impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.name {
             Some(name) => write!(f, "{}", name),
-            // Some(name) => write!(f, "Symbol({})", name),
             None => write!(f, "Symbol"),
         }
     }
