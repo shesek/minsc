@@ -158,8 +158,11 @@ pub enum RuntimeError {
     #[error("Number operation overflowed")]
     Overflow,
 
-    #[error("in {}(): {1}", .0.as_ref().unwrap_or(&"_anonymous".into()))]
+    #[error("in {}(): {1}", .0.as_ref().unwrap_or(&"<anonymous>".into()))]
     CallError(Option<Ident>, Box<RuntimeError>),
+
+    #[error("in {0}: {1}")]
+    ContextStr(&'static str, Box<RuntimeError>),
 
     // Error message with information about the originated argument/element index
     #[error("#{0}: {1}")]

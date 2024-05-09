@@ -304,22 +304,22 @@ impl Evaluate for ast::Block {
 impl Evaluate for Expr {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         Ok(match self {
-            Expr::Ident(x) => x.eval(scope)?,
-            Expr::Call(x) => x.eval(scope)?,
-            Expr::If(x) => x.eval(scope)?,
-            Expr::Or(x) => x.eval(scope)?,
-            Expr::And(x) => x.eval(scope)?,
-            Expr::Thresh(x) => x.eval(scope)?,
+            Expr::Ident(x) => x.eval(scope)?, // dedicated error type
+            Expr::Call(x) => x.eval(scope)?,  // dedicated error type
+            Expr::If(x) => x.eval(scope).ctx("if")?,
+            Expr::Or(x) => x.eval(scope).ctx("||")?,
+            Expr::And(x) => x.eval(scope).ctx("&&")?,
+            Expr::Thresh(x) => x.eval(scope).ctx("of")?,
             Expr::Block(x) => x.eval(scope)?,
-            Expr::Array(x) => x.eval(scope)?,
-            Expr::ArrayAccess(x) => x.eval(scope)?,
-            Expr::ChildDerive(x) => x.eval(scope)?,
-            Expr::ScriptFrag(x) => x.eval(scope)?,
-            Expr::FnExpr(x) => x.eval(scope)?,
-            Expr::Infix(x) => x.eval(scope)?,
-            Expr::Not(x) => x.eval(scope)?,
-            Expr::BtcAmount(x) => x.eval(scope)?, // eval'd as number
-            Expr::Duration(x) => x.eval(scope)?,  // eval'd as number
+            Expr::Array(x) => x.eval(scope).ctx("array construction")?,
+            Expr::ArrayAccess(x) => x.eval(scope).ctx("dot access")?,
+            Expr::ChildDerive(x) => x.eval(scope).ctx("xpub derivation")?,
+            Expr::ScriptFrag(x) => x.eval(scope).ctx("`` script")?,
+            Expr::FnExpr(x) => x.eval(scope)?, // cannot fail
+            Expr::Infix(x) => x.eval(scope)?,  // dedicated error type
+            Expr::Not(x) => x.eval(scope).ctx("! operator")?,
+            Expr::BtcAmount(x) => x.eval(scope).ctx("BTC amount")?, // eval'd into a Number
+            Expr::Duration(x) => x.eval(scope).ctx("time duration")?, // eval'd into a Number
 
             Expr::Address(x) => Value::Address(x.clone().assume_checked()),
             Expr::PubKey(x) => Value::PubKey(x.clone()),
@@ -329,6 +329,14 @@ impl Evaluate for Expr {
             Expr::Float(x) => Value::Number(Number::Float(*x)),
             Expr::DateTime(x) => Value::Number(x.timestamp().into()), // eval's as number
         })
+    }
+}
+trait ResultExt<T> {
+    fn ctx(self, context_str: &'static str) -> Result<T>;
+}
+impl<T> ResultExt<T> for Result<T> {
+    fn ctx(self, context_str: &'static str) -> Result<T> {
+        self.map_err(|e| Error::ContextStr(context_str, e.into()))
     }
 }
 
