@@ -137,7 +137,9 @@ lazy_static! {
     static ref DEMO_SCOPE: Scope<'static> = {
         console_error_panic_hook::set_once();
 
-        let mut scope = Scope::root();
+        // The root is cloned to make the playground library part of the root
+        // and to have it excluded from `env()`
+        let mut scope = Scope::root().clone();
         PLAYGROUND_LIB.exec(&mut scope).unwrap();
         scope
     };

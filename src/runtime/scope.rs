@@ -1,21 +1,33 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::parser::Ident;
 use crate::runtime::{function::NativeFunctionPt, Error, Result, Value};
-use crate::stdlib::attach_stdlib;
+use crate::{stdlib, Ident};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct Scope<'a> {
     parent: Option<&'a Scope<'a>>,
     local: HashMap<Ident, Value>,
 }
 
-impl<'a> Scope<'a> {
-    pub fn root() -> Self {
-        // TODO cache
-        let mut scope = Self::default();
-        attach_stdlib(&mut scope);
+lazy_static! {
+    static ref ROOT: Scope<'static> = {
+        let mut scope = Scope::default();
+        stdlib::attach_stdlib(&mut scope);
         scope
+    };
+}
+
+impl<'a> Scope<'a> {
+    /// Get a real-only reference to the cached global root scope
+    pub fn root() -> &'static Self {
+        &ROOT
+    }
+
+    /// Create a new writable child scope under the global root scope
+    /// To create a blank root scope with no stdlib, use Scope::default()
+    /// To get an owned root scope with stdlib, use Scope::root().clone()
+    pub fn new() -> Scope<'a> {
+        Scope::root().child()
     }
 
     /// Search the local and parent scope recursively for `key`
@@ -50,6 +62,7 @@ impl<'a> Scope<'a> {
         self.get(&key.into()).expect("built-in must exists")
     }
 
+    /// Create a child scope of this scope
     pub fn child(&'a self) -> Self {
         Scope {
             parent: Some(&self),

@@ -37,7 +37,7 @@ pub fn eval<T: TryInto<Expr>>(expr: T) -> Result<Value, Error>
 where
     Error: From<T::Error>,
 {
-    Ok(expr.try_into()?.eval(&Scope::root())?)
+    Ok(expr.try_into()?.eval(Scope::root())?)
 }
 
 /// Parse program code into an Expr AST

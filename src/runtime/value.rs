@@ -379,7 +379,7 @@ impl Value {
 impl FromStr for Value {
     type Err = error::Error;
     fn from_str(s: &str) -> error::Result<Self> {
-        Ok(Expr::from_str(s)?.eval(&Scope::root())?)
+        Ok(Expr::from_str(s)?.eval(Scope::root())?)
     }
 }
 
