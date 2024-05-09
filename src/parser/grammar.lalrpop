@@ -13,6 +13,9 @@ match {
   r"\s*" => { },
   // Skip `//` comments
   r"//[^\n\r]*[\n\r]*" => { },
+} else {
+  // Takes priority over IDENT
+  r"BTC|[mu]BTC|bits?|satoshis?|sats?|msats?" => BTC_DENOMINATION,
 } else{
   r"-?\d{1,25}" => INT, // i64::MAX_NUMBER is 19 digits long
   r"-?\d{1,25}\.\d{1,25}" => FLOAT, // f64 provides precision for up to approx 17 decimal digits
@@ -279,14 +282,8 @@ DurationTimeUnit: ast::DurationUnit = {
 
 DateTime: Expr = DATETIME =>? Ok(Expr::DateTime(time::parse_datetime(<>)?));
 
-BtcAmount: Expr = <num:SExpr> <denom:BtcDenomination> =>
+BtcAmount: Expr = <num:SExpr> <denom:BTC_DENOMINATION> =>
   ast::BtcAmount(num.into(), denom.parse().expect("must be valid")).into();
-
-BtcDenomination = {
-  "BTC", "mBTC", "uBTC",
-  "bit", "bits", "satoshi", "satoshis",
-  "sat", "sats", "msat", "msats",
-};
 
 //
 // Statements
