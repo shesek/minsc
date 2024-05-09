@@ -1,5 +1,5 @@
 use std::convert::{TryFrom, TryInto};
-use std::{fmt, iter, mem, ops, vec};
+use std::{fmt, mem, ops, vec};
 
 use crate::runtime::{Error, FromValue, Result, Value};
 use crate::util::{fmt_list, PrettyDisplay};
@@ -29,8 +29,11 @@ impl Array {
         self.0
     }
 
-    pub fn into_iter(self) -> vec::IntoIter<Value> {
-        self.0.into_iter()
+    pub fn into_iter(self) -> ValueItertor<vec::IntoIter<Value>> {
+        ValueItertor {
+            inner: self.0.into_iter(),
+            count: 0,
+        }
     }
 
     pub fn check_len(self, expected_len: usize) -> Result<Self> {
@@ -76,30 +79,37 @@ impl Array {
     }
 }
 
-/// Iterator method to get the next Value converted into any FromValue type. The type can be an
-/// Option to get back a None when iteration is finished, or a non-Option to back an an Error.
-pub trait IterValueInto: Iterator<Item = Value> + Sized {
-    fn next_into<T: FromValue>(&mut self) -> Result<T> {
-        T::from_opt_value(self.next())
+/// An Iterator over `Value`s, with conversion into FromValue types and improved error reporting
+pub struct ValueItertor<I: Iterator<Item = Value>> {
+    inner: I,
+    count: usize,
+}
+impl<I: Iterator<Item = Value>> ValueItertor<I> {
+    /// Convert the next Value into any FromValue type
+    /// If the type is not an Option and there are no more items, an error will be raised.
+    pub fn next_into<T: FromValue>(&mut self) -> Result<T> {
+        // Wrap errors with Error::NthContext to tell which argument/element index they originated from
+        // The counter is displayed as 1-indexed.
+        let this_index = self.count + 1; // use the next index even when next() returns None (1-indexed)
+        T::from_opt_value(self.next()).map_err(|e| Error::NthContext(this_index, e.into()))
     }
 
-    /// Wraps errors with Error::NthContext to tell which argument/element index they originated from.
-    /// Note this always returns the next value like next_into(), `index` is purely for error display.
-    fn nth_into<T: FromValue>(&mut self, index: usize) -> Result<T> {
-        self.next_into()
-            .map_err(|e| Error::NthContext(index, e.into()))
+    /// Collect all Values into a Vec of any FromValue type
+    pub fn collect_into<T: FromValue>(self) -> Result<Vec<T>> {
+        let initial_count = self.count + 1;
+        self.enumerate()
+            .map(|(i, val)| {
+                T::from_value(val).map_err(|e| Error::NthContext(initial_count + i, e.into()))
+            })
+            .collect()
     }
 }
-impl<I: Iterator<Item = Value>> IterValueInto for I {}
-
-// Allows collect()ing an Iterator over Values into a Vec of any FromValue type
-impl<T: FromValue> iter::FromIterator<Value> for Result<Vec<T>> {
-    fn from_iter<I: iter::IntoIterator<Item = Value>>(iter: I) -> Self {
-        iter.into_iter()
-            .enumerate()
-            .map(|(i, val)| T::from_value(val).map_err(|e| Error::NthContext(i, e.into())))
-            .collect()
-        //iter.into_iter().map(T::from_value).collect()
+impl<I: Iterator<Item = Value>> Iterator for ValueItertor<I> {
+    type Item = I::Item;
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self.inner.next()?;
+        self.count += 1; // for Error::NthContext
+        Some(item)
     }
 }
 
@@ -107,8 +117,7 @@ impl<T: FromValue> iter::FromIterator<Value> for Result<Vec<T>> {
 impl<T: FromValue> TryFrom<Array> for Vec<T> {
     type Error = Error;
     fn try_from(arr: Array) -> Result<Vec<T>> {
-        // handled by the FromIterator<Value> implementation above
-        arr.into_iter().collect()
+        arr.into_iter().collect_into()
     }
 }
 
@@ -119,8 +128,7 @@ impl<A: FromValue> TryFrom<Array> for (A,) {
     fn try_from(arr: Array) -> Result<(A,)> {
         let min_len = A::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 1)?.into_iter();
-
-        Ok((iter.nth_into(0)?,))
+        Ok((iter.next_into()?,))
     }
 }
 impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
@@ -128,8 +136,7 @@ impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
     fn try_from(arr: Array) -> Result<(A, B)> {
         let min_len = A::is_required() as usize + B::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 2)?.into_iter();
-
-        Ok((iter.nth_into(0)?, iter.nth_into(1)?))
+        Ok((iter.next_into()?, iter.next_into()?))
     }
 }
 impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
@@ -138,8 +145,7 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
         let min_len =
             A::is_required() as usize + B::is_required() as usize + C::is_required() as usize;
         let mut iter = arr.check_varlen(min_len, 3)?.into_iter();
-
-        Ok((iter.nth_into(0)?, iter.nth_into(1)?, iter.nth_into(2)?))
+        Ok((iter.next_into()?, iter.next_into()?, iter.next_into()?))
     }
 }
 

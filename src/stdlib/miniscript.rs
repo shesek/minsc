@@ -76,7 +76,6 @@ pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Value> {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
-    use crate::runtime::IterValueInto;
     use miniscript::DescriptorPublicKey;
 
     //

@@ -161,8 +161,9 @@ pub enum RuntimeError {
     #[error("in {}(): {1}", .0.as_ref().unwrap_or(&"_anonymous".into()))]
     CallError(Option<Ident>, Box<RuntimeError>),
 
-    #[error("#{}: {1}", .0 + 1)] // inner usize is 0-indexed, but displayed as 1-indexed
-    NthContext(usize, Box<RuntimeError>), // error with argument/element index context
+    // Error message with information about the originated argument/element index
+    #[error("#{0}: {1}")]
+    NthContext(usize, Box<RuntimeError>), // usize is 1-indexed
 
     #[error("{0:?} operator error: {1}")]
     InfixOpError(InfixOp, Box<RuntimeError>),
