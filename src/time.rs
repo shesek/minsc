@@ -62,15 +62,19 @@ pub fn relative_time_to_seq(
     }
 }
 
-// XXX add date string to error
 pub fn parse_datetime(s: &str) -> Result<NaiveDateTime, ParseError> {
-    let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M").or_else(|_| {
-        Ok::<_, ParseError>(NaiveDate::parse_from_str(s, "%Y-%m-%d")?.and_hms(0, 0, 0))
+    // Date always suffixed with T, hours optionally suffixed with Z
+    let s = s.trim_end_matches('Z');
+    eprintln!("parsing {}", s);
+    let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").or_else(|_| {
+        NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").or_else(|_| -> Result<_, ParseError> {
+            Ok(NaiveDate::parse_from_str(s, "%Y-%m-%dT")?.and_hms(0, 0, 0))
+        })
     })?;
     let ts = dt.timestamp();
     ensure!(
         ts >= LOCKTIME_THRESHOLD as i64 && ts <= u32::max_value() as i64,
-        ParseError::InvalidDateTimeOutOfRange
+        ParseError::InvalidDateTimeOutOfRange // TODO add date string to error
     );
     Ok(dt)
 }

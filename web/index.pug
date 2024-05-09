@@ -144,10 +144,10 @@ body
 
         +h(3, 'Time & Durations')
 
-        :markdown-it `after()` accepts dates formatted as `YYYY-MM-DD`, optionally with `HH:MM`.
+        :markdown-it `after()` accepts dates formatted as `<YYYY>-<MM>-<DD>T`, optionally with `<HH>:<MM>`.
         +snippet.
           // Lock some coins until 2030
-          pk(A) && after(2030-01-01)
+          pk(A) && after(2030-01-01T)
 
         :markdown-it `older()` accepts time durations with years, months, weeks, days, hours, minutes and seconds.
         +snippet.
