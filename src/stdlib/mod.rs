@@ -68,6 +68,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 pub mod fns {
     use super::*;
     use crate::runtime::{Call, Function};
+    use crate::util::PrettyDisplay;
 
     /// Get the argument type as a string
     /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array, symbol
@@ -154,9 +155,10 @@ pub mod fns {
     }
 
     pub fn r#str(args: Array, _: &Scope) -> Result<Value> {
-        Ok(match args.arg_into()? {
-            Value::String(string) => string,
-            other => other.to_string(),
+        Ok(match args.args_into()? {
+            (Value::String(string), _) => string,
+            (other, None | Some(false)) => other.to_string(),
+            (other, Some(true)) => other.pretty_str(),
         }
         .into())
     }
