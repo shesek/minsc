@@ -186,15 +186,16 @@ fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
     if elements.len() == 2 {
         match (&elements[0], &elements[1]) {
             // Never if the LHS is one of these (not typically used with colon tuple construction syntax)
-            (Bool(_) | Number(_) | Array(_) | Function(_) | Transaction(_), _) => false,
+            (Array(_) | Function(_) | Transaction(_), _) => false,
 
-            // Always if the LHS is String or Script (used as tagged list keys and predicates)
-            (String(_) | Script(_), _) => true,
+            // If the LHS is a String or Script, only if they're short (used as tagged list keys and predicates)
+            (String(lhs), _) => lhs.len() < 30,
+            (Script(lhs), _) => lhs.len() < 40,
 
             // Otherwise, only if the LHS and RHS are of different types
             (
-                lhs @ (Bytes(_) | Address(_) | PubKey(_) | Policy(_) | Descriptor(_) | TapInfo(_)
-                | WithProb(..) | Network(_) | Symbol(_)),
+                lhs @ (Bool(_) | Number(_) | Bytes(_) | Address(_) | PubKey(_) | Policy(_)
+                | Descriptor(_) | TapInfo(_) | WithProb(..) | Network(_) | Symbol(_)),
                 rhs,
             ) => mem::discriminant(lhs) != mem::discriminant(rhs),
         }
