@@ -305,9 +305,13 @@ FnDef: Stmt = {
         ast::FnDef { ident, signature, body }.into(),
 }
 
-IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmts> "}"
-               <else_body:("else" "{" <Stmts> "}")?> =>
+IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmts> "}" <else_body:IfStmtElse?> =>
     ast::IfStmt { condition: condition.into(), then_body: then_body.into(), else_body: else_body.into() }.into();
+IfStmtElse: ast::Stmts = {
+  "else" "{" <Stmts> "}",
+  // allow nested `else if` statements without `{}`
+  "else" <IfStmt> => ast::Stmts(vec![<>]),
+};
 
 // Helpers
 
