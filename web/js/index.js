@@ -44,7 +44,7 @@ worker.addEventListener('message', ({ data }) => {
   clearErrorMark()
 
   if (data.error) {
-    error_el.innerText = snipRegexes(data.error)
+    error_el.innerText = data.error
     error_el.style.display = 'block'
     markError(data.input, data.error)
   } else if (data.result) {
@@ -102,9 +102,6 @@ function markError(code, error) {
       .markText(pos.from, pos.to, { css: 'color: #8a1f11; background: #FBC2C4' })
   }
 }
-
-// Strip expected regexes from error messages, they cause long and ugly errors
-const snipRegexes = msg => msg.replace(/((,| or) r#"[^"]+"#)+/g, ', <regexes>')
 
 // Example snippets
 document.querySelectorAll('.snippet').forEach(snippet => {
