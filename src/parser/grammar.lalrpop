@@ -60,7 +60,6 @@ Expr = {
   ChildDerive,
   FnExpr,
   Infix,
-  Not,
   Duration,
 };
 
@@ -68,6 +67,7 @@ Expr = {
 // Includes SExpr, which can contain any wrapped expression
 SimpleExpr = {
   SExpr,
+  Not,
   Thresh,
   InfixProb,
   ArrayAccess,
@@ -248,7 +248,7 @@ InfixOpNonScript: ast::InfixOp = {
 InfixProb: Expr = <lhs:SExpr> "@" <rhs:SimpleExpr> =>
   ast::Infix { op: ast::InfixOp::Prob, lhs: lhs.into(), rhs: rhs.into() }.into();
 
-Not: Expr = "!" <Expr> =>
+Not: Expr = "!" <SimpleExpr> =>
   ast::Not(<>.into()).into();
 
 // Duration and times
