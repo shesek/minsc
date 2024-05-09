@@ -203,8 +203,10 @@ ScriptFragPart_ = {
   BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
 };
 // Cannot allow all Infix operators because < > conflicts
-ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart_> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_> =>
+ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart_> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_Infix_RHS> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
+// We can allow Paren<Expr>, but only for the RHS
+ScriptFragPart_Infix_RHS = { ScriptFragPart_, Paren<Expr> };
 
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();
