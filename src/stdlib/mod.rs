@@ -70,11 +70,11 @@ pub mod fns {
     use crate::runtime::{Call, Function};
 
     /// Get the argument type as a string
-    /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array
+    /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array, symbol
     /// typeof(Value) -> String
     pub fn r#typeof(args: Array, _: &Scope) -> Result<Value> {
         let type_of = args.arg_into::<Value>()?.type_of();
-        Ok(type_of.to_string().into())
+        Ok(type_of.into())
     }
 
     /// len(Array|Bytes|Script|String) -> Number
@@ -93,8 +93,8 @@ pub mod fns {
     /// Fold each element in the Array through the Function, starting with Value as the initial value
     pub fn fold(args: Array, scope: &Scope) -> Result<Value> {
         let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
-        let mut accumlator = init_val;
 
+        let mut accumlator = init_val;
         for element in array.into_iter() {
             accumlator = callback.call(vec![accumlator, element], scope)?;
         }
@@ -106,8 +106,8 @@ pub mod fns {
     /// to update the accumulated value and continue, or `true:$new_val` to return `$new_val` immediately.
     pub fn foldUntil(args: Array, scope: &Scope) -> Result<Value> {
         let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
-        let mut accumlator = init_val;
 
+        let mut accumlator = init_val;
         for element in array.into_iter() {
             let callback_ret = callback.call(vec![accumlator, element], scope)?;
             let (found, new_val): (bool, _) = callback_ret.try_into()?;

@@ -103,6 +103,11 @@ impl From<Vec<Value>> for Value {
         Value::Array(Array(vec))
     }
 }
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Value::String(s.to_string())
+    }
+}
 
 // From Value to the underlying enum inner type
 // Simple extraction of the enum variant, with no specialized type coercion logic
