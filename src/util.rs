@@ -329,25 +329,22 @@ where
     I: Iterator<Item = T>,
     F: Fn(&mut W, T) -> fmt::Result,
 {
-    let mut was_empty = true;
     if array_like {
-        write!(w, "[ ")?;
+        write!(w, "[")?;
     }
     for (i, item) in iter.enumerate() {
-        if i > 0 {
+        if i == 0 && array_like {
+            write!(w, " ")?;
+        } else if i > 0 {
             if array_like {
                 write!(w, ",")?;
             }
             write!(w, " ")?;
         }
         f(w, item)?;
-        was_empty = false;
     }
     if array_like {
-        if !was_empty {
-            write!(w, " ")?;
-        }
-        write!(w, "]")?;
+        write!(w, " ]")?;
     }
     Ok(())
 }
@@ -381,7 +378,7 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
 
 pub trait PrettyDisplay: fmt::Display + Sized {
     /// The one-liner Display representation is used below this size limit
-    const MAX_ONELINER_LENGTH: usize = 130;
+    const MAX_ONELINER_LENGTH: usize = 125;
 
     /// Use the one-liner Display if its short enough, or PrettyDisplay::multiline_fmt() otherwise
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result {

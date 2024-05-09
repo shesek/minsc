@@ -397,7 +397,7 @@ pub fn fmt_script<W: fmt::Write>(f: &mut W, script: &Script, wrap_backticks: boo
 pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
     write!(
         f,
-        r#"Transaction([ "version": {}, "locktime": {}, "inputs": "#,
+        r#"Transaction([ "version": {}, "locktime": {:?}, "inputs": "#,
         tx.version.0, tx.lock_time
     )?;
     fmt_list(f, &mut tx.input.iter(), true, |f, input| {

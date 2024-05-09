@@ -77,11 +77,9 @@ impl<'a> Scope<'a> {
 
             // Continue to the parent scope, unless the max_depth limit was reached
             depth += 1;
-            if depth == max_depth {
-                break;
-            }
             scope = match scope.parent {
                 None => break,
+                Some(_) if depth == max_depth => break,
                 // skip the top-level root scope when max_depth==-1
                 Some(scope) if max_depth == -1 && scope.parent.is_none() => break,
                 Some(scope) => scope,
