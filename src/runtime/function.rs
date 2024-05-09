@@ -122,7 +122,7 @@ impl PartialEq for Function {
             }
             (Function::User(_), Function::User(_)) => {
                 // TODO this requires implementing PartialEq for ast::Expr
-                unimplemented!("user defined functions cannot be compared")
+                false
             }
         }
     }
