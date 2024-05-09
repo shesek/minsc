@@ -22,7 +22,7 @@ use std::str::FromStr;
 
 pub use error::{Error, ParseError, RuntimeError};
 pub use parser::{ast, Expr, Ident, Library, Stmt, Stmts};
-pub use runtime::{Evaluate, Number, Scope, Value};
+pub use runtime::{Evaluate, Execute, Number, Scope, Value};
 pub use util::PrettyDisplay;
 
 use miniscript::{descriptor, policy};
