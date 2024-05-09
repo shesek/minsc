@@ -19,7 +19,7 @@ pub struct UserFunction {
 impl_from_variant!(UserFunction, Function, User);
 
 /// A native function implemented in Rust
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct NativeFunction {
     ident: Option<Ident>,
     pt: NativeFunctionPt,
@@ -131,7 +131,7 @@ impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Function::User(func) => write!(f, "{}", func),
-            Function::Native(func) => write!(f, "{:?}", func),
+            Function::Native(func) => write!(f, "{}", func),
         }
     }
 }
@@ -151,8 +151,12 @@ impl fmt::Display for UserFunction {
         write!(f, ")")
     }
 }
-impl fmt::Debug for NativeFunction {
+impl fmt::Display for NativeFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "fn ([native])")
+        write!(f, "fn ")?;
+        if let Some(ident) = &self.ident {
+            write!(f, "{}", ident)?;
+        }
+        write!(f, "([native])")
     }
 }
