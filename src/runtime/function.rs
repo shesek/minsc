@@ -20,23 +20,14 @@ impl_from_variant!(UserFunction, Function, User);
 
 /// A native function implemented in Rust
 #[derive(Clone)]
-pub struct NativeFunction(pub NativeFunctionPt);
+pub struct NativeFunction {
+    ident: Option<Ident>,
+    pt: NativeFunctionPt,
+}
 
 pub type NativeFunctionPt = fn(Array, &Scope) -> Result<Value>;
 
 impl_from_variant!(NativeFunction, Function, Native);
-
-
-impl Function {
-    /// Get the name associated with the function. Only available for user functions
-    /// defined using a named fn statement.
-    pub fn ident(&self) -> Option<&Ident> {
-        match self {
-            Function::User(f) => f.ident.as_ref(),
-            Function::Native(_) => None,
-        }
-    }
-}
 
 pub trait Call {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value>;
@@ -45,8 +36,12 @@ pub trait Call {
 impl Call for Function {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
         match self {
-            Function::User(x) => x.call(args, scope),
-            Function::Native(x) => x.call(args, scope),
+            Function::User(f) => f
+                .call(args, scope)
+                .map_err(|e| Error::CallError(f.ident.clone(), e.into())),
+            Function::Native(f) => f
+                .call(args, scope)
+                .map_err(|e| Error::CallError(f.ident.clone(), e.into())),
         }
     }
 }
@@ -71,7 +66,7 @@ impl Call for UserFunction {
 
 impl Call for NativeFunction {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        (self.0)(Array(args), scope)
+        (self.pt)(Array(args), scope)
     }
 }
 
@@ -84,9 +79,15 @@ impl Call for Value {
     }
 }
 
+impl NativeFunction {
+    pub fn new(pt: NativeFunctionPt, ident: Option<Ident>) -> Self {
+        Self { pt, ident }
+    }
+}
+
 impl From<NativeFunctionPt> for Function {
-    fn from(f: NativeFunctionPt) -> Self {
-        NativeFunction(f).into()
+    fn from(pt: NativeFunctionPt) -> Self {
+        NativeFunction { pt, ident: None }.into()
     }
 }
 
@@ -115,7 +116,7 @@ impl From<ast::FnExpr> for Function {
 impl PartialEq for Function {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Function::Native(a), Function::Native(b)) => a.0 as usize == b.0 as usize,
+            (Function::Native(a), Function::Native(b)) => a.pt as usize == b.pt as usize,
             (Function::Native(_), Function::User(_)) | (Function::User(_), Function::Native(_)) => {
                 false
             }

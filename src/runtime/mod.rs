@@ -87,13 +87,15 @@ impl Evaluate for ast::Call {
         let func = self.func.eval(scope)?.into_fn()?;
         let args = eval_exprs(scope, &self.args)?;
 
-        func.call(args, scope).map_err(|e| {
-            // Use the function name used by the caller if the function was accessed using a simple
-            // identifier. Otherwise, use the name associated with the Function itself (only available
-            // for user functions defined using a named fn statement, not for anonymous or native).
-            let ident = self.func.as_ident().or_else(|| func.ident());
-            Error::CallError(ident.cloned(), e.into())
-        })
+        match (func.call(args, scope), self.func.as_ident()) {
+            (Err(Error::CallError(None, e)), Some(caller_ident)) => {
+                // If the function originating the error is unnamed but the caller called it using an identifier,
+                // use the caller name for the CallError message. A name may not be available on the caller side
+                // either if the function was not accessed through a simple identifier, for example `([a].0)()`
+                Err(Error::CallError(Some(caller_ident.clone()), e.into()))
+            }
+            (other, _) => other,
+        }
     }
 }
 

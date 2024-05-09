@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::runtime::{function::NativeFunctionPt, Error, Result, Value};
+use crate::runtime::function::{NativeFunction, NativeFunctionPt};
+use crate::runtime::{Error, Result, Value};
 use crate::{stdlib, Ident};
 
 #[derive(Default, Debug, Clone)]
@@ -53,8 +54,10 @@ impl<'a> Scope<'a> {
 
     // NativeFunctionPt should work directly with set() as it implements Into<Value>,
     // but for some reason it fails with due to mismatched lifetimes
-    pub fn set_fn<K: Into<Ident>>(&mut self, key: K, f: NativeFunctionPt) -> Result<()> {
-        self.set(key, f)
+    pub fn set_fn<K: Into<Ident>>(&mut self, key: K, pt: NativeFunctionPt) -> Result<()> {
+        let key = key.into();
+        let func = NativeFunction::new(pt, Some(key.clone()));
+        self.set(key, func)
     }
 
     /// Get a builtin variable, which must be available in scope
