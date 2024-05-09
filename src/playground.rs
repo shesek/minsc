@@ -105,6 +105,8 @@ fn get_script_asm(script: &ScriptBuf) -> String {
 lazy_static! {
     // Provide some built-in example pubkeys and hashes in the web demo env
     static ref DEMO_SCOPE: Scope<'static> = {
+        console_error_panic_hook::set_once();
+
         let mut scope = Scope::root();
         let mut add_key = |name, key: &str| {
             scope
