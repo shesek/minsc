@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use crate::time;
-use crate::parser::{ast, concat, Expr, Stmt, ParseError};
+use crate::parser::{ast, concat, prepend, Expr, Stmt, ParseError};
 
 grammar;
 
@@ -104,9 +104,16 @@ Float: Expr = FLOAT =>? Ok(f64::from_str(<>).map_err(ParseError::from)?.into());
 IdentTerm: ast::Ident = IDENT => ast::Ident(<>.into());
 Ident: Expr = IdentTerm => Expr::Ident(<>);
 
-Call = { CallLiteral, CallExpr };
+Call = { CallLiteral, CallExpr, PipeCall };
+
 CallLiteral: Expr = <func:Ident> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args }.into();
 CallExpr: Expr = <func:WrapExpr> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args }.into();
+
+// Pipe call: `$first_arg | func($extra_args...)` -> `func($first_arg, $extra_args...)`
+PipeCall: Expr = <first_arg:PipeCallLHS> "|" <func:PipeCallFunc> <extra_args:Paren<List0<Expr, ",">>> =>
+  ast::Call { func: func.into(), args: prepend(extra_args, first_arg) }.into();
+PipeCallLHS = { SExpr, ArrayAccess, Duration };
+PipeCallFunc = { Ident, WrapExpr };
 
 WrapExpr = { Paren<Expr>, BlockExpr };
 

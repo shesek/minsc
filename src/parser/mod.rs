@@ -32,10 +32,16 @@ impl FromStr for Stmts {
 }
 impl_tryfrom_fromstr!(Stmts);
 
-// Utility function used by the grammar
+// Utility functions used by the grammar
+
 pub fn concat<T>(mut list: Vec<T>, val: Option<T>) -> Vec<T> {
     if let Some(val) = val {
         list.push(val);
     }
+    list
+}
+
+pub fn prepend<T>(mut list: Vec<T>, val: T) -> Vec<T> {
+    list.insert(0, val);
     list
 }
