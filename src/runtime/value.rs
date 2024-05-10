@@ -233,12 +233,10 @@ impl_hash_conv!(miniscript::hash256::Hash);
 /// This is blanket-implemented for types that implement TryFrom<Value>, which should be preferred
 /// over using FromValue directly unless necessary.
 pub trait FromValue: Sized {
+    const IS_REQUIRED: bool;
+
     fn from_value(value: Value) -> Result<Self>;
     fn from_opt_value(value: Option<Value>) -> Result<Self>;
-    fn is_optional() -> bool;
-    fn is_required() -> bool {
-        !Self::is_optional()
-    }
 }
 
 impl<T> FromValue for T
@@ -246,15 +244,14 @@ where
     T: TryFrom<Value> + FromValueMarker,
     Error: From<T::Error>,
 {
+    const IS_REQUIRED: bool = true;
+
     fn from_value(value: Value) -> Result<T> {
         Ok(value.try_into()?)
     }
     fn from_opt_value(value: Option<Value>) -> Result<T> {
         // Convert from Option<Value> to a T, erroring if there's no Value
         Ok(value.ok_or(Error::MissingValue)?.try_into()?)
-    }
-    fn is_optional() -> bool {
-        false
     }
 }
 
@@ -263,15 +260,14 @@ where
     T: TryFrom<Value> + FromValueMarker,
     Error: From<T::Error>,
 {
+    const IS_REQUIRED: bool = false;
+
     fn from_value(value: Value) -> Result<Option<T>> {
         Ok(Some(value.try_into()?))
     }
     fn from_opt_value(value: Option<Value>) -> Result<Option<T>> {
         // Convert from Option<Value> to an Option<T>, keeping `None`s
         Ok(value.map(Value::try_into).transpose()?)
-    }
-    fn is_optional() -> bool {
-        true
     }
 }
 

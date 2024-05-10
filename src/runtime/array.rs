@@ -126,7 +126,7 @@ impl<T: FromValue> TryFrom<Array> for Vec<T> {
 impl<A: FromValue> TryFrom<Array> for (A,) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A,)> {
-        let min_len = A::is_required() as usize;
+        let min_len = A::IS_REQUIRED as usize;
         let mut iter = arr.check_varlen(min_len, 1)?.into_iter();
         Ok((iter.next_into()?,))
     }
@@ -134,7 +134,7 @@ impl<A: FromValue> TryFrom<Array> for (A,) {
 impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A, B)> {
-        let min_len = A::is_required() as usize + B::is_required() as usize;
+        let min_len = A::IS_REQUIRED as usize + B::IS_REQUIRED as usize;
         let mut iter = arr.check_varlen(min_len, 2)?.into_iter();
         Ok((iter.next_into()?, iter.next_into()?))
     }
@@ -142,8 +142,7 @@ impl<A: FromValue, B: FromValue> TryFrom<Array> for (A, B) {
 impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
     type Error = Error;
     fn try_from(arr: Array) -> Result<(A, B, C)> {
-        let min_len =
-            A::is_required() as usize + B::is_required() as usize + C::is_required() as usize;
+        let min_len = A::IS_REQUIRED as usize + B::IS_REQUIRED as usize + C::IS_REQUIRED as usize;
         let mut iter = arr.check_varlen(min_len, 3)?.into_iter();
         Ok((iter.next_into()?, iter.next_into()?, iter.next_into()?))
     }
