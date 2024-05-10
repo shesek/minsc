@@ -164,9 +164,16 @@ pub fn tr(mut a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         }
 
         // tr(PubKey, Script) -> TaprootSpendInfo
-        // Single Script, used as the tree root
+        // Single Script used as the tree root, with an explicit internal key
         (Value::PubKey(pk), Some(Value::Script(script))) => {
             tapinfo_from_tree(definite_xonly(pk)?, Value::Script(script))?.into()
+        }
+
+        // tr(Script) -> TaprootSpendInfo
+        // Single Script used as the tree root, with an unspendable internal key
+        (Value::Script(script), None) => {
+            let unspendable = tr_unspendable(scope)?.ok_or(Error::TaprootNoViableKey)?;
+            tapinfo_from_tree(definite_xonly(unspendable)?, Value::Script(script))?.into()
         }
 
         // tr(PubKey, Hash) -> TaprootSpendInfo
