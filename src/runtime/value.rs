@@ -10,7 +10,7 @@ use miniscript::{bitcoin, DescriptorPublicKey};
 
 use crate::parser::Expr;
 use crate::util::PrettyDisplay;
-use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::{error, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
 
@@ -400,10 +400,10 @@ impl fmt::Display for Value {
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
-            Value::Array(x) => write!(f, "{}", x),
-            Value::Transaction(x) => stdlib::btc::fmt_tx(f, x),
-            Value::Script(x) => stdlib::btc::fmt_script(f, x, true),
-            Value::TapInfo(x) => stdlib::taproot::fmt_tapinfo(f, x), // not round-trip-able for >2 scripts
+            Value::Array(x) => write!(f, "{}", x.pretty_oneliner()),
+            Value::Transaction(x) => write!(f, "{}", x.pretty_oneliner()),
+            Value::Script(x) => write!(f, "{}", x.pretty_oneliner()),
+            Value::TapInfo(x) => write!(f, "{}", x.pretty_oneliner()), // not round-trip-able for >2 scripts
         }
     }
 }
@@ -432,9 +432,15 @@ fn fmt_escaped_str(f: &mut fmt::Formatter, str: &str) -> fmt::Result {
 }
 
 impl PrettyDisplay for Value {
-    fn multiline_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result {
+    const SUPPORT_MULTILINE: bool = true;
+
+    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         match self {
-            Value::Array(arr) => write!(f, "{}", arr.pretty(indent)),
+            Value::Array(x) => write!(f, "{}", x.pretty(indent)),
+            Value::Script(x) => write!(f, "{}", x.pretty(indent)),
+            Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
+            Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
+            // Use Display for types that don't implement PrettyDisplay
             other => write!(f, "{}", other),
         }
     }

@@ -3,7 +3,7 @@ use std::fmt;
 
 use bitcoin::bip32::{ChildNumber, DerivationPath};
 use bitcoin::hashes::{sha256, sha256d, Hash};
-use bitcoin::script::{Builder as ScriptBuilder, PushBytesBuf, Script, ScriptBuf};
+use bitcoin::script::{Builder as ScriptBuilder, PushBytesBuf, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use miniscript::bitcoin::{
     self, absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
@@ -11,7 +11,7 @@ use miniscript::bitcoin::{
 };
 
 use crate::runtime::{eval_exprs, Array, Error, Evaluate, Float, Int, Result, Scope, Value};
-use crate::util::{fmt_list, hash_to_child_vec, DeriveExt, DescriptorExt, EC};
+use crate::util::{fmt_list, hash_to_child_vec, DeriveExt, DescriptorExt, PrettyDisplay, EC};
 use crate::{ast, time};
 
 pub fn attach_stdlib(scope: &mut Scope) {
@@ -367,72 +367,73 @@ impl TryFrom<Value> for bitcoin::Witness {
     }
 }
 
-pub fn fmt_script<W: fmt::Write>(f: &mut W, script: &Script, wrap_backticks: bool) -> fmt::Result {
-    use bitcoin::opcodes::{Class, ClassifyContext};
-    use bitcoin::script::Instruction;
+impl PrettyDisplay for ScriptBuf {
+    const SUPPORT_MULTILINE: bool = false;
 
-    if wrap_backticks {
+    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        use bitcoin::opcodes::{Class, ClassifyContext};
+        use bitcoin::script::Instruction;
+
         write!(f, "`")?;
-    }
-    fmt_list(f, script.instructions(), false, |f, inst| match inst {
-        Ok(Instruction::PushBytes(push)) => {
-            if push.is_empty() {
-                write!(f, "<0>")
-            } else {
-                write!(f, "<0x{}>", push.as_bytes().as_hex())
+        fmt_list(f, self.instructions(), false, |f, inst| match inst {
+            Ok(Instruction::PushBytes(push)) => {
+                if push.is_empty() {
+                    write!(f, "<0>")
+                } else {
+                    write!(f, "<0x{}>", push.as_bytes().as_hex())
+                }
             }
-        }
-        Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
-            Class::PushNum(num) => write!(f, "<{}>", num),
-            _ => write!(f, "{:?}", opcode),
-        },
-        Err(e) => write!(f, "Err({})", e),
-    })?;
-    if wrap_backticks {
-        write!(f, "`")?;
+            Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
+                Class::PushNum(num) => write!(f, "<{}>", num),
+                _ => write!(f, "{:?}", opcode),
+            },
+            Err(e) => write!(f, "Err({})", e),
+        })?;
+        write!(f, "`")
     }
-    Ok(())
 }
+impl PrettyDisplay for Transaction {
+    const SUPPORT_MULTILINE: bool = false;
 
-pub fn fmt_tx(f: &mut fmt::Formatter, tx: &Transaction) -> fmt::Result {
-    write!(
-        f,
-        r#"Transaction([ "version": {}, "locktime": {:?}, "inputs": "#,
-        tx.version.0, tx.lock_time
-    )?;
-    fmt_list(f, &mut tx.input.iter(), true, |f, input| {
-        if input.sequence == Sequence::default()
-            && input.script_sig == ScriptBuf::default()
-            && input.witness.is_empty()
-        {
-            write!(f, "{}", input.previous_output)
-        } else {
-            write!(f, r#"[ "prevout": {}"#, input.previous_output)?;
-            if input.sequence != Sequence::default() {
-                write!(f, r#", "sequence": {}"#, input.sequence)?;
+    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        write!(
+            f,
+            r#"Transaction([ "version": {}, "locktime": {:?}, "inputs": "#,
+            self.version.0, self.lock_time
+        )?;
+        fmt_list(f, &mut self.input.iter(), true, |f, input| {
+            if input.sequence == Sequence::default()
+                && input.script_sig == ScriptBuf::default()
+                && input.witness.is_empty()
+            {
+                write!(f, "{}", input.previous_output)
+            } else {
+                write!(f, r#"[ "prevout": {}"#, input.previous_output)?;
+                if input.sequence != Sequence::default() {
+                    write!(f, r#", "sequence": {}"#, input.sequence)?;
+                }
+                if input.script_sig != ScriptBuf::default() {
+                    write!(f, r#", "script_sig": {}"#, &input.script_sig.pretty(None))?;
+                }
+                if !input.witness.is_empty() {
+                    write!(f, r#", "witness": "#)?;
+                    fmt_list(f, &mut input.witness.iter(), true, |f, wit_item: &[u8]| {
+                        write!(f, "0x{}", wit_item.as_hex())
+                    })?;
+                }
+                write!(f, r#" ]"#)
             }
-            if input.script_sig != ScriptBuf::default() {
-                write!(f, r#", "script_sig": "#)?;
-                fmt_script(f, &input.script_sig, true)?;
+        })?;
+        write!(f, r#", "outputs": "#)?;
+        fmt_list(f, self.output.iter(), true, |f, output| {
+            if let Ok(address) = Address::from_script(&output.script_pubkey, Network::Signet) {
+                // FIXME always uses the Signet version bytes
+                write!(f, "{}", address)?;
+            } else {
+                write!(f, "{}", output.script_pubkey.pretty(None))?;
             }
-            if !input.witness.is_empty() {
-                write!(f, r#", "witness": "#)?;
-                fmt_list(f, &mut input.witness.iter(), true, |f, wit_item: &[u8]| {
-                    write!(f, "0x{}", wit_item.as_hex())
-                })?;
-            }
-            write!(f, r#" ]"#)
-        }
-    })?;
-    write!(f, r#", "outputs": "#)?;
-    fmt_list(f, tx.output.iter(), true, |f, output| {
-        if let Ok(address) = Address::from_script(&output.script_pubkey, Network::Signet) {
-            // FIXME always uses the Signet version bytes
-            write!(f, "{}", address)?;
-        } else {
-            fmt_script(f, &output.script_pubkey, true)?;
-        }
-        write!(f, r#": {} BTC"#, output.value.to_btc())
-    })?;
-    write!(f, " ])")
+            write!(f, r#": {} BTC"#, output.value.to_btc())
+        })?;
+        write!(f, " ])")
+    }
 }

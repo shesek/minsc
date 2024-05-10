@@ -4,7 +4,6 @@ use serde::Serialize;
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
 
-use crate::stdlib::btc::fmt_script;
 use crate::util::DescriptorExt;
 use crate::{parse, Error, Evaluate, Execute, Library, PrettyDisplay, Scope, Value};
 
@@ -84,7 +83,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
             //script_hex: script.as_ref().map(|s| s.to_hex()),
             script_asm: script.as_ref().map(get_script_asm),
             address: addr.map(|a| a.to_string()),
-            other: other.map(|o| o.pretty_str()),
+            other: other.map(|o| o.multiline_str()),
         })
     };
     let result = _run_playground().map_err(|e| e.to_string())?;
@@ -96,9 +95,9 @@ fn run(code: &str) -> Result<Value, Error> {
 }
 
 fn get_script_asm(script: &ScriptBuf) -> String {
-    let mut s = String::new();
-    fmt_script(&mut s, script, false).unwrap();
-    s
+    let s = script.pretty_str();
+    // Remove the wrapping backticks
+    s[1..s.len() - 1].to_string()
 }
 
 lazy_static! {

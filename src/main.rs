@@ -21,7 +21,7 @@ fn main_() -> Result<(), Error> {
         println!("{:#?}", parse(&code)?);
     } else {
         let res = eval(parse(&code)?)?;
-        println!("{}", res.pretty(0));
+        println!("{}", res.pretty_multiline());
         if debug {
             println!("\n\n{:#?}", res);
         }

@@ -2,7 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::{fmt, mem, ops, vec};
 
 use crate::runtime::{Error, FromValue, Result, Value};
-use crate::util::{fmt_list, PrettyDisplay};
+use crate::util::PrettyDisplay;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);
@@ -149,33 +149,33 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
     }
 }
 
-// Standard Display, with no newlines or indentation
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if should_use_colon_syntax(&self.0) {
-            // Display 2-tuples using the A:B colon construction syntax
-            write!(f, "{}{}{}", self.0[0], colon_separator(&self.0), self.0[1])
-        } else {
-            fmt_list(f, self.0.iter(), true, |f, el| write!(f, "{}", el))
-        }
+        write!(f, "{}", self.pretty_oneliner())
     }
 }
 
-// Multi-line display with indentation
 impl PrettyDisplay for Array {
-    fn multiline_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result {
+    const SUPPORT_MULTILINE: bool = true;
+
+    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         if should_use_colon_syntax(&self.0) {
             let separator = colon_separator(&self.0);
             write!(f, "{}{}{}", self.0[0], separator, self.0[1].pretty(indent))
         } else {
-            write!(f, "[\n")?;
+            let newline_or_space = iif!(indent.is_some(), "\n", " ");
+            let inner_indent = indent.map(|n| n + 1);
+            let indent_w = indent.map_or(0, |n| n * Self::INDENT_WIDTH);
+            let inner_indent_w = inner_indent.map_or(0, |n| n * Self::INDENT_WIDTH);
+
+            write!(f, "[{}", newline_or_space)?;
             for (i, e) in self.0.iter().enumerate() {
                 if i > 0 {
-                    write!(f, ",\n")?;
+                    write!(f, ",{}", newline_or_space)?;
                 }
-                write!(f, "{:i$}{}", "", e.pretty(indent + 1), i = (indent + 1) * 2)?;
+                write!(f, "{:i$}{}", "", e.pretty(inner_indent), i = inner_indent_w)?;
             }
-            write!(f, "\n{:i$}]", "", i = indent * 2)
+            write!(f, "{}{:i$}]", newline_or_space, "", i = indent_w)
         }
     }
 }
@@ -189,7 +189,7 @@ fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
             (Array(_) | Function(_) | Transaction(_), _) => false,
 
             // If the LHS is a String or Script, only if they're short (used as tagged list keys and predicates)
-            (String(lhs), _) => lhs.len() < 30,
+            (String(lhs), _) => lhs.len() < 43,
             (Script(lhs), _) => lhs.len() < 40,
 
             // Otherwise, only if the LHS and RHS are of different types

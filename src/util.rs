@@ -1,4 +1,4 @@
-use std::fmt::{self, Write};
+use std::fmt;
 use std::marker::PhantomData;
 
 use bitcoin::bip32::{ChildNumber, IntoDerivationPath};
@@ -376,39 +376,53 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
     }
 }
 
-pub trait PrettyDisplay: fmt::Display + Sized {
-    /// The one-liner Display representation is used below this size limit
+/// Display-like with custom formatting options, newlines/indentation handling and the ability to implement on foreign types
+pub trait PrettyDisplay: Sized {
+    const SUPPORT_MULTILINE: bool;
+    const INDENT_WIDTH: usize = 2;
     const MAX_ONELINER_LENGTH: usize = 125;
 
-    /// Use the one-liner Display if its short enough, or PrettyDisplay::multiline_fmt() otherwise
-    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result {
-        // Try formatting into a buffer using Display first, to determine whether it exceeds the length limit.
-        // The LimitedWriter will reject writes once the limit is reached, terminating the Display process midway through.
+    /// Pretty formatting with optional multi-line indented formatting for long lines ove MAX_ONELINER_LENGTH
+    fn pretty_fmt<W: fmt::Write>(&self, w: &mut W, indent: Option<usize>) -> fmt::Result {
+        if !Self::SUPPORT_MULTILINE || indent.is_none() {
+            return self.pretty_fmt_inner(w, None);
+        }
+
+        // Try formatting into a buffer with no newlines first, to determine whether it exceeds the length limit.
+        // The LimitedWriter will reject writes once the limit is reached, terminating the process midway through.
         let mut one_liner = String::new();
         let mut lwriter = LimitedWriter::new(&mut one_liner, Self::MAX_ONELINER_LENGTH);
-        if write!(lwriter, "{}", self).is_ok() {
-            // Display fits in ONELINER_LIMIT, forward the buffered string to the outer `f` formatter
-            write!(f, "{}", one_liner)
+        if self.pretty_fmt_inner(&mut lwriter, None).is_ok() {
+            // Fits in MAX_ONELINER_LIMIT, forward the buffered string to the outer `w` formatter
+            write!(w, "{}", one_liner)
         } else {
-            // The one-liner was too long, use multi-line pretty formatting instead
-            self.multiline_fmt(f, indent)
+            // The one-liner was too long, use multi-line formatting with indentation instead
+            self.pretty_fmt_inner(w, indent)
         }
     }
 
     /// Format with multi-line and indentation. This is the only method that needs to be implemented.
-    fn multiline_fmt<W: fmt::Write>(&self, f: &mut W, indent: usize) -> fmt::Result;
+    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result;
 
     /// Get back a Display-able struct with pretty-formatting
-    fn pretty(&self, indent: usize) -> PrettyDisplayer<Self> {
+    fn pretty(&self, indent: Option<usize>) -> PrettyDisplayer<Self> {
         PrettyDisplayer {
             inner: &self,
             indent,
         }
     }
+    fn pretty_oneliner(&self) -> PrettyDisplayer<Self> {
+        self.pretty(None)
+    }
+    fn pretty_multiline(&self) -> PrettyDisplayer<Self> {
+        self.pretty(Some(0))
+    }
 
-    /// Pretty format as a String
     fn pretty_str(&self) -> String {
-        self.pretty(0).to_string()
+        self.pretty_oneliner().to_string()
+    }
+    fn multiline_str(&self) -> String {
+        self.pretty_multiline().to_string()
     }
 }
 
@@ -416,7 +430,8 @@ pub trait PrettyDisplay: fmt::Display + Sized {
 #[derive(Debug)]
 pub struct PrettyDisplayer<'a, T: PrettyDisplay> {
     inner: &'a T,
-    indent: usize,
+    /// Setting this implies enabling new-lines
+    indent: Option<usize>,
 }
 impl<'a, T: PrettyDisplay> fmt::Display for PrettyDisplayer<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -9,8 +9,8 @@ use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
 use super::miniscript::into_policies;
 use crate::runtime::{Error, Result, Scope, Value};
-use crate::util::{fmt_list, EC};
-use crate::{stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::util::{fmt_list, PrettyDisplay, EC};
+use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &mut Scope) {
     // Taproot Descriptor/TaprootSpendInfo construction
@@ -374,27 +374,31 @@ fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
     ))
 }
 
-pub fn fmt_tapinfo<W: fmt::Write>(f: &mut W, tapinfo: &TaprootSpendInfo) -> fmt::Result {
-    write!(f, "tr(0x{}", tapinfo.internal_key())?;
-    let script_map = tapinfo.script_map();
-    if !script_map.is_empty() {
-        write!(f, ", ",)?;
-        if script_map.len() > 1 {
-            fmt_list(f, script_map.into_iter(), true, |f, ((script, _), _)| {
-                //write!(f, "{:?}:", leaf_ver)?;
-                stdlib::btc::fmt_script(f, script, true)
-            })?;
-        } else {
-            let ((script, _), _) = script_map.first_key_value().unwrap();
-            stdlib::btc::fmt_script(f, script, true)?;
+impl PrettyDisplay for TaprootSpendInfo {
+    const SUPPORT_MULTILINE: bool = false;
+
+    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        write!(f, "tr(0x{}", self.internal_key())?;
+        let script_map = self.script_map();
+        if !script_map.is_empty() {
+            write!(f, ", ",)?;
+            if script_map.len() > 1 {
+                fmt_list(f, script_map.into_iter(), true, |f, ((script, _), _)| {
+                    //write!(f, "{:?}:", leaf_ver)?;
+                    write!(f, "{}", script.pretty(None))
+                })?;
+            } else {
+                let ((script, _), _) = script_map.first_key_value().unwrap();
+                write!(f, "{}", script.pretty(None))?;
+            }
+            if script_map.len() > 2 {
+                // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
+                // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
+                // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
+                // FIXME deduce the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
+                write!(f, "(not tree)")?;
+            }
         }
-        if script_map.len() > 2 {
-            // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
-            // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
-            // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
-            // FIXME deduce the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
-            write!(f, "(not tree)")?;
-        }
+        write!(f, ")")
     }
-    write!(f, ")")
 }
