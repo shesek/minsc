@@ -45,7 +45,9 @@ pub enum RuntimeError {
     #[error("Expected an array, not {0:?}")]
     NotArray(Value),
 
-    #[error("Accessing by index is possible on Array/Bytes, not {0:?}")]
+    #[error(
+        "Accessing by index is possible on Array, Bytes and multi-path Descriptors, not {0:?}"
+    )]
     NoArrayAccess(Value),
 
     #[error("Expected a number, not {0:?}")]

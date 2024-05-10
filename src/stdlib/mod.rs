@@ -85,6 +85,7 @@ pub mod fns {
             Value::Bytes(bytes) => bytes.len(),
             Value::String(string) => string.len(),
             Value::Script(script) => script.into_bytes().len(),
+            Value::Descriptor(desc) if desc.is_multipath() => desc.into_single_descriptors()?.len(),
             _ => bail!(Error::InvalidArguments),
         }
         .into())
