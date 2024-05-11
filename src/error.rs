@@ -110,6 +110,9 @@ pub enum RuntimeError {
     #[error("Required value missing")]
     MissingValue,
 
+    #[error("Invalid value: {0:?}")]
+    InvalidValue(Value),
+
     #[error("Expected length {1}, not {0}")]
     InvalidLength(usize, usize), // (actual, expected)
 
