@@ -322,33 +322,6 @@ pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
     c
 }
 
-/// Utility for formatting comma-separated lists of things
-pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, array_like: bool, f: F) -> fmt::Result
-where
-    W: fmt::Write,
-    I: Iterator<Item = T>,
-    F: Fn(&mut W, T) -> fmt::Result,
-{
-    if array_like {
-        write!(w, "[")?;
-    }
-    for (i, item) in iter.enumerate() {
-        if i == 0 && array_like {
-            write!(w, " ")?;
-        } else if i > 0 {
-            if array_like {
-                write!(w, ",")?;
-            }
-            write!(w, " ")?;
-        }
-        f(w, item)?;
-    }
-    if array_like {
-        write!(w, " ]")?;
-    }
-    Ok(())
-}
-
 /// A Write wrapper that allows up the `limit` bytes to be written through it to the inner `writer`.
 /// If the limit is reached, an fmt::Error is raised. This is used as an optimization by PrettyDisplay.
 pub struct LimitedWriter<'a, W: fmt::Write + ?Sized> {
@@ -378,31 +351,34 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
 
 /// Display-like with custom formatting options, newlines/indentation handling and the ability to implement on foreign types
 pub trait PrettyDisplay: Sized {
-    const SUPPORT_MULTILINE: bool;
-    const INDENT_WIDTH: usize = 2;
+    const SUPPORTS_MULTILINE: bool;
     const MAX_ONELINER_LENGTH: usize = 125;
 
-    /// Pretty formatting with optional multi-line indented formatting for long lines ove MAX_ONELINER_LENGTH
-    fn pretty_fmt<W: fmt::Write>(&self, w: &mut W, indent: Option<usize>) -> fmt::Result {
-        if !Self::SUPPORT_MULTILINE || indent.is_none() {
-            return self.pretty_fmt_inner(w, None);
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result;
+
+    /// Use multi-line indented formatting for long lines ove MAX_ONELINER_LENGTH,
+    fn auto_fmt<W: fmt::Write>(&self, w: &mut W, indent: Option<usize>) -> fmt::Result {
+        if !Self::SUPPORTS_MULTILINE || indent.is_none() || self.should_prefer_multiline() {
+            return self.pretty_fmt(w, indent);
         }
 
         // Try formatting into a buffer with no newlines first, to determine whether it exceeds the length limit.
         // The LimitedWriter will reject writes once the limit is reached, terminating the process midway through.
         let mut one_liner = String::new();
         let mut lwriter = LimitedWriter::new(&mut one_liner, Self::MAX_ONELINER_LENGTH);
-        if self.pretty_fmt_inner(&mut lwriter, None).is_ok() {
+        if self.pretty_fmt(&mut lwriter, None).is_ok() {
             // Fits in MAX_ONELINER_LIMIT, forward the buffered string to the outer `w` formatter
             write!(w, "{}", one_liner)
         } else {
             // The one-liner was too long, use multi-line formatting with indentation instead
-            self.pretty_fmt_inner(w, indent)
+            self.pretty_fmt(w, indent)
         }
     }
 
-    /// Format with multi-line and indentation. This is the only method that needs to be implemented.
-    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result;
+    /// Don't try fitting into a one-liner if this test passes
+    fn should_prefer_multiline(&self) -> bool {
+        false
+    }
 
     /// Get back a Display-able struct with pretty-formatting
     fn pretty(&self, indent: Option<usize>) -> PrettyDisplayer<Self> {
@@ -411,22 +387,19 @@ pub trait PrettyDisplay: Sized {
             indent,
         }
     }
-    fn pretty_oneliner(&self) -> PrettyDisplayer<Self> {
-        self.pretty(None)
-    }
     fn pretty_multiline(&self) -> PrettyDisplayer<Self> {
         self.pretty(Some(0))
     }
 
     fn pretty_str(&self) -> String {
-        self.pretty_oneliner().to_string()
+        self.pretty(None).to_string()
     }
     fn multiline_str(&self) -> String {
         self.pretty_multiline().to_string()
     }
 }
 
-/// A wrapper type implementing Display that delegates to the inner PrettyDisplay
+/// A wrapper type implementing Display over PrettyDisplay::auto_fmt()
 #[derive(Debug)]
 pub struct PrettyDisplayer<'a, T: PrettyDisplay> {
     inner: &'a T,
@@ -435,6 +408,36 @@ pub struct PrettyDisplayer<'a, T: PrettyDisplay> {
 }
 impl<'a, T: PrettyDisplay> fmt::Display for PrettyDisplayer<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.inner.pretty_fmt(f, self.indent)
+        self.inner.auto_fmt(f, self.indent)
     }
+}
+
+pub const LIST_INDENT_WIDTH: usize = 2;
+
+pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, indent: Option<usize>, func: F) -> fmt::Result
+where
+    W: fmt::Write,
+    I: Iterator<Item = T>,
+    F: Fn(&mut W, T, Option<usize>) -> fmt::Result,
+{
+    let (newline_or_space, inner_indent, indent_w, inner_indent_w) = indentation_params(indent);
+
+    write!(w, "[")?;
+    for (i, item) in iter.enumerate() {
+        if i > 0 {
+            write!(w, ",")?;
+        }
+        write!(w, "{newline_or_space}{:inner_indent_w$}", "")?;
+        func(w, item, inner_indent)?;
+    }
+    write!(w, "{newline_or_space}{:indent_w$}]", "")
+}
+
+pub fn indentation_params(indent: Option<usize>) -> (&'static str, Option<usize>, usize, usize) {
+    let newline_or_space = iif!(indent.is_some(), "\n", " ");
+    let inner_indent = indent.map(|n| n + 1);
+    let indent_w = indent.map_or(0, |n| n * LIST_INDENT_WIDTH);
+    let inner_indent_w = inner_indent.map_or(0, |n| n * LIST_INDENT_WIDTH);
+
+    (newline_or_space, inner_indent, indent_w, inner_indent_w)
 }

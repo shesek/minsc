@@ -2,7 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::{fmt, mem, ops, vec};
 
 use crate::runtime::{Error, FromValue, Result, Value};
-use crate::util::PrettyDisplay;
+use crate::util::{fmt_list, PrettyDisplay};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);
@@ -150,32 +150,26 @@ impl<A: FromValue, B: FromValue, C: FromValue> TryFrom<Array> for (A, B, C) {
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.pretty_oneliner())
+        write!(f, "{}", self.pretty(None))
     }
 }
 
 impl PrettyDisplay for Array {
-    const SUPPORT_MULTILINE: bool = true;
+    const SUPPORTS_MULTILINE: bool = true;
 
-    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         if should_use_colon_syntax(&self.0) {
             let separator = colon_separator(&self.0);
             write!(f, "{}{}{}", self.0[0], separator, self.0[1].pretty(indent))
         } else {
-            let newline_or_space = iif!(indent.is_some(), "\n", " ");
-            let inner_indent = indent.map(|n| n + 1);
-            let indent_w = indent.map_or(0, |n| n * Self::INDENT_WIDTH);
-            let inner_indent_w = inner_indent.map_or(0, |n| n * Self::INDENT_WIDTH);
-
-            write!(f, "[{}", newline_or_space)?;
-            for (i, e) in self.0.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ",{}", newline_or_space)?;
-                }
-                write!(f, "{:i$}{}", "", e.pretty(inner_indent), i = inner_indent_w)?;
-            }
-            write!(f, "{}{:i$}]", newline_or_space, "", i = indent_w)
+            fmt_list(f, self.0.iter(), indent, |f, el, inner_indent| {
+                write!(f, "{}", el.pretty(inner_indent))
+            })
         }
+    }
+
+    fn should_prefer_multiline(&self) -> bool {
+        self.len() > 10
     }
 }
 

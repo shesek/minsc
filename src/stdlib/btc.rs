@@ -11,7 +11,7 @@ use miniscript::bitcoin::{
 };
 
 use crate::runtime::{eval_exprs, Array, Error, Evaluate, Float, Int, Result, Scope, Value};
-use crate::util::{fmt_list, hash_to_child_vec, DeriveExt, DescriptorExt, PrettyDisplay, EC};
+use crate::util::{self, fmt_list, DeriveExt, DescriptorExt, PrettyDisplay, EC};
 use crate::{ast, time};
 
 pub fn attach_stdlib(scope: &mut Scope) {
@@ -99,7 +99,7 @@ impl Evaluate for ast::ChildDerive {
                 // Derive with a hash converted into a series of BIP32 non-hardened derivations using hash_to_child_vec()
                 Value::Bytes(bytes) => {
                     let hash = sha256::Hash::from_slice(&bytes)?;
-                    node.derive_path(hash_to_child_vec(hash), self.is_wildcard)?
+                    node.derive_path(util::hash_to_child_vec(hash), self.is_wildcard)?
                 }
 
                 // Derive a BIP389 Multipath descriptor
@@ -368,72 +368,113 @@ impl TryFrom<Value> for bitcoin::Witness {
 }
 
 impl PrettyDisplay for ScriptBuf {
-    const SUPPORT_MULTILINE: bool = false;
+    const SUPPORTS_MULTILINE: bool = false;
 
-    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
         use bitcoin::opcodes::{Class, ClassifyContext};
         use bitcoin::script::Instruction;
 
         write!(f, "`")?;
-        fmt_list(f, self.instructions(), false, |f, inst| match inst {
-            Ok(Instruction::PushBytes(push)) => {
-                if push.is_empty() {
-                    write!(f, "<0>")
-                } else {
-                    write!(f, "<0x{}>", push.as_bytes().as_hex())
-                }
+        for (i, inst) in self.instructions().enumerate() {
+            if i > 0 {
+                write!(f, " ")?;
             }
-            Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
-                Class::PushNum(num) => write!(f, "<{}>", num),
-                _ => write!(f, "{:?}", opcode),
-            },
-            Err(e) => write!(f, "Err({})", e),
-        })?;
+            match inst {
+                Ok(Instruction::PushBytes(push)) => {
+                    if push.is_empty() {
+                        write!(f, "<0>")?
+                    } else {
+                        write!(f, "<0x{}>", push.as_bytes().as_hex())?
+                    }
+                }
+                Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
+                    Class::PushNum(num) => write!(f, "<{}>", num)?,
+                    _ => write!(f, "{:?}", opcode)?,
+                },
+                Err(e) => write!(f, "Err({})", e)?,
+            }
+        }
         write!(f, "`")
+    }
+
+    fn should_prefer_multiline(&self) -> bool {
+        self.len() > 50
     }
 }
 impl PrettyDisplay for Transaction {
-    const SUPPORT_MULTILINE: bool = false;
+    const SUPPORTS_MULTILINE: bool = true;
+    const MAX_ONELINER_LENGTH: usize = 200;
 
-    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
+            util::indentation_params(indent);
+        let field_sep = format!("{newline_or_space}{:inner_indent_w$}", "");
         write!(
             f,
-            r#"Transaction([ "version": {}, "locktime": {:?}, "inputs": "#,
-            self.version.0, self.lock_time
+            r#"Transaction([{field_sep}"version": {}"#,
+            self.version.0
         )?;
-        fmt_list(f, &mut self.input.iter(), true, |f, input| {
-            if input.sequence == Sequence::default()
-                && input.script_sig == ScriptBuf::default()
-                && input.witness.is_empty()
-            {
-                write!(f, "{}", input.previous_output)
-            } else {
-                write!(f, r#"[ "prevout": {}"#, input.previous_output)?;
-                if input.sequence != Sequence::default() {
-                    write!(f, r#", "sequence": {}"#, input.sequence)?;
+        if self.lock_time != LockTime::ZERO {
+            write!(f, r#",{field_sep}"locktime": {}"#, self.lock_time)?;
+        }
+        if !self.input.is_empty() {
+            write!(f, r#",{field_sep}"inputs": "#)?;
+            fmt_list(f, &mut self.input.iter(), inner_indent, |f, input, _| {
+                // Individual inputs are always displayed as one-liners
+                if input.sequence == Sequence::default()
+                    && input.script_sig == ScriptBuf::default()
+                    && input.witness.is_empty()
+                {
+                    write!(f, "{}", input.previous_output)
+                } else {
+                    write!(f, r#"[ "prevout": {}"#, input.previous_output)?;
+                    if input.sequence != Sequence::default() {
+                        write!(f, r#", "sequence": {}"#, input.sequence)?;
+                    }
+                    if input.script_sig != ScriptBuf::default() {
+                        write!(f, r#", "script_sig": {}"#, &input.script_sig.pretty(None))?;
+                    }
+                    if !input.witness.is_empty() {
+                        write!(f, r#", "witness": {}"#, input.witness.pretty(None))?;
+                    }
+                    write!(f, r#" ]"#)
                 }
-                if input.script_sig != ScriptBuf::default() {
-                    write!(f, r#", "script_sig": {}"#, &input.script_sig.pretty(None))?;
-                }
-                if !input.witness.is_empty() {
-                    write!(f, r#", "witness": "#)?;
-                    fmt_list(f, &mut input.witness.iter(), true, |f, wit_item: &[u8]| {
-                        write!(f, "0x{}", wit_item.as_hex())
-                    })?;
-                }
-                write!(f, r#" ]"#)
-            }
-        })?;
-        write!(f, r#", "outputs": "#)?;
-        fmt_list(f, self.output.iter(), true, |f, output| {
-            if let Ok(address) = Address::from_script(&output.script_pubkey, Network::Signet) {
-                // FIXME always uses the Signet version bytes
-                write!(f, "{}", address)?;
-            } else {
-                write!(f, "{}", output.script_pubkey.pretty(None))?;
-            }
-            write!(f, r#": {} BTC"#, output.value.to_btc())
-        })?;
-        write!(f, " ])")
+            })?;
+        }
+        if !self.output.is_empty() {
+            write!(f, r#",{field_sep}"outputs": "#)?;
+            fmt_list(
+                f,
+                self.output.iter(),
+                inner_indent,
+                |f, output, _inner_indent| {
+                    // Individual outputs are always displayed as one-liners
+                    if let Ok(address) =
+                        Address::from_script(&output.script_pubkey, Network::Signet)
+                    {
+                        // XXX always uses the Signet version bytes
+                        write!(f, "{}", address)?;
+                    } else {
+                        write!(f, "{}", output.script_pubkey.pretty(None))?;
+                    }
+                    write!(f, r#": {} BTC"#, output.value.to_btc())
+                },
+            )?;
+        }
+        write!(f, "{newline_or_space}{:indent_w$}])", "")
+    }
+
+    fn should_prefer_multiline(&self) -> bool {
+        (self.input.len() + self.output.len()) > 2
+    }
+}
+
+impl PrettyDisplay for bitcoin::Witness {
+    const SUPPORTS_MULTILINE: bool = true;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        fmt_list(f, &mut self.iter(), indent, |f, wit_item: &[u8], _| {
+            write!(f, "0x{}", wit_item.as_hex())
+        })
     }
 }

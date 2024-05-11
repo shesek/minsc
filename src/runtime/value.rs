@@ -396,10 +396,10 @@ impl fmt::Display for Value {
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
-            Value::Array(x) => write!(f, "{}", x.pretty_oneliner()),
-            Value::Transaction(x) => write!(f, "{}", x.pretty_oneliner()),
-            Value::Script(x) => write!(f, "{}", x.pretty_oneliner()),
-            Value::TapInfo(x) => write!(f, "{}", x.pretty_oneliner()), // not round-trip-able for >2 scripts
+            Value::Array(x) => write!(f, "{}", x.pretty(None)),
+            Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
+            Value::Script(x) => write!(f, "{}", x.pretty(None)),
+            Value::TapInfo(x) => write!(f, "{}", x.pretty(None)), // not round-trip-able for >2 scripts
         }
     }
 }
@@ -428,9 +428,9 @@ fn fmt_escaped_str(f: &mut fmt::Formatter, str: &str) -> fmt::Result {
 }
 
 impl PrettyDisplay for Value {
-    const SUPPORT_MULTILINE: bool = true;
+    const SUPPORTS_MULTILINE: bool = true;
 
-    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         match self {
             Value::Array(x) => write!(f, "{}", x.pretty(indent)),
             Value::Script(x) => write!(f, "{}", x.pretty(indent)),

@@ -375,30 +375,35 @@ fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
 }
 
 impl PrettyDisplay for TaprootSpendInfo {
-    const SUPPORT_MULTILINE: bool = false;
+    const SUPPORTS_MULTILINE: bool = true;
+    const MAX_ONELINER_LENGTH: usize = 170;
 
-    fn pretty_fmt_inner<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         write!(f, "tr(0x{}", self.internal_key())?;
         let script_map = self.script_map();
         if !script_map.is_empty() {
             write!(f, ", ",)?;
             if script_map.len() > 1 {
-                fmt_list(f, script_map.into_iter(), true, |f, ((script, _), _)| {
+                fmt_list(f, script_map.keys(), indent, |f, (script, _), _| {
                     //write!(f, "{:?}:", leaf_ver)?;
                     write!(f, "{}", script.pretty(None))
                 })?;
+                if script_map.len() > 2 {
+                    // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
+                    // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
+                    // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
+                    // FIXME deduce the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
+                    write!(f, "(not tree)")?;
+                }
             } else {
                 let ((script, _), _) = script_map.first_key_value().unwrap();
                 write!(f, "{}", script.pretty(None))?;
             }
-            if script_map.len() > 2 {
-                // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
-                // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
-                // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
-                // FIXME deduce the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
-                write!(f, "(not tree)")?;
-            }
         }
         write!(f, ")")
+    }
+
+    fn should_prefer_multiline(&self) -> bool {
+        self.script_map().len() > 2
     }
 }
