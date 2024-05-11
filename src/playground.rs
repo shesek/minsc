@@ -1,5 +1,5 @@
 use miniscript::bitcoin::{Address, Network, ScriptBuf};
-use miniscript::descriptor::Descriptor;
+use miniscript::{Descriptor, MiniscriptKey};
 use serde::Serialize;
 use std::str::FromStr;
 use wasm_bindgen::prelude::*;
@@ -24,63 +24,55 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
         let value = run(code)?;
 
-        let (policy, desc, script, addr, other) = match value {
-            Value::Policy(policy) => {
-                let ms = policy.compile()?;
-                let desc = Descriptor::new_wsh(ms)?;
-                let script = desc.to_explicit_script()?;
-                let addr = desc.to_address(network)?;
-                (Some(policy), Some(desc), Some(script), Some(addr), None)
+        let (mut policy, mut desc, mut script, mut addr, mut other) =
+            (None, None, None, None, None);
+
+        match value {
+            Value::Policy(policy_) => {
+                // Convert policies into a wsh() descriptor
+                desc = Some(Descriptor::new_wsh(policy_.compile()?)?);
+                policy = Some(policy_);
             }
-            Value::Descriptor(desc) => {
-                let (addr, script, tapinfo) = if desc.is_multipath() {
-                    (None, None, None)
-                } else if let Descriptor::Tr(_) = desc {
-                    // For Taproot descriptors, also show the TaprootSpendInfo as the 'other' result
-                    let tapinfo = match desc.clone().at_derivation_index(0)? {
-                        Descriptor::Tr(tr) => (*tr.spend_info()).clone(),
-                        _ => unreachable!(),
-                    };
-                    (Some(desc.to_address(network)?), None, Some(tapinfo.into()))
-                } else {
-                    // Explicit script is only available for non-Taproot descriptors
-                    (
-                        Some(desc.to_address(network)?),
-                        Some(desc.to_explicit_script()?),
-                        None,
-                    )
-                };
-                (None, Some(desc), script, addr, tapinfo)
-            }
+            Value::Descriptor(desc_) => desc = Some(desc_),
             Value::PubKey(key) => {
-                let desc = Descriptor::new_wpkh(key.clone())?;
-                let (addr, script) = if desc.is_multipath() {
-                    (None, None)
+                // Convert pubkeys into wpkh()/tr() descriptors
+                desc = Some(if key.is_x_only_key() {
+                    Descriptor::new_tr(key.clone(), None)?
                 } else {
-                    let addr = desc.to_address(network)?;
-                    let script = desc.to_explicit_script()?;
-                    (Some(addr), Some(script))
-                };
-                (None, Some(desc), script, addr, Some(key.into()))
+                    Descriptor::new_wpkh(key.clone())?
+                });
+                other = Some(key.into());
             }
-            Value::Script(script) => {
-                let addr = Address::from_script(&script, network).ok();
-                (None, None, Some(script), addr, None)
+            Value::Script(script_) => {
+                addr = Address::from_script(&script_, network).ok();
+                script = Some(script_)
             }
             tapinfo @ Value::TapInfo(_) => {
+                // Display the address of TaprootSpendInfo
                 let spk = tapinfo.clone().into_spk()?;
-                let addr = Address::from_script(&spk, network).unwrap();
-                (None, None, None, Some(addr), Some(tapinfo))
+                addr = Some(Address::from_script(&spk, network).unwrap());
+                other = Some(tapinfo);
             }
 
-            Value::Address(addr) => (None, None, None, Some(addr), None),
-            other => (None, None, None, None, Some(other)),
+            Value::Address(addr_) => addr = Some(addr_),
+            other_ => other = Some(other_),
         };
+
+        // Display the explicitScript and address of descriptors
+        if let (Some(desc), None, None) = (&desc, &script, &addr) {
+            // Multi-path descriptors cannot be used to derive scripts/addresses
+            if !desc.is_multipath() {
+                addr = Some(desc.to_address(network)?);
+                // Taproot doesn't have an explicitScript
+                if !matches!(desc, Descriptor::Tr(_)) {
+                    script = Some(desc.to_explicit_script()?);
+                }
+            }
+        }
 
         Ok(PlaygroundResult {
             policy: policy.map(|p| p.to_string()),
-            descriptor: desc.map(|d| d.to_string()),
-            //script_hex: script.as_ref().map(|s| s.to_hex()),
+            descriptor: desc.map(|d| format!("{:#}", d)),
             script_asm: script.as_ref().map(get_script_asm),
             address: addr.map(|a| a.to_string()),
             other: other.map(|o| o.multiline_str()),
