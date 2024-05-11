@@ -193,6 +193,7 @@ fn assert::msg($bool, $msg) = if !$bool then throw($msg) else true;
 
 // env() with debug() formatting
 fn env::debug() = mapValues(env(), |$v| if !isFunction($v) then debug($v) else $v);
+fn env::log($label) = log($label, "env:", env());
 
 // Function form for assigning execution probabilities
 fn prob($n, $val) = $n@$val;

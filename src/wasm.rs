@@ -15,3 +15,12 @@ pub fn js_run(code: &str) -> Result<JsValue, JsValue> {
 fn run(code: &str) -> Result<Value, Error> {
     Ok(parse(code)?.eval(Scope::root())?)
 }
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    pub fn console_log(a: &str, b: &str);
+
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    pub fn console_error(a: &str, b: &str);
+}

@@ -43,6 +43,8 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Development utilities
     scope.set_fn("debug", fns::debug).unwrap();
     scope.set_fn("env", fns::env).unwrap();
+    scope.set_fn("log", fns::log).unwrap();
+    scope.set_fn("warn", fns::warn).unwrap();
 
     // Constants
     scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
@@ -181,16 +183,6 @@ pub mod fns {
         Ok(bytes.into())
     }
 
-    pub fn throw(args: Array, _: &Scope) -> Result<Value> {
-        let args = args.check_varlen(1, usize::MAX)?;
-        let msg_parts = args.into_iter().map(|arg| match arg {
-            Value::String(str) => str,
-            other => other.to_string(),
-        });
-        let msg = msg_parts.collect::<Vec<_>>().join(" ");
-        Err(Error::ScriptException(msg))
-    }
-
     /// le64(Number) -> Bytes
     /// Encode 64-bit signed integers as little-endian bytes
     /// Matches the format used by Elements Script
@@ -224,11 +216,50 @@ pub mod fns {
     pub fn env(args: Array, scope: &Scope) -> Result<Value> {
         // Set to -1 by default, which will return everything but the root scope
         let max_depth = args.arg_into::<Option<isize>>()?.unwrap_or(-1);
-        let vars = scope
+        let tagged_vars = scope
             .env(max_depth)
             .into_iter()
             .map(|(ident, val)| vec![Value::String(ident.0.clone()), val.clone()].into())
             .collect();
-        Ok(Array(vars).into())
+        Ok(Array(tagged_vars).into())
+    }
+
+    /// Throw a custom runtime script execution error
+    pub fn throw(args: Array, _: &Scope) -> Result<Value> {
+        let msg = stringify_args(args)?;
+        Err(Error::ScriptException(msg))
+    }
+
+    /// Log to STDOUT or console.log
+    pub fn log(args: Array, _scope: &Scope) -> Result<Value> {
+        let msg = stringify_args(args)?;
+
+        #[cfg(target_arch = "wasm32")]
+        crate::wasm::console_log("[LOG]", &msg);
+        #[cfg(not(target_arch = "wasm32"))]
+        println!("[LOG] {}", msg);
+
+        Ok(true.into())
+    }
+
+    /// Log to STDERR or console.error
+    pub fn warn(args: Array, _scope: &Scope) -> Result<Value> {
+        let msg = stringify_args(args)?;
+
+        #[cfg(target_arch = "wasm32")]
+        crate::wasm::console_error("[WARN]", &msg);
+        #[cfg(not(target_arch = "wasm32"))]
+        eprintln!("[WARN] {}", msg);
+
+        Ok(true.into())
+    }
+
+    fn stringify_args(args: Array) -> Result<String> {
+        let args_iter = args.check_varlen(1, usize::MAX)?.into_iter();
+        let strs = args_iter.map(|arg| match arg {
+            Value::String(str) => str,
+            other => other.to_string(),
+        });
+        Ok(strs.collect::<Vec<_>>().join(" "))
     }
 }
