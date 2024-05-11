@@ -40,66 +40,66 @@ pub enum RuntimeError {
     VarNotFound(Ident),
 
     #[error("Expected a function, not {0:?}")]
-    NotFn(Value),
+    NotFn(Box<Value>),
 
     #[error("Expected an array, not {0:?}")]
-    NotArray(Value),
+    NotArray(Box<Value>),
 
     #[error(
         "Accessing by index is possible on Array, Bytes and multi-path Descriptors, not {0:?}"
     )]
-    NoArrayAccess(Value),
+    NoArrayAccess(Box<Value>),
 
     #[error("Expected a number, not {0:?}")]
-    NotNumber(Value),
+    NotNumber(Box<Value>),
 
     #[error("Expected an integer, not {0:?}")]
     NotInt(f64),
 
     #[error("Expected a boolean, not {0:?}")]
-    NotBool(Value),
+    NotBool(Box<Value>),
 
     #[error("Expected a pubkey, not {0:?}")]
-    NotPubKey(Value),
+    NotPubKey(Box<Value>),
 
     #[error("Expected an address, not {0:?}")]
-    NotAddress(Value),
+    NotAddress(Box<Value>),
 
     #[error("Expected hash bytes, not {0:?}")]
-    NotHashLike(Value),
+    NotHashLike(Box<Value>),
 
     #[error("Expected a network type, not {0:?}")]
-    NotNetwork(Value),
+    NotNetwork(Box<Value>),
 
     #[error("Cannot be converted to Bytes: {0:?}")]
-    NotBytesLike(Value),
+    NotBytesLike(Box<Value>),
 
     #[error("Expected a string, not {0:?}")]
-    NotString(Value),
+    NotString(Box<Value>),
 
     #[error("Expected TapInfo or tr() Descriptor, not {0:?}")]
-    NotTapInfoLike(Value),
+    NotTapInfoLike(Box<Value>),
 
     #[error("Expected a policy or pubkey, not {0:?}")]
-    NotPolicyLike(Value),
+    NotPolicyLike(Box<Value>),
 
     #[error("Expected a descriptor or pubkey, not {0:?}")]
-    NotDescriptorLike(Value),
+    NotDescriptorLike(Box<Value>),
 
     #[error("Expected Script, not {0:?}")]
-    NotScript(Value),
+    NotScript(Box<Value>),
 
     #[error("Expected a transaction as object, raw bytes or tagged list, not {0:?}")]
-    NotTxLike(Value),
+    NotTxLike(Box<Value>),
 
     #[error("Expected raw Script or Bytes, not {0:?}. Perhaps you meant to use explicitScript()/scriptPubKey()?")]
-    InvalidScriptConstructor(Value),
+    InvalidScriptConstructor(Box<Value>),
 
     #[error("Cannot represent as a scriptPubKey: {0:?}")]
-    NoSpkRepr(Value),
+    NoSpkRepr(Box<Value>),
 
     #[error("Invalid script fragment: {0:?}")]
-    InvalidScriptFrag(Value),
+    InvalidScriptFrag(Box<Value>),
 
     #[error("Only integers can be interpolated as script fragments, received a float: {0:?}")]
     InvalidScriptFragIntOnly(f64),
@@ -111,7 +111,7 @@ pub enum RuntimeError {
     MissingValue,
 
     #[error("Invalid value: {0:?}")]
-    InvalidValue(Value),
+    InvalidValue(Box<Value>),
 
     #[error("Expected length {1}, not {0}")]
     InvalidLength(usize, usize), // (actual, expected)
@@ -180,10 +180,10 @@ pub enum RuntimeError {
     InfixOpError(InfixOp, #[source] Box<RuntimeError>),
 
     #[error("Invalid operands: ({0}, {1})")]
-    InfixOpArgs(Value, Value),
+    InfixOpArgs(Box<Value>, Box<Value>),
 
     #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
-    InfixOpMixedNum(Value, Value),
+    InfixOpMixedNum(Box<Value>, Box<Value>),
 
     #[error("Invalid merkle root hash: {0}")]
     InvalidMerkleRoot(#[source] hashes::FromSliceError),
@@ -195,7 +195,7 @@ pub enum RuntimeError {
     TaprootInvalidTrUse,
 
     #[error("Invalid Taproot unspendable key: {0}")]
-    InvalidTrUnspendable(Value),
+    InvalidTrUnspendable(Box<Value>),
 
     #[error("No viable taproot internal key found, provide one explicitly")]
     TaprootNoViableKey,
@@ -207,7 +207,7 @@ pub enum RuntimeError {
     TaprootInvalidScript,
 
     #[error("Expected a tuple array of 2 elements, not {0:?}")]
-    InvalidTuple(Value),
+    InvalidTuple(Box<Value>),
 
     #[error("Invalid tagged array structure: {0}")]
     InvalidTaggedList(#[source] Box<RuntimeError>),

@@ -206,7 +206,7 @@ impl Evaluate for ast::ArrayAccess {
                 ensure!(index < single_descs.len(), Error::ArrayIndexOutOfRange);
                 single_descs.remove(index).into()
             }
-            other => bail!(Error::NoArrayAccess(other)),
+            other => bail!(Error::NoArrayAccess(other.into())),
         })
     }
 }
@@ -288,11 +288,11 @@ impl ast::InfixOp {
             // Specialized error for mixed-up number types
             (_, lhs @ Num(Int(_)), rhs @ Num(Float(_)))
             | (_, lhs @ Num(Float(_)), rhs @ Num(Int(_))) => {
-                bail!(Error::InfixOpMixedNum(lhs, rhs))
+                bail!(Error::InfixOpMixedNum(lhs.into(), rhs.into()))
             }
 
             // Generic error for all other unmatched invocations
-            (_, lhs, rhs) => bail!(Error::InfixOpArgs(lhs, rhs)),
+            (_, lhs, rhs) => bail!(Error::InfixOpArgs(lhs.into(), rhs.into())),
         })
     }
 }

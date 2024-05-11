@@ -79,7 +79,7 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
         }
 
         Value::Number(Float(n)) => bail!(Error::InvalidScriptFragIntOnly(n)),
-        v => bail!(Error::InvalidScriptFrag(v)),
+        v => bail!(Error::InvalidScriptFrag(v.into())),
     })
     // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible
 }
@@ -162,7 +162,7 @@ pub mod fns {
         let network = network.unwrap_or(Network::Signet);
 
         Ok(Address::from_script(&spk, network)
-            .map_err(|_| Error::NotAddressable(spk))?
+            .map_err(|_| Error::NotAddressable(spk.into()))?
             .into())
     }
 
@@ -171,7 +171,7 @@ pub mod fns {
         Ok(match args.arg_into()? {
             Value::Script(script) => script.into(),
             Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
-            other => bail!(Error::InvalidScriptConstructor(other)),
+            other => bail!(Error::InvalidScriptConstructor(other.into())),
         })
     }
 
@@ -208,7 +208,7 @@ impl Value {
             )?),
             // Addresses can be provided as an Address or String
             Value::Address(_) | Value::String(_) => self.into_address()?.script_pubkey(),
-            other => bail!(Error::NoSpkRepr(other)),
+            other => bail!(Error::NoSpkRepr(other.into())),
         })
     }
     pub fn into_address(self) -> Result<Address> {
@@ -234,9 +234,9 @@ impl TryFrom<Value> for TaprootSpendInfo {
             Value::TapInfo(tapinfo) => tapinfo,
             Value::Descriptor(desc) => match desc.at_derivation_index(0)? {
                 miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
-                _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc))),
+                _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc).into())),
             },
-            v => bail!(Error::NotTapInfoLike(v)),
+            v => bail!(Error::NotTapInfoLike(v.into())),
         })
     }
 }
@@ -250,7 +250,7 @@ impl TryFrom<Value> for Address {
                 // XXX avoid assume_checked? we don't always know the network at the time the address is parsed.
                 addr.assume_checked()
             }
-            v => bail!(Error::NotAddress(v)),
+            v => bail!(Error::NotAddress(v.into())),
         })
     }
 }
@@ -285,7 +285,7 @@ impl TryFrom<Value> for Transaction {
                 tx
             }
 
-            other => bail!(Error::NotTxLike(other)),
+            other => bail!(Error::NotTxLike(other.into())),
         })
     }
 }
@@ -367,7 +367,7 @@ impl TryFrom<Value> for Sequence {
         Ok(Sequence(match val {
             Value::Bytes(bytes) => u32::from_le_bytes(bytes.as_slice().try_into()?),
             Value::Number(num) => num.into_u32()?,
-            other => bail!(Error::InvalidValue(other)),
+            other => bail!(Error::InvalidValue(other.into())),
         }))
     }
 }

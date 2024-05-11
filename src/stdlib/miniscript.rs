@@ -261,7 +261,7 @@ impl TryFrom<Value> for Policy {
             Value::Policy(policy) => Ok(policy),
             // Pubkeys are coerced into a pk() policy
             Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
-            v => Err(Error::NotPolicyLike(v)),
+            v => Err(Error::NotPolicyLike(v.into())),
         }
     }
 }
@@ -280,7 +280,7 @@ impl TryFrom<Value> for DescriptorPublicKey {
                 };
                 Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
             }
-            v => Err(Error::NotPubKey(v)),
+            v => Err(Error::NotPubKey(v.into())),
         }
     }
 }
@@ -291,7 +291,7 @@ impl TryFrom<Value> for Descriptor {
             Value::Descriptor(x) => Ok(x),
             // PubKeys are coerced into a wpkh() descriptor
             Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
-            v => Err(Error::NotDescriptorLike(v)),
+            v => Err(Error::NotDescriptorLike(v.into())),
         }
     }
 }

@@ -118,7 +118,7 @@ macro_rules! impl_simple_into_variant {
             fn try_from(value: Value) -> Result<Self> {
                 match value {
                     Value::$variant(x) => Ok(x),
-                    v => Err(Error::$error(v)),
+                    v => Err(Error::$error(v.into())),
                 }
             }
         }
@@ -156,7 +156,7 @@ macro_rules! impl_int_num_conv {
             fn try_from(number: Number) -> Result<Self> {
                 Ok(match number {
                     Number::Int(n) => n.try_into()?,
-                    Number::Float(n) => bail!(Error::NotInt(n)),
+                    Number::Float(n) => bail!(Error::NotInt(n.into())),
                 })
             }
         }
@@ -195,7 +195,7 @@ impl TryFrom<Value> for Vec<u8> {
             Value::String(string) => string.into_bytes(),
             Value::Script(script) => script.into_bytes(),
             Value::Transaction(tx) => bitcoin::consensus::serialize(&tx),
-            v => bail!(Error::NotBytesLike(v)),
+            v => bail!(Error::NotBytesLike(v.into())),
         })
     }
 }
@@ -209,7 +209,7 @@ macro_rules! impl_hash_conv {
             fn try_from(value: Value) -> Result<Self> {
                 match value {
                     Value::Bytes(b) => Ok(Self::from_slice(&b)?),
-                    v => Err(Error::NotHashLike(v)),
+                    v => Err(Error::NotHashLike(v.into())),
                 }
             }
         }

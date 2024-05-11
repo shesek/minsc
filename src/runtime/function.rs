@@ -79,7 +79,7 @@ impl Call for Value {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
         match self {
             Value::Function(func) => func.call(args, scope),
-            v => Err(Error::NotFn(v.clone())),
+            v => Err(Error::NotFn(v.clone().into())),
         }
     }
 }

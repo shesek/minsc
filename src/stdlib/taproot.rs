@@ -364,7 +364,7 @@ fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
     Ok(match scope.builtin("TR_UNSPENDABLE").clone() {
         Value::Bool(val) if val == false => None,
         Value::PubKey(val) => Some(val),
-        other => bail!(Error::InvalidTrUnspendable(other)),
+        other => bail!(Error::InvalidTrUnspendable(other.into())),
     })
 }
 
