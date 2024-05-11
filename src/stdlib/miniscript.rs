@@ -205,7 +205,7 @@ pub fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
     values
         .into_iter()
         .map(|v| match v {
-            Value::WithProb(_, _) => Err(Error::InvalidProb),
+            Value::WithProb(_, _) => Err(Error::InvalidPolicyProb),
             _ => Ok(Arc::new(v.into_policy()?)),
         })
         .collect()

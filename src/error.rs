@@ -149,7 +149,10 @@ pub enum RuntimeError {
     InvalidDerivationCode,
 
     #[error("Policy probabilities are only supported for OR with 2 branches")]
-    InvalidProb,
+    InvalidPolicyProb,
+
+    #[error("Script probabilities are not supported in explicit tree structure")]
+    InvalidScriptProb,
 
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,

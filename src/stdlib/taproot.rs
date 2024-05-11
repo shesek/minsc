@@ -265,6 +265,7 @@ fn tapinfo_from_tree(dpk: XOnlyPublicKey, node: Value) -> Result<TaprootSpendInf
                 let b = process_node(nodes.remove(0))?;
                 NodeInfo::combine(a, b)?
             }
+            Value::WithProb(_, _) => bail!(Error::InvalidScriptProb),
             _ => bail!(Error::TaprootInvalidScriptBinaryTree),
         })
     }
