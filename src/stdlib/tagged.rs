@@ -63,13 +63,15 @@ impl Value {
         })
     }
 
-    /// Considered to be a tagged list if self is an array, self.0 is too, and self.0.0 is a string
+    /// Considered to be a tagged list if self is an array, self.0 is a 2-tuple array, and self.0.0 is a string.
     /// This could have false positives depending on the alternative non-tagged structure in use.
     pub fn is_tagged_array(&self) -> bool {
         if let Value::Array(array) = self {
             if let Some(Value::Array(inner_array)) = array.get(0) {
-                if let Some(Value::String(_tag)) = inner_array.get(0) {
-                    return true;
+                if inner_array.len() == 2 {
+                    if let Some(Value::String(_tag)) = inner_array.get(0) {
+                        return true;
+                    }
                 }
             }
         }
