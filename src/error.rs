@@ -117,7 +117,7 @@ pub enum RuntimeError {
     InvalidVarLength(usize, usize, usize), // (actual, min, max)
 
     #[error("Invalid arguments: {0}")]
-    InvalidArgumentsError(Box<RuntimeError>),
+    InvalidArgumentsError(#[source] Box<RuntimeError>),
 
     #[error("Expected {1} arguments, not {0}")]
     ArgumentMismatch(usize, usize),
@@ -164,17 +164,17 @@ pub enum RuntimeError {
     Overflow,
 
     #[error("in {}(): {1}", .0.as_ref().unwrap_or(&"<anonymous>".into()))]
-    CallError(Option<Ident>, Box<RuntimeError>),
+    CallError(Option<Ident>, #[source] Box<RuntimeError>),
 
     #[error("in {0}: {1}")]
-    ContextStr(&'static str, Box<RuntimeError>),
+    ContextStr(&'static str, #[source] Box<RuntimeError>),
 
     // Error message with information about the originated argument/element index
     #[error("#{0}: {1}")]
-    NthContext(usize, Box<RuntimeError>), // usize is 1-indexed
+    NthContext(usize, #[source] Box<RuntimeError>), // usize is 1-indexed
 
     #[error("{0:?} operator error: {1}")]
-    InfixOpError(InfixOp, Box<RuntimeError>),
+    InfixOpError(InfixOp, #[source] Box<RuntimeError>),
 
     #[error("Invalid operands: ({0}, {1})")]
     InfixOpArgs(Value, Value),
@@ -183,7 +183,7 @@ pub enum RuntimeError {
     InfixOpMixedNum(Value, Value),
 
     #[error("Invalid merkle root hash: {0}")]
-    InvalidMerkleRoot(hashes::FromSliceError),
+    InvalidMerkleRoot(#[source] hashes::FromSliceError),
 
     #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
     InvalidPubKeyLen(usize),
@@ -207,10 +207,10 @@ pub enum RuntimeError {
     InvalidTuple(Value),
 
     #[error("Invalid tagged array structure: {0}")]
-    InvalidTaggedList(Box<RuntimeError>),
+    InvalidTaggedList(#[source] Box<RuntimeError>),
 
     #[error("\"{0}\" tag: {1}")]
-    TagError(String, Box<RuntimeError>),
+    TagError(String, #[source] Box<RuntimeError>),
 
     #[error("Duplicated tag")]
     TagDuplicated,
