@@ -48,6 +48,13 @@ impl Execute for ast::FnDef {
     }
 }
 
+impl Execute for ast::CallStmt {
+    fn exec(&self, scope: &mut Scope) -> Result<()> {
+        // Run the inner Call expression, discarding its return value
+        self.0.eval(scope).map(|_| ())
+    }
+}
+
 impl Execute for ast::IfStmt {
     fn exec(&self, scope: &mut Scope) -> Result<()> {
         if self.condition.eval(scope)?.into_bool()? {
@@ -66,6 +73,7 @@ impl Execute for ast::Stmt {
             Stmt::FnDef(x) => x.exec(scope),
             Stmt::Assign(x) => x.exec(scope),
             Stmt::If(x) => x.exec(scope),
+            Stmt::Call(x) => x.exec(scope),
         }
     }
 }

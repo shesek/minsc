@@ -41,6 +41,7 @@ impl_from_variant!(f64, Expr, Float);
 pub enum Stmt {
     FnDef(FnDef),
     Assign(Assign),
+    Call(CallStmt),
     If(IfStmt),
 }
 
@@ -213,6 +214,11 @@ pub struct Assignment {
     pub lhs: Ident,
     pub rhs: Expr,
 }
+
+/// A call statement whose return value is discarded
+#[derive(Debug, Clone)]
+pub struct CallStmt(pub Call);
+impl_from_variant!(CallStmt, Stmt, Call);
 
 #[derive(Debug, Clone)]
 pub struct IfStmt {
