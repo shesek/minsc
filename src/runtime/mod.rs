@@ -265,8 +265,8 @@ impl ast::InfixOp {
             }
 
             // * to repeat script fragments
-            (Multiply, s @ Script(_), Num(Int(n))) | (Multiply, Num(Int(n)), s @ Script(_)) => {
-                vec![s; n.try_into()?].into()
+            (Multiply, Script(s), Num(Int(n))) | (Multiply, Num(Int(n)), Script(s)) => {
+                stdlib::btc::repeat_script(s, n.try_into()?).into()
             }
 
             // @ to assign execution probabilities (to Script/Policy only)

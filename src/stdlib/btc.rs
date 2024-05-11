@@ -84,6 +84,12 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
     // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible
 }
 
+pub fn repeat_script(script: ScriptBuf, times: usize) -> ScriptBuf {
+    let bytes = script.into_bytes();
+    let bytes_n: Vec<u8> = (0..times).map(|_| bytes.clone()).flatten().collect();
+    ScriptBuf::from(bytes_n)
+}
+
 impl Evaluate for ast::ChildDerive {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut node = self.parent.eval(scope)?;
