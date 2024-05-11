@@ -187,6 +187,10 @@ fn unrollFor($max_iterations, $for_body) {
 // General utilities
 //
 
+fn assert($bool) = if !$bool then throw("Assertion failed") else true;
+fn assert::eq($a, $b) = if $a != $b then throw("Assertion failed: assert_eq("+str($a)+", "+str($b)+")") else true;
+fn assert::msg($bool, $msg) = if !$bool then throw($msg) else true;
+
 // env() with debug() formatting
 fn env::debug() = mapValues(env(), |$v| if !isFunction($v) then debug($v) else $v);
 

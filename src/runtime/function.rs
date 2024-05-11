@@ -2,6 +2,7 @@ use std::fmt;
 
 use crate::parser::{ast, Expr, Ident};
 use crate::runtime::{Array, Error, Evaluate, Result, Scope, Value};
+use crate::stdlib::fns::throw as stdlib_throw;
 
 #[derive(Debug, Clone)]
 pub enum Function {
@@ -36,37 +37,41 @@ pub trait Call {
 impl Call for Function {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
         match self {
-            Function::User(f) => f
-                .call(args, scope)
-                .map_err(|e| Error::CallError(f.ident.clone(), e.into())),
-            Function::Native(f) => f
-                .call(args, scope)
-                .map_err(|e| Error::CallError(f.ident.clone(), e.into())),
+            Function::User(f) => f.call(args, scope),
+            Function::Native(f) => f.call(args, scope), // wraps with CallError context internally
         }
     }
 }
 
 impl Call for UserFunction {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        ensure!(
-            self.signature.len() == args.len(),
-            Error::InvalidArgumentsError(
-                Error::InvalidLength(args.len(), self.signature.len()).into(),
-            )
-        );
-
-        let mut scope = scope.child();
-        for (index, value) in args.into_iter().enumerate() {
-            let ident = self.signature.get(index).unwrap();
-            scope.set(ident.clone(), value)?;
-        }
-        self.body.eval(&scope)
+        let _call = || {
+            ensure!(
+                self.signature.len() == args.len(),
+                Error::InvalidArgumentsError(
+                    Error::InvalidLength(args.len(), self.signature.len()).into(),
+                )
+            );
+            let mut scope = scope.child();
+            for (index, value) in args.into_iter().enumerate() {
+                let ident = self.signature.get(index).unwrap();
+                scope.set(ident.clone(), value)?;
+            }
+            self.body.eval(&scope)
+        };
+        _call().map_err(|e| Error::CallError(self.ident.clone(), e.into()))
     }
 }
 
 impl Call for NativeFunction {
     fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
-        (self.pt)(Array(args), scope)
+        (self.pt)(Array(args), scope).map_err(|e| {
+            if self.pt == stdlib_throw {
+                e // Don't include the `throw()` function in the CallError stack context.
+            } else {
+                Error::CallError(self.ident.clone(), e.into())
+            }
+        })
     }
 }
 

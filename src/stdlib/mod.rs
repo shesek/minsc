@@ -35,6 +35,8 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("bytes", fns::bytes).unwrap();
     scope.set_fn("Symbol", fns::Symbol).unwrap();
 
+    scope.set_fn("throw", fns::throw).unwrap();
+
     scope.set_fn("le64", fns::le64).unwrap();
     scope.set_fn("SHA256", fns::SHA256).unwrap();
 
@@ -177,6 +179,16 @@ pub mod fns {
     pub fn bytes(args: Array, _: &Scope) -> Result<Value> {
         let bytes: Vec<u8> = args.arg_into()?;
         Ok(bytes.into())
+    }
+
+    pub fn throw(args: Array, _: &Scope) -> Result<Value> {
+        let args = args.check_varlen(1, usize::MAX)?;
+        let msg_parts = args.into_iter().map(|arg| match arg {
+            Value::String(str) => str,
+            other => other.to_string(),
+        });
+        let msg = msg_parts.collect::<Vec<_>>().join(" ");
+        Err(Error::ScriptException(msg))
     }
 
     /// le64(Number) -> Bytes

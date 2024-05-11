@@ -218,6 +218,10 @@ pub enum RuntimeError {
     #[error("Unknown tag")]
     TagUnknown,
 
+    // Generic error raised from user-land Minsc code
+    #[error("Exception: {0}")]
+    ScriptException(String),
+
     //
     // Wrapped errors
     //
