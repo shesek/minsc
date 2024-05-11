@@ -1,19 +1,15 @@
 use wasm_bindgen::prelude::*;
 
-use crate::{parse, Error, Evaluate, Scope, Value};
+use crate::eval;
 
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-#[wasm_bindgen(js_name = run)]
-pub fn js_run(code: &str) -> Result<JsValue, JsValue> {
-    let value = run(code).map_err(|e| e.to_string())?;
+#[wasm_bindgen]
+pub fn run(code: &str) -> Result<JsValue, JsValue> {
+    let value = eval(code).map_err(|e| e.to_string())?;
     Ok(JsValue::from_str(&value.to_string()))
-}
-
-fn run(code: &str) -> Result<Value, Error> {
-    Ok(parse(code)?.eval(Scope::root())?)
 }
 
 #[wasm_bindgen]
