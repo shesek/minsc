@@ -270,12 +270,14 @@ impl TryFrom<Value> for Transaction {
                     input: vec![],
                     output: vec![],
                 };
-                value.for_each_unique_tag(|tag, val| {
+                value.for_each_tag(|tag, val| {
                     match tag {
-                        "version" => tx.version = Version::try_from(val)?,
-                        "locktime" => tx.lock_time = LockTime::try_from(val)?,
-                        "inputs" => tx.input = val.into_vec_of()?,
-                        "outputs" => tx.output = val.into_vec_of()?,
+                        "version" => tx.version = val.try_into()?,
+                        "locktime" => tx.lock_time = val.try_into()?,
+                        "input" => tx.input.push(val.try_into()?),
+                        "output" => tx.output.push(val.try_into()?),
+                        "inputs" => tx.input.extend(val.into_vec_of()?),
+                        "outputs" => tx.output.extend(val.into_vec_of()?),
                         _ => bail!(Error::TagUnknown),
                     }
                     Ok(())
