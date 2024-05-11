@@ -391,7 +391,7 @@ impl fmt::Display for Value {
             Value::String(x) => fmt_escaped_str(f, x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Descriptor(x) => write!(f, "{}", x), // not round-trip-able for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
+            Value::Descriptor(x) => write!(f, "{:#}", x), // not round-trip-able for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
             Value::Address(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
