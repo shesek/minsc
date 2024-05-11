@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use ::miniscript::bitcoin::hashes::{sha256, Hash};
 
 use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Symbol, Value};
-use crate::{time, Ident, Library};
+use crate::{time, Library};
 
 pub mod btc;
 pub mod ctv;
@@ -224,10 +224,11 @@ pub mod fns {
     pub fn env(args: Array, scope: &Scope) -> Result<Value> {
         // Set to -1 by default, which will return everything but the root scope
         let max_depth = args.arg_into::<Option<isize>>()?.unwrap_or(-1);
-        Ok(Array(scope.env(max_depth).into_iter().map(format_var).collect()).into())
-    }
-
-    fn format_var((ident, val): (&Ident, &Value)) -> Value {
-        vec![Value::String(ident.0.clone()), val.clone()].into()
+        let vars = scope
+            .env(max_depth)
+            .into_iter()
+            .map(|(ident, val)| vec![Value::String(ident.0.clone()), val.clone()].into())
+            .collect();
+        Ok(Array(vars).into())
     }
 }
