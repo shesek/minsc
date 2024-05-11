@@ -364,7 +364,11 @@ impl TryFrom<Value> for Version {
 impl TryFrom<Value> for Sequence {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        Ok(Sequence(val.into_u32()?))
+        Ok(Sequence(match val {
+            Value::Bytes(bytes) => u32::from_le_bytes(bytes.as_slice().try_into()?),
+            Value::Number(num) => num.into_u32()?,
+            other => bail!(Error::NotNumber(other)),
+        }))
     }
 }
 impl TryFrom<Value> for bitcoin::Witness {

@@ -258,8 +258,11 @@ pub enum RuntimeError {
     #[error("Bitcoin amount parse error: {0}")]
     ParseAmountError(#[from] amount::ParseAmountError),
 
-    #[error("Number type conversion failed (unexpected negative number?)")]
+    #[error("Number conversion failed: {0}")]
     TryFromInt(#[from] std::num::TryFromIntError),
+
+    #[error("Bytes conversion failed: {0}")]
+    TryFromSlice(#[from] std::array::TryFromSliceError),
 
     // needed so that Infallible conversions can be used with `?`
     #[error("Infallible (can never be constructed)")]
