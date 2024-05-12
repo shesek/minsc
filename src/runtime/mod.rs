@@ -143,7 +143,7 @@ fn eval_andor(operands: &[Expr], scope: &Scope, andor: AndOr) -> Result<Value> {
         Value::Bool(first_bool) => eval_bool_andor(first_bool, &operands[1..], scope, andor),
         Value::Policy(_) | Value::WithProb(_, _) | Value::PubKey(_) => {
             let policies = [&[first_operand], &eval_exprs(scope, &operands[1..])?[..]].concat();
-            stdlib::miniscript::multi_andor(andor, policies)
+            stdlib::miniscript::multi_andor(andor, policies).map(Into::into)
         }
         _ => Err(Error::InvalidArguments),
     }

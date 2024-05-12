@@ -7,7 +7,7 @@ use bitcoin::key::XOnlyPublicKey;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
-use super::miniscript::into_policies;
+use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::{Error, Result, Scope, Value};
 use crate::util::{fmt_list, PrettyDisplay, EC};
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
@@ -336,8 +336,8 @@ fn descriptor_from_array(
         let internal_key = pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?;
         descriptor_from_tree(internal_key, Value::array(policies))
     } else {
-        // Other arrays are expected to be flat and are compiled into a thresh(1, POLICIES) policy
-        let policy = Policy::Threshold(1, into_policies(policies)?);
+        // Other arrays are expected to be flat and are compiled into an OR or thresh(1, POLICIES) policy
+        let policy = multi_andor(AndOr::Or, policies)?;
         descriptor_from_policy(pk, unspendable, policy)
     }
 }

@@ -7,9 +7,11 @@ use bitcoin::{PublicKey, Sequence, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, AbsLockTime, ScriptContext};
 
-use crate::runtime::{AndOr, Array, Error, Evaluate, Result, Scope, Value};
+use crate::runtime::{Array, Error, Evaluate, Result, Scope, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
+
+pub use crate::runtime::AndOr;
 
 pub fn attach_stdlib(scope: &mut Scope) {
     // Miniscript Policy functions exposed in the Minsc runtime
@@ -55,7 +57,7 @@ impl Evaluate for ast::Thresh {
 }
 
 // AND/OR for policies, with support for >2 policies using thresh()
-pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Value> {
+pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Policy> {
     Ok(if policies.len() == 2 {
         // Use Miniscript's and()/or() when there are exactly 2 policies (more are not supported)
         match andor {
@@ -69,8 +71,7 @@ pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Value> {
             AndOr::Or => 1,
         };
         Policy::Threshold(thresh_n, into_policies(policies)?)
-    }
-    .into())
+    })
 }
 
 #[allow(non_snake_case)]
@@ -201,7 +202,7 @@ pub mod fns {
     }
 }
 
-pub fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
+fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
     values
         .into_iter()
         .map(|v| match v {
