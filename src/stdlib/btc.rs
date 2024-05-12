@@ -383,7 +383,7 @@ impl PrettyDisplay for ScriptBuf {
     const SUPPORTS_MULTILINE: bool = false;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
-        use bitcoin::opcodes::{Class, ClassifyContext};
+        use bitcoin::opcodes::{all as ops, Class, ClassifyContext};
         use bitcoin::script::Instruction;
 
         write!(f, "`")?;
@@ -399,10 +399,15 @@ impl PrettyDisplay for ScriptBuf {
                         write!(f, "<0x{}>", push.as_bytes().as_hex())?
                     }
                 }
-                Ok(Instruction::Op(opcode)) => match opcode.classify(ClassifyContext::TapScript) {
-                    Class::PushNum(num) => write!(f, "<{}>", num)?,
-                    _ => write!(f, "{:?}", opcode)?,
+                Ok(Instruction::Op(opcode)) => match opcode {
+                    // special-case for 'unofficial' opcodes
+                    ops::OP_NOP4 => write!(f, "OP_CHECKTEMPLATEVERIFY")?,
+                    opcode => match opcode.classify(ClassifyContext::TapScript) {
+                        Class::PushNum(num) => write!(f, "<{}>", num)?,
+                        _ => write!(f, "{:?}", opcode)?,
+                    },
                 },
+
                 Err(e) => write!(f, "Err({})", e)?,
             }
         }
