@@ -399,14 +399,47 @@ impl PrettyDisplay for ScriptBuf {
                         write!(f, "<0x{}>", push.as_bytes().as_hex())?
                     }
                 }
-                Ok(Instruction::Op(opcode)) => match opcode {
-                    // special-case for 'unofficial' opcodes
-                    ops::OP_NOP4 => write!(f, "OP_CHECKTEMPLATEVERIFY")?,
-                    opcode => match opcode.classify(ClassifyContext::TapScript) {
-                        Class::PushNum(num) => write!(f, "<{}>", num)?,
-                        _ => write!(f, "{:?}", opcode)?,
-                    },
-                },
+                Ok(Instruction::Op(opcode)) => {
+                    match (opcode, opcode.classify(ClassifyContext::TapScript)) {
+                        (_, Class::PushNum(num)) => write!(f, "<{}>", num)?,
+                        // special-case for 'unofficial' opcodes
+                        (ops::OP_NOP4, _) => write!(f, "OP_CHECKTEMPLATEVERIFY")?,
+                        (ops::OP_RETURN_215, _) => write!(f, "OP_ADD64")?,
+                        (ops::OP_RETURN_218, _) => write!(f, "OP_DIV64")?,
+                        (ops::OP_RETURN_227, _) => write!(f, "OP_ECMULSCALARVERIFY")?,
+                        (ops::OP_RETURN_222, _) => write!(f, "OP_GREATERTHAN64")?,
+                        (ops::OP_RETURN_223, _) => write!(f, "OP_GREATERTHANOREQUAL64")?,
+                        (ops::OP_RETURN_200, _) => write!(f, "OP_INSPECTINPUTASSET")?,
+                        (ops::OP_RETURN_204, _) => write!(f, "OP_INSPECTINPUTISSUANCE")?,
+                        (ops::OP_RETURN_199, _) => write!(f, "OP_INSPECTINPUTOUTPOINT")?,
+                        (ops::OP_RETURN_202, _) => write!(f, "OP_INSPECTINPUTSCRIPTPUBKEY")?,
+                        (ops::OP_RETURN_203, _) => write!(f, "OP_INSPECTINPUTSEQUENCE")?,
+                        (ops::OP_RETURN_201, _) => write!(f, "OP_INSPECTINPUTVALUE")?,
+                        (ops::OP_RETURN_211, _) => write!(f, "OP_INSPECTLOCKTIME")?,
+                        (ops::OP_RETURN_212, _) => write!(f, "OP_INSPECTNUMINPUTS")?,
+                        (ops::OP_RETURN_213, _) => write!(f, "OP_INSPECTNUMOUTPUTS")?,
+                        (ops::OP_RETURN_206, _) => write!(f, "OP_INSPECTOUTPUTASSET")?,
+                        (ops::OP_RETURN_208, _) => write!(f, "OP_INSPECTOUTPUTNONCE")?,
+                        (ops::OP_RETURN_209, _) => write!(f, "OP_INSPECTOUTPUTSCRIPTPUBKEY")?,
+                        (ops::OP_RETURN_207, _) => write!(f, "OP_INSPECTOUTPUTVALUE")?,
+                        (ops::OP_RETURN_210, _) => write!(f, "OP_INSPECTVERSION")?,
+                        (ops::OP_RETURN_226, _) => write!(f, "OP_LE32TOLE64")?,
+                        (ops::OP_RETURN_225, _) => write!(f, "OP_LE64TOSCRIPTNUM")?,
+                        (ops::OP_RETURN_220, _) => write!(f, "OP_LESSTHAN64")?,
+                        (ops::OP_RETURN_221, _) => write!(f, "OP_LESSTHANOREQUAL64")?,
+                        (ops::OP_RETURN_217, _) => write!(f, "OP_MUL64")?,
+                        (ops::OP_RETURN_219, _) => write!(f, "OP_NEG64")?,
+                        (ops::OP_RETURN_205, _) => write!(f, "OP_PUSHCURRENTINPUTINDEX")?,
+                        (ops::OP_RETURN_224, _) => write!(f, "OP_SCRIPTNUMTOLE64")?,
+                        (ops::OP_RETURN_198, _) => write!(f, "OP_SHA256FINALIZE")?,
+                        (ops::OP_RETURN_196, _) => write!(f, "OP_SHA256INITIALIZE")?,
+                        (ops::OP_RETURN_197, _) => write!(f, "OP_SHA256UPDATE")?,
+                        (ops::OP_RETURN_216, _) => write!(f, "OP_SUB64")?,
+                        (ops::OP_RETURN_228, _) => write!(f, "OP_TWEAKVERIFY")?,
+                        (ops::OP_RETURN_214, _) => write!(f, "OP_TXWEIGHT")?,
+                        (opcode, _) => write!(f, "{:?}", opcode)?,
+                    }
+                }
 
                 Err(e) => write!(f, "Err({})", e)?,
             }
