@@ -16,11 +16,11 @@ OP_ADD64 = script(0xd7), OP_SUB64 = script(0xd8), OP_MUL64 = script(0xd9), OP_DI
 //
 
 // in: <input/output index>
-// out: <explicit amount/asset> (or fail)
-inspectExplicitInValue = `OP_INSPECTINPUTVALUE OP_VERIFY`;
-inspectExplicitOutValue = `OP_INSPECTOUTPUTVALUE OP_VERIFY`;
-inspectExplicitInAsset = `OP_INSPECTINPUTASSET OP_VERIFY`;
-inspectExplicitOutAsset = `OP_INSPECTOUTPUTASSET OP_VERIFY`;
+// out: <explicit amount/asset> (or fail if confidential)
+INPUT_VALUE = `OP_INSPECTINPUTVALUE OP_VERIFY`;
+OUTPUT_VALUE = `OP_INSPECTOUTPUTVALUE OP_VERIFY`;
+INPUT_ASSET = `OP_INSPECTINPUTASSET OP_VERIFY`;
+OUTPUT_ASSET = `OP_INSPECTOUTPUTASSET OP_VERIFY`;
 
 // Inspect scriptPubKeys with the given expected version number, or fail if the version mismatches
 fn inspectOutSpkVer($expected_version) = `
@@ -32,30 +32,30 @@ fn inspectInSpkVer($expected_version) = `
 
 // in: <expected amount/asset> <input/output index>
 // out: none (or fail)
-outAssetEqVerify = `inspectExplicitOutAsset OP_EQUALVERIFY`;
-inAssetEqVerify = `inspectExplicitInAsset OP_EQUALVERIFY`;
-outValueEqVerify = `inspectExplicitOutValue OP_EQUALVERIFY`;
-inValueEqVerify = `inspectExplicitInValue OP_EQUALVERIFY`;
+OUTPUT_ASSET_EQ_VERIFY = `OUTPUT_ASSET OP_EQUALVERIFY`;
+INPUT_ASSET_EQ_VERIFY = `INPUT_ASSET OP_EQUALVERIFY`;
+OUTPUT_VALUE_EQ_VERIFY = `OUTPUT_VALUE OP_EQUALVERIFY`;
+INPUT_VALUE_EQ_VERIFY = `INPUT_VALUE OP_EQUALVERIFY`;
 
 // in: <expected program> <expected version> <input/output index>
 // out: none (or fail)
-outSpkEqVerify = `OP_INSPECTOUTPUTSCRIPTPUBKEY OP_ROT OP_EQUALVERIFY OP_EQUALVERIFY`;
-inSpkEqVerify = `OP_INSPECTINPUTSCRIPTPUBKEY OP_ROT OP_EQUALVERIFY OP_EQUALVERIFY`;
+OUTPUT_SPK_EQ_VERIFY = `OP_INSPECTOUTPUTSCRIPTPUBKEY OP_ROT OP_EQUALVERIFY*2`;
+INPUT_SPK_EQ_VERIFY = `OP_INSPECTINPUTSCRIPTPUBKEY OP_ROT OP_EQUALVERIFY*2`;
 
 fn checkOutput($vout, $asset_id, $amount, $spk_version, $spk_prog) = `
-  $asset_id $vout outAssetEqVerify
-  $amount $vout outValueEqVerify
-  $spk_prog $spk_version $vout outSpkEqVerify
+  $asset_id $vout OUTPUT_ASSET_EQ_VERIFY
+  $amount   $vout OUTPUT_VALUE_EQ_VERIFY
+  $spk_prog $spk_version $vout OUTPUT_SPK_EQ_VERIFY
 `;
 
 fn checkSameAsset($vin, $vout) = `
-    $vin inspectExplicitInAsset
-    $vout inspectExplicitOutAsset
+    $vin INPUT_ASSET
+    $vout OUTPUT_ASSET
     OP_EQUALVERIFY
 `;
 fn checkSameValue($vin, $vout) = `
-    $vin inspectExplicitInValue
-    $vout inspectExplicitOutValue
+    $vin INPUT_VALUE
+    $vout OUTPUT_VALUE
     OP_EQUALVERIFY
     // Checking the value matches without also checking the asset doesn't really make sense, so we always check both.
     checkSameAsset($vin, $vout)
@@ -64,10 +64,10 @@ fn checkSameSpk($vin, $vout) = `
     $vin OP_INSPECTINPUTSCRIPTPUBKEY
     $vout OP_INSPECTOUTPUTSCRIPTPUBKEY
     OP_ROT
-    OP_EQUALVERIFY OP_EQUALVERIFY
+    OP_EQUALVERIFY*2
 `;
 
-requireRbf = `
+REQUIRE_RBF = `
   OP_PUSHCURRENTINPUTINDEX
   OP_INSPECTINPUTSEQUENCE
   0xFFFFFFFD
@@ -75,20 +75,20 @@ requireRbf = `
 `;
 
 //
-// Utilities for 64 bit arithmetic
+// Aliases for 64 bit arithmetic
 //
 
-add64Verify = `OP_ADD64 OP_VERIFY`;
-sub64Verify = `OP_SUB64 OP_VERIFY`;
-mul64Verify = `OP_MUL64 OP_VERIFY`;
-div64Verify = `OP_DIV64 OP_VERIFY`;
-div64VerifyFloor = `div64Verify OP_NIP`;
-neg64Verify = `OP_NEG64 OP_VERIFY`;
+ADD64_VERIFY = `OP_ADD64 OP_VERIFY`;
+SUB64_VERIFY = `OP_SUB64 OP_VERIFY`;
+MUL_64_VERIFY = `OP_MUL64 OP_VERIFY`;
+DIV64_VERIFY = `OP_DIV64 OP_VERIFY`;
+DIV64FLOOR_VERIFY = `DIV64_VERIFY OP_NIP`;
+NEG64_VERIFY = `OP_NEG64 OP_VERIFY`;
 
-gt64Verify = `OP_GREATERTHAN64 OP_VERIFY`;
-lt64Verify = `OP_LESSTHAN64 OP_VERIFY`;
-gte64Verify = `OP_GREATERTHANOREQUAL64 OP_VERIFY`;
-lte64Verify = `OP_LESSTHANOREQUAL64 OP_VERIFY`;
+GT_VERIFY = `OP_GREATERTHAN64 OP_VERIFY`;
+LT64_VERIFY = `OP_LESSTHAN64 OP_VERIFY`;
+GTE64_VERIFY = `OP_GREATERTHANOREQUAL64 OP_VERIFY`;
+LTE64_VERIFY = `OP_LESSTHANOREQUAL64 OP_VERIFY`;
 
 //
 // Length encodings
@@ -98,7 +98,7 @@ lte64Verify = `OP_LESSTHANOREQUAL64 OP_VERIFY`;
 // This is needed to construct the TapLeaf.
 // in: <data blob>
 // out: <data blob> <len(data blob) in compactSize>
-getCompactSize = `
+ENCODE_COMPACT_SIZE = `
   OP_SIZE
   OP_DUP 253 OP_GREATERTHANOREQUAL OP_IF
     // add 0xFD prefix for sizes >= 253 (uint16 encoded as two bytes)
@@ -118,7 +118,7 @@ getCompactSize = `
 // This is useful for constructing a recursive quine.
 // in: <data blob>
 // out: <data blob> <len(data blob) as push opcode>
-getPushOp = `
+ENCODE_PUSH_OP = `
   OP_SIZE
   OP_DUP 75 OP_GREATERTHAN OP_IF
     OP_DUP 255 OP_GREATERTHAN OP_IF
@@ -148,7 +148,7 @@ TAPTWEAK_TAG = "TapTweak/elements";
 // Compute the TapLeaf hash for the script bytes at the top of the stack
 // in: <script bytes>
 // out: <leaf hash>
-hashTapLeaf = `
+HASH_TAPLEAF = `
   // Compute the tagged hash prefix (XXX could be precomputed)
     TAPLEAF_TAG
     OP_SHA256 OP_DUP OP_CAT
@@ -157,7 +157,7 @@ hashTapLeaf = `
     // Stack: <script bytes> <leaf: H('TapLeaf') || H('TapLeaf') || leaf_version>
   // Bring <script bytes> and prefix it with its size in compactSize encoding
     OP_SWAP
-    getCompactSize
+    ENCODE_COMPACT_SIZE
     OP_SWAP OP_CAT
   // Add size+script to leaf
     OP_CAT
@@ -169,7 +169,7 @@ hashTapLeaf = `
 // Compute for TapTweak hash for the merkle root and internal key given on the stack
 // in: <merkle root> <internal key>
 // out: <tweak hash>
-hashTapTweak = `
+HASH_TAPTWEAK = `
   // Compute the tagged hash prefix (XXX could be precomputed)
     TAPTWEAK_TAG
     OP_SHA256 OP_DUP OP_CAT
