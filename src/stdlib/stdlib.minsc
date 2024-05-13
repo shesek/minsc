@@ -27,6 +27,7 @@ fn isFunction($x) = typeof($x) == "function";
 //
 // Array utilities
 //
+
 // len(), fillArray(), fold() & foldUntil() are Rust-provided builtins, everything else is built on top of them.
 
 fn first($arr) = $arr.0;
@@ -39,25 +40,42 @@ fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 fn isEmpty($arr) = len($arr) == 0;
 repeat = fillArray; // alias name for a common fillArray use-case, to repeat Script fragments
 
-fn flatMap($arr_, $fn_) = fold($arr_, [], |$acc_, $el_| $acc_ + $fn_($el_));
-fn map($arr_, $fn_)     = fold($arr_, [], |$acc_, $el_| $acc_ + [ $fn_($el_) ]);
-fn filter($arr_, $fn_)  = fold($arr_, [], |$acc_, $el_| $acc_ + if $fn_($el_) then [ $el_ ] else [ ]);
+fn flatMap($$arr, $$fn) = fold($$arr, [], |$$acc, $$el| $$acc + $$fn($$el));
+fn map($$arr, $$fn)     = fold($$arr, [], |$$acc, $$el| $$acc + [ $$fn($$el) ]);
+fn filter($$arr, $$fn)  = fold($$arr, [], |$$acc, $$el| $$acc + if $$fn($$el) then [ $$el ] else [ ]);
 
-fn find($arr_, $fn_) = foldUntil($arr_, null,  |$acc_, $el_| if $fn_($el_)  then true:$el_  else false:null);
-fn reduce($arr_, $fn_) = if !isEmpty($arr_) then fold(tail($arr_), $arr_.0, $fn_) else null;
-fn mapValues($xs_, $fn_v) = map($xs_, |$x_| $x_.0: $fn_v($x_.1));
+fn reduce($$arr, $$fn) = if !isEmpty($$arr) then fold(tail($$arr), $$arr.0, $$fn) else null;
 
-//
+fn find($$arr, $$fn)  = foldUntil($$arr, null,  |$$acc, $$el| if $$fn($$el)  then true:$$el  else false:null);
+fn some($$arr, $$fn)  = foldUntil($$arr, false, |$$acc, $$el| if $$fn($$el)  then true:true  else false:false);
+fn every($$arr, $$fn) = foldUntil($$arr, true,  |$$acc, $$el| if !$$fn($$el) then true:false else false:true);
+
+fn concat($xs) = reduce($xs, |$acc, $x| $acc + $x);
+sum = concat; // works for arrays, bytes, strings and numbers
+
+// Null handling utilities
+fn mapNullable($$value, $$fn) = if $$value != null then $$fn($$value) else null;
+fn coalesce($values) = find($values, |$v| $v != null);
+
+// String utilities
+fn join($strs, $sep) =
+  if isEmpty($strs) then ""
+  else if len($strs) == 1 then $strs.0
+  else concat([ $strs.0 ] + map(tail($strs), |$str| $sep + $str));
+
+// Tag extraction. Works nicely with the pipe operator: ["a":["b":2]] | t("a") | t("b")
+fn t($tagged, $tag) = $tagged | find(|$el| $el.0 == $tag) | mapNullable(|$el| $el.1);
+fn ts($tagged, $tag) = $tagged | filter(|$el| $el.0 == $tag) | map(|$el| $el.1);
+
+
+
 // Miniscript utilities
-//
-
-fn all($policies) = thresh(len($policies), $policies);
-fn any($policies) = thresh(1, $policies);
-
+fn any($policies) = 1 of $policies;
+fn all($policies) = len($policies) of $policies;
 likely = 10; // likely probability alias, for e.g. `likely@pk(A) || pk(B)`
 
 //
-// Altstack utilities
+// Altstack manipulation
 //
 
 // ROLL/PICK from the altstack. $n must be known statically (cannot be read from the stack)
@@ -92,14 +110,12 @@ fn nFromAlt($max_iterations) = `
   unrollFor($max_iterations, `OP_FROMALTSTACK OP_ROT OP_ROT`)
 `;
 
-
 //
-// Control structure utilities
+// Conditional control structures
 //
 
-
-// Check a series of OP_IF..OP_ELSE conditions, running the script associated with the first match
-// or the optional final `default` branch. If there's no match and no `default`, execution fails.
+// Check a series of nested OP_IF..OP_ELSE conditions, running the script associated with the first
+// match or the optional `default` branch. If there's no match and no `default`, execution fails.
 //
 // For example, to match a number on the stack and run some code accordingly:
 // ifelseif([
@@ -148,11 +164,11 @@ fn switch($clauses) = match(map($clauses, |$clause| {
 // Does not support a `default` branch.
 // For example: select([ `$alice_pk OP_CHECKSIG`, `<6 months> OP_CSV OP_DROP` ])
 fn select($scripts) =
-  if len($scripts) == 2 // special-case optimization for 2 branches (MINIMALIF enforces 0/1 only)
-    then `OP_IF $scripts.0 OP_ELSE $scripts.1 OP_ENDIF`
-    else switch(map(keys($scripts), |$index| $index: $scripts.$index))
+  if len($scripts) == 2 then
+    // special-case optimization for 2 branches (MINIMALIF enforces 0/1 only)
+    `OP_IF $scripts.0 OP_ELSE $scripts.1 OP_ENDIF`
+  else switch(map(keys($scripts), |$index| $index: $scripts.$index))
 ;
-
 
 //
 // Looping utilities
@@ -162,38 +178,41 @@ fn select($scripts) =
 // $loop_body can be a Script or a Function that accepts the iteration count and returns a Script.
 // For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
 // more advanced example with some comments: https://gist.github.com/shesek/758c25489869d77d4ef624ea43f18c49
-fn unrollLoop($max_iterations, $condition, $loop_body) {
-  $loop_fn = if isFunction($loop_body) then $loop_body else |_| $loop_body;
+fn unrollLoop($$max_iterations, $$condition, $$loop_body) {
+  $$loop_fn = if isFunction($$loop_body) then $$loop_body else |_| $$loop_body;
 
-  fn _unrollLoop($loop_i) =
-    if $max_iterations > $loop_i
-      then `$condition OP_IF $loop_fn($loop_i) _unrollLoop($loop_i+1) OP_ENDIF`
-      else `$condition OP_NOT OP_VERIFY` // fail the script if the condition is still met after $max_iterations
+  fn _unrollLoop($$loop_i) =
+    if $$max_iterations > $$loop_i then
+      `$$condition OP_IF $$loop_fn($$loop_i) _unrollLoop($$loop_i+1) OP_ENDIF`
+    else `$$condition OP_NOT OP_VERIFY` // fail the script if the condition is still met after $max_iterations
   ;
   _unrollLoop(0)
 }
 
 // Read the top stack item as the number of times to run $for_body
 // Example with accumulator: `0 <num> unrollFor(50, `OP_DUP OP_ROT OP_ADD OP_SWAP`)` to sum the numbers from <num> to 1
-fn unrollFor($max_iterations, $for_body) {
-  $for_fn = if isFunction($for_body) then $for_body else |_| $for_body;
+fn unrollFor($$max_iterations, $$for_body) {
+  $$for_fn = if isFunction($$for_body) then $$for_body else |_| $$for_body;
   `
-    unrollLoop($max_iterations, `OP_DUP OP_0NOTEQUAL`, |$for_i| `$for_fn($for_i) OP_1SUB`)
+    unrollLoop($$max_iterations, `OP_DUP OP_0NOTEQUAL`, |$$for_i| `$$for_fn($$for_i) OP_1SUB`)
     OP_DROP // drop the counter (always 0 by now)
   `
 }
 
 //
-// General utilities
+// Development utilities
 //
 
-fn assert($bool) = if !$bool then throw("Assertion failed") else true;
-fn assert::eq($a, $b) = if $a != $b then throw("Assertion failed: assert_eq("+str($a)+", "+str($b)+")") else true;
-fn assert::msg($bool, $msg) = if !$bool then throw($msg) else true;
+fn assert($bool) = $bool || throw("Assertion failed");
+fn assert::eq($a, $b) = ($a == $b) || throw("Not equal: "+str($a)+" != "+str($b)+"");
+fn assert::msg($bool, $msg) = $bool || throw($msg);
 
-// env() with debug() formatting
-fn env::debug() = mapValues(env(), |$v| if !isFunction($v) then debug($v) else $v);
-fn env::log($label) = log($label, "env:", env());
+fn env::pretty() = env() | map(|$kv| $kv.0+" = "+str($kv.1, true, true)+" // "+typeof($kv.1)) | join("\n\n")| Symbol();
+fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | Symbol();
+fn _debug_nonfn($v) = if !isFunction($v) then str(debug($v, true)) else str($v, true);
+
+fn log::env($label) = log("variables:\n----\n" + str(env::pretty()) + "\n----");
+fn log::debug_env($label) = log("variables:\n----\n" + str(env::debug()) + "\n----");
 
 // Function form for assigning execution probabilities
 fn prob($n, $val) = $n@$val;
