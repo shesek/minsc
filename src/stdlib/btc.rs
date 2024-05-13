@@ -94,6 +94,24 @@ impl Evaluate for ast::ChildDerive {
     fn eval(&self, scope: &Scope) -> Result<Value> {
         let mut node = self.parent.eval(scope)?;
 
+        // Temporary fix to make number division work. Should be refactored to make
+        // ChildDerive work as another InfixOp.
+        if node.is_number() {
+            ensure!(!self.is_wildcard, Error::InvalidArguments);
+            let mut result = node.into_number()?;
+            for num in &self.path {
+                result = match (result, num.eval(&scope)?.into_number()?) {
+                    (Int(a), Int(b)) => Int(a.checked_div(b).ok_or(Error::Overflow)?),
+                    (Float(a), Float(b)) => Float(a / b),
+                    (a, b) => bail!(Error::InfixOpMixedNum(
+                        Box::new(a.into()),
+                        Box::new(b.into())
+                    )),
+                };
+            }
+            return Ok(Value::Number(result));
+        }
+
         for derivation_step in &self.path {
             node = match derivation_step.eval(scope)? {
                 // Derive with a BIP 32 child code index number
