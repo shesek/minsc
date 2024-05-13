@@ -159,11 +159,12 @@ pub mod fns {
         Ok(num.into())
     }
 
+    /// str(Value, Bool multiline=false, Bool quoted_str=false) -> String
     pub fn r#str(args: Array, _: &Scope) -> Result<Value> {
         Ok(match args.args_into()? {
-            (Value::String(string), _) => string,
-            (other, None | Some(false)) => other.to_string(),
-            (other, Some(true)) => other.pretty_str(),
+            (Value::String(string), _, None | Some(false)) => string,
+            (value, None | Some(false), _) => value.to_string(), // Value::String will be quoted
+            (value, Some(true), _) => value.multiline_str(),
         }
         .into())
     }
