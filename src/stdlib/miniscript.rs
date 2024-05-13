@@ -39,7 +39,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Descriptor utility functions
     scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope
-        .set_fn("single_descriptors", fns::single_descriptors)
+        .set_fn("singleDescriptors", fns::singleDescriptors)
         .unwrap();
 
     // Compile descriptor/policy to script
@@ -185,7 +185,7 @@ pub mod fns {
 
     /// Descriptor<Multi> -> Array<Descriptor<Single>>
     /// XXX rename descriptors() or singleDescriptors?
-    pub fn single_descriptors(args: Array, _: &Scope) -> Result<Value> {
+    pub fn singleDescriptors(args: Array, _: &Scope) -> Result<Value> {
         let desc: Descriptor = args.arg_into()?;
         let descs = desc.into_single_descriptors()?;
         Ok(Value::array(
