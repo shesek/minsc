@@ -86,6 +86,7 @@ impl DeriveExt for DescriptorPublicKey {
                         .collect(),
                 )
                 .expect("path cannot be empty");
+                mxpub.wildcard = iif!(is_wildcard, Wildcard::Unhardened, Wildcard::None);
                 Ok(DescriptorPublicKey::MultiXPub(mxpub))
             }
             DescriptorPublicKey::Single(_) => bail!(Error::NonDeriveableSingle),

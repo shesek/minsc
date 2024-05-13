@@ -143,6 +143,10 @@ impl Evaluate for ast::ChildDerive {
                 _ => bail!(Error::InvalidDerivationCode),
             }
         }
+        if self.path.is_empty() {
+            // If there was no path, derive once with an empty path so that is_wildcard is set.
+            node = node.derive_path(&[][..], self.is_wildcard)?;
+        }
         Ok(node)
     }
 }
