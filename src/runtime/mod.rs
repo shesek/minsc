@@ -322,18 +322,18 @@ impl Evaluate for Expr {
         Ok(match self {
             Expr::Ident(x) => x.eval(scope)?, // dedicated error type
             Expr::Call(x) => x.eval(scope)?,  // dedicated error type
-            Expr::If(x) => x.eval(scope).ctx("if")?,
-            Expr::Or(x) => x.eval(scope).ctx("||")?,
-            Expr::And(x) => x.eval(scope).ctx("&&")?,
+            Expr::If(x) => x.eval(scope)?,
+            Expr::Or(x) => x.eval(scope)?,
+            Expr::And(x) => x.eval(scope)?,
             Expr::Thresh(x) => x.eval(scope).ctx("of")?,
             Expr::Block(x) => x.eval(scope)?,
-            Expr::Array(x) => x.eval(scope).ctx("array construction")?,
+            Expr::Array(x) => x.eval(scope).ctx("[]")?,
             Expr::ArrayAccess(x) => x.eval(scope).ctx("dot access")?,
             Expr::ChildDerive(x) => x.eval(scope).ctx("/ operator")?,
             Expr::ScriptFrag(x) => x.eval(scope).ctx("`` script")?,
             Expr::FnExpr(x) => x.eval(scope)?, // cannot fail
             Expr::Infix(x) => x.eval(scope)?,  // dedicated error type
-            Expr::Not(x) => x.eval(scope).ctx("! operator")?,
+            Expr::Not(x) => x.eval(scope)?,
             Expr::BtcAmount(x) => x.eval(scope).ctx("BTC amount")?, // eval'd into a Number
             Expr::Duration(x) => x.eval(scope).ctx("time duration")?, // eval'd into a Number
 
