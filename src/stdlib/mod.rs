@@ -155,7 +155,7 @@ pub mod fns {
     }
 
     pub fn float(args: Array, _: &Scope) -> Result<Value> {
-        let num: f64 = args.arg_into()?;
+        let num: f64 = args.arg_into()?; // TryInto coerces ints into floats
         Ok(num.into())
     }
 
@@ -203,9 +203,16 @@ pub mod fns {
         Ok(hash.into())
     }
 
+    /// debug(Value, Bool multiline=false)
     /// Get the Debug representation of the Value
     pub fn debug(args: Array, _: &Scope) -> Result<Value> {
-        let debug_str = format!("{:?}", args.arg_into::<Value>()?);
+        let (val, multiline): (Value, Option<bool>) = args.args_into()?;
+        let debug_str = if multiline.unwrap_or(false) {
+            // Indent with 2 spaces instead of 4
+            format!("{:#?}", val).replace("    ", "  ")
+        } else {
+            format!("{:?}", val)
+        };
         // Uses Symbol as a hack to enable syntax highlighting for debug_str in the web playground.
         // This works because the Value's Display returns Symbol strings as-is, with no quoting or escaping.
         // This is a serious misuse of what Symbols are meant for, but I guess it works >.<
