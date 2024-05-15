@@ -39,5 +39,10 @@ module.exports = {
     }),
 
     new WorkerPlugin,
-  ]
+  ],
+  module: {
+    rules: [
+      { test: /\.(minsc|txt)$/, use: 'raw-loader' }
+    ]
+  }
 };

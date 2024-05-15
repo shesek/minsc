@@ -15,7 +15,7 @@ import './codemirror-miniscript'
 import './codemirror-bitcoin'
 
 import { debounce, encode, findErrorLines, loadGist } from './util'
-import default_code from './default-code'
+import default_code from '../default-code.minsc'
 
 const worker = new Worker('./worker.js', { name: 'w', type: 'module' })
 
