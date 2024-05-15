@@ -414,7 +414,7 @@ impl fmt::Display for Number {
 }
 
 impl PrettyDisplay for Value {
-    const SUPPORTS_MULTILINE: bool = true;
+    const AUTOFMT_ENABLED: bool = true;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         match self {

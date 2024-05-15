@@ -376,7 +376,7 @@ fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
 }
 
 impl PrettyDisplay for TaprootSpendInfo {
-    const SUPPORTS_MULTILINE: bool = true;
+    const AUTOFMT_ENABLED: bool = true;
     const MAX_ONELINER_LENGTH: usize = 170;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
@@ -404,7 +404,7 @@ impl PrettyDisplay for TaprootSpendInfo {
         write!(f, ")")
     }
 
-    fn should_prefer_multiline(&self) -> bool {
+    fn prefer_multiline_anyway(&self) -> bool {
         self.script_map().len() > 2
     }
 }

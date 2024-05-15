@@ -372,14 +372,15 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
 
 /// Display-like with custom formatting options, newlines/indentation handling and the ability to implement on foreign types
 pub trait PrettyDisplay: Sized + fmt::Debug {
-    const SUPPORTS_MULTILINE: bool;
+    const AUTOFMT_ENABLED: bool;
     const MAX_ONELINER_LENGTH: usize = 125;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result;
 
     /// Use multi-line indented formatting for long lines ove MAX_ONELINER_LENGTH,
+    /// or the one-liner formatting otherwise
     fn auto_fmt<W: fmt::Write>(&self, w: &mut W, indent: Option<usize>) -> fmt::Result {
-        if !Self::SUPPORTS_MULTILINE || indent.is_none() || self.should_prefer_multiline() {
+        if !Self::AUTOFMT_ENABLED || indent.is_none() || self.prefer_multiline_anyway() {
             return self.pretty_fmt(w, indent);
         }
 
@@ -397,7 +398,7 @@ pub trait PrettyDisplay: Sized + fmt::Debug {
     }
 
     /// Don't try fitting into a one-liner if this test passes
-    fn should_prefer_multiline(&self) -> bool {
+    fn prefer_multiline_anyway(&self) -> bool {
         false
     }
 

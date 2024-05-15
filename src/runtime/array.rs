@@ -155,7 +155,7 @@ impl fmt::Display for Array {
 }
 
 impl PrettyDisplay for Array {
-    const SUPPORTS_MULTILINE: bool = true;
+    const AUTOFMT_ENABLED: bool = true;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         if should_use_colon_syntax(&self.0) {
@@ -168,7 +168,7 @@ impl PrettyDisplay for Array {
         }
     }
 
-    fn should_prefer_multiline(&self) -> bool {
+    fn prefer_multiline_anyway(&self) -> bool {
         self.len() > 10
     }
 }

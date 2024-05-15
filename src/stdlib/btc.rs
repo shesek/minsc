@@ -434,7 +434,7 @@ impl TryFrom<Value> for bitcoin::Witness {
 }
 
 impl PrettyDisplay for ScriptBuf {
-    const SUPPORTS_MULTILINE: bool = false;
+    const AUTOFMT_ENABLED: bool = false;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         fmt_script(f, self, ScriptFmt::Minsc, indent)
@@ -521,7 +521,7 @@ fn scriptwiz_label(input: &str) -> String {
         .collect()
 }
 impl PrettyDisplay for Transaction {
-    const SUPPORTS_MULTILINE: bool = true;
+    const AUTOFMT_ENABLED: bool = true;
     const MAX_ONELINER_LENGTH: usize = 200;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
@@ -579,13 +579,13 @@ impl PrettyDisplay for Transaction {
         write!(f, "{newline_or_space}{:indent_w$}])", "")
     }
 
-    fn should_prefer_multiline(&self) -> bool {
+    fn prefer_multiline_anyway(&self) -> bool {
         (self.input.len() + self.output.len()) > 2
     }
 }
 
 impl PrettyDisplay for bitcoin::Witness {
-    const SUPPORTS_MULTILINE: bool = true;
+    const AUTOFMT_ENABLED: bool = true;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         fmt_list(f, &mut self.iter(), indent, |f, wit_item: &[u8], _| {
@@ -595,7 +595,7 @@ impl PrettyDisplay for bitcoin::Witness {
 }
 
 impl PrettyDisplay for Opcode {
-    const SUPPORTS_MULTILINE: bool = false;
+    const AUTOFMT_ENABLED: bool = false;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
         use bitcoin::opcodes::{all as ops, Class, ClassifyContext};
