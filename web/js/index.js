@@ -27,8 +27,10 @@ const error_el = document.querySelector('#error')
     , output_el_policy = document.querySelector('#output-policy')
     , output_el_desc = document.querySelector('#output-desc')
     , output_el_script = document.querySelector('#output-script')
-    , output_el_other = document.querySelector('#output-other')
     , output_el_address = document.querySelector('#output-address')
+    , output_el_tapinfo = document.querySelector('#output-tapinfo')
+    , output_el_key = document.querySelector('#output-key')
+    , output_el_other = document.querySelector('#output-other')
 
 const gist_id = location.hash.startsWith('#gist=') && location.hash.slice(6)
 const initial_code = gist_id ? '' // leave the editor empty while the gist is loading
@@ -63,6 +65,8 @@ worker.addEventListener('message', ({ data }) => {
     output_el_desc.style.display = r.descriptor ? 'block' : 'none'
     output_el_script.style.display = r.script_asm != null ? 'block' : 'none'
     output_el_address.style.display = r.address ? 'block' : 'none'
+    output_el_tapinfo.style.display = r.tapinfo ? 'block' : 'none'
+    output_el_key.style.display = r.key ? 'block' : 'none'
     output_el_other.style.display = r.other ? 'block' : 'none'
 
     // If nothing visible is collapsed, collapse the first visible output
@@ -74,6 +78,8 @@ worker.addEventListener('message', ({ data }) => {
     output_policy.setValue(r.policy || '')
     output_desc.setValue(r.descriptor || '')
     output_script.setValue(r.script_asm || '')
+    output_tapinfo.setValue(r.tapinfo|| '')
+    output_key.setValue(r.key || '')
     output_other.setValue(r.other || '')
     output_el_address.querySelector('span').innerText = r.address || ''
 
@@ -183,32 +189,19 @@ editor.on('change', debounce((_, c) =>
 , 150))
 update('init')
 
-// Setup the 4 output editors (read only)
-const output_policy = CodeMirror(output_el_policy.querySelector('.codeview'), {
-  mode: 'miniscript',
-  readOnly: true,
-  lineWrapping: true,
-  matchBrackets: true,
-  theme: 'darcula',
-})
-const output_desc = CodeMirror(output_el_desc.querySelector('.codeview'), {
-  mode: 'miniscript',
-  readOnly: true,
-  lineWrapping: true,
-  matchBrackets: true,
-  theme: 'darcula',
-})
-const output_script = CodeMirror(output_el_script.querySelector('.codeview'), {
-  mode: 'minsc',
-  readOnly: true,
-  lineWrapping: true,
-  matchBrackets: true,
-  theme: 'darcula',
-})
-const output_other = CodeMirror(output_el_other.querySelector('.codeview'), {
-  mode: 'minsc',
-  readOnly: true,
-  lineWrapping: true,
-  matchBrackets: true,
-  theme: 'darcula',
-})
+// Setup read-only CodeMirror editors to display outputs
+const readOnlyCodeview = (element, mode) =>
+  CodeMirror(element.querySelector('.codeview'), {
+    mode: mode,
+    readOnly: true,
+    lineWrapping: true,
+    matchBrackets: true,
+    theme: 'darcula',
+  })
+
+const output_policy = readOnlyCodeview(output_el_policy, 'miniscript')
+    , output_desc = readOnlyCodeview(output_el_desc, 'miniscript')
+    , output_script = readOnlyCodeview(output_el_script, 'minsc')
+    , output_tapinfo = readOnlyCodeview(output_el_tapinfo, 'minsc')
+    , output_key = readOnlyCodeview(output_el_key, 'minsc')
+    , output_other = readOnlyCodeview(output_el_other, 'minsc')

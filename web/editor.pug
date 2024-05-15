@@ -51,12 +51,15 @@ body
         h5#loading.font-italic.text-center Loading WASM...
 
         #outputs
-          +box('Result', true, true)#output-other.mb-3: .codeview
-          +box('Policy', true).mb-3#output-policy: .codeview
-          +box('Miniscript / Descriptor', true).mb-3#output-desc: .codeview
-          +box('Bitcoin Script', true, true).mb-3#output-script: .codeview
-          +box('Address', true, false)#output-address.mb-3
+          +box('Public Key', true, true).mb-3#output-key: .codeview
+          +box('Policy', true, true).mb-3#output-policy: .codeview
+          +box('Descriptor', true, true).mb-3#output-desc: .codeview
+          +box('Taproot', true, true).mb-3#output-tapinfo: .codeview
+          +box('Script', true, true).mb-3#output-script: .codeview
+          +box('Address', true, true)#output-address.mb-3
             p.m-0.p-2 #[span]
+          +box('Result', false, false)#output-other.mb-3: .codeview
+          //-.card.border-secondary#output-other.mb-3: .card-text: .codeview
 
     script.
       (function(u, _paq) {

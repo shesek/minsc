@@ -14,6 +14,8 @@ pub struct PlaygroundResult {
     script_asm: Option<String>,
     descriptor: Option<String>,
     address: Option<String>,
+    tapinfo: Option<String>,
+    key: Option<String>,
     other: Option<String>,
 }
 
@@ -24,8 +26,8 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
         let value = run(code)?;
 
-        let (mut policy, mut desc, mut script, mut addr, mut other) =
-            (None, None, None, None, None);
+        let (mut policy, mut desc, mut script, mut addr, mut key, mut tapinfo, mut other) =
+            (None, None, None, None, None, None, None);
 
         match value {
             Value::Policy(policy_) => {
@@ -34,24 +36,24 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
                 policy = Some(policy_);
             }
             Value::Descriptor(desc_) => desc = Some(desc_),
-            Value::PubKey(key) => {
+            Value::PubKey(key_) => {
                 // Convert pubkeys into wpkh()/tr() descriptors
-                desc = Some(if key.is_x_only_key() {
-                    Descriptor::new_tr(key.clone(), None)?
+                desc = Some(if key_.is_x_only_key() {
+                    Descriptor::new_tr(key_.clone(), None)?
                 } else {
-                    Descriptor::new_wpkh(key.clone())?
+                    Descriptor::new_wpkh(key_.clone())?
                 });
-                other = Some(key.into());
+                key = Some(key_);
             }
             Value::Script(script_) => {
                 addr = Address::from_script(&script_, network).ok();
                 script = Some(script_)
             }
-            tapinfo @ Value::TapInfo(_) => {
+            tapinfo_ @ Value::TapInfo(_) => {
                 // Display the address of TaprootSpendInfo
-                let spk = tapinfo.clone().into_spk()?;
+                let spk = tapinfo_.clone().into_spk()?;
                 addr = Some(Address::from_script(&spk, network).unwrap());
-                other = Some(tapinfo);
+                tapinfo = Some(tapinfo_);
             }
 
             Value::Address(addr_) => addr = Some(addr_),
@@ -73,8 +75,10 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
         Ok(PlaygroundResult {
             policy: policy.map(|p| p.to_string()),
             descriptor: desc.map(|d| format!("{:#}", d)),
-            script_asm: script.as_ref().map(PrettyDisplay::multiline_str),
+            script_asm: script.as_ref().map(|s| s.multiline_str()),
             address: addr.map(|a| a.to_string()),
+            tapinfo: tapinfo.map(|t| t.multiline_str()),
+            key: key.map(|a| a.to_string()),
             other: other.map(|o| o.multiline_str()),
         })
     };
