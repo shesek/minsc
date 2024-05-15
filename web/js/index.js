@@ -55,7 +55,7 @@ worker.addEventListener('message', ({ data }) => {
     markError(data.input, data.error)
   } else if (data.result) {
     const r = data.result
-    console.log(r)
+    //console.log(r)
     error_el.style.display = 'none'
     outputs_el.style.display = 'block'
 
