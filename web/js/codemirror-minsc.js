@@ -46,6 +46,9 @@ CodeMirror.defineSimpleMode("minsc",{
     // Function calls
     {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\()/, token: ["atom", null], indent: true},
 
+    // PUSH in Script's Debug format
+    {regex: /(OP_PUSHBYTES\w*)\s*([a-f0-9]+)\b/, token: ["variable-2", "number"]},
+
     // Variables
     {regex: /[A-Z$][A-Z0-9_]+\b/, token: "variable-2"}, // different look for all-caps identifiers, typically OP_CODES
     {regex: /[$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*\b/, token: "variable-3"},
