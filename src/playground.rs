@@ -73,7 +73,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
         Ok(PlaygroundResult {
             policy: policy.map(|p| p.to_string()),
             descriptor: desc.map(|d| format!("{:#}", d)),
-            script_asm: script.as_ref().map(get_script_asm),
+            script_asm: script.as_ref().map(PrettyDisplay::multiline_str),
             address: addr.map(|a| a.to_string()),
             other: other.map(|o| o.multiline_str()),
         })
@@ -84,12 +84,6 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
 fn run(code: &str) -> Result<Value, Error> {
     Ok(parse(code)?.eval(&DEMO_SCOPE)?)
-}
-
-fn get_script_asm(script: &ScriptBuf) -> String {
-    let s = script.pretty_str();
-    // Remove the wrapping backticks
-    s[1..s.len() - 1].to_string()
 }
 
 lazy_static! {

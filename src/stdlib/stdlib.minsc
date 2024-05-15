@@ -79,7 +79,7 @@ fn mark($kind, $body) = if !MARK_SCRIPT then `` else
   // SCRIPT_MARKER_MAGIC available from Rust
 
 fn mark::ctx($$context, $$fn) {
-  MARK_CTX = MARK_CTX + str($$context);
+  MARK_CTX = MARK_CTX + $$context;
   $$fn()
 }
 

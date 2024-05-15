@@ -434,8 +434,8 @@ impl TryFrom<Value> for bitcoin::Witness {
 }
 
 impl PrettyDisplay for ScriptBuf {
-    const AUTOFMT_ENABLED: bool = false;
-
+    const AUTOFMT_ENABLED: bool = true;
+    const MAX_ONELINER_LENGTH: usize = 350;
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         fmt_script(f, self, ScriptFmt::Minsc, indent)
     }
@@ -454,9 +454,11 @@ fn fmt_script<W: fmt::Write>(
 ) -> fmt::Result {
     use crate::util::quote_str;
 
-    match format {
-        ScriptFmt::Minsc => write!(f, "`")?,
-        ScriptFmt::ScriptWiz => write!(f, "\n")?,
+    if format == ScriptFmt::Minsc {
+        write!(f, "`")?;
+    }
+    if indent.is_some() || format == ScriptFmt::ScriptWiz {
+        write!(f, "\n")?;
     }
     let inner_indent_w = indent.map_or(0, |n| (n + 1) * 2);
 
@@ -465,9 +467,7 @@ fn fmt_script<W: fmt::Write>(
         .peekable();
 
     while let Some(item) = iter.next() {
-        if format == ScriptFmt::ScriptWiz {
-            write!(f, "{:i$}", "", i = inner_indent_w)?;
-        }
+        write!(f, "{:i$}", "", i = inner_indent_w)?;
         match item {
             Ok(item) => match item {
                 MarkerItem::Instruction(inst) => match inst {
@@ -478,7 +478,9 @@ fn fmt_script<W: fmt::Write>(
                 // Format debug markers encoded within the Script
                 MarkerItem::Marker(Marker { kind, body }) => match (format, kind) {
                     // Minsc formatting, as Minsc code that can re-construct the markers
-                    (ScriptFmt::Minsc, "comment") => write!(f, "#{}", quote_str(body))?,
+                    (ScriptFmt::Minsc, "comment") => {
+                        write!(f, "#{}{}", iif!(indent.is_some(), " ", ""), quote_str(body))?
+                    }
                     (ScriptFmt::Minsc, "label") if !body.is_empty() => {
                         write!(f, "@{}", encode_label(body))?
                     }
@@ -507,8 +509,9 @@ fn fmt_script<W: fmt::Write>(
             Err(e) => write!(f, "Err(\"{}\")", e)?,
         }
         match format {
-            ScriptFmt::Minsc if iter.peek().is_some() => write!(f, " ")?,
-            // ScriptWiz requires newlines between opcodes. Include one at the end too.
+            ScriptFmt::Minsc if indent.is_none() && iter.peek().is_some() => write!(f, " ")?,
+            ScriptFmt::Minsc if indent.is_some() => write!(f, "\n")?,
+            // ScriptWiz requires newlines between opcodes, so they're added regardless of `indent`.
             ScriptFmt::ScriptWiz => write!(f, "\n")?,
             _ => (),
         }
