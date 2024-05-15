@@ -201,7 +201,7 @@ pub mod fns {
             .into())
     }
 
-    /// script(Bytes|Address) -> Script
+    /// script(Bytes|Script) -> Script
     pub fn script(args: Array, _: &Scope) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Script(script) => script.into(),

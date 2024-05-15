@@ -15,10 +15,10 @@ DUST_NON_SW = 546;
 
 // A point with unknown discrete logarithm (to eliminate key-path spend)
 NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
-TR_UNSPENDABLE = NUMS, H_POINT = NUMS;
+TR_UNSPENDABLE = NUMS; // the default for tr()
 
-// Some aliases until I figure out what I like best
-Script=script, Transaction=transaction, Address=address, PubKey=pubkey, Bytes=bytes, String=str, Int=int, Float=float, tx=Transaction;
+// Some aliases
+PubKey=pubkey, Transaction=transaction, tx=transaction;
 
 // Common type checks
 fn isArray($x) = typeof($x) == "array";
@@ -27,9 +27,7 @@ fn isFunction($x) = typeof($x) == "function";
 //
 // Array utilities
 //
-
 // len(), fillArray(), fold() & foldUntil() are Rust-provided builtins, everything else is built on top of them.
-
 fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
 fn range($start, $end) = fillArray(($end-$start)+1, |$n| $start+$n);
@@ -67,10 +65,7 @@ fn join($strs, $sep) =
 fn t($tagged, $tag) = $tagged | find(|$el| $el.0 == $tag) | mapNullable(|$el| $el.1);
 fn ts($tagged, $tag) = $tagged | filter(|$el| $el.0 == $tag) | map(|$el| $el.1);
 
-//
 // Script Marker utilities
-//
-
 MARK_SCRIPT=true;
 MARK_CTX="";
 
@@ -78,14 +73,13 @@ fn mark($kind, $body) = if !MARK_SCRIPT then `` else
   `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP {MARK_CTX+str($body)} OP_DROP`;
   // SCRIPT_MARKER_MAGIC available from Rust
 
+fn mark::comment($comment) = mark("comment", $comment);
+fn mark::label($name) = mark("label", $name);
 fn mark::ctx($$context, $$fn) {
   MARK_CTX = MARK_CTX + $$context;
   $$fn()
 }
 
-fn mark::comment($comment) = mark("comment", $comment);
-fn mark::label($name) = mark("label", $name);
-mark::c=mark::comment, mark::l=mark::label;
 
 // Miniscript utilities
 fn any($policies) = 1 of $policies;
@@ -96,36 +90,51 @@ likely = 10; // likely probability alias, for e.g. `likely@pk(A) || pk(B)`
 // Altstack manipulation
 //
 
-// ROLL/PICK from the altstack. $n must be known statically (cannot be read from the stack)
+// ROLL/PICK from the altstack, for static $n
 fn rollAlt($n) = `
-  repeat($n, OP_FROMALTSTACK)
-  repeat($n - 1, `OP_SWAP OP_TOALTSTACK`)
+  OP_FROMALTSTACK*$n
+  {`OP_SWAP OP_TOALTSTACK`}*($n - 1)
 `;
+
 fn pickAlt($n) = `
-  repeat($n, OP_FROMALTSTACK)
+  OP_FROMALTSTACK*$n
   OP_DUP OP_TOALTSTACK
-  repeat($n - 1, `OP_SWAP OP_TOALTSTACK`)
+  {`OP_SWAP OP_TOALTSTACK`}*($n - 1)
 `;
-rollFromAltStack=rollAlt, pickFromAltStack=pickAlt;
+
+// ROLL/PICK from the altstack, using the number at the top of the stack as the depth
+fn nRollAlt($max_n) = `
+  OP_DUP
+  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT OP_ROT`)
+  OP_1SUB
+  unrollFor($max_n, `OP_ROT OP_TOALTSTACK`)
+`;
+
+fn nPickAlt($max_n) = `
+  OP_DUP
+  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT OP_ROT`)
+  OP_SWAP OP_DUP OP_ROT
+  unrollFor($max_n, `OP_ROT OP_TOALTSTACK`)
+`;
 
 // Read the top stack item as the number of stack items to send to the altstack
 // stack in: <el1> <el2> .. <elN> <N total>, stack out: (empty)
 // altstack out: <elN> .. <el2> <el1> <N total>
-fn nToAlt($max_iterations) = `
+fn nToAlt($max_n) = `
   OP_DUP // keep a copy of the total number of elements
   // stack: <el1> <el2> .. <elN> <N total> <N counter>
-  unrollFor($max_iterations, `OP_ROT OP_TOALTSTACK`)
+  unrollFor($max_in, `OP_ROT OP_TOALTSTACK`)
   OP_TOALTSTACK // send the total number of elements as the final altstack item
 `;
 
 // The reverse of nToAlt() - bring back items from the altstack to the stack
 // altstack in: <elN> .. <el2> <el1> <N total>, altstack out: (empty)
 // stack in: (none), stack out: <el1> <el2> .. <elN> <N total>
-fn nFromAlt($max_iterations) = `
+fn nFromAlt($max_n) = `
   OP_FROMALTSTACK
   OP_DUP // keep a copy of the total number of elements
   // stack: <N total> <N counter>, alt stack: <el1> <el2> .. <elN>
-  unrollFor($max_iterations, `OP_FROMALTSTACK OP_ROT OP_ROT`)
+  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT OP_ROT`)
 `;
 
 //
@@ -149,7 +158,7 @@ fn ifelseif($clauses) = if isEmpty($clauses) then `` else `
   { if last($clauses).0 != default then `last($clauses).0 OP_VERIFY` else ``}
   last($clauses).1
 
-  repeat(len($clauses) - 1, OP_ENDIF)
+  OP_ENDIF*(len($clauses) - 1)
 `;
 
 // Match the item at the top of the stack against the clauses and run the matching script,
