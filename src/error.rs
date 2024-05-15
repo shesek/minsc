@@ -228,6 +228,9 @@ pub enum RuntimeError {
     //
     // Wrapped errors
     //
+    #[error(transparent)]
+    ScriptMarker(#[from] crate::stdlib::script_marker::MarkerError),
+
     #[error("Descriptor conversion error: {0}")]
     DescriptorConversion(#[from] descriptor::ConversionError),
 
@@ -267,6 +270,9 @@ pub enum RuntimeError {
     #[error("Bytes conversion failed: {0}")]
     TryFromSlice(#[from] std::array::TryFromSliceError),
 
+    #[error("fmt Error: {0}")]
+    Fmt(#[from] std::fmt::Error),
+
     // needed so that Infallible conversions can be used with `?`
     #[error("Infallible (can never be constructed)")]
     Infallible(#[from] std::convert::Infallible),
@@ -289,8 +295,8 @@ pub enum RuntimeError {
     #[error("Encoding error: {0}")]
     EncodeError(#[from] bitcoin::consensus::encode::Error),
 
-    #[error("Script error: {0}")]
-    ScriptError(#[from] bitcoin::script::Error),
+    #[error("Invalid Script: {0}")]
+    InvalidScript(#[from] bitcoin::script::Error),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {

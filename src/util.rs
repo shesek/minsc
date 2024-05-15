@@ -323,6 +323,26 @@ pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
     c
 }
 
+pub fn fmt_quoted_str<W: fmt::Write>(f: &mut W, str: &str) -> fmt::Result {
+    write!(f, "\"")?;
+    for char in str.chars() {
+        match char {
+            '\r' => write!(f, "\\r")?,
+            '\n' => write!(f, "\\n")?,
+            '\t' => write!(f, "\\t")?,
+            '"' => write!(f, "\\\"")?,
+            _ => write!(f, "{}", char)?,
+        };
+    }
+    write!(f, "\"")
+}
+
+pub fn quote_str(s: &str) -> String {
+    let mut quoted = String::with_capacity(s.len());
+    fmt_quoted_str(&mut quoted, s).unwrap();
+    quoted
+}
+
 /// A Write wrapper that allows up the `limit` bytes to be written through it to the inner `writer`.
 /// If the limit is reached, an fmt::Error is raised. This is used as an optimization by PrettyDisplay.
 pub struct LimitedWriter<'a, W: fmt::Write + ?Sized> {
@@ -351,7 +371,7 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
 }
 
 /// Display-like with custom formatting options, newlines/indentation handling and the ability to implement on foreign types
-pub trait PrettyDisplay: Sized {
+pub trait PrettyDisplay: Sized + fmt::Debug {
     const SUPPORTS_MULTILINE: bool;
     const MAX_ONELINER_LENGTH: usize = 125;
 

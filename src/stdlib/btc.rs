@@ -3,16 +3,22 @@ use std::fmt;
 
 use bitcoin::bip32::{ChildNumber, DerivationPath};
 use bitcoin::hashes::{sha256, sha256d, Hash};
-use bitcoin::script::{Builder as ScriptBuilder, PushBytesBuf, ScriptBuf};
+use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use miniscript::bitcoin::{
     self, absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
-    Network, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
+    Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
 
-use crate::runtime::{eval_exprs, Array, Error, Evaluate, Float, Int, Result, Scope, Value};
+use super::script_marker::{Marker, MarkerItem, ScriptMarker};
+use crate::runtime::{
+    eval_exprs, Array, Error, Evaluate, Float, Int, Result, Scope, Symbol, Value,
+};
 use crate::util::{self, fmt_list, DeriveExt, DescriptorExt, PrettyDisplay, EC};
 use crate::{ast, time};
+
+// XXX should this be randomized? is there a way this could be abused when viewing untrusted scripts?
+const SCRIPT_MARKER_MAGIC_BYTES: &[u8] = "SCRIPT MARKER MAGIC BYTES".as_bytes();
 
 pub fn attach_stdlib(scope: &mut Scope) {
     // Network types
@@ -28,6 +34,12 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("transaction", fns::transaction).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
+    scope.set_fn("script::strip", fns::scriptStrip).unwrap();
+    scope.set_fn("script::wiz", fns::scriptWiz).unwrap();
+
+    scope
+        .set("SCRIPT_MARKER_MAGIC", SCRIPT_MARKER_MAGIC_BYTES.to_vec())
+        .unwrap();
 }
 
 impl Evaluate for ast::BtcAmount {
@@ -176,6 +188,7 @@ impl Evaluate for ast::Duration {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
+
     /// Generate an address
     /// address(Script|Descriptor|PubKey|TapInfo|String|Address, Network=Signet) -> Address
     pub fn address(args: Array, _: &Scope) -> Result<Value> {
@@ -212,6 +225,25 @@ pub mod fns {
     pub fn scriptPubKey(args: Array, _: &Scope) -> Result<Value> {
         let spk = args.arg_into::<Value>()?.into_spk()?;
         Ok(spk.into())
+    }
+
+    /// script::strip(Script) -> Script
+    /// Strip debug markers from the given Script
+    pub fn scriptStrip(args: Array, _: &Scope) -> Result<Value> {
+        Ok(args
+            .arg_into::<ScriptBuf>()?
+            .strip_markers(SCRIPT_MARKER_MAGIC_BYTES)?
+            .into())
+    }
+
+    /// script::wiz(Script) -> Symbol
+    /// Encode the Script in a Scriptwiz-Compatible format (newlines, stack labels & comments)
+    pub fn scriptWiz(args: Array, _: &Scope) -> Result<Value> {
+        let script = args.arg_into::<ScriptBuf>()?;
+        let mut wiz_str = String::new();
+        fmt_script(&mut wiz_str, &script, ScriptFmt::ScriptWiz, None)?;
+        // Uses Symbol for the same reason described in `stdlib::fns::debug()`
+        Ok(Symbol::new(Some(wiz_str)).into())
     }
 }
 
@@ -404,74 +436,89 @@ impl TryFrom<Value> for bitcoin::Witness {
 impl PrettyDisplay for ScriptBuf {
     const SUPPORTS_MULTILINE: bool = false;
 
-    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
-        use bitcoin::opcodes::{all as ops, Class, ClassifyContext};
-        use bitcoin::script::Instruction;
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        fmt_script(f, self, ScriptFmt::Minsc, indent)
+    }
+}
 
-        write!(f, "`")?;
-        for (i, inst) in self.instructions().enumerate() {
-            if i > 0 {
-                write!(f, " ")?;
-            }
-            match inst {
-                Ok(Instruction::PushBytes(push)) => {
-                    if push.is_empty() {
-                        write!(f, "<0>")?
-                    } else {
-                        write!(f, "<0x{}>", push.as_bytes().as_hex())?
-                    }
-                }
-                Ok(Instruction::Op(opcode)) => {
-                    match (opcode, opcode.classify(ClassifyContext::TapScript)) {
-                        (_, Class::PushNum(num)) => write!(f, "<{}>", num)?,
-                        // special-case for 'unofficial' opcodes
-                        (ops::OP_NOP4, _) => write!(f, "OP_CHECKTEMPLATEVERIFY")?,
-                        (ops::OP_RETURN_215, _) => write!(f, "OP_ADD64")?,
-                        (ops::OP_RETURN_218, _) => write!(f, "OP_DIV64")?,
-                        (ops::OP_RETURN_227, _) => write!(f, "OP_ECMULSCALARVERIFY")?,
-                        (ops::OP_RETURN_222, _) => write!(f, "OP_GREATERTHAN64")?,
-                        (ops::OP_RETURN_223, _) => write!(f, "OP_GREATERTHANOREQUAL64")?,
-                        (ops::OP_RETURN_200, _) => write!(f, "OP_INSPECTINPUTASSET")?,
-                        (ops::OP_RETURN_204, _) => write!(f, "OP_INSPECTINPUTISSUANCE")?,
-                        (ops::OP_RETURN_199, _) => write!(f, "OP_INSPECTINPUTOUTPOINT")?,
-                        (ops::OP_RETURN_202, _) => write!(f, "OP_INSPECTINPUTSCRIPTPUBKEY")?,
-                        (ops::OP_RETURN_203, _) => write!(f, "OP_INSPECTINPUTSEQUENCE")?,
-                        (ops::OP_RETURN_201, _) => write!(f, "OP_INSPECTINPUTVALUE")?,
-                        (ops::OP_RETURN_211, _) => write!(f, "OP_INSPECTLOCKTIME")?,
-                        (ops::OP_RETURN_212, _) => write!(f, "OP_INSPECTNUMINPUTS")?,
-                        (ops::OP_RETURN_213, _) => write!(f, "OP_INSPECTNUMOUTPUTS")?,
-                        (ops::OP_RETURN_206, _) => write!(f, "OP_INSPECTOUTPUTASSET")?,
-                        (ops::OP_RETURN_208, _) => write!(f, "OP_INSPECTOUTPUTNONCE")?,
-                        (ops::OP_RETURN_209, _) => write!(f, "OP_INSPECTOUTPUTSCRIPTPUBKEY")?,
-                        (ops::OP_RETURN_207, _) => write!(f, "OP_INSPECTOUTPUTVALUE")?,
-                        (ops::OP_RETURN_210, _) => write!(f, "OP_INSPECTVERSION")?,
-                        (ops::OP_RETURN_226, _) => write!(f, "OP_LE32TOLE64")?,
-                        (ops::OP_RETURN_225, _) => write!(f, "OP_LE64TOSCRIPTNUM")?,
-                        (ops::OP_RETURN_220, _) => write!(f, "OP_LESSTHAN64")?,
-                        (ops::OP_RETURN_221, _) => write!(f, "OP_LESSTHANOREQUAL64")?,
-                        (ops::OP_RETURN_217, _) => write!(f, "OP_MUL64")?,
-                        (ops::OP_RETURN_219, _) => write!(f, "OP_NEG64")?,
-                        (ops::OP_RETURN_205, _) => write!(f, "OP_PUSHCURRENTINPUTINDEX")?,
-                        (ops::OP_RETURN_224, _) => write!(f, "OP_SCRIPTNUMTOLE64")?,
-                        (ops::OP_RETURN_198, _) => write!(f, "OP_SHA256FINALIZE")?,
-                        (ops::OP_RETURN_196, _) => write!(f, "OP_SHA256INITIALIZE")?,
-                        (ops::OP_RETURN_197, _) => write!(f, "OP_SHA256UPDATE")?,
-                        (ops::OP_RETURN_216, _) => write!(f, "OP_SUB64")?,
-                        (ops::OP_RETURN_228, _) => write!(f, "OP_TWEAKVERIFY")?,
-                        (ops::OP_RETURN_214, _) => write!(f, "OP_TXWEIGHT")?,
-                        (opcode, _) => write!(f, "{:?}", opcode)?,
-                    }
-                }
+#[derive(PartialEq, Debug, Clone, Copy)]
+pub enum ScriptFmt {
+    Minsc,
+    ScriptWiz,
+}
+fn fmt_script<W: fmt::Write>(
+    f: &mut W,
+    script: &Script,
+    format: ScriptFmt,
+    indent: Option<usize>,
+) -> fmt::Result {
+    use crate::util::quote_str;
 
-                Err(e) => write!(f, "Err({})", e)?,
-            }
+    match format {
+        ScriptFmt::Minsc => write!(f, "`")?,
+        ScriptFmt::ScriptWiz => write!(f, "\n")?,
+    }
+    let inner_indent_w = indent.map_or(0, |n| (n + 1) * 2);
+
+    let mut iter = script
+        .iter_with_markers(SCRIPT_MARKER_MAGIC_BYTES)
+        .peekable();
+
+    while let Some(item) = iter.next() {
+        if format == ScriptFmt::ScriptWiz {
+            write!(f, "{:i$}", "", i = inner_indent_w)?;
         }
-        write!(f, "`")
-    }
+        match item {
+            Ok(item) => match item {
+                MarkerItem::Instruction(inst) => match inst {
+                    Instruction::PushBytes(push) if push.is_empty() => write!(f, "<0>")?,
+                    Instruction::PushBytes(push) => write!(f, "<0x{}>", push.as_bytes().as_hex())?,
+                    Instruction::Op(opcode) => write!(f, "{}", opcode.pretty(None))?,
+                },
+                // Format debug markers encoded within the Script
+                MarkerItem::Marker(Marker { kind, body }) => match (format, kind) {
+                    // Minsc formatting, as Minsc code that can re-construct the markers
+                    (ScriptFmt::Minsc, "label") => write!(f, "mark::l({})", quote_str(body))?,
+                    (ScriptFmt::Minsc, "comment") => write!(f, "mark::c({})", quote_str(body))?,
+                    (ScriptFmt::Minsc, "breakpoint") => {
+                        write!(f, "breakpoint({})", quote_str(body))?
+                    }
+                    (ScriptFmt::Minsc, kind) => {
+                        write!(f, "mark({}, {})", quote_str(kind), quote_str(body))?
+                    }
 
-    fn should_prefer_multiline(&self) -> bool {
-        self.len() > 50
+                    // ScriptWiz formatting
+                    // The "$<label>" format is used by ScriptWiz to assign a label name to the top stack element
+                    (ScriptFmt::ScriptWiz, "label") => write!(f, "${}", scriptwiz_label(body))?,
+                    (ScriptFmt::ScriptWiz, "comment") => {
+                        write!(f, "// {}", body.replace("\n", "\n// "))?
+                    }
+                    (ScriptFmt::ScriptWiz, kind) => {
+                        write!(f, "// {} mark: {}", quote_str(kind), quote_str(body))?
+                    }
+                },
+            },
+            Err(e) => write!(f, "Err(\"{}\")", e)?,
+        }
+        match format {
+            ScriptFmt::Minsc if iter.peek().is_some() => write!(f, " ")?,
+            // ScriptWiz requires newlines between opcodes. Include one at the end too.
+            ScriptFmt::ScriptWiz => write!(f, "\n")?,
+            _ => (),
+        }
     }
+    if format == ScriptFmt::Minsc {
+        write!(f, "`")?;
+    }
+    Ok(())
+}
+
+// ScriptWiz only allows alphanumeric characters and underscores in label names
+fn scriptwiz_label(input: &str) -> String {
+    input
+        .chars()
+        .map(|c| iif!(c.is_alphanumeric(), c, '_'))
+        .collect()
 }
 impl PrettyDisplay for Transaction {
     const SUPPORTS_MULTILINE: bool = true;
@@ -544,5 +591,53 @@ impl PrettyDisplay for bitcoin::Witness {
         fmt_list(f, &mut self.iter(), indent, |f, wit_item: &[u8], _| {
             write!(f, "0x{}", wit_item.as_hex())
         })
+    }
+}
+
+impl PrettyDisplay for Opcode {
+    const SUPPORTS_MULTILINE: bool = false;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        use bitcoin::opcodes::{all as ops, Class, ClassifyContext};
+        // XXX always uses TapScript as the ClassifyContext
+        match (*self, self.classify(ClassifyContext::TapScript)) {
+            (_, Class::PushNum(num)) => write!(f, "<{}>", num),
+            // special-case for unofficial opcodes
+            (ops::OP_NOP4, _) => write!(f, "OP_CHECKTEMPLATEVERIFY"),
+            (ops::OP_RETURN_215, _) => write!(f, "OP_ADD64"),
+            (ops::OP_RETURN_218, _) => write!(f, "OP_DIV64"),
+            (ops::OP_RETURN_227, _) => write!(f, "OP_ECMULSCALARVERIFY"),
+            (ops::OP_RETURN_222, _) => write!(f, "OP_GREATERTHAN64"),
+            (ops::OP_RETURN_223, _) => write!(f, "OP_GREATERTHANOREQUAL64"),
+            (ops::OP_RETURN_200, _) => write!(f, "OP_INSPECTINPUTASSET"),
+            (ops::OP_RETURN_204, _) => write!(f, "OP_INSPECTINPUTISSUANCE"),
+            (ops::OP_RETURN_199, _) => write!(f, "OP_INSPECTINPUTOUTPOINT"),
+            (ops::OP_RETURN_202, _) => write!(f, "OP_INSPECTINPUTSCRIPTPUBKEY"),
+            (ops::OP_RETURN_203, _) => write!(f, "OP_INSPECTINPUTSEQUENCE"),
+            (ops::OP_RETURN_201, _) => write!(f, "OP_INSPECTINPUTVALUE"),
+            (ops::OP_RETURN_211, _) => write!(f, "OP_INSPECTLOCKTIME"),
+            (ops::OP_RETURN_212, _) => write!(f, "OP_INSPECTNUMINPUTS"),
+            (ops::OP_RETURN_213, _) => write!(f, "OP_INSPECTNUMOUTPUTS"),
+            (ops::OP_RETURN_206, _) => write!(f, "OP_INSPECTOUTPUTASSET"),
+            (ops::OP_RETURN_208, _) => write!(f, "OP_INSPECTOUTPUTNONCE"),
+            (ops::OP_RETURN_209, _) => write!(f, "OP_INSPECTOUTPUTSCRIPTPUBKEY"),
+            (ops::OP_RETURN_207, _) => write!(f, "OP_INSPECTOUTPUTVALUE"),
+            (ops::OP_RETURN_210, _) => write!(f, "OP_INSPECTVERSION"),
+            (ops::OP_RETURN_226, _) => write!(f, "OP_LE32TOLE64"),
+            (ops::OP_RETURN_225, _) => write!(f, "OP_LE64TOSCRIPTNUM"),
+            (ops::OP_RETURN_220, _) => write!(f, "OP_LESSTHAN64"),
+            (ops::OP_RETURN_221, _) => write!(f, "OP_LESSTHANOREQUAL64"),
+            (ops::OP_RETURN_217, _) => write!(f, "OP_MUL64"),
+            (ops::OP_RETURN_219, _) => write!(f, "OP_NEG64"),
+            (ops::OP_RETURN_205, _) => write!(f, "OP_PUSHCURRENTINPUTINDEX"),
+            (ops::OP_RETURN_224, _) => write!(f, "OP_SCRIPTNUMTOLE64"),
+            (ops::OP_RETURN_198, _) => write!(f, "OP_SHA256FINALIZE"),
+            (ops::OP_RETURN_196, _) => write!(f, "OP_SHA256INITIALIZE"),
+            (ops::OP_RETURN_197, _) => write!(f, "OP_SHA256UPDATE"),
+            (ops::OP_RETURN_216, _) => write!(f, "OP_SUB64"),
+            (ops::OP_RETURN_228, _) => write!(f, "OP_TWEAKVERIFY"),
+            (ops::OP_RETURN_214, _) => write!(f, "OP_TXWEIGHT"),
+            (opcode, _) => write!(f, "{:}", opcode),
+        }
     }
 }

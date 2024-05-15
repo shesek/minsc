@@ -8,6 +8,7 @@ use crate::{time, Library};
 pub mod btc;
 pub mod ctv;
 pub mod miniscript;
+pub mod script_marker;
 pub mod tagged;
 pub mod taproot;
 

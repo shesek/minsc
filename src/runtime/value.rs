@@ -9,7 +9,7 @@ use bitcoin::{
 use miniscript::{bitcoin, DescriptorPublicKey};
 
 use crate::parser::Expr;
-use crate::util::PrettyDisplay;
+use crate::util::{fmt_quoted_str, PrettyDisplay};
 use crate::{error, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
@@ -388,7 +388,7 @@ impl fmt::Display for Value {
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
             Value::Bytes(x) => write!(f, "0x{}", x.as_hex()),
-            Value::String(x) => fmt_escaped_str(f, x),
+            Value::String(x) => fmt_quoted_str(f, x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
             Value::Descriptor(x) => write!(f, "{:#}", x), // not round-trip-able for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
@@ -411,20 +411,6 @@ impl fmt::Display for Number {
             Number::Float(x) => write!(f, "{:?}", x),
         }
     }
-}
-
-fn fmt_escaped_str(f: &mut fmt::Formatter, str: &str) -> fmt::Result {
-    write!(f, "\"")?;
-    for char in str.chars() {
-        match char {
-            '\r' => write!(f, "\\r")?,
-            '\n' => write!(f, "\\n")?,
-            '\t' => write!(f, "\\t")?,
-            '"' => write!(f, "\\\"")?,
-            _ => write!(f, "{}", char)?,
-        };
-    }
-    write!(f, "\"")
 }
 
 impl PrettyDisplay for Value {

@@ -67,6 +67,22 @@ fn join($strs, $sep) =
 fn t($tagged, $tag) = $tagged | find(|$el| $el.0 == $tag) | mapNullable(|$el| $el.1);
 fn ts($tagged, $tag) = $tagged | filter(|$el| $el.0 == $tag) | map(|$el| $el.1);
 
+//
+// Script Marker utilities
+//
+
+DEBUG_SCRIPT=true;
+DEBUG_CTX="";
+// SCRIPT_MARKER_MAGIC available from Rust
+
+fn mark($kind, $body) = if !DEBUG_SCRIPT then `` else
+  `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP $body OP_DROP`;
+
+fn mark::comment($comment) = mark("comment", DEBUG_CTX + $comment);
+fn mark::label($name) = mark("label", DEBUG_CTX + $name);
+fn mark::breakpoint($name) = mark("breakpoint", DEBUG_CTX + $name);
+
+mark::c=mark::comment, mark::l=mark::label, mark::b=mark::breakpoint, breakpoint=mark::b;
 
 
 // Miniscript utilities
