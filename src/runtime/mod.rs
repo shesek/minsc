@@ -265,6 +265,8 @@ impl ast::InfixOp {
             (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             (Add, String(a), String(b)) => [a, b].concat().into(),
+            // + for string and number
+            (Add, String(a), Num(b)) => [a, b.to_string()].concat().into(),
 
             // + for taproot construction (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
