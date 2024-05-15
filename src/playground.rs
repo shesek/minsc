@@ -88,6 +88,14 @@ fn run(code: &str) -> Result<Value, Error> {
 
 lazy_static! {
     static ref PLAYGROUND_LIB: Library = r#"
+        // Add a default `main` function displaying all environment variables,
+        // or a welcome message if there aren't any.
+        fn main() {
+            $env = str(env::pretty());
+            Symbol(if !isEmpty($env) then "// Environment variables:\n\n" + $env
+                   else "// Welcome! Put some variables in your environment and they will show up here.")
+        }
+
         // Provide some built-in example pubkeys and hashes for the demo env
 
         A = pubkey(0x029ffbe722b147f3035c87cb1c60b9a5947dd49c774cc31e94773478711a929ac0);
