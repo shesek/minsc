@@ -60,7 +60,7 @@ h1[id], h2[id], h3[id], h4[id]
   word-break break-all
 
 .cm-s-darcula .cm-variable-2
-  color #b39ac0 !important
+  color #a689b6 !important
 
 #outputs
   .CodeMirror-cursor
@@ -84,6 +84,8 @@ h1
   position sticky
   bottom 0
   z-index 5 // needed to be above codemirror
+  max-height 10em
+  overflow auto
   font-family monospace
   white-space break-spaces
   word-wrap break-word
@@ -91,10 +93,11 @@ h1
 #outputs
   display none
 
-#output-address
+#output-address .card-text span
   font-family monospace
   white-space break-spaces
   word-wrap break-word
+  color #6897bb
 
 #share-box
   width auto

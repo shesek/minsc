@@ -55,13 +55,14 @@ worker.addEventListener('message', ({ data }) => {
 
     output_el_policy.style.display = r.policy ? 'block' : 'none'
     output_el_desc.style.display = r.descriptor ? 'block' : 'none'
-    output_el_script.style.display = r.script_asm ? 'block' : 'none'
+    output_el_script.style.display = r.script_asm != null ? 'block' : 'none'
     output_el_address.style.display = r.address ? 'block' : 'none'
     output_el_other.style.display = r.other ? 'block' : 'none'
 
     // If nothing visible is collapsed, collapse the first visible output
     if (!document.querySelector("#outputs > .collapsed[style*=block]")) {
-      document.querySelector("#outputs > [style*=block]").classList.add('collapsed')
+      let visible = document.querySelector("#outputs > [style*=block]")
+      if (visible) visible.classList.add('collapsed')
     }
 
     output_policy.setValue(r.policy || '')
@@ -69,6 +70,13 @@ worker.addEventListener('message', ({ data }) => {
     output_script.setValue(r.script_asm || '')
     output_other.setValue(r.other || '')
     output_el_address.querySelector('span').innerText = r.address || ''
+
+    if (r.other) {
+      // Clear matchingBracket highlights, they show up automatically when the result display
+      // is updated to a text beginning with a bracket, even when the editor is not focused.
+      output_other.getAllMarks().filter(m => m.className=='CodeMirror-matchingbracket')
+        .forEach(m => m.clear())
+    }
   }
 })
 
@@ -157,7 +165,7 @@ const editor = CodeMirror(document.querySelector('#editor'), {
 
 editor.on('change', debounce((_, c) =>
   c.origin != 'setValue' && update('edit')
-, 350))
+, 150))
 update('init')
 
 // Setup the 4 output editors (read only)
