@@ -478,18 +478,15 @@ fn fmt_script<W: fmt::Write>(
                 // Format debug markers encoded within the Script
                 MarkerItem::Marker(Marker { kind, body }) => match (format, kind) {
                     // Minsc formatting, as Minsc code that can re-construct the markers
-                    (ScriptFmt::Minsc, "label") => write!(f, "mark::l({})", quote_str(body))?,
-                    (ScriptFmt::Minsc, "comment") => write!(f, "mark::c({})", quote_str(body))?,
-                    (ScriptFmt::Minsc, "breakpoint") => {
-                        write!(f, "breakpoint({})", quote_str(body))?
-                    }
+                    (ScriptFmt::Minsc, "label") => write!(f, "@{}", encode_label(body))?,
+                    (ScriptFmt::Minsc, "comment") => write!(f, "#{}", quote_str(body))?,
                     (ScriptFmt::Minsc, kind) => {
-                        write!(f, "mark({}, {})", quote_str(kind), quote_str(body))?
+                        write!(f, "@@{}:{}", encode_label(kind), quote_str(body))?
                     }
 
                     // ScriptWiz formatting
                     // The "$<label>" format is used by ScriptWiz to assign a label name to the top stack element
-                    (ScriptFmt::ScriptWiz, "label") => write!(f, "${}", scriptwiz_label(body))?,
+                    (ScriptFmt::ScriptWiz, "label") => write!(f, "${}", encode_label(body))?,
                     (ScriptFmt::ScriptWiz, "comment") => {
                         write!(f, "// {}", body.replace("\n", "\n// "))?
                     }
@@ -514,7 +511,7 @@ fn fmt_script<W: fmt::Write>(
 }
 
 // ScriptWiz only allows alphanumeric characters and underscores in label names
-fn scriptwiz_label(input: &str) -> String {
+fn encode_label(input: &str) -> String {
     input
         .chars()
         .map(|c| iif!(c.is_alphanumeric(), c, '_'))

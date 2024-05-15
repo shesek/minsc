@@ -211,13 +211,25 @@ ScriptFragPart = { ScriptFragPart_, ScriptFragPart_Infix };
 ScriptFragPart_ = {
   Ident, Number, String, Bytes, PubKey, DateTime, CallLiteral, ArrayAccess, Array,
   BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
+  ScriptFragPart_Mark, ScriptFragPart_Label, ScriptFragPart_Comment,
 };
 // Cannot allow all Infix operators because < > conflicts
-ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart_> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_Infix_RHS> =>
+ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart_> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_RHS> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
-// We can allow Paren<Expr>, but only for the RHS
-ScriptFragPart_Infix_RHS = { ScriptFragPart_, Paren<Expr> };
 
+ScriptFragPart_RHS = { SExpr, ArrayAccess };
+
+// Script Marker syntax, only valid within script fragments.
+// Translated into the AST as a Call, it probably shouldn't.
+ScriptFragPart_Mark: Expr = "@@" <kind:IDENT> ":" <body:ScriptFragPart_RHS> =>
+  ast::Call { func: Expr::Ident("mark".into()).into(), args: vec![Expr::String(kind.to_string()), body ] }.into();
+ScriptFragPart_Label: Expr = "@" <IDENT> =>
+  ast::Call { func: Expr::Ident("mark::label".into()).into(), args: vec![Expr::String(<>.to_string())] }.into();
+ScriptFragPart_Comment: Expr = "#" <ScriptFragPart_RHS> =>
+  ast::Call { func: Expr::Ident("mark::comment".into()).into(), args: vec![<>] }.into();
+
+
+// Anonymous function expression
 FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
     ast::FnExpr { signature, body: body.into() }.into();
 FnExprSignature = {
