@@ -1,3 +1,3 @@
 fn main() {
-    lalrpop::Configuration::new().process().unwrap();
+    lalrpop::process_root().unwrap();
 }
