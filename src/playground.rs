@@ -1,4 +1,4 @@
-use miniscript::bitcoin::{Address, Network, ScriptBuf};
+use miniscript::bitcoin::{Address, Network};
 use miniscript::{Descriptor, MiniscriptKey};
 use serde::Serialize;
 use std::str::FromStr;

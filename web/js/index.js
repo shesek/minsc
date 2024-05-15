@@ -199,7 +199,7 @@ const output_desc = CodeMirror(output_el_desc.querySelector('.codeview'), {
   theme: 'darcula',
 })
 const output_script = CodeMirror(output_el_script.querySelector('.codeview'), {
-  mode: 'bitcoin',
+  mode: 'minsc',
   readOnly: true,
   lineWrapping: true,
   matchBrackets: true,
