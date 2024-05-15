@@ -478,10 +478,19 @@ fn fmt_script<W: fmt::Write>(
                 // Format debug markers encoded within the Script
                 MarkerItem::Marker(Marker { kind, body }) => match (format, kind) {
                     // Minsc formatting, as Minsc code that can re-construct the markers
-                    (ScriptFmt::Minsc, "label") => write!(f, "@{}", encode_label(body))?,
                     (ScriptFmt::Minsc, "comment") => write!(f, "#{}", quote_str(body))?,
+                    (ScriptFmt::Minsc, "label") if !body.is_empty() => {
+                        write!(f, "@{}", encode_label(body))?
+                    }
+                    (ScriptFmt::Minsc, kind) if is_valid_ident(kind) => {
+                        if body.is_empty() {
+                            write!(f, "@{}()", encode_label(kind))?
+                        } else {
+                            write!(f, "@{}({})", encode_label(kind), quote_str(body))?
+                        }
+                    }
                     (ScriptFmt::Minsc, kind) => {
-                        write!(f, "@@{}:{}", encode_label(kind), quote_str(body))?
+                        write!(f, "@({}, {})", quote_str(kind), quote_str(body))?
                     }
 
                     // ScriptWiz formatting
@@ -516,6 +525,9 @@ fn encode_label(input: &str) -> String {
         .chars()
         .map(|c| iif!(c.is_alphanumeric(), c, '_'))
         .collect()
+}
+fn is_valid_ident(s: &str) -> bool {
+    s.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
 impl PrettyDisplay for Transaction {
     const AUTOFMT_ENABLED: bool = true;

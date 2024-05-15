@@ -54,13 +54,14 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /\/\/.*/, token: "comment"},
 
     // Script fragment start
-    {regex:/`/, token: "property", next: "backticks"},
+    {regex:/`/, token: "property"},//, next: "backticks"},
 
-    ...rules,
-  ],
-  backticks: [
-    {regex:/`/, token: "property", next: "start"},
-    {regex: /@([\w_$]+|@[\w_$]+:)/, token: "property"},
+  //  ...rules,
+  //],
+  //backticks: [
+   //` {regex:/`/, token: "property", next: "start"},
+   // {regex: /@@?([\w_$]+|@[\w_$]+:)/, token: "property"},
+    {regex: /@([\w_$]*|@)/, token: "property"},
     {regex: /(#)("(?:[^\\]|\\.)*?")/, token: ["property", "comment"]},
     {regex: /#/, token: "property"},
     ...rules,

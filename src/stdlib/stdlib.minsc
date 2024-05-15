@@ -71,16 +71,20 @@ fn ts($tagged, $tag) = $tagged | filter(|$el| $el.0 == $tag) | map(|$el| $el.1);
 // Script Marker utilities
 //
 
-DEBUG_SCRIPT=true;
-DEBUG_CTX="";
+MARK_SCRIPT=true;
+MARK_CTX="";
 
-fn mark($kind, $body) = if !DEBUG_SCRIPT then `` else
+fn mark($kind, $body) = if !MARK_SCRIPT then `` else
+  `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP {MARK_CTX+str($body)} OP_DROP`;
   // SCRIPT_MARKER_MAGIC available from Rust
-  `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP {DEBUG_CTX+str($body)} OP_DROP`;
+
+fn mark::ctx($$context, $$fn) {
+  MARK_CTX = MARK_CTX + str($$context);
+  $$fn()
+}
 
 fn mark::comment($comment) = mark("comment", $comment);
 fn mark::label($name) = mark("label", $name);
-
 mark::c=mark::comment, mark::l=mark::label;
 
 // Miniscript utilities
