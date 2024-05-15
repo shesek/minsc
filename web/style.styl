@@ -1,7 +1,9 @@
 @import "node_modules/typeface-lato/index.css"
 @import "node_modules/codemirror/lib/codemirror.css"
-@import "node_modules/codemirror/addon/lint/lint.css"
 @import "node_modules/codemirror/theme/darcula.css"
+// @import "node_modules/codemirror/addon/lint/lint.css"
+@import "node_modules/codemirror/addon/display/fullscreen.css"
+@import "node_modules/codemirror/addon/hint/show-hint.css"
 
 .card-header
   padding 0.5rem 1rem
@@ -58,6 +60,15 @@ h1[id], h2[id], h3[id], h4[id]
 
 .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like
   word-break break-all
+
+.CodeMirror-hint
+  color #fff
+
+.CodeMirror-focused
+  .cm-matchhighlight
+    background-image url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVQI12NgYGBgkKzc8x9CMDAwAAAmhwSbidEoSQAAAABJRU5ErkJggg==")
+    background-position bottom
+    background-repeat repeat-x
 
 .cm-s-darcula .cm-variable-2
   color #a689b6 !important

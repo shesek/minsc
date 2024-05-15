@@ -1,7 +1,13 @@
 import CodeMirror from 'codemirror'
 import 'codemirror/addon/mode/simple'
 import 'codemirror/addon/edit/matchbrackets'
-
+//import 'codemirror/addon/comment/comment'
+//import 'codemirror/addon/comment/continuecomment'
+import 'codemirror/addon/selection/active-line'
+import 'codemirror/addon/display/fullscreen'
+import 'codemirror/addon/search/match-highlighter'
+import 'codemirror/addon/hint/show-hint'
+import 'codemirror/addon/hint/anyword-hint'
 import 'codemirror/addon/runmode/runmode'
 
 import './codemirror-minsc'
@@ -156,10 +162,19 @@ share_el.addEventListener('click', _ => {
 // Setup main editor
 const editor = CodeMirror(document.querySelector('#editor'), {
   mode: 'minsc',
+  theme: 'darcula',
   lineNumbers: true,
   lineWrapping: true,
   matchBrackets: true,
-  theme: 'darcula',
+  styleActiveLine: true,
+  hintOptions: { word: /[\w$:]+/, completeSingle: false },
+  highlightSelectionMatches: true, // {showToken: /[\w$:]/},
+  // continueComments: true // could not get this to work. :<
+  extraKeys: {
+    "F11": cm => cm.setOption("fullScreen", !cm.getOption("fullScreen")),
+    "Esc": cm => cm.getOption("fullScreen") && cm.setOption("fullScreen", false),
+    "Ctrl-Space":  cm => cm.showHint({hint: CodeMirror.hint.anyword }),
+  },
   value: initial_code,
 })
 
