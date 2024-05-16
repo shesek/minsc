@@ -241,7 +241,7 @@ pub mod fns {
     pub fn scriptWiz(args: Array, _: &Scope) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut wiz_str = String::new();
-        fmt_script(&mut wiz_str, &script, ScriptFmt::ScriptWiz, None)?;
+        fmt_script(&mut wiz_str, &script, ScriptFmt::ScriptWiz, Some(0))?;
         // Uses Symbol for the same reason described in `stdlib::fns::debug()`
         Ok(Symbol::new(Some(wiz_str)).into())
     }
@@ -452,31 +452,46 @@ fn fmt_script<W: fmt::Write>(
     format: ScriptFmt,
     indent: Option<usize>,
 ) -> fmt::Result {
-    use crate::util::quote_str;
+    use crate::util::{quote_str, LIST_INDENT_WIDTH as INDENT};
+    use bitcoin::opcodes::all::{OP_ELSE, OP_ENDIF, OP_IF, OP_NOTIF};
 
-    if format == ScriptFmt::Minsc {
-        write!(f, "`")?;
+    match format {
+        ScriptFmt::Minsc => write!(f, "`")?,
+        ScriptFmt::ScriptWiz => write!(f, "// ScriptWiz formatted")?,
     }
     if indent.is_some() || format == ScriptFmt::ScriptWiz {
         write!(f, "\n")?;
     }
-    let inner_indent_w = indent.map_or(0, |n| (n + 1) * 2);
+    let inner_indent_w = indent.map_or(0, |n| (n + 1) * INDENT);
+    let mut if_indent_w: usize = 0;
 
     let mut iter = script
         .iter_with_markers(SCRIPT_MARKER_MAGIC_BYTES)
         .peekable();
 
     while let Some(item) = iter.next() {
-        write!(f, "{:i$}", "", i = inner_indent_w)?;
+        if let (Ok(MarkerItem::Instruction(Instruction::Op(OP_ELSE | OP_ENDIF))), Some(_)) =
+            (&item, indent)
+        {
+            if_indent_w = if_indent_w.checked_sub(INDENT).unwrap_or(0);
+        }
+        write!(f, "{:i$}", "", i = inner_indent_w + if_indent_w)?;
+
         match item {
-            Ok(item) => match item {
-                MarkerItem::Instruction(inst) => match inst {
-                    Instruction::PushBytes(push) if push.is_empty() => write!(f, "<0>")?,
-                    Instruction::PushBytes(push) => write!(f, "<0x{}>", push.as_bytes().as_hex())?,
-                    Instruction::Op(opcode) => write!(f, "{}", opcode.pretty(None))?,
-                },
-                // Format debug markers encoded within the Script
-                MarkerItem::Marker(Marker { kind, body }) => match (format, kind) {
+            Ok(MarkerItem::Instruction(inst)) => match inst {
+                Instruction::PushBytes(push) if push.is_empty() => write!(f, "<0>")?,
+                Instruction::PushBytes(push) => write!(f, "<0x{}>", push.as_bytes().as_hex())?,
+                Instruction::Op(opcode) => {
+                    write!(f, "{}", opcode.pretty(None))?;
+
+                    if let (OP_IF | OP_NOTIF | OP_ELSE, Some(_)) = (opcode, indent) {
+                        if_indent_w = if_indent_w + INDENT;
+                    }
+                }
+            },
+            // Format debug markers encoded within the Script
+            Ok(MarkerItem::Marker(Marker { kind, body })) => {
+                match (format, kind) {
                     // Minsc formatting, as Minsc code that can re-construct the markers
                     (ScriptFmt::Minsc, "label") if is_valid_ident(body) => write!(f, "@{}", body)?,
                     (ScriptFmt::Minsc, "label") => write!(f, "@{{{}}}", quote_str(body))?,
@@ -498,13 +513,15 @@ fn fmt_script<W: fmt::Write>(
                     // The "$<label>" format is used by ScriptWiz to assign a label name to the top stack element
                     (ScriptFmt::ScriptWiz, "label") => write!(f, "${}", encode_label(body))?,
                     (ScriptFmt::ScriptWiz, "comment") => {
-                        write!(f, "// {}", body.replace("\n", "\n// "))?
+                        let newline_indent =
+                            format!("\n{:i$}// ", "", i = inner_indent_w + if_indent_w);
+                        write!(f, "// {}", body.replace("\n", &newline_indent))?
                     }
                     (ScriptFmt::ScriptWiz, kind) => {
-                        write!(f, "// {} mark: {}", quote_str(kind), quote_str(body))?
+                        write!(f, "// {}: {}", quote_str(kind), quote_str(body))?
                     }
-                },
-            },
+                }
+            }
             Err(e) => write!(f, "Err(\"{}\")", e)?,
         }
         match format {
