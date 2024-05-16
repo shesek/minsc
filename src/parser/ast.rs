@@ -35,6 +35,7 @@ pub enum Expr {
 
 impl_from_variant!(i64, Expr, Int);
 impl_from_variant!(f64, Expr, Float);
+impl_from_variant!(String, Expr, String);
 
 /// Statements have side-effects and don't produce a value
 #[derive(Debug, Clone)]
@@ -95,6 +96,11 @@ impl_from_variant!(Ident, Expr);
 impl From<&str> for Ident {
     fn from(s: &str) -> Self {
         Ident(s.into())
+    }
+}
+impl From<String> for Ident {
+    fn from(s: String) -> Self {
+        Ident(s)
     }
 }
 impl std::fmt::Display for Ident {

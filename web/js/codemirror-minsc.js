@@ -40,9 +40,6 @@ CodeMirror.defineSimpleMode("minsc",{
     // Assignment
     //{regex: /\b([$a-zA-Z_][$a-zA-Z_0-9]*)\s*(=)/, token: ["variable-3", null]},
 
-    // Infix operators
-    {regex: /[-+\/*<>!;@]|[=!<>]=|&&|\|\||\|/, token: "operator"},
-
     // Function calls
     {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\()/, token: ["atom", null], indent: true},
 
@@ -56,13 +53,17 @@ CodeMirror.defineSimpleMode("minsc",{
     // Numeric array index
     {regex: /\.\d+\b/, token: "property"},
 
-    // Script fragment start
+    // Script fragment start/end
     {regex:/`/, token: "property"},
 
     // Script markers
-    {regex: /\s@([\w_$]*|@)/, token: "property"},
+    {regex: /\s*@@/, token: "property"},
+    {regex: /\s@[\w_$]*/, token: "property"}, // checks \s to avoid highlighting the probability@policy syntax
     {regex: /(#)\s*("(?:[^\\]|\\.)*?")/, token: ["property", "comment"]},
     {regex: /#/, token: "property"},
+
+    // Infix operators
+    {regex: /[-+\/*<>!;@]|[=!<>]=|&&|\|\||\|/, token: "operator"},
 
     // Indentation for { [ (
     {regex: /[\{\[\(]/, indent: true},

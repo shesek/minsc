@@ -45,3 +45,11 @@ pub fn prepend<T>(mut list: Vec<T>, val: T) -> Vec<T> {
     list.insert(0, val);
     list
 }
+
+pub fn call(func: &str, args: Vec<Expr>) -> Expr {
+    ast::Call {
+        func: Expr::Ident(func.to_string().into()).into(),
+        args,
+    }
+    .into()
+}
