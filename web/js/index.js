@@ -5,7 +5,6 @@ import 'codemirror/addon/edit/matchbrackets'
 //import 'codemirror/addon/comment/continuecomment'
 import 'codemirror/addon/selection/active-line'
 import 'codemirror/addon/display/fullscreen'
-import 'codemirror/addon/search/match-highlighter'
 import 'codemirror/addon/hint/show-hint'
 import 'codemirror/addon/hint/anyword-hint'
 import 'codemirror/addon/runmode/runmode'
@@ -13,6 +12,7 @@ import 'codemirror/addon/runmode/runmode'
 import './codemirror-minsc'
 import './codemirror-miniscript'
 import './codemirror-bitcoin'
+import './codemirror-addon-highlighter'
 
 import { debounce, encode, findErrorLines, loadGist } from './util'
 import default_code from '../default-code.minsc'
@@ -174,7 +174,7 @@ const editor = CodeMirror(document.querySelector('#editor'), {
   matchBrackets: true,
   styleActiveLine: true,
   hintOptions: { word: /[\w$:]+/, completeSingle: false },
-  highlightSelectionMatches: true, // {showToken: /[\w$:]/},
+  highlightSelectionMatches: { showToken: /[\w$:]/ },
   // continueComments: true // could not get this to work. :<
   extraKeys: {
     "F11": cm => cm.setOption("fullScreen", !cm.getOption("fullScreen")),
