@@ -60,7 +60,10 @@ impl<'a, 'b> Iterator for MarkerIterator<'a, 'b> {
     fn next(&mut self) -> Option<Result<MarkerItem<'a>, MarkerError>> {
         Some(match self.inner.next()? {
             Err(e) => Err(MarkerError::InvalidScript(e)),
-            Ok(Instruction::PushBytes(push)) if push.as_bytes() == self.magic_bytes => {
+            Ok(Instruction::PushBytes(push))
+                if push.as_bytes() == self.magic_bytes && next_is_drop(&mut self.inner) =>
+            {
+                self.inner.next(); // consume the OP_DROP following the marker magic bytes
                 read_marker(&mut self.inner).map(MarkerItem::Marker)
             }
             Ok(instruction) => Ok(MarkerItem::Instruction(instruction)),
@@ -68,7 +71,11 @@ impl<'a, 'b> Iterator for MarkerIterator<'a, 'b> {
     }
 }
 
-// Attempt to read the marker's kind and body following the marker magic (already read by now).
+fn next_is_drop(iter: &mut iter::Peekable<Instructions>) -> bool {
+    matches!(iter.peek(), Some(Ok(Instruction::Op(ops::OP_DROP))))
+}
+
+// Try to read the marker's contents following the marker magic PUSH-then-DROP (already read by now).
 // Instructions will be consumed from the iterator as long as they match the expected format.
 // The first non-matching instruction will result in an error, but remain available in the iterator
 // so that they can be included when encoding Script to a string.
@@ -76,7 +83,6 @@ fn read_marker<'a>(
     instructions: &mut iter::Peekable<Instructions<'a>>,
 ) -> Result<Marker<'a>, MarkerError> {
     let res = (|| {
-        verify_drop(instructions)?; // look for the OP_DROP following the magic marker
         let kind = str::from_utf8(read_pushdrop(instructions)?)?;
         let body = str::from_utf8(read_pushdrop(instructions)?)?;
         Ok(Marker { kind, body })
@@ -149,7 +155,7 @@ pub enum MarkerError {
     #[error("ScriptMarker: UTF-8 Error: {0}")]
     Utf8Error(#[from] std::str::Utf8Error),
 
-    /// An invalid Script (e.g. end-of-bound PUSH) was detected following the magic marker
+    /// An invalid Script (e.g. out-of-bound PUSH) was detected following the magic marker
     #[error("ScriptMarker: {0}")]
     InvalidMarkScript(bitcoin::script::Error),
 
