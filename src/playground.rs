@@ -1,4 +1,4 @@
-use miniscript::bitcoin::{Address, Network};
+use miniscript::bitcoin::{Address, Network, ScriptBuf};
 use miniscript::{Descriptor, MiniscriptKey};
 use serde::Serialize;
 use std::str::FromStr;
@@ -75,7 +75,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
         Ok(PlaygroundResult {
             policy: policy.map(|p| p.to_string()),
             descriptor: desc.map(|d| format!("{:#}", d)),
-            script_asm: script.as_ref().map(|s| s.multiline_str()),
+            script_asm: script.as_ref().map(script_asm),
             address: addr.map(|a| a.to_string()),
             tapinfo: tapinfo.map(|t| t.multiline_str()),
             key: key.map(|a| a.to_string()),
@@ -88,6 +88,13 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
 fn run(code: &str) -> Result<Value, Error> {
     Ok(parse(code)?.eval(&DEMO_SCOPE)?)
+}
+
+fn script_asm(script: &ScriptBuf) -> String {
+    use crate::stdlib::btc::{fmt_script, ScriptFmt};
+    let mut asm = String::new();
+    fmt_script(&mut asm, script, ScriptFmt::Minsc(false), Some(0)).unwrap();
+    asm
 }
 
 lazy_static! {

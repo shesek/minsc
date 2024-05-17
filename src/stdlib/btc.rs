@@ -435,18 +435,18 @@ impl TryFrom<Value> for bitcoin::Witness {
 
 impl PrettyDisplay for ScriptBuf {
     const AUTOFMT_ENABLED: bool = true;
-    const MAX_ONELINER_LENGTH: usize = 350;
+    const MAX_ONELINER_LENGTH: usize = 300;
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
-        fmt_script(f, self, ScriptFmt::Minsc, indent)
+        fmt_script(f, self, ScriptFmt::Minsc(true), indent)
     }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum ScriptFmt {
-    Minsc,
+    Minsc(bool), // with or without wrapping backticks
     ScriptWiz,
 }
-fn fmt_script<W: fmt::Write>(
+pub fn fmt_script<W: fmt::Write>(
     f: &mut W,
     script: &Script,
     format: ScriptFmt,
@@ -455,15 +455,22 @@ fn fmt_script<W: fmt::Write>(
     use crate::util::{quote_str, LIST_INDENT_WIDTH as INDENT};
     use bitcoin::opcodes::all::{OP_ELSE, OP_ENDIF, OP_IF, OP_NOTIF};
 
-    match format {
-        ScriptFmt::Minsc => write!(f, "`")?,
-        ScriptFmt::ScriptWiz => write!(f, "// ScriptWiz formatted")?,
-    }
-    if indent.is_some() || format == ScriptFmt::ScriptWiz {
-        write!(f, "\n")?;
-    }
-    let inner_indent_w = indent.map_or(0, |n| (n + 1) * INDENT);
+    let mut indent_w = indent.map_or(0, |n| n * INDENT);
     let mut if_indent_w: usize = 0;
+
+    match format {
+        ScriptFmt::Minsc(true) => {
+            write!(f, "`")?;
+            if indent.is_some() {
+                write!(f, "\n")?;
+                indent_w += INDENT;
+            }
+        }
+        ScriptFmt::Minsc(false) => (),
+        ScriptFmt::ScriptWiz => {
+            write!(f, "// ScriptWiz formatted\n")?;
+        }
+    }
 
     let mut iter = script
         .iter_with_markers(SCRIPT_MARKER_MAGIC_BYTES)
@@ -475,7 +482,7 @@ fn fmt_script<W: fmt::Write>(
         {
             if_indent_w = if_indent_w.checked_sub(INDENT).unwrap_or(0);
         }
-        write!(f, "{:i$}", "", i = inner_indent_w + if_indent_w)?;
+        write!(f, "{:i$}", "", i = indent_w + if_indent_w)?;
 
         match item {
             Ok(MarkerItem::Instruction(inst)) => match inst {
@@ -493,19 +500,21 @@ fn fmt_script<W: fmt::Write>(
             Ok(MarkerItem::Marker(Marker { kind, body })) => {
                 match (format, kind) {
                     // Minsc formatting, as Minsc code that can re-construct the markers
-                    (ScriptFmt::Minsc, "label") if is_valid_ident(body) => write!(f, "@{}", body)?,
-                    (ScriptFmt::Minsc, "label") => write!(f, "@{{{}}}", quote_str(body))?,
-                    (ScriptFmt::Minsc, "comment") => {
+                    (ScriptFmt::Minsc(_), "label") if is_valid_ident(body) => {
+                        write!(f, "@{}", body)?
+                    }
+                    (ScriptFmt::Minsc(_), "label") => write!(f, "@{{{}}}", quote_str(body))?,
+                    (ScriptFmt::Minsc(_), "comment") => {
                         write!(f, "#{}{}", iif!(indent.is_some(), " ", ""), quote_str(body))?
                     }
-                    (ScriptFmt::Minsc, kind) if is_valid_ident(kind) => {
+                    (ScriptFmt::Minsc(_), kind) if is_valid_ident(kind) => {
                         if body.is_empty() {
                             write!(f, "@{}()", kind)?
                         } else {
                             write!(f, "@{}({})", kind, quote_str(body))?
                         }
                     }
-                    (ScriptFmt::Minsc, kind) => {
+                    (ScriptFmt::Minsc(_), kind) => {
                         write!(f, "@({}, {})", quote_str(kind), quote_str(body))?
                     }
 
@@ -513,8 +522,7 @@ fn fmt_script<W: fmt::Write>(
                     // The "$<label>" format is used by ScriptWiz to assign a label name to the top stack element
                     (ScriptFmt::ScriptWiz, "label") => write!(f, "${}", encode_label(body))?,
                     (ScriptFmt::ScriptWiz, "comment") => {
-                        let newline_indent =
-                            format!("\n{:i$}// ", "", i = inner_indent_w + if_indent_w);
+                        let newline_indent = format!("\n{:i$}// ", "", i = indent_w + if_indent_w);
                         write!(f, "// {}", body.replace("\n", &newline_indent))?
                     }
                     (ScriptFmt::ScriptWiz, kind) => {
@@ -525,15 +533,24 @@ fn fmt_script<W: fmt::Write>(
             Err(e) => write!(f, "Err(\"{}\")", e)?,
         }
         match format {
-            ScriptFmt::Minsc if indent.is_none() && iter.peek().is_some() => write!(f, " ")?,
-            ScriptFmt::Minsc if indent.is_some() => write!(f, "\n")?,
+            ScriptFmt::Minsc(backticks) => {
+                let has_more = iter.peek().is_some();
+                if indent.is_none() && has_more {
+                    write!(f, " ")?; // add space before the next item
+                } else if indent.is_some() && (has_more || backticks) {
+                    write!(f, "\n")?; // add newline before the next item or the closing backtick
+                }
+            }
             // ScriptWiz requires newlines between opcodes, so they're added regardless of `indent`.
             ScriptFmt::ScriptWiz => write!(f, "\n")?,
-            _ => (),
         }
     }
-    if format == ScriptFmt::Minsc {
-        write!(f, "`")?;
+    if format == ScriptFmt::Minsc(true) {
+        if indent.is_some() {
+            write!(f, "{:i$}`", "", i = indent_w - INDENT)?;
+        } else {
+            write!(f, "`")?;
+        }
     }
     Ok(())
 }
