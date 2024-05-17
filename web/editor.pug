@@ -36,14 +36,16 @@ head
   link(rel='stylesheet', href='style.css')
 
 body
-  #content.container-fluid.mt-5
+  #content.container-fluid.mt-3
     .row
       .col-md-8.col-lg-9
-        +box('Minsc').mb-2: #editor
-
-        .mb-4.d-flex.justify-content-end
-          input#share-box.form-control.form-control-sm.bg-dark.text-muted.d-none(readonly)
-          a#share.btn.btn-sm.btn-secondary(href='#') #[+icon('link-45deg')] Share URL
+        #editor-wrap.card.border-secondary
+          h5.card-header.d-flex.justify-content-between
+            | Minsc
+            .d-flex.justify-content-end
+              input#share-box.form-control.form-control-sm.bg-dark.text-muted.d-none(readonly)
+              a#share.btn.btn-sm.btn-secondary.bg-dark(href='#') #[+icon('link-45deg')] Share URL
+          #editor.card-text
 
         #error.alert.alert-warning
 
@@ -51,15 +53,14 @@ body
         h5#loading.font-italic.text-center Loading WASM...
 
         #outputs
-          +box('Public Key', true, true).mb-3#output-key: .codeview
-          +box('Policy', true, true).mb-3#output-policy: .codeview
-          +box('Descriptor', true, true).mb-3#output-desc: .codeview
-          +box('Taproot', true, true).mb-3#output-tapinfo: .codeview
-          +box('Script', true, true).mb-3#output-script: .codeview
-          +box('Address', true, true)#output-address.mb-3
+          +box('Public Key', true, true)#output-key: .codeview
+          +box('Policy', true, true)#output-policy: .codeview
+          +box('Descriptor', true, true)#output-desc: .codeview
+          +box('Taproot', true, true)#output-tapinfo: .codeview
+          +box('Script', true, true)#output-script: .codeview
+          +box('Address', true, true)#output-address
             p.m-0.p-2 #[span]
-          +box('Result', false, false)#output-other.mb-3: .codeview
-          //-.card.border-secondary#output-other.mb-3: .card-text: .codeview
+          +box('Result', false, false)#output-other: .codeview
 
     script.
       (function(u, _paq) {

@@ -55,8 +55,26 @@ h1[id], h2[id], h3[id], h4[id]
   &:not(.collapsed) .icon-arrows-collapse
     display none
 
+#content > .row > div
+  @media (max-width: 767.98px)
+    margin-bottom 1.5rem
+
 .CodeMirror
   height auto
+
+@media (min-width: 768px)
+  #editor-wrap
+    height calc(100vh - 2rem)
+    overflow auto
+
+    #editor
+      flex 1
+    .CodeMirror
+      height 100%
+
+  #outputs
+    max-height calc(100vh - 2rem)
+    overflow auto
 
 .CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like
   word-break break-all
@@ -83,6 +101,10 @@ h1[id], h2[id], h3[id], h4[id]
 #outputs
   .CodeMirror-cursor
     display none
+
+  .card:not(:last-child)
+    margin-bottom 1rem
+
 h1
   font-weight 300
   font-size 3.5rem
@@ -107,6 +129,10 @@ h1
   font-family monospace
   white-space break-spaces
   word-wrap break-word
+  margin-bottom 0
+
+  @media (min-width: 768px)
+    bottom 1rem
 
 #outputs
   display none
@@ -117,9 +143,12 @@ h1
   word-wrap break-word
   color #6897bb
 
+#share, #share-box
+  font-size 0.6rem
+  padding 0.2rem 0.4rem
 #share-box
-  width auto
-  flex-grow 1
+  width 13em
+  margin-right 0.2rem
 
 #ref
   h2
