@@ -7,6 +7,9 @@ import 'codemirror/addon/selection/active-line'
 import 'codemirror/addon/display/fullscreen'
 import 'codemirror/addon/hint/show-hint'
 import 'codemirror/addon/hint/anyword-hint'
+import 'codemirror/addon/search/search'
+import 'codemirror/addon/search/searchcursor'
+import 'codemirror/addon/dialog/dialog'
 import 'codemirror/addon/runmode/runmode'
 
 import './codemirror-minsc'
@@ -150,6 +153,8 @@ document.querySelectorAll('.card.collapsible').forEach(collapsible => {
     output_policy.refresh()
     output_desc.refresh()
     output_script.refresh()
+    output_tapinfo.refresh()
+    output_key.refresh()
   })
 })
 
