@@ -70,6 +70,13 @@ h1[id], h2[id], h3[id], h4[id]
     background-position bottom
     background-repeat repeat-x
 
+.CodeMirror-fullscreen
+  // Add some padding to full-screen read-only views
+  padding 1em
+  // But not to the main editor
+  #editor &
+    padding 0
+
 .cm-s-darcula .cm-variable-2
   color #a689b6 !important
 

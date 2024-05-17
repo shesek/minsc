@@ -5,6 +5,13 @@ CodeMirror.defineSimpleMode("minsc",{
     // Comments
     {regex: /\/\/.*/, token: "comment"},
 
+    // @ Execution probability operator
+    // Matched early to tell apart from @ used as markers inside script fragments
+    // (and also has to match prior to numbers and variables)
+    {regex: /(\d+)\s*(@)/, token: ["number", "operator"]},
+    {regex: /(likely)\s*(@)/, token: ["builtin", "operator"]},
+    {regex: /([$a-zA-Z_][$a-zA-Z_0-9:]*)\s*(@)/, token: ["variable-3", "operator"]},
+
     // Time durations
     {regex: /\d+(\.\d+)?\s+(years?|months?|weeks?|days?|hours?|min(?:utes?|s)|seconds?)\b/, token: "number"},
 
@@ -58,7 +65,7 @@ CodeMirror.defineSimpleMode("minsc",{
 
     // Script markers
     {regex: /\s*@@/, token: "property"},
-    {regex: /\s@[\w_$]*/, token: "property"}, // checks \s to avoid highlighting the probability@policy syntax
+    {regex: /\s*@[\w_$:]*/, token: "property"},
     {regex: /(#)\s*("(?:[^\\]|\\.)*?")/, token: ["property", "comment"]},
     {regex: /#/, token: "property"},
 
