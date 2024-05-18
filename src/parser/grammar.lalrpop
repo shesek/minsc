@@ -87,6 +87,7 @@ SExpr = {
   Address,
   PubKey,
   ScriptFrag,
+  ScriptMarkCtx,
 
   // Allow any expression wrapped in () or {}
   Paren<Expr>,
@@ -233,9 +234,13 @@ ScriptFragPart_Mark: Expr = {
   "@" <Paren<(<Expr> "," <Expr>)>> => call("mark", vec![<>.0, <>.1]),
 
   // @@("CONTEXT", ScriptExpr)
-  // Wraps the body expression in a function, to be evaluated from within the `mark::ctx()` scope.
-  "@@" <Paren<(<Expr> "," <Expr>)>> => call("mark::ctx", vec![<>.0, ast::FnExpr { signature: vec![], body: <>.1.into() }.into()]),
+  ScriptMarkCtx,
 };
+
+// Defined separately because it is allowed outside ``
+ScriptMarkCtx: Expr =
+  // Wraps the body expression in a function, to be evaluated from within the `mark::ctx()` scope.
+  "@@" <Paren<(<Expr> "," <Expr>)>> => call("mark::ctx", vec![<>.0, ast::FnExpr { signature: vec![], body: <>.1.into() }.into()]);
 
 
 // Anonymous function expression
