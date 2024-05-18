@@ -16,15 +16,10 @@ module.exports = {
   experiments: {
     asyncWebAssembly: true,
   },
-  externals: {
-    //'./pkg' : 'commonjs2 ./pkg',
-  },
-  /*
-  optimization: {
-    namedChunks: true,
-  },*/
   devServer: {
     static: dist,
+    // Does not work well with WASM changes
+    hot: false,
   },
   plugins: [
     new CopyPlugin({ patterns: [
