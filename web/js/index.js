@@ -9,6 +9,9 @@ import 'codemirror/addon/hint/show-hint'
 import 'codemirror/addon/search/search'
 import 'codemirror/addon/search/searchcursor'
 import 'codemirror/addon/dialog/dialog'
+import 'codemirror/addon/search/matchesonscrollbar'
+import 'codemirror/addon/scroll/simplescrollbars'
+import 'codemirror/addon/scroll/annotatescrollbar'
 import 'codemirror/addon/runmode/runmode'
 
 import './codemirror-minsc'
@@ -189,6 +192,7 @@ const editor = CodeMirror(document.querySelector('#editor'), {
   tabSize: 2,
   lineNumbers: true,
   lineWrapping: true,
+  scrollbarStyle: 'overlay',
   matchBrackets: true,
   styleActiveLine: true,
   hintOptions: {
@@ -198,7 +202,7 @@ const editor = CodeMirror(document.querySelector('#editor'), {
     closeCharacters: /[\s()\[\]{};>,]/,
     minAnyhintLen: 3,
   },
-  highlightSelectionMatches: { showToken: /[\w$:]/ },
+  highlightSelectionMatches: { showToken: /[\w$:]/, annotateScrollbar: true },
   // continueComments: true // could not get this to work. :<
   extraKeys: {
     ...full_screen_keys,

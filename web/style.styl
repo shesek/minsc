@@ -5,6 +5,8 @@
 @import "node_modules/codemirror/addon/display/fullscreen.css"
 @import "node_modules/codemirror/addon/hint/show-hint.css"
 @import "node_modules/codemirror/addon/dialog/dialog.css"
+@import "node_modules/codemirror/addon/scroll/simplescrollbars.css"
+@import "node_modules/codemirror/addon/search/matchesonscrollbar.css"
 
 .card-header
   padding 0.5rem 1rem
@@ -194,3 +196,21 @@ footer
   @media (min-width: 768px)
     display flex
     justify-content space-between
+
+
+// CodeMirror scrollbar styling
+
+.cm-s-darcula
+  div.CodeMirror-overlayscroll-horizontal div
+    background-color: #606366
+    border-radius: 3px
+
+  div.CodeMirror-overlayscroll-vertical div
+    background-color: #606366
+    border-radius: 3px
+
+  div.CodeMirror-overlayscroll-horizontal div:hover
+    background-color: #A9B7C6
+
+  div.CodeMirror-overlayscroll-vertical div:hover
+    background-color: #A9B7C6
