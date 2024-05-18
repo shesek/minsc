@@ -66,10 +66,10 @@ h1[id], h2[id], h3[id], h4[id]
 @media (min-width: 768px)
   #editor-wrap
     height calc(100vh - 2rem)
-    overflow auto
 
     #editor
       flex 1
+      overflow auto
     .CodeMirror
       height 100%
 
@@ -122,18 +122,14 @@ h1
 
 #error
   display none
-  position sticky
-  bottom 0
   z-index 5 // needed to be above codemirror
   max-height 10em
   overflow auto
   font-family monospace
   white-space break-spaces
   word-wrap break-word
+  border-radius 0rem 0 0.25rem 0.25rem
   margin-bottom 0
-
-  @media (min-width: 768px)
-    bottom 1rem
 
 #outputs
   display none

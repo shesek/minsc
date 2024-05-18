@@ -13,13 +13,13 @@ export const encode = str =>
     .replace(/[*._-~'!()]/g, escape)
 
 export function findErrorLines (code, errMessage) {
-  const m = errMessage.match(/ at (\d+)(?::(\d+))?/)
+  const m = errMessage.match(/^Parse error:.* at (\d+)(?::(\d+))?/)
   if (!m) return null
 
   let [ , start_pos, end_pos ] = m.map(Number)
   if (start_pos >= code.length) start_pos = code.length-1
   if (!end_pos) end_pos = start_pos+1
-  const LoC = code.split('\n'), lines = []
+  const LoC = code.split('\n')
 
   let pos = 0, line = 0, line_start=0;
   for (; pos <= start_pos; line_start=pos, pos+=LoC.shift().length+1, line++);

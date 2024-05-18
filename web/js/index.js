@@ -55,9 +55,9 @@ worker.addEventListener('message', ({ data }) => {
   clearErrorMark()
 
   if (data.error) {
-    error_el.innerText = data.error
+    const errorMsg = handleError(data.input, data.error)
+    error_el.innerText = errorMsg
     error_el.style.display = 'block'
-    markError(data.input, data.error)
   } else if (data.result) {
     const r = data.result
     //console.log(r)
@@ -112,17 +112,21 @@ function update(source) {
 }
 
 let error_marker
+
+function handleError(input, error) {
+  const pos = findErrorLines(input, error)
+  if (pos) {
+    error_marker = editor.getDoc()
+      .markText(pos.from, pos.to, { css: 'color: #8a1f11; background: #FBC2C4' })
+    error = error.replace(/ at (\d+)(?::(\d+))?/, ` at ${pos.from.line+1}:${pos.from.ch+1}`)
+  }
+  return error
+}
+
 function clearErrorMark() {
   if (error_marker) {
     error_marker.clear()
     error_marker = null
-  }
-}
-function markError(code, error) {
-  const pos = findErrorLines(code, error)
-  if (pos) {
-    error_marker = editor.getDoc()
-      .markText(pos.from, pos.to, { css: 'color: #8a1f11; background: #FBC2C4' })
   }
 }
 
