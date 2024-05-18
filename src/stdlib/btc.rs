@@ -32,7 +32,6 @@ pub fn attach_stdlib(scope: &mut Scope) {
     // Functions
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("transaction", fns::transaction).unwrap();
-    scope.set_fn("xonly", fns::xonly).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("script::strip", fns::scriptStrip).unwrap();
@@ -216,29 +215,6 @@ pub mod fns {
     pub fn transaction(args: Array, _: &Scope) -> Result<Value> {
         let tx: Transaction = args.arg_into()?;
         Ok(tx.into())
-    }
-
-    /// xonly(PubKey<Single<FullKey>>) -> PuKey<Single<XOnly>>
-    pub fn xonly(args: Array, _: &Scope) -> Result<Value> {
-        use bitcoin::XOnlyPublicKey;
-        use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
-        Ok(Value::PubKey(match args.arg_into()? {
-            // Convert single full keys -> xonly
-            DescriptorPublicKey::Single(SinglePub {
-                origin,
-                key: SinglePubKey::FullKey(fullkey),
-            }) => DescriptorPublicKey::Single(SinglePub {
-                key: SinglePubKey::XOnly(XOnlyPublicKey::from(fullkey)),
-                origin,
-            }),
-            // Keep x-only single pubkeys as-is
-            key @ DescriptorPublicKey::Single(SinglePub {
-                origin: _,
-                key: SinglePubKey::XOnly(_),
-            }) => key,
-            // Does not support xpubs
-            _ => bail!(Error::InvalidArguments),
-        }))
     }
 
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
