@@ -6,7 +6,6 @@ import 'codemirror/addon/edit/matchbrackets'
 import 'codemirror/addon/selection/active-line'
 import 'codemirror/addon/display/fullscreen'
 import 'codemirror/addon/hint/show-hint'
-import 'codemirror/addon/hint/anyword-hint'
 import 'codemirror/addon/search/search'
 import 'codemirror/addon/search/searchcursor'
 import 'codemirror/addon/dialog/dialog'
@@ -16,6 +15,9 @@ import './codemirror-minsc'
 import './codemirror-miniscript'
 import './codemirror-bitcoin'
 import './codemirror-addon-highlighter'
+import './codemirror-addon-hinting'
+
+import stdlib_wordlist from './stdlib-wordlist.json'
 
 import { debounce, encode, findErrorLines, loadGist } from './util'
 import default_code from '../default-code.minsc'
@@ -189,20 +191,33 @@ const editor = CodeMirror(document.querySelector('#editor'), {
   lineWrapping: true,
   matchBrackets: true,
   styleActiveLine: true,
-  hintOptions: { word: /[\w$:]+/, completeSingle: false },
+  hintOptions: {
+    hint: CodeMirror.hint.multihint,
+    wordlist: stdlib_wordlist,
+    word: /[\w$:]+/,
+    closeCharacters: /[\s()\[\]{};>,]/,
+    minAnyhintLen: 3,
+  },
   highlightSelectionMatches: { showToken: /[\w$:]/ },
   // continueComments: true // could not get this to work. :<
   extraKeys: {
     ...full_screen_keys,
-    "Ctrl-Space":  cm => cm.showHint({hint: CodeMirror.hint.anyword }),
+    "Ctrl-Space":  cm => cm.showHint({ completeSingle: true }),
   },
   value: initial_code,
 })
 
+// Execute on change
 editor.on('change', debounce((_, c) =>
   c.origin != 'setValue' && update('edit')
 , 150))
 update('init')
+
+// Suggest autocomplete hints
+editor.on('inputRead', debounce((cm, changes) => {
+  if (!cm.state.completionActive)
+    cm.showHint({ completeSingle: false, wordEndOnly: true, minSearchLen: 2, displayIfLess: 35 })
+}, 250))
 
 // Setup read-only CodeMirror editors to display outputs
 const readOnlyCodeview = (element, mode) =>
