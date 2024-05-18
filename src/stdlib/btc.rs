@@ -36,6 +36,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("script::strip", fns::scriptStrip).unwrap();
     scope.set_fn("script::wiz", fns::scriptWiz).unwrap();
+    scope.set_fn("script::bitide", fns::scriptBitIde).unwrap();
 
     scope
         .set("SCRIPT_MARKER_MAGIC", SCRIPT_MARKER_MAGIC_BYTES.to_vec())
@@ -237,13 +238,22 @@ pub mod fns {
     }
 
     /// script::wiz(Script) -> Symbol
-    /// Encode the Script in a Scriptwiz-Compatible format (newlines, stack labels & comments)
+    /// Encode the Script in a Scriptwiz-compatible format (newlines, stack labels & comments)
     pub fn scriptWiz(args: Array, _: &Scope) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut wiz_str = String::new();
         fmt_script(&mut wiz_str, &script, ScriptFmt::ScriptWiz, Some(0))?;
         // Uses Symbol for the same reason described in `stdlib::fns::debug()`
         Ok(Symbol::new(Some(wiz_str)).into())
+    }
+
+    /// script::bitide(Script) -> Symbol
+    /// Encode the Script in a BitIDE-compatible format (newlines, stack labels & comments)
+    pub fn scriptBitIde(args: Array, _: &Scope) -> Result<Value> {
+        let script = args.arg_into::<ScriptBuf>()?;
+        let mut bitide_str = String::new();
+        fmt_script(&mut bitide_str, &script, ScriptFmt::BitIde, Some(0))?;
+        Ok(Symbol::new(Some(bitide_str)).into())
     }
 }
 
@@ -445,6 +455,7 @@ impl PrettyDisplay for ScriptBuf {
 pub enum ScriptFmt {
     Minsc(bool), // with or without wrapping backticks
     ScriptWiz,
+    BitIde,
 }
 pub fn fmt_script<W: fmt::Write>(
     f: &mut W,
@@ -452,7 +463,7 @@ pub fn fmt_script<W: fmt::Write>(
     format: ScriptFmt,
     indent: Option<usize>,
 ) -> fmt::Result {
-    use crate::util::{quote_str, LIST_INDENT_WIDTH as INDENT};
+    use crate::util::{quote_str as quote, LIST_INDENT_WIDTH as INDENT};
     use bitcoin::opcodes::all::{OP_ELSE, OP_ENDIF, OP_IF, OP_NOTIF};
 
     let mut indent_w = indent.map_or(0, |n| n * INDENT);
@@ -469,6 +480,9 @@ pub fn fmt_script<W: fmt::Write>(
         ScriptFmt::Minsc(false) => (),
         ScriptFmt::ScriptWiz => {
             write!(f, "// ScriptWiz formatted\n")?;
+        }
+        ScriptFmt::BitIde => {
+            write!(f, "// BitIDE formatted\n")?;
         }
     }
 
@@ -503,30 +517,42 @@ pub fn fmt_script<W: fmt::Write>(
                     (ScriptFmt::Minsc(_), "label") if is_valid_ident(body) => {
                         write!(f, "@{}", body)?
                     }
-                    (ScriptFmt::Minsc(_), "label") => write!(f, "@{{{}}}", quote_str(body))?,
+                    (ScriptFmt::Minsc(_), "label") => write!(f, "@{{{}}}", quote(body))?,
                     (ScriptFmt::Minsc(_), "comment") => {
-                        write!(f, "#{}{}", iif!(indent.is_some(), " ", ""), quote_str(body))?
+                        write!(f, "#{}{}", iif!(indent.is_some(), " ", ""), quote(body))?
                     }
                     (ScriptFmt::Minsc(_), kind) if is_valid_ident(kind) => {
                         if body.is_empty() {
                             write!(f, "@{}()", kind)?
                         } else {
-                            write!(f, "@{}({})", kind, quote_str(body))?
+                            write!(f, "@{}({})", kind, quote(body))?
                         }
                     }
                     (ScriptFmt::Minsc(_), kind) => {
-                        write!(f, "@({}, {})", quote_str(kind), quote_str(body))?
+                        write!(f, "@({}, {})", quote(kind), quote(body))?
                     }
 
                     // ScriptWiz formatting
-                    // The "$<label>" format is used by ScriptWiz to assign a label name to the top stack element
+                    // Uses the "$<label>" format to assign a label names to the top stack element
                     (ScriptFmt::ScriptWiz, "label") => write!(f, "${}", encode_label(body))?,
-                    (ScriptFmt::ScriptWiz, "comment") => {
+
+                    // BitIDE formatting
+                    // Uses the "#<label>" format for labels
+                    (ScriptFmt::BitIde, "label") => write!(f, "#{}", encode_label(body))?,
+                    // BitIDE-only features: {NAME} to move the stack element identified by NAME
+                    // to the top, or [NAME] to copy it.
+                    (ScriptFmt::BitIde, "bitide::copy") => {
+                        write!(f, " {{{}}}", encode_label(body))?
+                    }
+                    (ScriptFmt::BitIde, "bitide::move") => write!(f, "[{}]", encode_label(body))?,
+
+                    // Standard // comment format, ScriptWiz & BitIDE
+                    (ScriptFmt::ScriptWiz | ScriptFmt::BitIde, "comment") => {
                         let newline_indent = format!("\n{:i$}// ", "", i = indent_w + if_indent_w);
                         write!(f, "// {}", body.replace("\n", &newline_indent))?
                     }
-                    (ScriptFmt::ScriptWiz, kind) => {
-                        write!(f, "// {}: {}", quote_str(kind), quote_str(body))?
+                    (ScriptFmt::ScriptWiz | ScriptFmt::BitIde, kind) => {
+                        write!(f, "// Mark {}: {}", quote(kind), quote(body))?
                     }
                 }
             }
@@ -541,8 +567,9 @@ pub fn fmt_script<W: fmt::Write>(
                     write!(f, "\n")?; // add newline before the next item or the closing backtick
                 }
             }
-            // ScriptWiz requires newlines between opcodes, so they're added regardless of `indent`.
-            ScriptFmt::ScriptWiz => write!(f, "\n")?,
+
+            // Always add newlines, these are never rendered as a single line
+            ScriptFmt::ScriptWiz | ScriptFmt::BitIde => write!(f, "\n")?,
         }
     }
     if format == ScriptFmt::Minsc(true) {
