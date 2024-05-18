@@ -1,7 +1,6 @@
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
-const WorkerPlugin = require('worker-plugin');
 
 const dist = path.resolve(__dirname, "dist");
 
@@ -13,9 +12,9 @@ module.exports = {
   output: {
     path: dist,
     filename: "[name].js",
-
-    // https://github.com/webpack-contrib/worker-loader/issues/174
-    globalObject: `typeof self !== 'undefined' ? self : window`,
+  },
+  experiments: {
+    asyncWebAssembly: true,
   },
   externals: {
     //'./pkg' : 'commonjs2 ./pkg',
@@ -25,24 +24,23 @@ module.exports = {
     namedChunks: true,
   },*/
   devServer: {
-    contentBase: dist,
+    static: dist,
   },
   plugins: [
-    new CopyPlugin([
+    new CopyPlugin({ patterns: [
       path.resolve(__dirname, "www")
-    ]),
+    ] }),
 
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, '..'),
       outDir: path.resolve(__dirname, 'pkg'),
       outName: 'index',
+      extraArgs: '--no-typescript',
     }),
-
-    new WorkerPlugin,
   ],
   module: {
     rules: [
-      { test: /\.(minsc|txt)$/, use: 'raw-loader' }
+      { test: /\.(minsc|txt)$/, type: 'asset/source' }
     ]
-  }
+  },
 };

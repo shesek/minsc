@@ -20,7 +20,7 @@ import './codemirror-addon-highlighter'
 import { debounce, encode, findErrorLines, loadGist } from './util'
 import default_code from '../default-code.minsc'
 
-const worker = new Worker('./worker.js', { name: 'w', type: 'module' })
+const worker = new Worker(new URL("./worker.js", import.meta.url));
 
 const error_el = document.querySelector('#error')
     , head_el = document.querySelector('#live-head')
