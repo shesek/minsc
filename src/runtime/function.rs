@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::parser::{ast, Expr, Ident};
-use crate::runtime::{Array, Error, Evaluate, Result, Scope, Value};
+use crate::runtime::{Array, Error, Evaluate, Result, ScopeRef, Value};
 use crate::stdlib::fns::throw as stdlib_throw;
 
 #[derive(Debug, Clone)]
@@ -26,16 +26,16 @@ pub struct NativeFunction {
     pt: NativeFunctionPt,
 }
 
-pub type NativeFunctionPt = fn(Array, &Scope) -> Result<Value>;
+pub type NativeFunctionPt = fn(Array, &ScopeRef) -> Result<Value>;
 
 impl_from_variant!(NativeFunction, Function, Native);
 
 pub trait Call {
-    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value>;
+    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value>;
 }
 
 impl Call for Function {
-    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
         match self {
             Function::User(f) => f.call(args, scope),
             Function::Native(f) => f.call(args, scope), // wraps with CallError context internally
@@ -44,7 +44,7 @@ impl Call for Function {
 }
 
 impl Call for UserFunction {
-    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
         let _call = || {
             ensure!(
                 self.signature.len() == args.len(),
@@ -52,19 +52,22 @@ impl Call for UserFunction {
                     Error::InvalidLength(args.len(), self.signature.len()).into(),
                 )
             );
-            let mut scope = scope.child();
-            for (index, value) in args.into_iter().enumerate() {
-                let ident = self.signature.get(index).unwrap();
-                scope.set(ident.clone(), value)?;
+            let scope = scope.child();
+            {
+                let mut scope = scope.borrow_mut();
+                for (index, value) in args.into_iter().enumerate() {
+                    let ident = self.signature.get(index).unwrap();
+                    scope.set(ident.clone(), value)?;
+                }
             }
-            self.body.eval(&scope)
+            self.body.eval(&scope.into_readonly())
         };
         _call().map_err(|e| Error::CallError(self.ident.clone(), e.into()))
     }
 }
 
 impl Call for NativeFunction {
-    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
         (self.pt)(Array(args), scope).map_err(|e| {
             if self.pt == stdlib_throw {
                 e // Don't include the `throw()` function in the CallError stack context.
@@ -76,7 +79,7 @@ impl Call for NativeFunction {
 }
 
 impl Call for Value {
-    fn call(&self, args: Vec<Value>, scope: &Scope) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
         match self {
             Value::Function(func) => func.call(args, scope),
             v => Err(Error::NotFn(v.clone().into())),

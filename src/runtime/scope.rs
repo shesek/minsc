@@ -1,41 +1,44 @@
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
+use std::{marker::PhantomData, rc::Rc};
 
 use crate::runtime::function::{NativeFunction, NativeFunctionPt};
 use crate::runtime::{Error, Result, Value};
 use crate::{stdlib, Ident};
 
 #[derive(Default, Debug, Clone)]
-pub struct Scope<'a> {
-    parent: Option<&'a Scope<'a>>,
+pub struct Scope {
+    parent: Option<ScopeRef<ReadOnly>>,
     local: HashMap<Ident, Value>,
 }
 
-lazy_static! {
-    static ref ROOT: Scope<'static> = {
-        let mut scope = Scope::default();
-        stdlib::attach_stdlib(&mut scope);
-        scope
+thread_local! {
+    static ROOT: ScopeRef<ReadOnly> = {
+        let scope = ScopeRef::default();
+        stdlib::attach_stdlib(&scope);
+        scope.into_readonly()
     };
 }
 
-impl<'a> Scope<'a> {
+impl Scope {
     /// Get a real-only reference to the cached global root scope
-    pub fn root() -> &'static Self {
-        &ROOT
+    pub fn root() -> ScopeRef<ReadOnly> {
+        ROOT.with(ScopeRef::make_ref)
     }
 
-    /// Create a new writable child scope under the global root scope
-    /// To create a blank root scope with no stdlib, use Scope::default()
-    /// To get an owned root scope with stdlib, use Scope::root().clone()
-    pub fn new() -> Scope<'a> {
+    /// Create a new mutable child scope under the global root scope
+    /// To create a blank root scope with no stdlib, use ScopeRef::default()
+    /// To create an owned root scope with stdlib, use Scope::root().make_copy()
+    pub fn new() -> ScopeRef<Mutable> {
         Scope::root().child()
     }
 
-    /// Search the local and parent scope recursively for `key`
-    pub fn get(&self, key: &Ident) -> Option<&Value> {
+    /// Search the local and parent scopes recursively for `key`, returning a copy of its value
+    pub fn get(&self, key: &Ident) -> Option<Value> {
         self.local
             .get(key)
-            .or_else(|| self.parent.as_ref().and_then(|p| p.get(key)))
+            .cloned()
+            .or_else(|| self.parent.as_ref().and_then(|p| p.borrow().get(key)))
     }
 
     /// Set a local variable
@@ -52,8 +55,7 @@ impl<'a> Scope<'a> {
         }
     }
 
-    // NativeFunctionPt should work directly with set() as it implements Into<Value>,
-    // but for some reason it fails with due to mismatched lifetimes
+    /// Add a native Rust function to the scope
     pub fn set_fn<K: Into<Ident>>(&mut self, key: K, pt: NativeFunctionPt) -> Result<()> {
         let key = key.into();
         let func = NativeFunction::new(pt, Some(key.clone()));
@@ -61,46 +63,126 @@ impl<'a> Scope<'a> {
     }
 
     /// Get a builtin variable, which must be available in scope
-    pub fn builtin(&self, key: &str) -> &Value {
+    pub fn builtin(&self, key: &str) -> Value {
         self.get(&key.into()).expect("built-in must exists")
-    }
-
-    /// Create a child scope of this scope
-    pub fn child(&'a self) -> Self {
-        Scope {
-            parent: Some(&self),
-            local: HashMap::new(),
-        }
     }
 
     /// Get the entire env from the local and parent scopes
     ///
     /// max_depth can be set to limit the number of scopes included. It may be set to 0
     /// to return everything or to -1 to return everything but the top-level global scope.
-    pub fn env(&self, max_depth: isize) -> Vec<(&Ident, &Value)> {
-        // env returned as a Vec to retain order, with variables from inner scopes appearing first,
-        // then sorted by key name to retain deterministic order
-        let mut env = vec![];
+    pub fn env(&self, max_depth: isize) -> Vec<(Ident, Value)> {
         let mut depth = 0;
         let mut seen_keys = HashSet::new();
-        let mut scope = self;
-        loop {
-            // Collect new vars from the current scope
-            let locals = scope.local.iter();
-            let mut new_vars: Vec<_> = locals.filter(|(key, _)| seen_keys.insert(*key)).collect();
-            new_vars.sort_unstable_by_key(|&(key, _)| key);
-            env.append(&mut new_vars);
+        // env returned as a Vec to retain order, with variables from inner scopes appearing first,
+        // then sorted by key name to retain deterministic order
+        let mut env = self.local_env(&mut seen_keys);
 
-            // Continue to the parent scope, unless the max_depth limit was reached
+        let mut next_parent = self.parent.as_ref().map(ScopeRef::make_ref);
+        while let Some(parent) = next_parent {
             depth += 1;
-            scope = match scope.parent {
-                None => break,
-                Some(_) if depth == max_depth => break,
-                // skip the top-level root scope when max_depth==-1
-                Some(scope) if max_depth == -1 && scope.parent.is_none() => break,
-                Some(scope) => scope,
-            };
+            if max_depth > 0 && depth == max_depth {
+                break;
+            }
+            let parent = parent.borrow();
+            if max_depth == -1 && parent.parent.is_none() {
+                break; // skip the top-level root scope when max_depth==-1
+            }
+
+            env.append(&mut parent.local_env(&mut seen_keys));
+            next_parent = parent.parent.as_ref().map(ScopeRef::make_ref);
         }
         env
     }
+
+    fn local_env(&self, seen_keys: &mut HashSet<Ident>) -> Vec<(Ident, Value)> {
+        let mut new_vars = self
+            .local
+            .iter()
+            .filter(|(key, _)| seen_keys.insert((*key).clone()))
+            .map(|(key, val)| (key.clone(), val.clone()))
+            .collect::<Vec<_>>();
+        new_vars.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        new_vars
+    }
 }
+
+/// A shared Scope reference with ReadOnly/Mutable markers, to have compile-time enforcement
+/// for accessing the RefCell interior mutability.
+#[derive(Debug)]
+pub struct ScopeRef<A: ScopeAccess = ReadOnly>(Rc<RefCell<Scope>>, PhantomData<A>);
+
+// Marker types
+#[derive(Debug)]
+pub enum ReadOnly {}
+
+#[derive(Debug)]
+pub enum Mutable {}
+
+pub trait ScopeAccess {}
+impl ScopeAccess for ReadOnly {}
+impl ScopeAccess for Mutable {}
+
+// Methods available on ReadOnly and Mutable scopes
+impl<A: ScopeAccess> ScopeRef<A> {
+    /// Borrow the inner Scope as read-only
+    pub fn borrow(&self) -> Ref<Scope> {
+        self.0.borrow()
+    }
+
+    /// Get a read-only ScopeRef pointing to the same inner Scope
+    pub fn make_ref(&self) -> ScopeRef<ReadOnly> {
+        ScopeRef(Rc::clone(&self.0), PhantomData)
+    }
+
+    /// Get a mutable ScopeRef with a copy of the inner Scope
+    pub fn make_copy(&self) -> ScopeRef<Mutable> {
+        let cloned = self.0.borrow().clone();
+        ScopeRef(Rc::new(RefCell::new(cloned)), PhantomData)
+    }
+
+    // Create a new mutable ScopeRef that is a child of this scope
+    pub fn child(&self) -> ScopeRef<Mutable> {
+        let child = Scope {
+            parent: Some(self.make_ref()),
+            local: HashMap::new(),
+        };
+        ScopeRef(Rc::new(RefCell::new(child)), PhantomData)
+    }
+}
+
+// Methods available on Mutable scopes only
+impl ScopeRef<Mutable> {
+    pub fn borrow_mut(&self) -> RefMut<Scope> {
+        self.0.borrow_mut()
+    }
+    pub fn into_readonly(self) -> ScopeRef<ReadOnly> {
+        ScopeRef(self.0, PhantomData)
+    }
+    pub fn as_readonly(&self) -> ScopeRef<ReadOnly> {
+        self.make_ref()
+    }
+}
+
+impl Clone for ScopeRef<ReadOnly> {
+    fn clone(&self) -> Self {
+        self.make_ref()
+    }
+}
+impl Clone for ScopeRef<Mutable> {
+    fn clone(&self) -> Self {
+        self.make_copy()
+    }
+}
+impl Default for ScopeRef<Mutable> {
+    fn default() -> Self {
+        ScopeRef(Default::default(), PhantomData::<Mutable>)
+    }
+}
+/*
+impl From<ScopeRef<Mutable>> for ScopeRef<ReadOnly> {
+    fn from(scope: ScopeRef<Mutable>) -> ScopeRef<ReadOnly> {
+        self.into_readonly()
+    }
+}
+*/

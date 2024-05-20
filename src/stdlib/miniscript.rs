@@ -7,13 +7,16 @@ use bitcoin::{PublicKey, Sequence, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
 use miniscript::{bitcoin, AbsLockTime, ScriptContext};
 
-use crate::runtime::{Array, Error, Evaluate, Result, Scope, Value};
+use crate::runtime::scope::{Mutable, ScopeRef};
+use crate::runtime::{Array, Error, Evaluate, Result, Value};
 use crate::util::{DescriptorExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 pub use crate::runtime::AndOr;
 
-pub fn attach_stdlib(scope: &mut Scope) {
+pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
+    let mut scope = scope.borrow_mut();
+
     // Miniscript Policy functions exposed in the Minsc runtime
     scope.set_fn("or", fns::or).unwrap();
     scope.set_fn("and", fns::and).unwrap();
@@ -49,9 +52,9 @@ pub fn attach_stdlib(scope: &mut Scope) {
 }
 
 impl Evaluate for ast::Thresh {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        let thresh_n = self.thresh.eval(scope)?.into_usize()?;
-        let policies = into_policies(self.policies.eval(scope)?.into_vec()?)?;
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
+        let thresh_n = self.thresh.eval(&scope)?.into_usize()?;
+        let policies = into_policies(self.policies.eval(&scope)?.into_vec()?)?;
         Ok(Policy::Threshold(thresh_n, policies).into())
     }
 }
@@ -83,13 +86,13 @@ pub mod fns {
     // Miniscript Policy functions
     //
 
-    pub fn or(args: Array, _: &Scope) -> Result<Value> {
+    pub fn or(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::Or(into_prob_policies(args.into_inner())?).into())
     }
-    pub fn and(args: Array, _: &Scope) -> Result<Value> {
+    pub fn and(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::And(into_policies(args.into_inner())?).into())
     }
-    pub fn thresh(args: Array, _: &Scope) -> Result<Value> {
+    pub fn thresh(args: Array, _: &ScopeRef) -> Result<Value> {
         let args = args.check_varlen(2, usize::MAX)?;
         let is_array_call = args.len() == 2 && args[1].is_array();
         let mut args_iter = args.into_iter();
@@ -106,40 +109,40 @@ pub mod fns {
         Ok(Policy::Threshold(thresh_n, policies).into())
     }
 
-    pub fn older(args: Array, _: &Scope) -> Result<Value> {
+    pub fn older(args: Array, _: &ScopeRef) -> Result<Value> {
         let locktime = Sequence(args.arg_into()?);
         Ok(Policy::Older(locktime).into())
     }
-    pub fn after(args: Array, _: &Scope) -> Result<Value> {
+    pub fn after(args: Array, _: &ScopeRef) -> Result<Value> {
         let locktime = AbsLockTime::from_consensus(args.arg_into()?);
         Ok(Policy::After(locktime).into())
     }
 
-    pub fn pk(args: Array, _: &Scope) -> Result<Value> {
+    pub fn pk(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::Key(args.arg_into()?).into())
     }
 
-    pub fn sha256(args: Array, _: &Scope) -> Result<Value> {
+    pub fn sha256(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::Sha256(args.arg_into()?).into())
     }
-    pub fn hash256(args: Array, _: &Scope) -> Result<Value> {
+    pub fn hash256(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::Hash256(args.arg_into()?).into())
     }
-    pub fn ripemd160(args: Array, _: &Scope) -> Result<Value> {
+    pub fn ripemd160(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::Ripemd160(args.arg_into()?).into())
     }
-    pub fn hash160(args: Array, _: &Scope) -> Result<Value> {
+    pub fn hash160(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::Hash160(args.arg_into()?).into())
     }
 
     // wpkh(PubKey) -> Descriptor::Wpkh
-    pub fn wpkh(args: Array, _: &Scope) -> Result<Value> {
+    pub fn wpkh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Descriptor::new_wpkh(args.arg_into()?)?.into())
     }
 
     /// wsh(Policy|Miniscript) -> Descriptor::Wsh
     /// wsh(Script witnessScript) -> Script scriptPubKey
-    pub fn wsh(args: Array, _: &Scope) -> Result<Value> {
+    pub fn wsh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Policy(policy) => {
                 let miniscript = policy.compile()?;
@@ -151,7 +154,7 @@ pub mod fns {
     }
 
     /// Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
-    pub fn sh(args: Array, _: &Scope) -> Result<Value> {
+    pub fn sh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Descriptor(desc) => match desc {
                 Descriptor::Wsh(wsh) => Descriptor::new_sh_with_wsh(wsh),
@@ -164,20 +167,20 @@ pub mod fns {
     }
 
     /// Descriptor -> Script witnessScript
-    pub fn explicitScript(args: Array, _: &Scope) -> Result<Value> {
+    pub fn explicitScript(args: Array, _: &ScopeRef) -> Result<Value> {
         let descriptor: Descriptor = args.arg_into()?;
         Ok(descriptor.to_explicit_script()?.into())
     }
 
     /// Policy -> Script witnessScript
-    pub fn tapscript(args: Array, _: &Scope) -> Result<Value> {
+    pub fn tapscript(args: Array, _: &ScopeRef) -> Result<Value> {
         let policy: Policy = args.arg_into()?;
         let miniscript = policy.compile::<miniscript::Tap>()?;
         Ok(miniscript.derive_keys()?.encode().into())
     }
 
     /// Policy -> Script witnessScript
-    pub fn segwitv0(args: Array, _: &Scope) -> Result<Value> {
+    pub fn segwitv0(args: Array, _: &ScopeRef) -> Result<Value> {
         let policy: Policy = args.arg_into()?;
         let miniscript = policy.compile::<miniscript::Segwitv0>()?;
         Ok(miniscript.derive_keys()?.encode().into())
@@ -185,7 +188,7 @@ pub mod fns {
 
     /// Descriptor<Multi> -> Array<Descriptor<Single>>
     /// XXX rename descriptors() or singleDescriptors?
-    pub fn singleDescriptors(args: Array, _: &Scope) -> Result<Value> {
+    pub fn singleDescriptors(args: Array, _: &ScopeRef) -> Result<Value> {
         let desc: Descriptor = args.arg_into()?;
         let descs = desc.into_single_descriptors()?;
         Ok(Value::array(
@@ -196,7 +199,7 @@ pub mod fns {
     /// Cast 32/33 long Bytes into a Single DescriptorPubKey
     /// PubKeys are returned as-is
     /// pubkey(Bytes|PubKey) -> PubKey
-    pub fn pubkey(args: Array, _: &Scope) -> Result<Value> {
+    pub fn pubkey(args: Array, _: &ScopeRef) -> Result<Value> {
         let pubkey: DescriptorPublicKey = args.arg_into()?;
         Ok(pubkey.into())
     }

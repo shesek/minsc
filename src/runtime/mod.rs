@@ -14,17 +14,17 @@ pub mod value;
 
 pub use array::Array;
 pub use function::{Call, Function};
-pub use scope::Scope;
+pub use scope::{Mutable, Scope, ScopeRef};
 pub use value::{FromValue, Number, Number::*, Symbol, Value};
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
-    fn eval(&self, scope: &Scope) -> Result<Value>;
+    fn eval(&self, scope: &ScopeRef) -> Result<Value>;
 }
 
 /// Execute a statement. Statements have side-effects and don't have a return value.
 pub trait Execute {
-    fn exec(&self, scope: &mut Scope) -> Result<()>;
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()>;
 }
 
 //
@@ -32,32 +32,33 @@ pub trait Execute {
 //
 
 impl Execute for ast::Assign {
-    fn exec(&self, scope: &mut Scope) -> Result<()> {
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
+        let readonly = scope.as_readonly();
         for assignment in &self.0 {
-            let value = assignment.rhs.eval(scope)?;
-            scope.set(assignment.lhs.clone(), value)?;
+            let value = assignment.rhs.eval(&readonly)?;
+            scope.borrow_mut().set(assignment.lhs.clone(), value)?;
         }
         Ok(())
     }
 }
 
 impl Execute for ast::FnDef {
-    fn exec(&self, scope: &mut Scope) -> Result<()> {
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
         let func = Function::from(self.clone());
-        scope.set(self.ident.clone(), func)
+        scope.borrow_mut().set(self.ident.clone(), func)
     }
 }
 
 impl Execute for ast::CallStmt {
-    fn exec(&self, scope: &mut Scope) -> Result<()> {
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
         // Run the inner Call expression, discarding its return value
-        self.0.eval(scope).map(|_| ())
+        self.0.eval(&scope.as_readonly()).map(|_| ())
     }
 }
 
 impl Execute for ast::IfStmt {
-    fn exec(&self, scope: &mut Scope) -> Result<()> {
-        if self.condition.eval(scope)?.into_bool()? {
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
+        if self.condition.eval(&scope.as_readonly())?.into_bool()? {
             self.then_body.exec(scope)
         } else if let Some(else_body) = &*self.else_body {
             else_body.exec(scope)
@@ -68,7 +69,7 @@ impl Execute for ast::IfStmt {
 }
 
 impl Execute for ast::Stmt {
-    fn exec(&self, scope: &mut Scope) -> Result<()> {
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
         match self {
             Stmt::FnDef(x) => x.exec(scope),
             Stmt::Assign(x) => x.exec(scope),
@@ -79,7 +80,7 @@ impl Execute for ast::Stmt {
 }
 
 impl Execute for ast::Stmts {
-    fn exec(&self, scope: &mut Scope) -> Result<()> {
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
         for stmt in &self.0 {
             stmt.exec(scope)?;
         }
@@ -92,7 +93,7 @@ impl Execute for ast::Stmts {
 //
 
 impl Evaluate for ast::Call {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let func = self.func.eval(scope)?.into_fn()?;
         let args = eval_exprs(scope, &self.args)?;
 
@@ -109,7 +110,7 @@ impl Evaluate for ast::Call {
 }
 
 impl Evaluate for ast::IfExpr {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         if self.condition.eval(scope)?.into_bool()? {
             self.then_val.eval(scope)
         } else {
@@ -119,12 +120,12 @@ impl Evaluate for ast::IfExpr {
 }
 
 impl Evaluate for ast::Or {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         eval_andor(&self.0, scope, AndOr::Or)
     }
 }
 impl Evaluate for ast::And {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         eval_andor(&self.0, scope, AndOr::And)
     }
 }
@@ -134,7 +135,7 @@ pub enum AndOr {
     Or,
 }
 
-fn eval_andor(operands: &[Expr], scope: &Scope, andor: AndOr) -> Result<Value> {
+fn eval_andor(operands: &[Expr], scope: &ScopeRef, andor: AndOr) -> Result<Value> {
     // Peek at the first operand to determine if its an operation between booleans or between policies.
     // All the other operands are expected to be of the same type. We don't pre-evaluate all of them
     // so that eval_bool_andor() may do so lazily.
@@ -153,7 +154,7 @@ fn eval_andor(operands: &[Expr], scope: &Scope, andor: AndOr) -> Result<Value> {
 fn eval_bool_andor(
     first_operand: bool,
     other_operands_exprs: &[Expr],
-    scope: &Scope,
+    scope: &ScopeRef,
     andor: AndOr,
 ) -> Result<Value> {
     let stop_on = match andor {
@@ -173,23 +174,23 @@ fn eval_bool_andor(
 }
 
 impl Evaluate for ast::Ident {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         scope
+            .borrow()
             .get(&self)
-            .cloned()
             .ok_or_else(|| Error::VarNotFound(self.clone()))
     }
 }
 
 impl Evaluate for ast::Array {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let elements = eval_exprs(scope, &self.0)?;
         Ok(elements.into())
     }
 }
 
 impl Evaluate for ast::ArrayAccess {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let value = self.array.eval(scope)?;
         let index = self.index.eval(scope)?.into_usize()?;
         Ok(match value {
@@ -212,19 +213,19 @@ impl Evaluate for ast::ArrayAccess {
 }
 
 impl Evaluate for ast::FnExpr {
-    fn eval(&self, _scope: &Scope) -> Result<Value> {
+    fn eval(&self, _: &ScopeRef) -> Result<Value> {
         Ok(Function::from(self.clone()).into())
     }
 }
 
 impl Evaluate for ast::Not {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         Ok((!self.0.eval(scope)?.into_bool()?).into())
     }
 }
 
 impl Evaluate for ast::Infix {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         self.op
             .apply(self.lhs.eval(scope)?, self.rhs.eval(scope)?, scope)
             .map_err(|e| Error::InfixOpError(self.op, e.into()))
@@ -232,7 +233,7 @@ impl Evaluate for ast::Infix {
 }
 
 impl ast::InfixOp {
-    fn apply(&self, lhs: Value, rhs: Value, scope: &Scope) -> Result<Value> {
+    fn apply(&self, lhs: Value, rhs: Value, scope: &ScopeRef) -> Result<Value> {
         use ast::InfixOp::*;
         use Value::{Array, Bytes, Number as Num, Policy, PubKey, Script, String, WithProb};
 
@@ -271,7 +272,7 @@ impl ast::InfixOp {
             // + for taproot construction (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
             | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
-                stdlib::taproot::tr(k, Some(s), scope)?
+                stdlib::taproot::tr(k, Some(s), &scope.borrow())?
             }
 
             // * to repeat script fragments
@@ -301,18 +302,19 @@ impl ast::InfixOp {
 
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
-    fn eval(&self, scope: &Scope) -> Result<Value> {
-        let mut scope = scope.child();
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
+        let scope = scope.child();
         for stmt in &self.stmts {
-            stmt.exec(&mut scope)?;
+            stmt.exec(&scope)?;
         }
+        let scope = scope.as_readonly();
         if let Some(return_value) = &self.return_value {
             // The return value is the final expression within the function body,
             // optionally prefixed with the `return` keyword
             return_value.eval(&scope)
-        } else if let Some(Value::Function(func)) = scope.get(&"main".into()) {
+        } else if let Some(main_fn) = scope.borrow().get(&"main".into()) {
             // The return value is the evaluation of main()
-            func.call(vec![], &scope)
+            main_fn.call(vec![], &scope)
         } else {
             Err(Error::NoReturnValue)
         }
@@ -320,7 +322,7 @@ impl Evaluate for ast::Block {
 }
 
 impl Evaluate for Expr {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         Ok(match self {
             Expr::Ident(x) => x.eval(scope)?, // dedicated error type
             Expr::Call(x) => x.eval(scope)?,  // dedicated error type
@@ -359,6 +361,6 @@ impl<T> ResultExt<T> for Result<T> {
 }
 
 /// Evaluate a list of expressions to produce a list of values
-pub fn eval_exprs<T: Borrow<Expr>>(scope: &Scope, exprs: &[T]) -> Result<Vec<Value>> {
+pub fn eval_exprs<T: Borrow<Expr>>(scope: &ScopeRef, exprs: &[T]) -> Result<Vec<Value>> {
     exprs.iter().map(|arg| arg.borrow().eval(scope)).collect()
 }
