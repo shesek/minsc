@@ -69,13 +69,13 @@ fn ts($tagged, $tag) = $tagged | filter(|$el| $el.0 == $tag) | map(|$el| $el.1);
 MARK_SCRIPT=true;
 MARK_CTX="";
 
-fn mark($kind, $body) = if !MARK_SCRIPT then `` else
+dyn fn mark($kind, $body) = if !MARK_SCRIPT then `` else
   `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP {MARK_CTX+str($body)} OP_DROP`;
   // SCRIPT_MARKER_MAGIC available from Rust
 
-fn mark::comment($comment) = mark("comment", $comment);
-fn mark::label($name) = mark("label", $name);
-fn mark::ctx($$context, $$fn) {
+dyn fn mark::comment($comment) = mark("comment", $comment);
+dyn fn mark::label($name) = mark("label", $name);
+dyn fn mark::ctx($$context, $$fn) {
   MARK_CTX = MARK_CTX + $$context;
   $$fn()
 }
@@ -234,12 +234,12 @@ fn assert($bool) = $bool || throw("Assertion failed");
 fn assert::eq($a, $b) = ($a == $b) || throw("Not equal: "+str($a)+" != "+str($b)+"");
 fn assert::msg($bool, $msg) = $bool || throw($msg);
 
-fn env::pretty() = env() | map(|$kv| $kv.0+" = "+str($kv.1, true, true)+" // "+typeof($kv.1)) | join("\n\n")| Symbol();
-fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | Symbol();
+dyn fn env::pretty() = env() | map(|$kv| $kv.0+" = "+str($kv.1, true, true)+" // "+typeof($kv.1)) | join("\n\n")| Symbol();
+dyn fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | Symbol();
 fn _debug_nonfn($v) = if !isFunction($v) then str(debug($v, true)) else str($v, true);
 
-fn log::env($label) = log("variables:\n----\n" + str(env::pretty()) + "\n----");
-fn log::debug_env($label) = log("variables:\n----\n" + str(env::debug()) + "\n----");
+dyn fn log::env($label) = log("variables:\n----\n" + str(env::pretty()) + "\n----");
+dyn fn log::debug_env($label) = log("variables:\n----\n" + str(env::debug()) + "\n----");
 
 // Function form for assigning execution probabilities
 fn prob($n, $val) = $n@$val;

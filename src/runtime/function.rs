@@ -16,7 +16,7 @@ pub struct UserFunction {
     pub ident: Option<Ident>,
     pub signature: Vec<Ident>,
     pub body: Expr,
-    pub scope: ScopeRef,
+    pub scope: Option<ScopeRef>,
 }
 impl_from_variant!(UserFunction, Function, User);
 
@@ -45,7 +45,7 @@ impl Call for Function {
 }
 
 impl Call for UserFunction {
-    fn call(&self, args: Vec<Value>, _caller_scope: &ScopeRef) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
         let _call = || {
             ensure!(
                 self.signature.len() == args.len(),
@@ -53,7 +53,9 @@ impl Call for UserFunction {
                     Error::InvalidLength(args.len(), self.signature.len()).into(),
                 )
             );
-            let scope = self.scope.child();
+            // For lexically-scoped functions, create a child scope of the scope where the function was defined.
+            // For dynamically-scoped function, create a child of the caller scope.
+            let scope = self.scope.as_ref().unwrap_or(caller_scope).child();
             {
                 let mut scope = scope.borrow_mut();
                 for (index, value) in args.into_iter().enumerate() {
@@ -107,7 +109,7 @@ impl Function {
             ident: Some(fn_def.ident),
             signature: fn_def.signature,
             body: fn_def.body,
-            scope,
+            scope: iif!(!fn_def.dynamic_scoping, Some(scope), None),
         }
         .into()
     }
@@ -118,7 +120,7 @@ impl Function {
             ident: None,
             signature: fn_expr.signature,
             body: *fn_expr.body,
-            scope,
+            scope: iif!(!fn_expr.dynamic_scoping, Some(scope), None),
         }
         .into()
     }
@@ -160,6 +162,9 @@ impl fmt::Display for Function {
 }
 impl fmt::Display for UserFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.scope.is_none() {
+            write!(f, "dyn ")?;
+        }
         write!(f, "fn ")?;
         if let Some(ident) = &self.ident {
             write!(f, "{}", ident)?;

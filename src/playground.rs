@@ -103,7 +103,7 @@ lazy_static! {
     static ref PLAYGROUND_LIB: Library = r#"
         // Add a default `main` function displaying all environment variables,
         // or a welcome message if there aren't any.
-        fn main() {
+        dyn fn main() {
             $env = str(env::pretty());
             Symbol(if !isEmpty($env) then "// Environment variables:\n\n" + $env
                    else "// Welcome! Put some variables in your environment and they will show up here.")

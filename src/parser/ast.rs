@@ -140,6 +140,7 @@ impl_from_variant!(ScriptFrag, Expr);
 pub struct FnExpr {
     pub signature: Vec<Ident>,
     pub body: Box<Expr>,
+    pub dynamic_scoping: bool,
 }
 impl_from_variant!(FnExpr, Expr);
 
@@ -207,6 +208,7 @@ pub struct FnDef {
     pub ident: Ident,
     pub signature: Vec<Ident>,
     pub body: Expr,
+    pub dynamic_scoping: bool,
 }
 impl_from_variant!(FnDef, Stmt);
 
