@@ -38,21 +38,21 @@ fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 fn isEmpty($arr) = len($arr) == 0;
 repeat = fillArray; // alias name for a common fillArray use-case, to repeat Script fragments
 
-fn flatMap($$arr, $$fn) = fold($$arr, [], |$$acc, $$el| $$acc + $$fn($$el));
-fn map($$arr, $$fn)     = fold($$arr, [], |$$acc, $$el| $$acc + [ $$fn($$el) ]);
-fn filter($$arr, $$fn)  = fold($$arr, [], |$$acc, $$el| $$acc + if $$fn($$el) then [ $$el ] else [ ]);
+fn flatMap($arr, $fn) = fold($arr, [], |$acc, $el| $acc + $fn($el));
+fn map($arr, $fn)     = fold($arr, [], |$acc, $el| $acc + [ $fn($el) ]);
+fn filter($arr, $fn)  = fold($arr, [], |$acc, $el| $acc + if $fn($el) then [ $el ] else [ ]);
 
-fn reduce($$arr, $$fn) = if !isEmpty($$arr) then fold(tail($$arr), $$arr.0, $$fn) else null;
+fn reduce($arr, $fn) = if !isEmpty($arr) then fold(tail($arr), $arr.0, $fn) else null;
 
-fn find($$arr, $$fn)  = foldUntil($$arr, null,  |$$acc, $$el| if $$fn($$el)  then true:$$el  else false:null);
-fn some($$arr, $$fn)  = foldUntil($$arr, false, |$$acc, $$el| if $$fn($$el)  then true:true  else false:false);
-fn every($$arr, $$fn) = foldUntil($$arr, true,  |$$acc, $$el| if !$$fn($$el) then true:false else false:true);
+fn find($arr, $fn)  = foldUntil($arr, null,  |$acc, $el| if $fn($el)  then true:$el  else false:null);
+fn some($arr, $fn)  = foldUntil($arr, false, |$acc, $el| if $fn($el)  then true:true  else false:false);
+fn every($arr, $fn) = foldUntil($arr, true,  |$acc, $el| if !$fn($el) then true:false else false:true);
 
 fn concat($xs) = reduce($xs, |$acc, $x| $acc + $x);
 sum = concat; // works for arrays, bytes, strings and numbers
 
 // Null handling utilities
-fn mapNullable($$value, $$fn) = if $$value != null then $$fn($$value) else null;
+fn mapNullable($value, $fn) = if $value != null then $fn($value) else null;
 fn coalesce($values) = find($values, |$v| $v != null);
 
 // String utilities
@@ -205,23 +205,22 @@ fn select($scripts) =
 // $loop_body can be a Script or a Function that accepts the iteration count and returns a Script.
 // For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
 // more advanced example with some comments: https://gist.github.com/shesek/758c25489869d77d4ef624ea43f18c49
-fn unrollLoop($$max_iterations, $$condition, $$loop_body) {
-  $$loop_fn = if isFunction($$loop_body) then $$loop_body else |_| $$loop_body;
+fn unrollLoop($max_iterations, $condition, $loop_body) {
+  $body_fn = if isFunction($loop_body) then $loop_body else |_| $loop_body;
 
-  fn _unrollLoop($$loop_i) =
-    if $$max_iterations > $$loop_i then
-      `$$condition OP_IF $$loop_fn($$loop_i) _unrollLoop($$loop_i+1) OP_ENDIF`
-    else `$$condition OP_NOT OP_VERIFY` // fail the script if the condition is still met after $max_iterations
+  fn _unrollLoop($i) =
+    if $max_iterations > $i then `$condition OP_IF $body_fn($i) _unrollLoop($i+1) OP_ENDIF`
+    else `$condition OP_NOT OP_VERIFY` // fail the script if the condition is still met after $max_iterations
   ;
   _unrollLoop(0)
 }
 
 // Read the top stack item as the number of times to run $for_body
 // Example with accumulator: `0 <num> unrollFor(50, `OP_DUP OP_ROT OP_ADD OP_SWAP`)` to sum the numbers from <num> to 1
-fn unrollFor($$max_iterations, $$for_body) {
-  $$for_fn = if isFunction($$for_body) then $$for_body else |_| $$for_body;
+fn unrollFor($max_iterations, $for_body) {
+  $body_fn = if isFunction($for_body) then $for_body else |_| $for_body;
   `
-    unrollLoop($$max_iterations, `OP_DUP OP_0NOTEQUAL`, |$$for_i| `$$for_fn($$for_i) OP_1SUB`)
+    unrollLoop($max_iterations, `OP_DUP OP_0NOTEQUAL`, |$i| `$body_fn($i) OP_1SUB`)
     OP_DROP // drop the counter (always 0 by now)
   `
 }
