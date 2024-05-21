@@ -303,7 +303,6 @@ impl Value {
     pub fn type_of(&self) -> &'static str {
         match self {
             Value::PubKey(_) => "pubkey",
-            Value::Number(_) => "number",
             Value::Bool(_) => "bool",
             Value::Bytes(_) => "bytes",
             Value::String(_) => "string",
@@ -318,6 +317,8 @@ impl Value {
             Value::TapInfo(_) => "tapinfo",
             Value::Array(_) => "array",
             Value::Symbol(_) => "symbol",
+            Value::Number(Number::Int(_)) => "int",
+            Value::Number(Number::Float(_)) => "float",
         }
     }
 
