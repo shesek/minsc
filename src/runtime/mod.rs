@@ -44,7 +44,7 @@ impl Execute for ast::Assign {
 
 impl Execute for ast::FnDef {
     fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
-        let func = Function::from(self.clone());
+        let func = Function::from_def(self.clone(), scope.as_readonly());
         scope.borrow_mut().set(self.ident.clone(), func)
     }
 }
@@ -213,8 +213,9 @@ impl Evaluate for ast::ArrayAccess {
 }
 
 impl Evaluate for ast::FnExpr {
-    fn eval(&self, _: &ScopeRef) -> Result<Value> {
-        Ok(Function::from(self.clone()).into())
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
+        let func = Function::from_expr(self.clone(), scope.make_ref());
+        Ok(func.into())
     }
 }
 

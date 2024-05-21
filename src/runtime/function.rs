@@ -11,11 +11,12 @@ pub enum Function {
 }
 
 /// A user-defined function implemented in Minsc
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct UserFunction {
     pub ident: Option<Ident>,
     pub signature: Vec<Ident>,
     pub body: Expr,
+    pub scope: ScopeRef,
 }
 impl_from_variant!(UserFunction, Function, User);
 
@@ -31,20 +32,20 @@ pub type NativeFunctionPt = fn(Array, &ScopeRef) -> Result<Value>;
 impl_from_variant!(NativeFunction, Function, Native);
 
 pub trait Call {
-    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value>;
+    fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value>;
 }
 
 impl Call for Function {
-    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
         match self {
-            Function::User(f) => f.call(args, scope),
-            Function::Native(f) => f.call(args, scope), // wraps with CallError context internally
+            Function::User(f) => f.call(args, caller_scope),
+            Function::Native(f) => f.call(args, caller_scope), // wraps with CallError context internally
         }
     }
 }
 
 impl Call for UserFunction {
-    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, _caller_scope: &ScopeRef) -> Result<Value> {
         let _call = || {
             ensure!(
                 self.signature.len() == args.len(),
@@ -52,7 +53,7 @@ impl Call for UserFunction {
                     Error::InvalidLength(args.len(), self.signature.len()).into(),
                 )
             );
-            let scope = scope.child();
+            let scope = self.scope.child();
             {
                 let mut scope = scope.borrow_mut();
                 for (index, value) in args.into_iter().enumerate() {
@@ -67,8 +68,8 @@ impl Call for UserFunction {
 }
 
 impl Call for NativeFunction {
-    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
-        (self.pt)(Array(args), scope).map_err(|e| {
+    fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
+        (self.pt)(Array(args), caller_scope).map_err(|e| {
             if self.pt == stdlib_throw {
                 e // Don't include the `throw()` function in the CallError stack context.
             } else {
@@ -79,9 +80,9 @@ impl Call for NativeFunction {
 }
 
 impl Call for Value {
-    fn call(&self, args: Vec<Value>, scope: &ScopeRef) -> Result<Value> {
+    fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
         match self {
-            Value::Function(func) => func.call(args, scope),
+            Value::Function(func) => func.call(args, caller_scope),
             v => Err(Error::NotFn(v.clone().into())),
         }
     }
@@ -99,23 +100,25 @@ impl From<NativeFunctionPt> for Function {
     }
 }
 
-impl From<ast::FnDef> for Function {
-    fn from(fn_def: ast::FnDef) -> Self {
+impl Function {
+    /// From a named function definition statement
+    pub fn from_def(fn_def: ast::FnDef, scope: ScopeRef) -> Self {
         UserFunction {
             ident: Some(fn_def.ident),
             signature: fn_def.signature,
             body: fn_def.body,
+            scope,
         }
         .into()
     }
-}
 
-impl From<ast::FnExpr> for Function {
-    fn from(fn_expr: ast::FnExpr) -> Self {
+    /// From an anonymous function expression
+    pub fn from_expr(fn_expr: ast::FnExpr, scope: ScopeRef) -> Self {
         UserFunction {
             ident: None,
             signature: fn_expr.signature,
             body: *fn_expr.body,
+            scope,
         }
         .into()
     }
@@ -135,6 +138,18 @@ impl PartialEq for Function {
         }
     }
 }
+
+impl fmt::Debug for UserFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("UserFunction")
+            .field("ident", &self.ident)
+            .field("signature", &self.signature)
+            .field("body", &self.body)
+            .field("scoping", &iif!(self.scope.is_some(), "lexical", "dynamic"))
+            .finish()
+    }
+}
+
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
