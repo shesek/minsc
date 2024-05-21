@@ -238,14 +238,14 @@ ScriptFragPart_Mark: Expr = {
 };
 
 // Defined separately because it is allowed outside ``
-ScriptMarkCtx: Expr =
-  // Wraps the body expression in a function, to be evaluated from within the `mark::ctx()` scope.
-  "@@" <Paren<(<Expr> "," <Expr>)>> => call("mark::ctx", vec![<>.0, ast::FnExpr { signature: vec![], body: <>.1.into() }.into()]);
+ScriptMarkCtx: Expr = "@@" <Paren<(<Expr> "," <Expr>)>> =>
+  // Wraps the body expression in a dynamically-scoped function, to be evaluated from within the `mark::ctx()` scope.
+  call("mark::ctx", vec![<>.0, ast::FnExpr { signature: vec![], body: <>.1.into(), dynamic_scoping: true }.into()]);
 
 
 // Anonymous function expression
-FnExpr: Expr = <signature:FnExprSignature> <body:Expr> =>
-    ast::FnExpr { signature, body: body.into() }.into();
+FnExpr: Expr = <dyn_scoping:"dyn"?> <signature:FnExprSignature> <body:Expr> =>
+    ast::FnExpr { signature, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
 FnExprSignature = {
   "|" <List0<IdentTerm, ",">> "|",
   // No arguments should already be captured by the `List0`, but for some reason it isn't.
@@ -334,10 +334,10 @@ Assignment: ast::Assignment = <lhs:IdentTerm> "=" <rhs:Expr> =>
     ast::Assignment { lhs, rhs };
 
 FnDef: Stmt = {
-    "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> "=" <body:Expr> ";" =>
-        ast::FnDef { ident, signature, body }.into(),
-    "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> <body:BlockExpr> ";"? =>
-        ast::FnDef { ident, signature, body }.into(),
+    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> "=" <body:Expr> ";" =>
+        ast::FnDef { ident, signature, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
+    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> <body:BlockExpr> ";"? =>
+        ast::FnDef { ident, signature, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
 }
 
 CallStmt: Stmt = <Call_> ";" => ast::CallStmt(<>).into();

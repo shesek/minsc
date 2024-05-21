@@ -38,10 +38,10 @@ CodeMirror.defineSimpleMode("minsc",{
 
     // Function definition
     {regex: /\b(fn)(\s+)([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)(\(\[native\]\))/, token: ["keyword", null, "def", "def"]},
-    {regex: /\b(fn)(\s+)([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\b/, token: ["keyword", null, "def"]},
+    {regex: /\b((?:dyn )?fn)(\s+)([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\b/, token: ["keyword", null, "def"]},
 
     // Keywords
-    {regex: /\b(of|return|let|if|then|else|_)\b/, token: "keyword"},
+    {regex: /\b(of|return|let|if|then|else|dyn(?: fn)?|_)\b/, token: "keyword"},
     {regex: /\b(true|false|null|default|int|float|str|bytes|likely)\b/, token: "builtin"},
 
     // Assignment

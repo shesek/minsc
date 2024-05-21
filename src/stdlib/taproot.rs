@@ -8,11 +8,14 @@ use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootS
 use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
 
 use super::miniscript::{multi_andor, AndOr};
-use crate::runtime::{Error, Result, Scope, Value};
+use crate::runtime::scope::{Mutable, Scope, ScopeRef};
+use crate::runtime::{Error, Result, Value};
 use crate::util::{fmt_list, PrettyDisplay, EC};
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
-pub fn attach_stdlib(scope: &mut Scope) {
+pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
+    let mut scope = scope.borrow_mut();
+
     // Taproot Descriptor/TaprootSpendInfo construction
     scope.set_fn("tr", fns::tr).unwrap();
 
@@ -45,15 +48,15 @@ pub mod fns {
     /// tr(PubKey, Script|Array<Script>) -> TaprootSpendInfo
     /// tr(Script|Array<Script>) -> TaprootSpendInfo
     /// tr(PubKey, Hash) -> TaprootSpendInfo
-    pub fn tr(args: Array, scope: &Scope) -> Result<Value> {
+    pub fn tr(args: Array, scope: &ScopeRef) -> Result<Value> {
         let (a, b): (Value, Option<Value>) = args.args_into()?;
-        super::tr(a, b, scope)
+        super::tr(a, b, &scope.borrow())
     }
 
     /// tr::internalKey(TapInfo) -> PubKey
     ///
     /// Get the internal x-only key of the given TapInfo
-    pub fn internalKey(args: Array, _: &Scope) -> Result<Value> {
+    pub fn internalKey(args: Array, _: &ScopeRef) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         Ok(tapinfo.internal_key().into())
@@ -62,7 +65,7 @@ pub mod fns {
     /// tr::outputKey(TapInfo) -> PubKey | (PubKey, Number)
     ///
     /// Get the output key of the given TapInfo, optionally with the parity as a tuple of (key, parity)
-    pub fn outputKey(args: Array, _: &Scope) -> Result<Value> {
+    pub fn outputKey(args: Array, _: &ScopeRef) -> Result<Value> {
         let (tapinfo, with_parity): (TaprootSpendInfo, Option<bool>) = args.args_into()?;
         let key = tapinfo.output_key();
 
@@ -77,7 +80,7 @@ pub mod fns {
     /// tr::merkleRoot(TapInfo) -> Hash
     ///
     /// Get the merkle root hash of the given TapInfo
-    pub fn merkleRoot(args: Array, _: &Scope) -> Result<Value> {
+    pub fn merkleRoot(args: Array, _: &ScopeRef) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         Ok(Value::Bytes(match tapinfo.merkle_root() {
@@ -89,7 +92,7 @@ pub mod fns {
     /// tr::scripts(TapInfo) -> Array<(Script, Bytes version, Bytes control_block)>
     ///
     /// Get the scripts in this TapInfo with their control blocks
-    pub fn scripts(args: Array, _: &Scope) -> Result<Value> {
+    pub fn scripts(args: Array, _: &ScopeRef) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
         let scripts_ctrls = tapinfo
@@ -109,14 +112,14 @@ pub mod fns {
     /// tr::tapInfo(Descriptor|TapInfo) -> TapInfo
     ///
     /// Convert the Tr Descriptor into a TapInfo (or return TapInfo as-is)
-    pub fn tapInfo(args: Array, _: &Scope) -> Result<Value> {
+    pub fn tapInfo(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::TapInfo(args.arg_into()?))
     }
 
     /// tr::tapLeaf(Script, version=0xc0) -> Hash
     ///
     /// Compute the leaf hash of the given script
-    pub fn tapLeaf(args: Array, _: &Scope) -> Result<Value> {
+    pub fn tapLeaf(args: Array, _: &ScopeRef) -> Result<Value> {
         let (script, leaf_var): (ScriptBuf, Option<Value>) = args.args_into()?;
         let leaf_ver = leaf_var.map_or(Ok(LeafVersion::TapScript), |ver| -> Result<_> {
             Ok(LeafVersion::from_consensus(match ver {
@@ -132,7 +135,7 @@ pub mod fns {
     /// tr::tapBranch(Hash node_a, Hash node_b) -> Hash
     ///
     /// Combine two nodes to create a new TapBranch parent
-    pub fn tapBranch(args: Array, _: &Scope) -> Result<Value> {
+    pub fn tapBranch(args: Array, _: &ScopeRef) -> Result<Value> {
         let (a_hash, b_hash) = args.args_into()?;
         let branch = branch_hash(&a_hash, &b_hash);
 
@@ -361,7 +364,7 @@ fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descript
 // Get the TR_UNSPENDABLE key from scope. It may be set to false to disable it.
 fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
     // Must exists in scope because its set in the stdlib
-    Ok(match scope.builtin("TR_UNSPENDABLE").clone() {
+    Ok(match scope.builtin("TR_UNSPENDABLE") {
         Value::Bool(val) if val == false => None,
         Value::PubKey(val) => Some(val),
         other => bail!(Error::InvalidTrUnspendable(other.into())),

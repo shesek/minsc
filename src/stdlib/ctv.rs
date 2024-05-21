@@ -3,7 +3,8 @@ use bitcoin::{Transaction, TxIn};
 use miniscript::bitcoin;
 
 use crate::parser::Library;
-use crate::runtime::{Error, Execute, Result, Scope, Value};
+use crate::runtime::scope::{Mutable, ScopeRef};
+use crate::runtime::{Error, Execute, Result, Value};
 
 lazy_static! {
     static ref MINSC_CTV_LIB: Library = r#"
@@ -16,9 +17,11 @@ lazy_static! {
     .unwrap();
 }
 
-pub fn attach_stdlib(scope: &mut Scope) {
-    scope.set_fn("ctvHash", fns::ctvHash).unwrap();
-
+pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
+    {
+        let mut scope = scope.borrow_mut();
+        scope.set_fn("ctvHash", fns::ctvHash).unwrap();
+    }
     MINSC_CTV_LIB.exec(scope).unwrap();
 }
 
@@ -30,7 +33,7 @@ pub mod fns {
     /// ctvHash(Array|Transaction tx, Number input_index=0) -> Hash
     ///
     /// Example: ctvHash([ "version": 1, "outputs": [ $bob_pk: 10000 sats, $alice_pk: 25000 sats ] ])
-    pub fn ctvHash(args: Array, _: &Scope) -> Result<Value> {
+    pub fn ctvHash(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut tx, input_index): (Transaction, Option<u32>) = args.args_into()?;
 
         // Add a default input if none exists. The only input field that matters for

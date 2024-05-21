@@ -11,16 +11,17 @@ use miniscript::bitcoin::{
 };
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
-use crate::runtime::{
-    eval_exprs, Array, Error, Evaluate, Float, Int, Result, Scope, Symbol, Value,
-};
+use crate::runtime::scope::{Mutable, ScopeRef};
+use crate::runtime::{eval_exprs, Array, Error, Evaluate, Float, Int, Result, Symbol, Value};
 use crate::util::{self, fmt_list, DeriveExt, DescriptorExt, PrettyDisplay, EC};
 use crate::{ast, time};
 
 // XXX should this be randomized? is there a way this could be abused when viewing untrusted scripts?
 const SCRIPT_MARKER_MAGIC_BYTES: &[u8] = "SCRIPT MARKER MAGIC BYTES".as_bytes();
 
-pub fn attach_stdlib(scope: &mut Scope) {
+pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
+    let mut scope = scope.borrow_mut();
+
     // Network types
     scope.set("signet", Network::Signet).unwrap();
     scope.set("testnet", Network::Testnet).unwrap();
@@ -44,7 +45,7 @@ pub fn attach_stdlib(scope: &mut Scope) {
 }
 
 impl Evaluate for ast::BtcAmount {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let amount_n = self.0.eval(scope)?.into_f64()?;
         let amount = SignedAmount::from_float_in(amount_n, self.1)?;
         Ok(Value::from(amount.to_sat()))
@@ -52,7 +53,7 @@ impl Evaluate for ast::BtcAmount {
 }
 
 impl Evaluate for ast::ScriptFrag {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let frags = eval_exprs(scope, &self.fragments)?;
         Ok(script_frag(Value::array(frags))?.into())
     }
@@ -104,7 +105,7 @@ pub fn repeat_script(script: ScriptBuf, times: usize) -> ScriptBuf {
 }
 
 impl Evaluate for ast::ChildDerive {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let mut node = self.parent.eval(scope)?;
 
         // Temporary fix to make number division work. Should be refactored to make
@@ -113,7 +114,7 @@ impl Evaluate for ast::ChildDerive {
             ensure!(!self.is_wildcard, Error::InvalidArguments);
             let mut result = node.into_number()?;
             for num in &self.path {
-                result = match (result, num.eval(&scope)?.into_number()?) {
+                result = match (result, num.eval(scope)?.into_number()?) {
                     (Int(a), Int(b)) => Int(a.checked_div(b).ok_or(Error::Overflow)?),
                     (Float(a), Float(b)) => Float(a / b),
                     (a, b) => bail!(Error::InfixOpMixedNum(
@@ -165,14 +166,14 @@ impl Evaluate for ast::ChildDerive {
 }
 
 impl Evaluate for ast::Duration {
-    fn eval(&self, scope: &Scope) -> Result<Value> {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let seq_num = match self {
             ast::Duration::BlockHeight(num_blocks) => {
                 let num_blocks = num_blocks.eval(scope)?.into_u32()?;
                 time::relative_height_to_seq(num_blocks)?
             }
             ast::Duration::BlockTime { parts, heightwise } => {
-                let block_interval = scope.builtin("BLOCK_INTERVAL").clone().into_u32()?;
+                let block_interval = scope.borrow().builtin("BLOCK_INTERVAL").into_u32()?;
 
                 let time_parts = parts
                     .into_iter()
@@ -192,7 +193,7 @@ pub mod fns {
 
     /// Generate an address
     /// address(Script|Descriptor|PubKey|TapInfo|String|Address, Network=Signet) -> Address
-    pub fn address(args: Array, _: &Scope) -> Result<Value> {
+    pub fn address(args: Array, _: &ScopeRef) -> Result<Value> {
         let (spk, network): (Value, Option<Network>) = args.args_into()?;
         let spk = spk.into_spk()?;
         let network = network.unwrap_or(Network::Signet);
@@ -203,7 +204,7 @@ pub mod fns {
     }
 
     /// script(Bytes|Script) -> Script
-    pub fn script(args: Array, _: &Scope) -> Result<Value> {
+    pub fn script(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Script(script) => script.into(),
             Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
@@ -212,7 +213,7 @@ pub mod fns {
     }
 
     /// transaction(Bytes|TaggedArray|Transaction) -> Transaction
-    pub fn transaction(args: Array, _: &Scope) -> Result<Value> {
+    pub fn transaction(args: Array, _: &ScopeRef) -> Result<Value> {
         let tx: Transaction = args.arg_into()?;
         Ok(tx.into())
     }
@@ -223,14 +224,14 @@ pub mod fns {
     /// TapInfo are returned as their V1 witness program
     /// PubKeys are converted into a wpkh() scripts
     /// Scripts are returned as-is
-    pub fn scriptPubKey(args: Array, _: &Scope) -> Result<Value> {
+    pub fn scriptPubKey(args: Array, _: &ScopeRef) -> Result<Value> {
         let spk = args.arg_into::<Value>()?.into_spk()?;
         Ok(spk.into())
     }
 
     /// script::strip(Script) -> Script
     /// Strip debug markers from the given Script
-    pub fn scriptStrip(args: Array, _: &Scope) -> Result<Value> {
+    pub fn scriptStrip(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(args
             .arg_into::<ScriptBuf>()?
             .strip_markers(SCRIPT_MARKER_MAGIC_BYTES)?
@@ -239,7 +240,7 @@ pub mod fns {
 
     /// script::wiz(Script) -> Symbol
     /// Encode the Script in a Scriptwiz-compatible format (newlines, stack labels & comments)
-    pub fn scriptWiz(args: Array, _: &Scope) -> Result<Value> {
+    pub fn scriptWiz(args: Array, _: &ScopeRef) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut wiz_str = String::new();
         fmt_script(&mut wiz_str, &script, ScriptFmt::ScriptWiz, Some(0))?;
@@ -249,7 +250,7 @@ pub mod fns {
 
     /// script::bitide(Script) -> Symbol
     /// Encode the Script in a BitIDE-compatible format (newlines, stack labels & comments)
-    pub fn scriptBitIde(args: Array, _: &Scope) -> Result<Value> {
+    pub fn scriptBitIde(args: Array, _: &ScopeRef) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut bitide_str = String::new();
         fmt_script(&mut bitide_str, &script, ScriptFmt::BitIde, Some(0))?;

@@ -2,7 +2,8 @@ use std::convert::TryInto;
 
 use ::miniscript::bitcoin::hashes::{sha256, Hash};
 
-use crate::runtime::{Array, Error, Execute, Number, Result, Scope, Symbol, Value};
+use crate::runtime::scope::{Mutable, ScopeRef};
+use crate::runtime::{Array, Error, Execute, Number, Result, Symbol, Value};
 use crate::{time, Library};
 
 pub mod btc;
@@ -18,39 +19,43 @@ lazy_static! {
 }
 
 /// Attach built-in functions and variables to the Minsc runtime environment
-pub fn attach_stdlib(scope: &mut Scope) {
-    // Boolean types
-    scope.set("true", true).unwrap();
-    scope.set("false", false).unwrap();
+pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
+    {
+        let mut scope = scope.borrow_mut();
 
-    // Functions
-    scope.set_fn("typeof", fns::r#typeof).unwrap();
-    scope.set_fn("len", fns::len).unwrap();
-    scope.set_fn("fold", fns::fold).unwrap();
-    scope.set_fn("foldUntil", fns::foldUntil).unwrap();
-    scope.set_fn("fillArray", fns::fillArray).unwrap();
+        // Boolean types
+        scope.set("true", true).unwrap();
+        scope.set("false", false).unwrap();
 
-    scope.set_fn("int", fns::int).unwrap();
-    scope.set_fn("float", fns::float).unwrap();
-    scope.set_fn("str", fns::r#str).unwrap();
-    scope.set_fn("bytes", fns::bytes).unwrap();
-    scope.set_fn("Symbol", fns::Symbol).unwrap();
+        // Functions
+        scope.set_fn("typeof", fns::r#typeof).unwrap();
+        scope.set_fn("len", fns::len).unwrap();
+        scope.set_fn("fold", fns::fold).unwrap();
+        scope.set_fn("foldUntil", fns::foldUntil).unwrap();
+        scope.set_fn("fillArray", fns::fillArray).unwrap();
 
-    scope.set_fn("throw", fns::throw).unwrap();
+        scope.set_fn("int", fns::int).unwrap();
+        scope.set_fn("float", fns::float).unwrap();
+        scope.set_fn("str", fns::r#str).unwrap();
+        scope.set_fn("bytes", fns::bytes).unwrap();
+        scope.set_fn("Symbol", fns::Symbol).unwrap();
 
-    scope.set_fn("le64", fns::le64).unwrap();
-    scope.set_fn("SHA256", fns::SHA256).unwrap();
+        scope.set_fn("throw", fns::throw).unwrap();
 
-    // Development utilities
-    scope.set_fn("debug", fns::debug).unwrap();
-    scope.set_fn("env", fns::env).unwrap();
-    scope.set_fn("log", fns::log).unwrap();
-    scope.set_fn("warn", fns::warn).unwrap();
+        scope.set_fn("le64", fns::le64).unwrap();
+        scope.set_fn("SHA256", fns::SHA256).unwrap();
 
-    // Constants
-    scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
-    scope.set("MAX_NUMBER", i64::MAX).unwrap();
-    scope.set("MIN_NUMBER", i64::MIN).unwrap();
+        // Development utilities
+        scope.set_fn("debug", fns::debug).unwrap();
+        scope.set_fn("env", fns::env).unwrap();
+        scope.set_fn("log", fns::log).unwrap();
+        scope.set_fn("warn", fns::warn).unwrap();
+
+        // Constants
+        scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
+        scope.set("MAX_NUMBER", i64::MAX).unwrap();
+        scope.set("MIN_NUMBER", i64::MIN).unwrap();
+    }
 
     // Bitcoin related functions
     self::btc::attach_stdlib(scope);
@@ -78,13 +83,13 @@ pub mod fns {
     /// Get the argument type as a string
     /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array, symbol
     /// typeof(Value) -> String
-    pub fn r#typeof(args: Array, _: &Scope) -> Result<Value> {
+    pub fn r#typeof(args: Array, _: &ScopeRef) -> Result<Value> {
         let type_of = args.arg_into::<Value>()?.type_of();
         Ok(type_of.into())
     }
 
     /// len(Array|Bytes|Script|String) -> Number
-    pub fn len(args: Array, _: &Scope) -> Result<Value> {
+    pub fn len(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Array(array) => array.len(),
             Value::Bytes(bytes) => bytes.len(),
@@ -98,7 +103,7 @@ pub mod fns {
 
     /// fold(Array, Value, Function) -> Value
     /// Fold each element in the Array through the Function, starting with Value as the initial value
-    pub fn fold(args: Array, scope: &Scope) -> Result<Value> {
+    pub fn fold(args: Array, scope: &ScopeRef) -> Result<Value> {
         let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
 
         let mut accumlator = init_val;
@@ -111,7 +116,7 @@ pub mod fns {
     /// foldUntil(Array, Value, Function) -> Value
     /// Like fold(), with support for early termination. The callback can return a `false:$new_val` tuple
     /// to update the accumulated value and continue, or `true:$new_val` to return `$new_val` immediately.
-    pub fn foldUntil(args: Array, scope: &Scope) -> Result<Value> {
+    pub fn foldUntil(args: Array, scope: &ScopeRef) -> Result<Value> {
         let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
 
         let mut accumlator = init_val;
@@ -131,7 +136,7 @@ pub mod fns {
     ///
     /// fillArray(Number, Function) -> Array
     /// Return an array of the specified size, using the callback function to produce values
-    pub fn fillArray(args: Array, scope: &Scope) -> Result<Value> {
+    pub fn fillArray(args: Array, scope: &ScopeRef) -> Result<Value> {
         let (num, producer): (usize, Value) = args.args_into()?;
         Ok(match producer {
             Value::Function(callback) => Value::array(
@@ -143,7 +148,7 @@ pub mod fns {
         })
     }
 
-    pub fn int(args: Array, _: &Scope) -> Result<Value> {
+    pub fn int(args: Array, _: &ScopeRef) -> Result<Value> {
         let num = match args.arg_into()? {
             Number::Int(n) => n,
             Number::Float(n) if n.is_finite() && n >= i64::MIN as f64 && n <= i64::MAX as f64 => {
@@ -155,13 +160,13 @@ pub mod fns {
         Ok(num.into())
     }
 
-    pub fn float(args: Array, _: &Scope) -> Result<Value> {
+    pub fn float(args: Array, _: &ScopeRef) -> Result<Value> {
         let num: f64 = args.arg_into()?; // TryInto coerces ints into floats
         Ok(num.into())
     }
 
     /// str(Value, Bool multiline=false, Bool quoted_str=false) -> String
-    pub fn r#str(args: Array, _: &Scope) -> Result<Value> {
+    pub fn r#str(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.args_into()? {
             (Value::String(string), _, None | Some(false)) => string,
             (value, None | Some(false), _) => value.to_string(), // Value::String will be quoted
@@ -172,7 +177,7 @@ pub mod fns {
 
     /// Create a new unique Symbol
     /// Symbol(String=None) -> Symbol
-    pub fn Symbol(args: Array, _: &Scope) -> Result<Value> {
+    pub fn Symbol(args: Array, _: &ScopeRef) -> Result<Value> {
         let name = args.arg_into()?;
         Ok(Symbol::new(name).into())
     }
@@ -180,7 +185,7 @@ pub mod fns {
     /// Convert the argument into Bytes
     /// Scripts are serialized, Strings are converted to Bytes, Bytes are returned as-is
     /// bytes(Script|Bytes|String) -> Bytes
-    pub fn bytes(args: Array, _: &Scope) -> Result<Value> {
+    pub fn bytes(args: Array, _: &ScopeRef) -> Result<Value> {
         let bytes: Vec<u8> = args.arg_into()?;
         Ok(bytes.into())
     }
@@ -188,7 +193,7 @@ pub mod fns {
     /// le64(Number) -> Bytes
     /// Encode 64-bit signed integers as little-endian bytes
     /// Matches the format used by Elements Script
-    pub fn le64(args: Array, _: &Scope) -> Result<Value> {
+    pub fn le64(args: Array, _: &ScopeRef) -> Result<Value> {
         let num: i64 = args.arg_into()?;
         Ok(num.to_le_bytes().to_vec().into())
     }
@@ -198,7 +203,7 @@ pub mod fns {
     /// Hash some data with SHA256
     /// Named in upper-case to avoid a conflict with the Miniscript sha256(Bytes) policy function
     /// (Yes, this is awfully confusing and requires a better solution. :<)
-    pub fn SHA256(args: Array, _: &Scope) -> Result<Value> {
+    pub fn SHA256(args: Array, _: &ScopeRef) -> Result<Value> {
         let bytes: Vec<u8> = args.arg_into()?;
         let hash = sha256::Hash::hash(&bytes);
         Ok(hash.into())
@@ -206,7 +211,7 @@ pub mod fns {
 
     /// debug(Value, Bool multiline=false)
     /// Get the Debug representation of the Value
-    pub fn debug(args: Array, _: &Scope) -> Result<Value> {
+    pub fn debug(args: Array, _: &ScopeRef) -> Result<Value> {
         let (val, multiline): (Value, Option<bool>) = args.args_into()?;
         let debug_str = if multiline.unwrap_or(false) {
             // Indent with 2 spaces instead of 4
@@ -222,25 +227,26 @@ pub mod fns {
 
     /// Get env vars from the local and parent scopes
     /// env(max_depth=1) -> Array<(String, Value)>
-    pub fn env(args: Array, scope: &Scope) -> Result<Value> {
+    pub fn env(args: Array, scope: &ScopeRef) -> Result<Value> {
         // Set to -1 by default, which will return everything but the root scope
         let max_depth = args.arg_into::<Option<isize>>()?.unwrap_or(-1);
         let tagged_vars = scope
+            .borrow()
             .env(max_depth)
             .into_iter()
-            .map(|(ident, val)| vec![Value::String(ident.0.clone()), val.clone()].into())
+            .map(|(ident, val)| vec![Value::String(ident.0), val].into())
             .collect();
         Ok(Array(tagged_vars).into())
     }
 
     /// Throw a custom runtime script execution error
-    pub fn throw(args: Array, _: &Scope) -> Result<Value> {
+    pub fn throw(args: Array, _: &ScopeRef) -> Result<Value> {
         let msg = stringify_args(args)?;
         Err(Error::ScriptException(msg))
     }
 
     /// Log to STDOUT or console.log
-    pub fn log(args: Array, _scope: &Scope) -> Result<Value> {
+    pub fn log(args: Array, _: &ScopeRef) -> Result<Value> {
         let msg = stringify_args(args)?;
 
         #[cfg(target_arch = "wasm32")]
@@ -252,7 +258,7 @@ pub mod fns {
     }
 
     /// Log to STDERR or console.error
-    pub fn warn(args: Array, _scope: &Scope) -> Result<Value> {
+    pub fn warn(args: Array, _: &ScopeRef) -> Result<Value> {
         let msg = stringify_args(args)?;
 
         #[cfg(target_arch = "wasm32")]

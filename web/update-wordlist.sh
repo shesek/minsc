@@ -13,7 +13,7 @@ node -p '
     vars: vars.filter(v => v.length >= 2 && !v.startsWith("_")),
     funcs: funcs.filter(v => !v.startsWith("_")).map(def => [
         def.slice(0, def.indexOf(" ")),
-        def.slice(def.indexOf("(")+1, def.length-1).replace(/\$\$/g, "$")
+        def.slice(def.indexOf("(")+1, def.length-1)
     ]),
   }, null, 2)
 ' > js/stdlib-wordlist.json

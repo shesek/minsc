@@ -22,7 +22,7 @@ use std::str::FromStr;
 
 pub use error::{Error, ParseError, RuntimeError};
 pub use parser::{ast, Expr, Ident, Library, Stmt, Stmts};
-pub use runtime::{Evaluate, Execute, Number, Scope, Value};
+pub use runtime::{Evaluate, Execute, Number, Scope, ScopeRef, Value};
 pub use util::PrettyDisplay;
 
 use miniscript::{descriptor, policy};
@@ -37,7 +37,7 @@ pub fn eval<T: TryInto<Expr>>(expr: T) -> Result<Value, Error>
 where
     Error: From<T::Error>,
 {
-    Ok(expr.try_into()?.eval(Scope::root())?)
+    Ok(expr.try_into()?.eval(&Scope::root())?)
 }
 
 /// Parse program code into an Expr AST

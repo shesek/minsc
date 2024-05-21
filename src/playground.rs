@@ -1,11 +1,13 @@
-use miniscript::bitcoin::{Address, Network, ScriptBuf};
-use miniscript::{Descriptor, MiniscriptKey};
-use serde::Serialize;
 use std::str::FromStr;
+
+use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
+use miniscript::bitcoin::{Address, Network, ScriptBuf};
+use miniscript::{Descriptor, MiniscriptKey};
+
 use crate::util::DescriptorExt;
-use crate::{parse, Error, Evaluate, Execute, Library, PrettyDisplay, Scope, Value};
+use crate::{parse, Error, Evaluate, Execute, Library, PrettyDisplay, Scope, ScopeRef, Value};
 
 #[derive(Serialize)]
 pub struct PlaygroundResult {
@@ -87,7 +89,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 }
 
 fn run(code: &str) -> Result<Value, Error> {
-    Ok(parse(code)?.eval(&DEMO_SCOPE)?)
+    DEMO_SCOPE.with(|root| Ok(parse(code)?.eval(root)?))
 }
 
 fn script_asm(script: &ScriptBuf) -> String {
@@ -101,7 +103,7 @@ lazy_static! {
     static ref PLAYGROUND_LIB: Library = r#"
         // Add a default `main` function displaying all environment variables,
         // or a welcome message if there aren't any.
-        fn main() {
+        dyn fn main() {
             $env = str(env::pretty());
             Symbol(if !isEmpty($env) then "// Environment variables:\n\n" + $env
                    else "// Welcome! Put some variables in your environment and they will show up here.")
@@ -139,14 +141,17 @@ lazy_static! {
     "#
     .parse()
     .unwrap();
+}
+
+thread_local! {
     // Provide some built-in example pubkeys and hashes in the web demo env
-    static ref DEMO_SCOPE: Scope<'static> = {
+    static DEMO_SCOPE: ScopeRef = {
         console_error_panic_hook::set_once();
 
         // The root is cloned to make the playground library part of the root
         // and to have it excluded from `env()`
-        let mut scope = Scope::root().clone();
-        PLAYGROUND_LIB.exec(&mut scope).unwrap();
-        scope
+        let scope = Scope::root().make_copy();
+        PLAYGROUND_LIB.exec(&scope).unwrap();
+        scope.into_readonly()
     };
 }
