@@ -107,11 +107,12 @@ IdentTerm: ast::Ident = IDENT => ast::Ident(<>.into());
 Ident: Expr = IdentTerm => Expr::Ident(<>);
 
 Call: Expr = Call_ => Expr::Call(<>);
-CallLiteral: Expr = CallLiteral_ => Expr::Call(<>);
+SimpleCall: Expr = SimpleCall_ => Expr::Call(<>);
 
-Call_: ast::Call = { CallLiteral_, CallExpr_, PipeCall_ };
-CallLiteral_: ast::Call = <func:Ident> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args };
-CallExpr_: ast::Call = <func:WrapExpr> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args };
+Call_: ast::Call = { SimpleCall_, ExprCall_, PipeCall_ };
+SimpleCall_: ast::Call = <func:Ident> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args };
+ExprCall_: ast::Call = <func:ExprCallFunc> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args };
+ExprCallFunc: Expr = { WrapExpr, Call, ArrayAccess };
 
 // Pipe call: `$first_arg | func($extra_args...)` -> `func($first_arg, $extra_args...)`
 PipeCall_: ast::Call = <first_arg:PipeCallLHS> "|" <func:PipeCallFunc> <extra_args:Paren<List0<Expr, ",">>> =>
@@ -150,7 +151,7 @@ ArrayCurly: Expr = "{" <e1:Expr> "," <e2:Expr> "}" =>
 
 ArrayAccess_: Expr = <array:ArrayAccessLHS> "." <index:ArrayAccessRHS> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
-ArrayAccessLHS = { Ident, CallLiteral, Array, BlockExpr, Bytes, ArrayAccess };
+ArrayAccessLHS = { Ident, SimpleCall, Array, BlockExpr, Bytes, ArrayAccess };
 ArrayAccessRHS = { Int, Ident, Paren<Expr>, BlockExpr };
 
 // Hack :<
@@ -210,7 +211,7 @@ ChildDeriveWildcard = { "/*", "/ *" };
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
 ScriptFragPart = { ScriptFragPart_, ScriptFragPart_Infix };
 ScriptFragPart_ = {
-  Ident, Number, String, Bytes, PubKey, DateTime, CallLiteral, ArrayAccess, Array,
+  Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, ArrayAccess, Array,
   ScriptFragPart_Mark, BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
 };
 // Cannot allow all Infix operators because < > conflicts
@@ -300,7 +301,7 @@ DurationTime: Expr = <heightwise:"heightwise"?> <parts:DurationTimePart+>  =>
   ast::Duration::BlockTime { parts, heightwise: heightwise.is_some() }.into();
 
 DurationTimePart: ast::DurationPart = <n:DurationTimeNum> <i:DurationTimeUnit> => (n.into(), i);
-DurationTimeNum = { Number, CallLiteral, Ident, Paren<Expr> };
+DurationTimeNum = { Number, SimpleCall, Ident, Paren<Expr> };
 DurationTimeUnit: ast::DurationUnit = {
   "year" => ast::DurationUnit::Years,
   "years" => ast::DurationUnit::Years,
