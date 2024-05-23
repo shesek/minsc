@@ -17,7 +17,10 @@ CodeMirror.registerHelper("hint", "multihint", (cm, options) => {
   while (start && wordRe.test(currLine.charAt(start - 1))) --start;
   const currWord = start < cur.ch ? currLine.slice(start, cur.ch) : '';
 
+  // Skip short and all-numeric words
   if (options.minSearchLen != null && currWord.length < options.minSearchLen)
+    return;
+  if (!/[a-zA-Z$]/.test(currWord))
     return;
 
   const listhints = wordlistHints(wordlist, currWord)
