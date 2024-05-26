@@ -385,7 +385,6 @@ impl FromStr for Value {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::PubKey(x) => write!(f, "{}", x),
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
             Value::Bytes(x) => write!(f, "0x{}", x.as_hex()),
@@ -397,6 +396,7 @@ impl fmt::Display for Value {
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
+            Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
             Value::Script(x) => write!(f, "{}", x.pretty(None)),
@@ -419,6 +419,7 @@ impl PrettyDisplay for Value {
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         match self {
+            Value::PubKey(x) => write!(f, "{}", x.pretty(indent)),
             Value::Array(x) => write!(f, "{}", x.pretty(indent)),
             Value::Script(x) => write!(f, "{}", x.pretty(indent)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),

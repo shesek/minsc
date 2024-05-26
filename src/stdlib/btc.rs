@@ -657,6 +657,17 @@ impl PrettyDisplay for Transaction {
     }
 }
 
+impl PrettyDisplay for miniscript::DescriptorPublicKey {
+    const AUTOFMT_ENABLED: bool = false;
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        use miniscript::DescriptorPublicKey::{MultiXPub, Single, XPub};
+        match self {
+            XPub(_) | MultiXPub(_) => write!(f, "{}", self),
+            Single(_) => write!(f, "pubkey({})", self),
+        }
+    }
+}
+
 impl PrettyDisplay for bitcoin::Witness {
     const AUTOFMT_ENABLED: bool = true;
 
