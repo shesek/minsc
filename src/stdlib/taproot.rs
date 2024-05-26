@@ -144,10 +144,11 @@ pub mod fns {
 }
 
 pub fn tr(mut a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
+    // Convert internal keys provided as Bytes into PubKeys, for compatibility with the Miniscirpt Policy tr() syntax
     if a.is_bytes() {
-        // Support providing the internal pubkey as raw Bytes, for compatibility with the Miniscirpt Policy tr() syntax
         a = Value::PubKey(a.try_into()?);
     }
+
     Ok(match (a, b) {
         // tr(Policy) -> Descriptor
         // Single policy, compiled into a script tree
@@ -161,9 +162,9 @@ pub fn tr(mut a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         (Value::PubKey(pk), None) => Descriptor::new_tr(pk, None)?.into(),
 
         // tr(PubKey, Policy) -> Descriptor
-        // Use an explicit internal key with the given policy
-        (Value::PubKey(pk), Some(Value::Policy(policy))) => {
-            descriptor_from_policy(Some(pk), None, policy)?.into()
+        // Use an explicit internal key with the given Policy (or PubKey, coerced into a pk() Policy)
+        (Value::PubKey(pk), Some(b @ Value::Policy(_) | b @ Value::PubKey(_))) => {
+            descriptor_from_policy(Some(pk), None, b.into_policy()?)?.into()
         }
 
         // tr(PubKey, Script) -> TaprootSpendInfo
@@ -217,9 +218,11 @@ fn tr_from_array(
     // expected to be of the same type.
     fn peek_node_type(node: &Value) -> Result<NodeType> {
         Ok(match node {
-            Value::Policy(_) => NodeType::Policy,
             Value::Script(_) => NodeType::Script,
+            // PubKeys are coercible into Policy
+            Value::Policy(_) | Value::PubKey(_) => NodeType::Policy,
             Value::WithProb(_, inner) if inner.is_script() => NodeType::Script,
+            Value::WithProb(_, inner) if inner.is_policy_coercible() => NodeType::Policy,
             Value::Array(array) if array.len() > 0 => peek_node_type(&array[0])?,
             _ => bail!(Error::TaprootInvalidScript),
         })
@@ -348,7 +351,9 @@ fn descriptor_from_array(
 fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descriptor> {
     fn process_node(node: Value) -> Result<TapTree<DescriptorPublicKey>> {
         Ok(match node {
-            Value::Policy(policy) => TapTree::Leaf(Arc::new(policy.compile()?)),
+            Value::Policy(_) | Value::PubKey(_) => {
+                TapTree::Leaf(Arc::new(node.into_policy()?.compile()?))
+            }
             Value::Array(mut nodes) if nodes.len() == 2 => {
                 let a = process_node(nodes.remove(0))?;
                 let b = process_node(nodes.remove(0))?;
@@ -393,8 +398,8 @@ impl PrettyDisplay for TaprootSpendInfo {
                     write!(f, "{}", script.pretty(indent_inner))
                 })?;
                 if scripts.len() > 2 {
-                    // Because scripts are provided as a flat array, the Taproot tree structure information is lost here when there
-                    // are more than two scripts. Add "(not tree)" to inform users, and to make the serialized string invalid as a
+                    // The Taproot script tree is displayed as a flat array, which loses the the Taproot tree structure information when there
+                    // are more than two scripts. "(not tree)" is added to inform users, and to make the serialized string invalid as a
                     // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
                     // FIXME deduce the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
                     write!(f, "(not tree)")?;

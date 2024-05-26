@@ -272,7 +272,7 @@ impl ast::InfixOp {
 
             // + for taproot construction (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
-            | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ Array(_)) => {
+            | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ PubKey(_) | s @ Array(_)) => {
                 stdlib::taproot::tr(k, Some(s), &scope.borrow())?
             }
 
@@ -281,8 +281,8 @@ impl ast::InfixOp {
                 stdlib::btc::repeat_script(s, n.try_into()?).into()
             }
 
-            // @ to assign execution probabilities (to Script/Policy only)
-            (Prob, Num(prob), v @ Policy(_) | v @ Script(_)) => {
+            // @ to assign execution probabilities (Script/Policy, or a PubKey coerced into a pk() Policy)
+            (Prob, Num(prob), v @ Policy(_) | v @ Script(_) | v @ PubKey(_)) => {
                 WithProb(prob.into_usize()?, v.into())
             }
 
