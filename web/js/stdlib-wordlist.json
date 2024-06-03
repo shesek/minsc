@@ -319,6 +319,10 @@
       "[native]"
     ],
     [
+      "genkey",
+      "[native]"
+    ],
+    [
       "hash160",
       "[native]"
     ],

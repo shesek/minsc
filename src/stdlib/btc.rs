@@ -3,7 +3,7 @@ use std::fmt;
 
 use miniscript::bitcoin;
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, Xpub};
+use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{sha256, sha256d, Hash};
 use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
@@ -43,6 +43,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("pubkey", fns::pubkey).unwrap();
 
+    scope.set_fn("genkey", fns::genkey).unwrap();
     scope.set_fn("sign::ecdsa", fns::signEcdsa).unwrap();
     scope.set_fn("sign::schnorr", fns::signSchnorr).unwrap();
 
@@ -51,6 +52,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("script::wiz", fns::scriptWiz).unwrap();
     scope.set_fn("script::bitide", fns::scriptBitIde).unwrap();
 
+    // Constants
     scope
         .set("SCRIPT_MARKER_MAGIC", SCRIPT_MARKER_MAGIC_BYTES.to_vec())
         .unwrap();
@@ -237,6 +239,19 @@ pub mod fns {
         Ok(tx.into())
     }
 
+    /// Generate a new random SecKey over an Xpriv
+    /// genkey([Network = Signet]) -> SecKey
+    pub fn genkey(args: Array, _: &ScopeRef) -> Result<Value> {
+        use secp256k1::rand::{thread_rng, Rng};
+
+        let network = args
+            .arg_into::<Option<Network>>()?
+            .unwrap_or(Network::Signet);
+        let seed: [u8; 32] = thread_rng().gen();
+
+        Ok(Xpriv::new_master(network, &seed).unwrap().into())
+    }
+
     /// Sign the given message (hash) using ECDSA
     /// sign::ecdsa(SecKey, Bytes[, Bool compact_sig])
     pub fn signEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
@@ -352,6 +367,21 @@ impl From<Xpub> for Value {
             wildcard: descriptor::Wildcard::Unhardened,
             origin: if xpub.depth > 0 {
                 Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
+            } else {
+                None
+            },
+        }))
+    }
+}
+
+impl From<Xpriv> for Value {
+    fn from(xprv: Xpriv) -> Self {
+        Value::SecKey(DescriptorSecretKey::XPrv(DescriptorXKey {
+            xkey: xprv,
+            derivation_path: DerivationPath::master(),
+            wildcard: descriptor::Wildcard::Unhardened,
+            origin: if xprv.depth > 0 {
+                Some((xprv.parent_fingerprint, [xprv.child_number][..].into()))
             } else {
                 None
             },
