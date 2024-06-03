@@ -1,14 +1,18 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use bitcoin::bip32::{ChildNumber, DerivationPath};
+use miniscript::bitcoin;
+
+use bitcoin::bip32::{ChildNumber, DerivationPath, Xpub};
 use bitcoin::hashes::{sha256, sha256d, Hash};
+use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
-use miniscript::bitcoin::{
-    self, absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
+use bitcoin::{
+    absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
     Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
+use miniscript::descriptor::{self, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
 use crate::runtime::scope::{Mutable, ScopeRef};
@@ -34,6 +38,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("transaction", fns::transaction).unwrap();
     scope.set_fn("script", fns::script).unwrap();
+    scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("script::strip", fns::scriptStrip).unwrap();
     scope.set_fn("script::wiz", fns::scriptWiz).unwrap();
@@ -212,6 +217,14 @@ pub mod fns {
         })
     }
 
+    /// Cast 32/33 long Bytes into a Single DescriptorPubKey
+    /// PubKeys are returned as-is
+    /// pubkey(Bytes|PubKey) -> PubKey
+    pub fn pubkey(args: Array, _: &ScopeRef) -> Result<Value> {
+        let pubkey: DescriptorPublicKey = args.arg_into()?;
+        Ok(pubkey.into())
+    }
+
     /// transaction(Bytes|TaggedArray|Transaction) -> Transaction
     pub fn transaction(args: Array, _: &ScopeRef) -> Result<Value> {
         let tx: Transaction = args.arg_into()?;
@@ -276,6 +289,9 @@ impl Value {
             other => bail!(Error::NoSpkRepr(other.into())),
         })
     }
+    pub fn into_key(self) -> Result<DescriptorPublicKey> {
+        self.try_into()
+    }
     pub fn into_address(self) -> Result<Address> {
         self.try_into()
     }
@@ -290,7 +306,58 @@ impl Value {
     }
 }
 
+// Convert from Bitcoin types to Value
+
+impl From<XOnlyPublicKey> for Value {
+    fn from(key: XOnlyPublicKey) -> Self {
+        Value::PubKey(DescriptorPublicKey::Single(SinglePub {
+            key: SinglePubKey::XOnly(key),
+            origin: None,
+        }))
+    }
+}
+impl From<TweakedPublicKey> for Value {
+    fn from(key: TweakedPublicKey) -> Self {
+        key.to_inner().into()
+    }
+}
+
+impl From<Xpub> for Value {
+    fn from(xpub: Xpub) -> Self {
+        Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
+            xkey: xpub,
+            derivation_path: DerivationPath::master(),
+            wildcard: descriptor::Wildcard::Unhardened,
+            origin: if xpub.depth > 0 {
+                Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
+            } else {
+                None
+            },
+        }))
+    }
+}
+
 // Convert from Value to Bitcoin types
+
+impl TryFrom<Value> for DescriptorPublicKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::PubKey(x) => Ok(x),
+            // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
+            Value::Bytes(bytes) => {
+                let key = match bytes.len() {
+                    33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
+                    32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
+                    // uncompressed keys are currently unsupported
+                    len => bail!(Error::InvalidPubKeyLen(len)),
+                };
+                Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
+            }
+            v => Err(Error::NotPubKey(v.into())),
+        }
+    }
+}
 
 impl TryFrom<Value> for TaprootSpendInfo {
     type Error = Error;
@@ -305,6 +372,7 @@ impl TryFrom<Value> for TaprootSpendInfo {
         })
     }
 }
+
 impl TryFrom<Value> for Address {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
