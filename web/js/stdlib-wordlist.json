@@ -519,6 +519,14 @@
       "[native]"
     ],
     [
+      "sign::ecdsa",
+      "[native]"
+    ],
+    [
+      "sign::schnorr",
+      "[native]"
+    ],
+    [
       "singleDescriptors",
       "[native]"
     ],

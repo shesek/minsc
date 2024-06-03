@@ -154,6 +154,9 @@ pub enum RuntimeError {
     )]
     InvalidDerivationCode,
 
+    #[error("Unexpected multi-path Xpriv, only single path is supported")]
+    InvalidMultiXprv,
+
     #[error("Policy probabilities are only supported for OR with 2 branches")]
     InvalidPolicyProb,
 

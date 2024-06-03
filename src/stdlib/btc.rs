@@ -9,11 +9,12 @@ use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
-    absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
-    Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
+    absolute::LockTime, address, hex::DisplayHex, secp256k1, taproot::TaprootSpendInfo, Address,
+    Amount, Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
 use miniscript::descriptor::{
-    self, Descriptor, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey,
+    self, Descriptor, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePub,
+    SinglePubKey,
 };
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
@@ -41,6 +42,10 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("transaction", fns::transaction).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("pubkey", fns::pubkey).unwrap();
+
+    scope.set_fn("sign::ecdsa", fns::signEcdsa).unwrap();
+    scope.set_fn("sign::schnorr", fns::signSchnorr).unwrap();
+
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("script::strip", fns::scriptStrip).unwrap();
     scope.set_fn("script::wiz", fns::scriptWiz).unwrap();
@@ -232,6 +237,32 @@ pub mod fns {
         Ok(tx.into())
     }
 
+    /// Sign the given message (hash) using ECDSA
+    /// sign::ecdsa(SecKey, Bytes[, Bool compact_sig])
+    pub fn signEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (seckey, msg, compact_sig): (_, _, Option<bool>) = args.args_into()?;
+        let sig = EC.sign_ecdsa(&msg, &seckey);
+
+        Ok(if compact_sig.unwrap_or(false) {
+            sig.serialize_compact().to_vec()
+        } else {
+            sig.serialize_der().to_vec()
+        }
+        .into())
+    }
+
+    /// Sign the given message (hash) using Schnorr
+    /// sign::schnorr(SecKey, Bytes)
+    pub fn signSchnorr(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (keypair, msg): (secp256k1::Keypair, secp256k1::Message) = args.args_into()?;
+
+        // XXX rust-miniscript doesn't support enabling the `bitcoin/rand-std` feature to transitively enable
+        // `secp256k1/rand-std`, which is needed for signing with auxiliary random data as advised by BIP 340.
+        // (bitcoind doesn't add random data either: https://bitcoin.stackexchange.com/q/119042/11442)
+        let sig = EC.sign_schnorr_no_aux_rand(&msg, &keypair);
+        Ok(Value::Bytes(sig.serialize().to_vec()))
+    }
+
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
     ///
     /// Descriptors are compiled into their scriptPubKey
@@ -325,6 +356,31 @@ impl From<Xpub> for Value {
                 None
             },
         }))
+    }
+}
+
+// Convert from Value to secp256k1 types
+
+impl TryFrom<Value> for secp256k1::SecretKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value.try_into()? {
+            DescriptorSecretKey::Single(single_priv) => single_priv.key.inner,
+            DescriptorSecretKey::XPrv(dxprv) => dxprv.xkey.private_key,
+            DescriptorSecretKey::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
+        })
+    }
+}
+impl TryFrom<Value> for secp256k1::Keypair {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(secp256k1::SecretKey::try_from(value)?.keypair(&EC))
+    }
+}
+impl TryFrom<Value> for secp256k1::Message {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(secp256k1::Message::from_digest_slice(&value.into_bytes()?)?)
     }
 }
 
