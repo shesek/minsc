@@ -1,7 +1,7 @@
-use minsc::run;
+use minsc::eval;
 
 fn test(minsc: &str, expected_policy: &str) {
-    let res = run(&replace_dummy(minsc)).unwrap();
+    let res = eval(replace_dummy(minsc).as_str()).unwrap();
     let policy = res.into_policy().unwrap().to_string();
     assert_eq!(policy, replace_dummy(expected_policy));
 }
@@ -34,8 +34,8 @@ fn test_probs() {
 
 #[test]
 fn test_datetime() {
-    test("after(2030-01-01)", "after(1893456000)");
-    test("after(2030-01-01 13:37)", "after(1893505020)");
+    test("after(2030-01-01T)", "after(1893456000)");
+    test("after(2030-01-01T13:37)", "after(1893505020)");
 }
 
 #[test]

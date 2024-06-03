@@ -4,25 +4,25 @@
 //!
 //! For example, a tagged transaction can look like:
 //!
-//!     [
-//!       [ "version", 2 ],
-//!       [ "locktime", 0 ],
-//!       [ "inputs", [
-//!         [ [ "txid", ... ], [ "vout", ... ] ],
-//!         ...
-//!       ] ]
-//!     ]
+//!    [
+//!      [ "version", 2 ],
+//!      [ "locktime", 0 ],
+//!      [ "inputs", [
+//!        [ [ "txid", ... ], [ "vout", ... ] ],
+//!        ...
+//!      ] ]
+//!    ]
 //!
 //! Or alternatively using the colon tuple syntax (equivalent to the above):
 //!
-//!     [
-//!       "version": 2,
-//!       "locktime": 0,
-//!       "inputs": [
-//!         [ "txid": ..., "vout": ... ],
-//!         ...
-//!       ]
-//!     ]
+//!    [
+//!      "version": 2,
+//!      "locktime": 0,
+//!      "inputs": [
+//!        [ "txid": ..., "vout": ... ],
+//!        ...
+//!      ]
+//!    ]
 
 use std::collections::HashSet;
 use std::convert::TryInto;
