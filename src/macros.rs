@@ -23,6 +23,28 @@ macro_rules! impl_tryfrom_fromstr {
     };
 }
 
+// Simple extraction of a Value enum variant, with no specialized type coercion logic
+macro_rules! impl_simple_into_variant {
+    ($type:path, $variant:ident, $into_fn_name:ident, $error:ident) => {
+        impl TryFrom<Value> for $type {
+            type Error = Error;
+            fn try_from(value: Value) -> Result<Self> {
+                match value {
+                    Value::$variant(x) => Ok(x),
+                    v => Err(Error::$error(v.into())),
+                }
+            }
+        }
+        impl Value {
+            pub fn $into_fn_name(self) -> Result<$type> {
+                self.try_into()
+            }
+        }
+    };
+}
+
+// Error handling utilities
+
 macro_rules! ensure {
     ($cond:expr, $e:expr) => {
         if !($cond) {

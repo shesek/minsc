@@ -330,6 +330,10 @@ impl From<Xpub> for Value {
 
 // Convert from Value to Bitcoin types
 
+impl_simple_into_variant!(ScriptBuf, Script, into_script, NotScript);
+impl_simple_into_variant!(Network, Network, into_network, NotNetwork);
+impl_simple_into_variant!(DescriptorSecretKey, SecKey, into_seckey, NotSecKey);
+
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {

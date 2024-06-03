@@ -115,31 +115,11 @@ impl From<&str> for Value {
 
 // From Value to the underlying enum inner type
 // Simple extraction of the enum variant, with no specialized type coercion logic
-macro_rules! impl_simple_into_variant {
-    ($type:path, $variant:ident, $into_fn_name:ident, $error:ident) => {
-        impl TryFrom<Value> for $type {
-            type Error = Error;
-            fn try_from(value: Value) -> Result<Self> {
-                match value {
-                    Value::$variant(x) => Ok(x),
-                    v => Err(Error::$error(v.into())),
-                }
-            }
-        }
-        impl Value {
-            pub fn $into_fn_name(self) -> Result<$type> {
-                self.try_into()
-            }
-        }
-    };
-}
 impl_simple_into_variant!(bool, Bool, into_bool, NotBool);
 impl_simple_into_variant!(Number, Number, into_number, NotNumber);
 impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
-impl_simple_into_variant!(ScriptBuf, Script, into_script, NotScript);
-impl_simple_into_variant!(Network, Network, into_network, NotNetwork);
 
 // From Value to f64 primitive, with auto-coercion for integers
 impl TryFrom<Value> for f64 {
