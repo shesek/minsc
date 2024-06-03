@@ -249,12 +249,6 @@ impl Value {
     pub fn into_policy(self) -> Result<Policy> {
         self.try_into()
     }
-    pub fn into_desc(self) -> Result<Descriptor> {
-        self.try_into()
-    }
-    pub fn into_miniscript<Ctx: ScriptContext>(self) -> Result<Miniscript<Ctx>> {
-        self.try_into()
-    }
 
     pub fn is_policy_coercible(&self) -> bool {
         matches!(self, Value::Policy(_) | Value::PubKey(_))

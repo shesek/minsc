@@ -12,7 +12,9 @@ use bitcoin::{
     absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
     Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
-use miniscript::descriptor::{self, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey};
+use miniscript::descriptor::{
+    self, Descriptor, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey,
+};
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
 use crate::runtime::scope::{Mutable, ScopeRef};
@@ -278,28 +280,18 @@ impl Value {
             // Raw scripts are returned as-is
             Value::Script(script) => script,
             // Descriptors (or values coercible into them) are converted into their scriptPubKey
-            Value::Descriptor(_) | Value::PubKey(_) => self.into_desc()?.to_script_pubkey()?,
+            Value::Descriptor(descriptor) => descriptor.to_script_pubkey()?,
+            Value::PubKey(_) => Descriptor::try_from(self)?.to_script_pubkey()?,
             // TapInfo returns the output V1 witness program of the output key
             Value::TapInfo(tapinfo) => ScriptBuf::new_witness_program(&WitnessProgram::new(
                 WitnessVersion::V1,
                 &tapinfo.output_key().serialize(),
             )?),
             // Addresses can be provided as an Address or String
-            Value::Address(_) | Value::String(_) => self.into_address()?.script_pubkey(),
+            Value::Address(address) => address.script_pubkey(),
+            Value::String(_) => Address::try_from(self)?.script_pubkey(),
             other => bail!(Error::NoSpkRepr(other.into())),
         })
-    }
-    pub fn into_key(self) -> Result<DescriptorPublicKey> {
-        self.try_into()
-    }
-    pub fn into_address(self) -> Result<Address> {
-        self.try_into()
-    }
-    pub fn into_tapinfo(self) -> Result<TaprootSpendInfo> {
-        self.try_into()
-    }
-    pub fn into_tx(self) -> Result<Transaction> {
-        self.try_into()
     }
     pub fn is_script(&self) -> bool {
         matches!(self, Value::Script(_))
@@ -365,7 +357,7 @@ impl TryFrom<Value> for TaprootSpendInfo {
         Ok(match value {
             Value::TapInfo(tapinfo) => tapinfo,
             Value::Descriptor(desc) => match desc.at_derivation_index(0)? {
-                miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
+                Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
                 _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc).into())),
             },
             v => bail!(Error::NotTapInfoLike(v.into())),
