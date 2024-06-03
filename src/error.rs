@@ -71,6 +71,9 @@ pub enum RuntimeError {
     #[error("Expected a network type, not {0:?}")]
     NotNetwork(Box<Value>),
 
+    #[error("Expected a secret key, not {0:?}")]
+    NotSecKey(Box<Value>),
+
     #[error("Cannot be converted to Bytes: {0:?}")]
     NotBytesLike(Box<Value>),
 
