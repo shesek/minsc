@@ -26,6 +26,7 @@ match {
   r"\d{4}-\d{1,2}-\d{1,2}T(\d{1,2}:\d{1,2}(:\d{1,2})?Z?)?" => DATETIME,
   r"[123][0-9a-zA-Z]{25,34}|((bc|tb|bcrt)1[0-9a-z]{38,60}|(BC|TB|BCRT)1[0-9A-Z]{38,60})" => ADDRESS,
   r"(\[[a-fA-F0-9]{8}(/\d+['h]?)*\])?[xt]pub[0-9a-zA-Z]{100,120}" => XPUB,
+  r"(\[[a-fA-F0-9]{8}(/\d+['h]?)*\])?[xt]prv[0-9a-zA-Z]{100,120}" => XPRV,
   r"\[[a-fA-F0-9]{8}(/\d+['h]?)*\]([a-fA-F0-9]{64}|[a-fA-F0-9]{66})" => SINGLE_PK_ORIG, // single pubkey with BIP32 origin
   _,
 }
@@ -86,6 +87,7 @@ SExpr = {
   BtcAmount,
   Address,
   PubKey,
+  SecKey,
   ScriptFrag,
   ScriptMarkCtx,
 
@@ -170,6 +172,9 @@ ArrayAccess = { ArrayAccess_, ArrayAccessFixFloat };
 // An xpub or standalone public key (33 bytes or 32 for x-only, uncompressed is unsupported)
 PubKey: Expr = PubKey_ =>? Ok(Expr::PubKey(<>.parse().map_err(ParseError::from)?));
 PubKey_ = { XPUB, SINGLE_PK_ORIG };
+
+// An xprv. Standalone private keys are currently unsupported.
+SecKey: Expr = XPRV =>? Ok(Expr::SecKey(<>.parse().map_err(ParseError::from)?));
 
 Bytes: Expr = {
   BYTES =>? Ok(Expr::bytes_from_hex(&<>[2..])?),

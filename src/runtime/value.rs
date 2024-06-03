@@ -2,11 +2,13 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
+use miniscript::{bitcoin, descriptor};
+
 use bitcoin::{
     hashes, hashes::Hash, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, ScriptBuf,
     Transaction,
 };
-use miniscript::{bitcoin, DescriptorPublicKey};
+use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
 use crate::parser::Expr;
 use crate::util::{fmt_quoted_str, PrettyDisplay};
@@ -31,6 +33,7 @@ pub enum Value {
     Transaction(Transaction),
     Network(Network),
     PubKey(DescriptorPublicKey),
+    SecKey(DescriptorSecretKey),
     Policy(Policy),
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
@@ -93,6 +96,7 @@ impl_from_variant!(Symbol, Value);
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
+impl_from_variant!(DescriptorSecretKey, Value, SecKey);
 impl_from_variant!(ScriptBuf, Value, Script);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Network, Value);
@@ -303,6 +307,7 @@ impl Value {
     pub fn type_of(&self) -> &'static str {
         match self {
             Value::PubKey(_) => "pubkey",
+            Value::SecKey(_) => "seckey",
             Value::Bool(_) => "bool",
             Value::Bytes(_) => "bytes",
             Value::String(_) => "string",
@@ -396,6 +401,7 @@ impl fmt::Display for Value {
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
+            Value::SecKey(x) => write!(f, "{}", x),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
