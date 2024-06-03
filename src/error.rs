@@ -80,7 +80,7 @@ pub enum RuntimeError {
     #[error("Expected TapInfo or tr() Descriptor, not {0:?}")]
     NotTapInfoLike(Box<Value>),
 
-    #[error("Expected a policy or pubkey, not {0:?}")]
+    #[error("Expected a Policy (or a coercible PubKey/SecKey), not {0:?}")]
     NotPolicyLike(Box<Value>),
 
     #[error("Expected a descriptor or pubkey, not {0:?}")]
@@ -233,6 +233,9 @@ pub enum RuntimeError {
 
     #[error("Descriptor conversion error: {0}")]
     DescriptorConversion(#[from] descriptor::ConversionError),
+
+    #[error("Descriptor key parse error: {0}")]
+    DescriptorKeyParseError(#[from] descriptor::DescriptorKeyParseError),
 
     #[error("Miniscript error: {0}")]
     MiniscriptError(#[from] miniscript::Error),

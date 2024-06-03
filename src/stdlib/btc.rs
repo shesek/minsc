@@ -219,9 +219,8 @@ pub mod fns {
         })
     }
 
-    /// Cast 32/33 long Bytes into a Single DescriptorPubKey
-    /// PubKeys are returned as-is
-    /// pubkey(Bytes|PubKey) -> PubKey
+    /// Cast SecKey/Bytes into a PubKey
+    /// pubkey(SecKey|Bytes|PubKey) -> PubKey
     pub fn pubkey(args: Array, _: &ScopeRef) -> Result<Value> {
         let pubkey: DescriptorPublicKey = args.arg_into()?;
         Ok(pubkey.into())
@@ -335,7 +334,8 @@ impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
-            Value::PubKey(x) => Ok(x),
+            Value::PubKey(pubkey) => Ok(pubkey),
+            Value::SecKey(seckey) => Ok(seckey.to_public(&EC)?),
             // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
             Value::Bytes(bytes) => {
                 let key = match bytes.len() {
