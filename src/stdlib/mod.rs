@@ -107,7 +107,7 @@ pub mod fns {
         let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
 
         let mut accumlator = init_val;
-        for element in array.into_iter() {
+        for element in array {
             accumlator = callback.call(vec![accumlator, element], scope)?;
         }
         Ok(accumlator)
@@ -120,7 +120,7 @@ pub mod fns {
         let (array, init_val, callback): (Array, Value, Function) = args.args_into()?;
 
         let mut accumlator = init_val;
-        for element in array.into_iter() {
+        for element in array {
             let callback_ret = callback.call(vec![accumlator, element], scope)?;
             let (found, new_val): (bool, _) = callback_ret.try_into()?;
             accumlator = new_val;

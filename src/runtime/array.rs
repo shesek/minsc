@@ -29,13 +29,6 @@ impl Array {
         self.0
     }
 
-    pub fn into_iter(self) -> ValueItertor<vec::IntoIter<Value>> {
-        ValueItertor {
-            inner: self.0.into_iter(),
-            count: 0,
-        }
-    }
-
     pub fn check_len(self, expected_len: usize) -> Result<Self> {
         ensure!(
             self.len() == expected_len,
@@ -110,6 +103,17 @@ impl<I: Iterator<Item = Value>> Iterator for ValueItertor<I> {
         let item = self.inner.next()?;
         self.count += 1; // for Error::NthContext
         Some(item)
+    }
+}
+
+impl IntoIterator for Array {
+    type Item = Value;
+    type IntoIter = ValueItertor<vec::IntoIter<Value>>;
+    fn into_iter(self) -> Self::IntoIter {
+        ValueItertor {
+            inner: self.0.into_iter(),
+            count: 0,
+        }
     }
 }
 
