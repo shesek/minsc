@@ -27,9 +27,9 @@
 use std::collections::HashSet;
 use std::convert::TryInto;
 
-use crate::runtime::{Error, FromValue, Result, Value};
+use crate::runtime::{Array, Error, FromValue, Result, Value};
 
-impl Value {
+impl Array {
     /// Transform a tagged Value::Array into a Vec of tag names and their values
     pub fn into_tags(self) -> Result<Vec<(String, Value)>> {
         // handled via the TryFrom<Value> implementations for Vec<T> and (A, B) in runtime.rs
@@ -66,12 +66,10 @@ impl Value {
     /// Considered to be a tagged list if self is an array, self.0 is a 2-tuple array, and self.0.0 is a string.
     /// This could have false positives depending on the alternative non-tagged structure in use.
     pub fn is_tagged_array(&self) -> bool {
-        if let Value::Array(array) = self {
-            if let Some(Value::Array(inner_array)) = array.get(0) {
-                if inner_array.len() == 2 {
-                    if let Some(Value::String(_tag)) = inner_array.get(0) {
-                        return true;
-                    }
+        if let Some(Value::Array(inner_array)) = self.get(0) {
+            if inner_array.len() == 2 {
+                if let Some(Value::String(_tag)) = inner_array.get(0) {
+                    return true;
                 }
             }
         }
@@ -79,9 +77,11 @@ impl Value {
     }
 
     pub fn is_tagged_or_empty(&self) -> bool {
-        self.is_empty_array() || self.is_tagged_array()
+        self.is_empty() || self.is_tagged_array()
     }
+}
 
+impl Value {
     /// Parse values that can be either a tuple of (A,B) or a tagged list with `a_tag` and `b_tag`
     /// For example, tuple_or_tags::<Txid,u32>("txid", "vout") to accept either [$txid,$vout] tuples or tagged ["txid":$txid,"vout":$vout]
     pub fn tagged_or_tuple<A: FromValue, B: FromValue>(
@@ -95,6 +95,38 @@ impl Value {
         } else {
             self.into_tuple()
         }
+    }
+
+    pub fn is_tagged_array(&self) -> bool {
+        match self {
+            Value::Array(array) => array.is_tagged_array(),
+            _ => false,
+        }
+    }
+
+    pub fn is_tagged_or_empty(&self) -> bool {
+        match self {
+            Value::Array(array) => array.is_tagged_or_empty(),
+            _ => false,
+        }
+    }
+
+    pub fn into_tags(self) -> Result<Vec<(String, Value)>> {
+        self.into_array()?.into_tags()
+    }
+
+    pub fn for_each_tag<F>(self, f: F) -> Result<()>
+    where
+        F: FnMut(&str, Value) -> Result<()>,
+    {
+        self.into_array()?.for_each_tag(f)
+    }
+
+    pub fn for_each_unique_tag<F>(self, f: F) -> Result<()>
+    where
+        F: FnMut(&str, Value) -> Result<()>,
+    {
+        self.into_array()?.for_each_unique_tag(f)
     }
 }
 
