@@ -358,12 +358,12 @@ impl Evaluate for Expr {
         })
     }
 }
-trait ResultExt<T> {
+trait RuntimeResultExt<T> {
     fn ctx(self, context_str: &'static str) -> Result<T>;
 }
-impl<T> ResultExt<T> for Result<T> {
+impl<T> RuntimeResultExt<T> for Result<T> {
     fn ctx(self, context_str: &'static str) -> Result<T> {
-        self.map_err(|e| Error::ContextStr(context_str, e.into()))
+        self.map_err(|e| Error::ContextStr(context_str, Box::new(e)))
     }
 }
 

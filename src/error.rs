@@ -1,3 +1,5 @@
+use std::result::Result as StdResult;
+
 use miniscript::bitcoin::{
     self, amount, bip32, hashes, hex, key, network, script, taproot, witness_program,
 };
@@ -16,7 +18,7 @@ pub enum Error {
     Runtime(RuntimeError),
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = StdResult<T, Error>;
 
 impl<T: Into<RuntimeError>> From<T> for Error {
     fn from(err: T) -> Error {
@@ -356,5 +358,17 @@ pub type LalrParseError<'a> =
 impl<'a> From<LalrParseError<'a>> for ParseError {
     fn from(e: LalrParseError<'a>) -> Self {
         ParseError::LalrError(e.to_string())
+    }
+}
+
+pub trait ResultExt<T, E> {
+    /// Like map_err(), but boxes the error. Can be used directly with the boxed enum variant,
+    /// for example `result.box_ctx(Error::Foo)` with `enum Error { Foo(Box<Error>) }`
+    fn box_err<O>(self, op: impl FnOnce(Box<E>) -> O) -> StdResult<T, O>;
+}
+
+impl<T, E> ResultExt<T, E> for StdResult<T, E> {
+    fn box_err<O>(self, op: impl FnOnce(Box<E>) -> O) -> StdResult<T, O> {
+        self.map_err(|e| op(Box::new(e)))
     }
 }
