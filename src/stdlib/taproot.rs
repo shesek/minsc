@@ -143,9 +143,23 @@ pub mod fns {
     }
 }
 
+impl TryFrom<Value> for TaprootSpendInfo {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
+            Value::TapInfo(tapinfo) => tapinfo,
+            Value::Descriptor(desc) => match desc.at_derivation_index(0)? {
+                miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
+                _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc).into())),
+            },
+            v => bail!(Error::NotTapInfoLike(v.into())),
+        })
+    }
+}
+
 pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
     let a = match a {
-        // Convert internal keys provided as Bytes into PubKeys, for compatibility with the Miniscirpt Policy tr() syntax
+        // Convert internal keys provided as Bytes into PubKeys, for compatibility with the Miniscript Policy tr() syntax
         Value::Bytes(_) => Value::PubKey(a.try_into()?),
         // Accept SecKeys, converted into a PubKey
         Value::SecKey(_) => Value::PubKey(a.try_into()?),

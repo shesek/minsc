@@ -8,8 +8,8 @@ use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Scrip
 use bitcoin::secp256k1::rand::{thread_rng, Rng};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
-    absolute::LockTime, address, hex::DisplayHex, secp256k1, taproot::TaprootSpendInfo, Address,
-    Amount, Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
+    absolute::LockTime, address, hex::DisplayHex, secp256k1, Address, Amount, Network, Opcode,
+    Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
 use miniscript::descriptor::{
     self, Descriptor, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv,
@@ -500,20 +500,6 @@ impl TryFrom<Value> for DescriptorSecretKey {
             }),
             v => Err(Error::NotSecKey(v.into())),
         }
-    }
-}
-
-impl TryFrom<Value> for TaprootSpendInfo {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(match value {
-            Value::TapInfo(tapinfo) => tapinfo,
-            Value::Descriptor(desc) => match desc.at_derivation_index(0)? {
-                Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
-                _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc).into())),
-            },
-            v => bail!(Error::NotTapInfoLike(v.into())),
-        })
     }
 }
 
