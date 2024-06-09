@@ -1,7 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
+use bitcoin::bip32::{self, ChildNumber, DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{sha256, sha256d, Hash};
 use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
@@ -423,10 +423,7 @@ impl TryFrom<Value> for secp256k1::SecretKey {
 impl TryFrom<Value> for secp256k1::PublicKey {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        Ok(DescriptorPublicKey::try_from(val)?
-            .at_derivation_index(0)?
-            .derive_public_key(&EC)?
-            .inner)
+        Ok(bitcoin::PublicKey::try_from(val)?.inner)
     }
 }
 impl TryFrom<Value> for secp256k1::Keypair {
@@ -500,6 +497,15 @@ impl TryFrom<Value> for DescriptorSecretKey {
             }),
             v => Err(Error::NotSecKey(v.into())),
         }
+    }
+}
+
+impl TryFrom<Value> for bitcoin::PublicKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(DescriptorPublicKey::try_from(val)?
+            .at_derivation_index(0)?
+            .derive_public_key(&EC)?)
     }
 }
 
@@ -653,6 +659,46 @@ impl TryFrom<Value> for bitcoin::ecdsa::Signature {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(Self::from_slice(&val.into_bytes()?)?)
+    }
+}
+impl TryFrom<Value> for Xpub {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(match val.try_into()? {
+            DescriptorPublicKey::XPub(dxpub) => {
+                dxpub.xkey.derive_pub(&EC, &dxpub.derivation_path)?
+            }
+            other => bail!(Error::NotSingleXpub(other.into())),
+        })
+    }
+}
+impl TryFrom<Value> for Xpriv {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(match val.try_into()? {
+            DescriptorSecretKey::XPrv(dxprv) => {
+                dxprv.xkey.derive_priv(&EC, &dxprv.derivation_path)?
+            }
+            other => bail!(Error::NotSingleXpriv(other.into())),
+        })
+    }
+}
+impl TryFrom<Value> for bip32::Fingerprint {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(val.into_bytes()?.as_slice().try_into()?)
+    }
+}
+impl TryFrom<Value> for DerivationPath {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(val.into_vec_of::<ChildNumber>()?.into())
+    }
+}
+impl TryFrom<Value> for ChildNumber {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(val.into_u32()?.into())
     }
 }
 

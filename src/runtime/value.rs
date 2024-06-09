@@ -236,6 +236,8 @@ impl_hash_conv!(hashes::sha256::Hash);
 impl_hash_conv!(hashes::sha256d::Hash);
 impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
+impl_hash_conv!(bitcoin::TapNodeHash);
+impl_hash_conv!(bitcoin::TapLeafHash);
 impl_hash_conv!(miniscript::hash256::Hash);
 
 /// Generic conversion from a Value/Option<Value> into T/Option<T> of any TryFrom<Value> type.
@@ -357,6 +359,11 @@ impl Value {
     }
     pub fn is_empty_array(&self) -> bool {
         matches!(self, Value::Array(arr) if arr.is_empty())
+    }
+
+    pub fn into_u8(self) -> Result<u8> {
+        // Cannot be implemented as TryFrom because the Vec<u8> and Vec<T> conversions would conflict
+        Ok(self.into_u32()?.try_into()?)
     }
 
     pub fn into_f64(self) -> Result<f64> {

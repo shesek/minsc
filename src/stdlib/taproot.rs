@@ -411,6 +411,24 @@ impl TryFrom<Value> for bitcoin::secp256k1::schnorr::Signature {
         Ok(Self::from_slice(&val.into_bytes()?)?)
     }
 }
+impl TryFrom<Value> for bitcoin::taproot::Signature {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_slice(&val.into_bytes()?)?)
+    }
+}
+impl TryFrom<Value> for bitcoin::taproot::LeafVersion {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_consensus(val.into_u8()?)?)
+    }
+}
+impl TryFrom<Value> for bitcoin::taproot::ControlBlock {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::decode(&val.into_bytes()?)?)
+    }
+}
 
 impl PrettyDisplay for TaprootSpendInfo {
     const AUTOFMT_ENABLED: bool = true;

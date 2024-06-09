@@ -9,6 +9,7 @@ use crate::{time, Library};
 pub mod btc;
 pub mod ctv;
 pub mod miniscript;
+pub mod psbt;
 pub mod script_marker;
 pub mod tagged;
 pub mod taproot;
@@ -57,16 +58,10 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set("MIN_NUMBER", i64::MIN).unwrap();
     }
 
-    // Bitcoin related functions
     self::btc::attach_stdlib(scope);
-
-    // Miniscript related functions
     self::miniscript::attach_stdlib(scope);
-
-    // Taproot related functions
     self::taproot::attach_stdlib(scope);
-
-    // CTV
+    self::psbt::attach_stdlib(scope);
     self::ctv::attach_stdlib(scope);
 
     // Standard library implemented in Minsc

@@ -8,6 +8,7 @@ use miniscript::{descriptor, TranslateErr};
 
 use crate::parser::ast::{Ident, InfixOp};
 use crate::runtime::Value;
+use crate::stdlib;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -81,6 +82,12 @@ pub enum RuntimeError {
 
     #[error("Expected a string, not {0:?}")]
     NotString(Box<Value>),
+
+    #[error("Expected a single Xpub, not {0}")]
+    NotSingleXpub(Box<miniscript::descriptor::DescriptorPublicKey>),
+
+    #[error("Expected a single Xpriv, not {0}")]
+    NotSingleXpriv(Box<miniscript::descriptor::DescriptorSecretKey>),
 
     #[error("Expected TapInfo or tr() Descriptor, not {0:?}")]
     NotTapInfoLike(Box<Value>),
@@ -199,7 +206,9 @@ pub enum RuntimeError {
     #[error("Invalid merkle root hash: {0}")]
     InvalidMerkleRoot(#[source] hashes::FromSliceError),
 
-    #[error("Invalid public key length {0} (expected 33 for single key, 32 for x-only or 78 for xpub")]
+    #[error(
+        "Invalid public key length {0} (expected 33 for single key, 32 for x-only or 78 for xpub"
+    )]
     InvalidPubKeyLen(usize),
 
     #[error("Invalid secret key length {0} (expected 32 for single key or 78 for xpub)")]
@@ -235,6 +244,25 @@ pub enum RuntimeError {
     #[error("Unknown tag")]
     TagUnknown,
 
+    // PSBT
+    #[error("Cannot construct PSBT from {0:?}")]
+    NotPsbtLike(Box<Value>),
+
+    #[error("Expected PSBT sighash as number/string, not {0:?}")]
+    PsbtInvalidSighashType(Box<Value>),
+
+    #[error("PSBT tagged array construction must begin with the \"tx\"/\"unsigned_tx\" field")]
+    PsbtFirstTagNotTx,
+
+    #[error("Invalid PSBT source tx: {0}")]
+    PsbtInvalidTx(#[source] Box<RuntimeError>),
+
+    #[error("PSBT input #{0} does not exists")]
+    PsbtInputNotFound(usize),
+
+    #[error("PSBT output #{0} does not exists")]
+    PsbtOutputNotFound(usize),
+
     // Generic error raised from user-land Minsc code
     #[error("Exception: {0}")]
     ScriptException(String),
@@ -243,7 +271,7 @@ pub enum RuntimeError {
     // Wrapped errors
     //
     #[error(transparent)]
-    ScriptMarker(#[from] crate::stdlib::script_marker::MarkerError),
+    ScriptMarker(#[from] stdlib::script_marker::MarkerError),
 
     #[error("Descriptor conversion error: {0}")]
     DescriptorConversion(#[from] descriptor::ConversionError),
@@ -323,6 +351,12 @@ pub enum RuntimeError {
 
     #[error("Failed extracting PSBT tx: {0}")]
     PsbtExtractTx(#[from] bitcoin::psbt::ExtractTxError),
+
+    #[error("Invalid sighash: {0}")]
+    SighashTypeParse(#[from] bitcoin::sighash::SighashTypeParseError),
+
+    #[error("Failed parsing taproot signature: {0}")]
+    SigFromSlice(#[from] bitcoin::taproot::SigFromSliceError),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {

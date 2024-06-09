@@ -1,0 +1,249 @@
+use std::convert::{TryFrom, TryInto};
+
+use bitcoin::psbt::{self, Psbt};
+use bitcoin::{bip32::Xpriv, PrivateKey, PublicKey, TxIn, TxOut};
+use miniscript::bitcoin;
+
+use crate::error::ResultExt;
+use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
+use crate::util::EC;
+
+pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
+    let mut scope = scope.borrow_mut();
+    scope.set_fn("psbt", fns::psbt).unwrap();
+    scope.set_fn("psbt::create", fns::psbt).unwrap();
+    scope.set_fn("psbt::update", fns::update).unwrap();
+    scope.set_fn("psbt::combine", fns::combine).unwrap();
+}
+
+impl TryFrom<Value> for Psbt {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
+            Value::Psbt(psbt) => psbt,
+            Value::Bytes(bytes) => Psbt::deserialize(&bytes)?,
+            Value::Transaction(tx) => Psbt::from_unsigned_tx(tx)?,
+            Value::Array(array) => psbt_from_tags(array)?,
+            other => bail!(Error::NotPsbtLike(other.into())),
+        })
+    }
+}
+
+#[allow(non_snake_case)]
+pub mod fns {
+    use std::collections::BTreeMap;
+
+    use super::*;
+
+    // psbt(Transaction|Bytes|Array<Tagged>) -> Psbt
+    pub fn psbt(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::Psbt(args.arg_into()?))
+    }
+
+    // psbt::update(Psbt, Array<Tagged>) -> Psbt
+    pub fn update(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (mut psbt, tags) = args.args_into()?;
+        update_psbt(&mut psbt, tags)?;
+        Ok(Value::Psbt(psbt))
+    }
+
+    // psbt::combine(Array<Psbt>) -> Psbt
+    pub fn combine(args: Array, _: &ScopeRef) -> Result<Value> {
+        let mut psbts: Vec<Psbt> = args.arg_into()?;
+        ensure!(!psbts.is_empty(), Error::InvalidArguments);
+        let mut psbt = psbts.swap_remove(0); // OK to swap because combine is commutative
+        for other_psbt in psbts {
+            psbt.combine(other_psbt)?;
+        }
+        Ok(Value::Psbt(psbt))
+    }
+}
+
+fn psbt_from_tags(tags: Array) -> Result<Psbt> {
+    let mut tags = tags.check_varlen(1, usize::MAX)?;
+
+    // The first tag must be te tx to initialize the PSBT with
+    let (first_tag, tx_val): (String, Value) = tags.0.remove(0).try_into()?; // safe to remove() because the length was checked
+    ensure!(
+        first_tag == "tx" || first_tag == "unsigned_tx",
+        Error::PsbtFirstTagNotTx
+    );
+
+    let unsigned_tx = tx_val.try_into().box_err(Error::PsbtInvalidTx)?;
+    let mut psbt = Psbt::from_unsigned_tx(unsigned_tx)?;
+
+    // The rest are tagged instructions for update_psbt()
+    update_psbt(&mut psbt, tags)?;
+
+    Ok(psbt)
+}
+
+fn mut_input(psbt: &mut Psbt, vin: usize) -> Result<&mut psbt::Input> {
+    psbt.inputs
+        .get_mut(vin)
+        .ok_or(Error::PsbtInputNotFound(vin))
+}
+fn mut_output(psbt: &mut Psbt, vout: usize) -> Result<&mut psbt::Output> {
+    psbt.outputs
+        .get_mut(vout)
+        .ok_or(Error::PsbtOutputNotFound(vout))
+}
+
+fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
+    tags.for_each_tag(|tag, val| {
+        match tag {
+            "version" => psbt.version = val.try_into()?,
+            "xpub" => psbt.xpub = val.try_into()?,
+            "proprietary" => psbt.proprietary = val.try_into()?,
+            "unknown" => psbt.unknown = val.try_into()?,
+            "inputs" => {
+                for (vin, in_tags) in mapped_or_all(val, psbt.inputs.len())? {
+                    update_input(mut_input(psbt, vin)?, in_tags)?;
+                }
+            }
+            "outputs" => {
+                for (vout, out_tags) in mapped_or_all(val, psbt.outputs.len())? {
+                    update_output(mut_output(psbt, vout)?, out_tags)?;
+                }
+            }
+            "combine" => psbt.combine(val.try_into()?)?,
+
+            // Shortcut for setting just the `witness_utxo` of multiple inputs
+            // (non-segwit inputs may be set manually through `inputs`)
+            "utxos" | "witness_utxos" => {
+                for (vin, spent_utxo) in mapped_or_all(val, psbt.inputs.len())? {
+                    mut_input(psbt, vin)?.witness_utxo = Some(spent_utxo);
+                }
+            }
+
+            // Shortcut for adding a Coin as a Transaction input and as a Psbt Input with the `witness_utxo` field.
+            // (non-segwit inputs may be set manually through `inputs`)
+            //
+            // Coin consists of a tx input (or just its outpoint) alongside the spent txout.
+            // All of the following are valid Coin definitions:
+            // [ "input": [ "prevout": $txid:0, "sequence": 0, ... ], "utxo": [ "scriptPubKey": wpkh($alice), "amount": 0.01 BTC ] ]
+            // [ "input": $txid:0, "utxo": wpkh($alice):1000000 ]
+            // [ $txid:0, wpkh($alice):0.1 BTC]
+            // ($txid:0):(wpkh($alice):0.1 BTC)
+            // $outpoint:$utxo
+            "coins" => {
+                for PsbtCoin(input, spent_utxo) in val.into_vec_of()? {
+                    psbt.unsigned_tx.input.push(input);
+                    let mut psbt_input = psbt::Input::default();
+                    psbt_input.witness_utxo = Some(spent_utxo);
+                    psbt.inputs.push(psbt_input);
+                }
+            }
+
+            _ => bail!(Error::TagUnknown),
+        }
+        Ok(())
+    })
+}
+
+fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
+    tags.for_each_tag(|tag, val| {
+        match tag {
+            "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
+            "witness_utxo" | "utxo" => psbt_input.witness_utxo = Some(val.try_into()?),
+            "partial_sigs" => psbt_input.partial_sigs = val.try_into()?,
+            "sighash_type" => psbt_input.sighash_type = Some(val.try_into()?),
+            "redeem_script" => psbt_input.redeem_script = Some(val.try_into()?),
+            "witness_script" => psbt_input.witness_script = Some(val.try_into()?),
+            "bip32_derivation" => psbt_input.bip32_derivation = val.try_into()?,
+            "final_script_sig" => psbt_input.final_script_sig = Some(val.try_into()?),
+            "final_script_witness" => psbt_input.final_script_witness = Some(val.try_into()?),
+            "ripemd160_preimages" => psbt_input.ripemd160_preimages = val.try_into()?,
+            "sha256_preimages" => psbt_input.sha256_preimages = val.try_into()?,
+            "hash160_preimages" => psbt_input.hash160_preimages = val.try_into()?,
+            "hash256_preimages" => psbt_input.hash256_preimages = val.try_into()?,
+            "tap_key_sig" => psbt_input.tap_key_sig = Some(val.try_into()?),
+            "tap_script_sigs" => psbt_input.tap_script_sigs = val.try_into()?,
+            "tap_scripts" => psbt_input.tap_scripts = val.try_into()?,
+            "tap_key_origins" => psbt_input.tap_key_origins = val.try_into()?,
+            "tap_internal_key" => psbt_input.tap_internal_key = Some(val.try_into()?),
+            "tap_merkle_root" => psbt_input.tap_merkle_root = Some(val.try_into()?),
+            "proprietary" => psbt_input.proprietary = val.try_into()?,
+            "unknown" => psbt_input.unknown = val.try_into()?,
+            _ => bail!(Error::TagUnknown),
+        }
+        Ok(())
+    })
+}
+
+fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
+    tags.for_each_tag(|tag, val| {
+        match tag {
+            "redeem_script" => psbt_output.redeem_script = Some(val.try_into()?),
+            "witness_script" => psbt_output.witness_script = Some(val.try_into()?),
+            "bip32_derivation" => psbt_output.bip32_derivation = val.try_into()?,
+            "tap_internal_key" => psbt_output.tap_internal_key = Some(val.try_into()?),
+            // TOOD "tap_tree" => psbt_output.tap_internal_key = Some(val.try_into()?),
+            "tap_key_origins" => psbt_output.tap_key_origins = val.try_into()?,
+            "proprietary" => psbt_output.proprietary = val.try_into()?,
+            "unknown" => psbt_output.unknown = val.try_into()?,
+            _ => bail!(Error::TagUnknown),
+        }
+        Ok(())
+    })
+}
+
+// Parse an Array that either contains a list of index:value tuples mapping from
+// element indexes to values, or a full list of all element values with no indexes.
+// Returned as a list of index:value tuples in both cases.
+fn mapped_or_all<T: FromValue>(arr: Value, expected_all_length: usize) -> Result<Vec<(usize, T)>> {
+    let arr = arr.into_array()?;
+    if let Some(Value::Array(first_el)) = arr.get(0) {
+        if let Some(Value::Number(_)) = first_el.get(0) {
+            // Provided as [ 0: $val0, 1: $val1, ... ]
+            return arr.try_into();
+        }
+    }
+    // Provided as [ $val0, $val1, ... ]
+    ensure!(
+        arr.len() == expected_all_length,
+        Error::InvalidLength(arr.len(), expected_all_length)
+    );
+    Ok(<Vec<T>>::try_from(arr)?.into_iter().enumerate().collect())
+}
+
+struct PsbtCoin(TxIn, TxOut);
+impl TryFrom<Value> for PsbtCoin {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        let (input, spent_utxo) = value.tagged_or_tuple("input", "utxo")?;
+        Ok(Self(input, spent_utxo))
+    }
+}
+
+impl TryFrom<Value> for psbt::PsbtSighashType {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(match val {
+            Value::Number(Int(num)) => Self::from_u32(num.try_into()?),
+            Value::String(str) => str.parse()?,
+            other => bail!(Error::PsbtInvalidSighashType(Box::new(other))),
+        })
+    }
+}
+impl TryFrom<Value> for psbt::raw::Key {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        let (type_value, key): (u32, Vec<u8>) = val.try_into()?;
+        Ok(Self {
+            type_value: type_value.try_into()?,
+            key,
+        })
+    }
+}
+impl TryFrom<Value> for psbt::raw::ProprietaryKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        let (prefix, subtype, key): (Vec<u8>, u32, Vec<u8>) = val.try_into()?;
+        Ok(Self {
+            prefix,
+            subtype: subtype.try_into()?,
+            key,
+        })
+    }
+}
