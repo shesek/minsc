@@ -194,7 +194,7 @@ pub enum RuntimeError {
     #[error("Invalid merkle root hash: {0}")]
     InvalidMerkleRoot(#[source] hashes::FromSliceError),
 
-    #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
+    #[error("Invalid public key length {0} (expected 33 for single key, 32 for x-only or 78 for xpub")]
     InvalidPubKeyLen(usize),
 
     #[error("Invalid secret key length {0} (expected 32 for single key or 78 for xpub)")]

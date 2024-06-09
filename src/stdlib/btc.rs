@@ -435,16 +435,20 @@ impl TryFrom<Value> for DescriptorPublicKey {
         match value {
             Value::PubKey(pubkey) => Ok(pubkey),
             Value::SecKey(seckey) => Ok(seckey.to_public(&EC)?),
-            // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
-            Value::Bytes(bytes) => {
-                let key = match bytes.len() {
-                    33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
-                    32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
-                    // uncompressed keys are currently unsupported
-                    len => bail!(Error::InvalidPubKeyLen(len)),
-                };
-                Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
-            }
+            // Bytes are coerced into a single PubKey if they are 33 or 32 bytes long,
+            // or to an Xpub if they're 78 bytes long
+            Value::Bytes(bytes) => Ok(match bytes.len() {
+                33 | 32 => DescriptorPublicKey::Single(SinglePub {
+                    origin: None,
+                    key: match bytes.len() {
+                        33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
+                        32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
+                        _ => unreachable!(),
+                    },
+                }),
+                78 => Value::from(Xpub::decode(&bytes)?).try_into()?,
+                len => bail!(Error::InvalidPubKeyLen(len)),
+            }),
             v => Err(Error::NotPubKey(v.into())),
         }
     }
