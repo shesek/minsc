@@ -317,6 +317,12 @@ pub enum RuntimeError {
 
     #[error("ECDSA error: {0}")]
     Ecdsa(#[from] bitcoin::ecdsa::Error),
+
+    #[error("PSBT error: {0}")]
+    Psbt(#[from] bitcoin::psbt::Error),
+
+    #[error("Failed extracting PSBT tx: {0}")]
+    PsbtExtractTx(#[from] bitcoin::psbt::ExtractTxError),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {

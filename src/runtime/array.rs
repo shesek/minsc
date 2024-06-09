@@ -192,8 +192,8 @@ fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
             // Otherwise, only if the LHS and RHS are of different types
             (
                 lhs @ (Bool(_) | Number(_) | Bytes(_) | Address(_) | PubKey(_) | SecKey(_)
-                | Policy(_) | Descriptor(_) | TapInfo(_) | WithProb(..) | Network(_)
-                | Symbol(_)),
+                | Policy(_) | Descriptor(_) | TapInfo(_) | Psbt(_) | WithProb(..)
+                | Network(_) | Symbol(_)),
                 rhs,
             ) => mem::discriminant(lhs) != mem::discriminant(rhs),
         }
@@ -208,7 +208,8 @@ fn colon_separator(elements: &Vec<Value>) -> &str {
     // Assumes `elements` was already checked to be a 2-tuple
     match (&elements[0], &elements[1]) {
         (
-            String(_) | PubKey(_) | SecKey(_) | Policy(_) | Script(_) | Descriptor(_) | TapInfo(_),
+            String(_) | PubKey(_) | SecKey(_) | Policy(_) | Script(_) | Descriptor(_) | TapInfo(_)
+            | Psbt(_),
             _,
         ) => ": ",
         (_, Array(_)) => ": ",

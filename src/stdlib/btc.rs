@@ -524,6 +524,7 @@ impl TryFrom<Value> for Transaction {
         Ok(match value {
             Value::Transaction(tx) => tx,
             Value::Bytes(bytes) => bitcoin::consensus::deserialize(&bytes)?,
+            Value::Psbt(psbt) => psbt.extract_tx()?,
 
             // From tagged [ "version": $version, "locktime": $locktime, "inputs": [ .. ], "outputs": [ .. ] ]
             Value::Array(_) => {

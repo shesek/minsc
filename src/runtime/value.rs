@@ -5,8 +5,8 @@ use std::str::FromStr;
 use miniscript::{bitcoin, descriptor};
 
 use bitcoin::{
-    hashes, hashes::Hash, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, ScriptBuf,
-    Transaction,
+    hashes, hashes::Hash, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, Psbt,
+    ScriptBuf, Transaction,
 };
 use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
@@ -37,6 +37,7 @@ pub enum Value {
     Policy(Policy),
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
+    Psbt(Psbt),
     WithProb(usize, Box<Value>), // Policy/Script with an associated execution probability (the `@` operator)
 
     // A unique Symbol
@@ -102,6 +103,8 @@ impl_from_variant!(Address, Value);
 impl_from_variant!(Network, Value);
 impl_from_variant!(Transaction, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
+impl_from_variant!(Psbt, Value);
+
 impl From<Vec<Value>> for Value {
     fn from(vec: Vec<Value>) -> Value {
         Value::Array(Array(vec))
@@ -202,6 +205,7 @@ impl TryFrom<Value> for Vec<u8> {
                 Dsk::Single(sk) => sk.key.to_bytes(),
                 Dsk::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
             },
+            Value::Psbt(psbt) => psbt.serialize(),
             v => bail!(Error::NotBytesLike(v.into())),
         })
     }
@@ -323,6 +327,7 @@ impl Value {
             Value::Function(_) => "function",
             Value::Network(_) => "network",
             Value::TapInfo(_) => "tapinfo",
+            Value::Psbt(_) => "psbt",
             Value::Array(_) => "array",
             Value::Symbol(_) => "symbol",
             Value::Number(Number::Int(_)) => "int",
@@ -399,10 +404,11 @@ impl fmt::Display for Value {
             Value::String(x) => fmt_quoted_str(f, x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Descriptor(x) => write!(f, "{:#}", x), // not round-trip-able for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
+            Value::Descriptor(x) => write!(f, "{:#}", x), // round-trip-able except for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
             Value::Address(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
+            Value::Psbt(x) => write!(f, "{:?}", x), // not round-trip-able
             Value::Symbol(x) => write!(f, "{}", x),
             Value::SecKey(x) => write!(f, "{}", x),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
@@ -433,6 +439,8 @@ impl PrettyDisplay for Value {
             Value::Script(x) => write!(f, "{}", x.pretty(indent)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
+            // support multi-line Psbt via its Debug impl (the actual `indent` setting is ignored)
+            Value::Psbt(x) if indent.is_some() => write!(f, "{:#?}", x),
             // Use Display for types that don't implement PrettyDisplay
             other => write!(f, "{}", other),
         }
