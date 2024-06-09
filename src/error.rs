@@ -71,6 +71,9 @@ pub enum RuntimeError {
     #[error("Expected a network type, not {0:?}")]
     NotNetwork(Box<Value>),
 
+    #[error("Expected a secret key, not {0:?}")]
+    NotSecKey(Box<Value>),
+
     #[error("Cannot be converted to Bytes: {0:?}")]
     NotBytesLike(Box<Value>),
 
@@ -80,7 +83,7 @@ pub enum RuntimeError {
     #[error("Expected TapInfo or tr() Descriptor, not {0:?}")]
     NotTapInfoLike(Box<Value>),
 
-    #[error("Expected a policy or pubkey, not {0:?}")]
+    #[error("Expected a Policy (or a coercible PubKey/SecKey), not {0:?}")]
     NotPolicyLike(Box<Value>),
 
     #[error("Expected a descriptor or pubkey, not {0:?}")]
@@ -151,6 +154,12 @@ pub enum RuntimeError {
     )]
     InvalidDerivationCode,
 
+    #[error("Unexpected multi-path Xpriv, only single-path Xprivs or single keys are accepted")]
+    InvalidMultiXprv,
+
+    #[error("Unexpected multi-path Xpub, only single-path Xpubs or single keys are accepted")]
+    InvalidMultiXpub,
+
     #[error("Policy probabilities are only supported for OR with 2 branches")]
     InvalidPolicyProb,
 
@@ -188,8 +197,11 @@ pub enum RuntimeError {
     #[error("Invalid merkle root hash: {0}")]
     InvalidMerkleRoot(#[source] hashes::FromSliceError),
 
-    #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
+    #[error("Invalid public key length {0} (expected 33 for single key, 32 for x-only or 78 for xpub")]
     InvalidPubKeyLen(usize),
+
+    #[error("Invalid secret key length {0} (expected 32 for single key or 78 for xpub)")]
+    InvalidSecKeyLen(usize),
 
     #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash)")]
     TaprootInvalidTrUse,
@@ -233,6 +245,9 @@ pub enum RuntimeError {
 
     #[error("Descriptor conversion error: {0}")]
     DescriptorConversion(#[from] descriptor::ConversionError),
+
+    #[error("Descriptor key parse error: {0}")]
+    DescriptorKeyParseError(#[from] descriptor::DescriptorKeyParseError),
 
     #[error("Miniscript error: {0}")]
     MiniscriptError(#[from] miniscript::Error),
@@ -297,6 +312,9 @@ pub enum RuntimeError {
 
     #[error("Invalid Script: {0}")]
     InvalidScript(#[from] bitcoin::script::Error),
+
+    #[error("ECDSA error: {0}")]
+    Ecdsa(#[from] bitcoin::ecdsa::Error),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {

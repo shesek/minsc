@@ -319,6 +319,10 @@
       "[native]"
     ],
     [
+      "genkey",
+      "[native]"
+    ],
+    [
       "hash160",
       "[native]"
     ],
@@ -503,6 +507,10 @@
       "[native]"
     ],
     [
+      "seckey",
+      "[native]"
+    ],
+    [
       "segwitv0",
       "[native]"
     ],
@@ -516,6 +524,14 @@
     ],
     [
       "sha256",
+      "[native]"
+    ],
+    [
+      "sign::ecdsa",
+      "[native]"
+    ],
+    [
+      "sign::schnorr",
       "[native]"
     ],
     [
@@ -621,6 +637,14 @@
     [
       "unrollLoop",
       "$max_iterations, $condition, $loop_body"
+    ],
+    [
+      "verify::ecdsa",
+      "[native]"
+    ],
+    [
+      "verify::schnorr",
+      "[native]"
     ],
     [
       "warn",

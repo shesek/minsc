@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::sync::Arc;
 
@@ -143,11 +143,14 @@ pub mod fns {
     }
 }
 
-pub fn tr(mut a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
-    // Convert internal keys provided as Bytes into PubKeys, for compatibility with the Miniscirpt Policy tr() syntax
-    if a.is_bytes() {
-        a = Value::PubKey(a.try_into()?);
-    }
+pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
+    let a = match a {
+        // Convert internal keys provided as Bytes into PubKeys, for compatibility with the Miniscirpt Policy tr() syntax
+        Value::Bytes(_) => Value::PubKey(a.try_into()?),
+        // Accept SecKeys, converted into a PubKey
+        Value::SecKey(_) => Value::PubKey(a.try_into()?),
+        other => other,
+    };
 
     Ok(match (a, b) {
         // tr(Policy) -> Descriptor
@@ -219,8 +222,8 @@ fn tr_from_array(
     fn peek_node_type(node: &Value) -> Result<NodeType> {
         Ok(match node {
             Value::Script(_) => NodeType::Script,
-            // PubKeys are coercible into Policy
-            Value::Policy(_) | Value::PubKey(_) => NodeType::Policy,
+            // PubKeys/SecKeys are coercible into Policy
+            _ if node.is_policy_coercible() => NodeType::Policy,
             Value::WithProb(_, inner) if inner.is_script() => NodeType::Script,
             Value::WithProb(_, inner) if inner.is_policy_coercible() => NodeType::Policy,
             Value::Array(array) if array.len() > 0 => peek_node_type(&array[0])?,
@@ -351,7 +354,7 @@ fn descriptor_from_array(
 fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descriptor> {
     fn process_node(node: Value) -> Result<TapTree<DescriptorPublicKey>> {
         Ok(match node {
-            Value::Policy(_) | Value::PubKey(_) => {
+            Value::Policy(_) | Value::PubKey(_) | Value::SecKey(_) => {
                 TapTree::Leaf(Arc::new(node.into_policy()?.compile()?))
             }
             Value::Array(mut nodes) if nodes.len() == 2 => {
@@ -381,6 +384,18 @@ fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
     Ok(XOnlyPublicKey::from(
         pk.at_derivation_index(0)?.derive_public_key(&EC)?.inner,
     ))
+}
+impl TryFrom<Value> for bitcoin::XOnlyPublicKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        definite_xonly(val.try_into()?)
+    }
+}
+impl TryFrom<Value> for bitcoin::secp256k1::schnorr::Signature {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_slice(&val.into_bytes()?)?)
+    }
 }
 
 impl PrettyDisplay for TaprootSpendInfo {

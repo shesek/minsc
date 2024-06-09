@@ -6,7 +6,7 @@ use miniscript::{bitcoin, AbsLockTime, ScriptContext};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, Result, Value};
-use crate::util::{DescriptorExt, MiniscriptExt};
+use crate::util::{DescriptorExt, MiniscriptExt, EC};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 pub use crate::runtime::AndOr;
@@ -220,8 +220,13 @@ impl TryFrom<Value> for Policy {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::Policy(policy) => Ok(policy),
-            // Pubkeys are coerced into a pk() policy
+            // PubKeys are coerced into a pk() policy
             Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
+            // SecKeys are coerced into a PubKey, then to a pk()
+            Value::SecKey(seckey) => {
+                let pubkey = seckey.to_public(&EC)?;
+                Ok(Policy::Key(pubkey))
+            }
             v => Err(Error::NotPolicyLike(v.into())),
         }
     }
@@ -251,6 +256,6 @@ impl Value {
     }
 
     pub fn is_policy_coercible(&self) -> bool {
-        matches!(self, Value::Policy(_) | Value::PubKey(_))
+        matches!(self, Value::Policy(_) | Value::PubKey(_) | Value::SecKey(_))
     }
 }

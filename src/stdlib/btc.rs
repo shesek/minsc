@@ -1,19 +1,19 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use miniscript::bitcoin;
-
-use bitcoin::bip32::{ChildNumber, DerivationPath, Xpub};
+use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{sha256, sha256d, Hash};
 use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
+use bitcoin::secp256k1::rand::{thread_rng, Rng};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
-    absolute::LockTime, address, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Amount,
-    Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
+    absolute::LockTime, address, hex::DisplayHex, secp256k1, taproot::TaprootSpendInfo, Address,
+    Amount, Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
 use miniscript::descriptor::{
-    self, Descriptor, DescriptorPublicKey, DescriptorXKey, SinglePub, SinglePubKey,
+    self, Descriptor, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv,
+    SinglePub, SinglePubKey,
 };
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
@@ -41,11 +41,20 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("transaction", fns::transaction).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("pubkey", fns::pubkey).unwrap();
+
+    scope.set_fn("seckey", fns::seckey).unwrap();
+    scope.set_fn("genkey", fns::genkey).unwrap();
+    scope.set_fn("sign::ecdsa", fns::signEcdsa).unwrap();
+    scope.set_fn("sign::schnorr", fns::signSchnorr).unwrap();
+    scope.set_fn("verify::ecdsa", fns::verifyEcdsa).unwrap();
+    scope.set_fn("verify::schnorr", fns::verifySchnorr).unwrap();
+
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("script::strip", fns::scriptStrip).unwrap();
     scope.set_fn("script::wiz", fns::scriptWiz).unwrap();
     scope.set_fn("script::bitide", fns::scriptBitIde).unwrap();
 
+    // Constants
     scope
         .set("SCRIPT_MARKER_MAGIC", SCRIPT_MARKER_MAGIC_BYTES.to_vec())
         .unwrap();
@@ -219,9 +228,8 @@ pub mod fns {
         })
     }
 
-    /// Cast 32/33 long Bytes into a Single DescriptorPubKey
-    /// PubKeys are returned as-is
-    /// pubkey(Bytes|PubKey) -> PubKey
+    /// Cast SecKey/Bytes into a PubKey
+    /// pubkey(SecKey|Bytes|PubKey) -> PubKey
     pub fn pubkey(args: Array, _: &ScopeRef) -> Result<Value> {
         let pubkey: DescriptorPublicKey = args.arg_into()?;
         Ok(pubkey.into())
@@ -231,6 +239,57 @@ pub mod fns {
     pub fn transaction(args: Array, _: &ScopeRef) -> Result<Value> {
         let tx: Transaction = args.arg_into()?;
         Ok(tx.into())
+    }
+
+    /// seckey(Bytes|SecKey) -> SecKey
+    pub fn seckey(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::SecKey(args.arg_into()?))
+    }
+
+    /// Generate a new random Xpriv
+    /// genkey(Network = Signet) -> SecKey
+    pub fn genkey(args: Array, _: &ScopeRef) -> Result<Value> {
+        let network = args
+            .arg_into::<Option<Network>>()?
+            .unwrap_or(Network::Signet);
+        let seed: [u8; 32] = thread_rng().gen();
+
+        Ok(Xpriv::new_master(network, &seed).unwrap().into())
+    }
+
+    /// Sign the given message (hash) using ECDSA
+    /// sign::ecdsa(SecKey, Bytes, Bool compact_sig=false)
+    pub fn signEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (seckey, msg, compact_sig): (_, _, Option<bool>) = args.args_into()?;
+        let sig = EC.sign_ecdsa(&msg, &seckey);
+
+        Ok(if compact_sig.unwrap_or(false) {
+            sig.serialize_compact().to_vec()
+        } else {
+            sig.serialize_der().to_vec()
+        }
+        .into())
+    }
+
+    /// Sign the given message (hash) using Schnorr
+    /// sign::schnorr(SecKey, Bytes)
+    pub fn signSchnorr(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (keypair, msg): (secp256k1::Keypair, secp256k1::Message) = args.args_into()?;
+
+        let sig = EC.sign_schnorr_with_rng(&msg, &keypair, &mut thread_rng());
+        Ok(sig.serialize().to_vec().into())
+    }
+
+    /// verify::ecdsa(PubKey, Bytes msg, Bytes signature)
+    pub fn verifyEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (pk, msg, sig) = args.args_into()?;
+        Ok(EC.verify_ecdsa(&msg, &sig, &pk).is_ok().into())
+    }
+
+    /// verify::schnorr(PubKey, Bytes msg, Bytes signature)
+    pub fn verifySchnorr(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (pk, msg, sig) = args.args_into()?;
+        Ok(EC.verify_schnorr(&sig, &msg, &pk).is_ok().into())
     }
 
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
@@ -319,7 +378,7 @@ impl From<Xpub> for Value {
         Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
             xkey: xpub,
             derivation_path: DerivationPath::master(),
-            wildcard: descriptor::Wildcard::Unhardened,
+            wildcard: descriptor::Wildcard::None,
             origin: if xpub.depth > 0 {
                 Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
             } else {
@@ -329,24 +388,117 @@ impl From<Xpub> for Value {
     }
 }
 
+impl From<Xpriv> for Value {
+    fn from(xprv: Xpriv) -> Self {
+        Value::SecKey(DescriptorSecretKey::XPrv(DescriptorXKey {
+            xkey: xprv,
+            derivation_path: DerivationPath::master(),
+            wildcard: descriptor::Wildcard::None,
+            origin: if xprv.depth > 0 {
+                Some((xprv.parent_fingerprint, [xprv.child_number][..].into()))
+            } else {
+                None
+            },
+        }))
+    }
+}
+
+// Convert from Value to secp256k1 types
+
+impl TryFrom<Value> for secp256k1::SecretKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value.try_into()? {
+            DescriptorSecretKey::Single(single_priv) => single_priv.key.inner,
+            DescriptorSecretKey::XPrv(xprv) => {
+                // TODO derive wildcards (similarly to pubkeys via at_derivation_index)
+                xprv.xkey
+                    .derive_priv(&EC, &xprv.derivation_path)?
+                    .private_key
+            }
+            DescriptorSecretKey::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
+        })
+    }
+}
+impl TryFrom<Value> for secp256k1::PublicKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(DescriptorPublicKey::try_from(val)?
+            .at_derivation_index(0)?
+            .derive_public_key(&EC)?
+            .inner)
+    }
+}
+impl TryFrom<Value> for secp256k1::Keypair {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(secp256k1::SecretKey::try_from(value)?.keypair(&EC))
+    }
+}
+impl TryFrom<Value> for secp256k1::Message {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(Self::from_digest_slice(&value.into_bytes()?)?)
+    }
+}
+impl TryFrom<Value> for secp256k1::ecdsa::Signature {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        let bytes = value.into_bytes()?;
+        Ok(if bytes.len() == 64 {
+            Self::from_compact(&bytes)?
+        } else {
+            Self::from_der(&bytes)?
+        })
+    }
+}
+
 // Convert from Value to Bitcoin types
+
+impl_simple_into_variant!(ScriptBuf, Script, into_script, NotScript);
+impl_simple_into_variant!(Network, Network, into_network, NotNetwork);
 
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         match value {
-            Value::PubKey(x) => Ok(x),
-            // Bytes are coerced into a PubKey when they are 33 or 32 bytes long
-            Value::Bytes(bytes) => {
-                let key = match bytes.len() {
-                    33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
-                    32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
-                    // uncompressed keys are currently unsupported
-                    len => bail!(Error::InvalidPubKeyLen(len)),
-                };
-                Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
-            }
+            Value::PubKey(pubkey) => Ok(pubkey),
+            Value::SecKey(seckey) => Ok(seckey.to_public(&EC)?),
+            // Bytes are coerced into a single PubKey if they are 33 or 32 bytes long,
+            // or to an Xpub if they're 78 bytes long
+            Value::Bytes(bytes) => Ok(match bytes.len() {
+                33 | 32 => DescriptorPublicKey::Single(SinglePub {
+                    origin: None,
+                    key: match bytes.len() {
+                        33 => SinglePubKey::FullKey(PublicKey::from_slice(&bytes)?),
+                        32 => SinglePubKey::XOnly(XOnlyPublicKey::from_slice(&bytes)?),
+                        _ => unreachable!(),
+                    },
+                }),
+                78 => Value::from(Xpub::decode(&bytes)?).try_into()?,
+                len => bail!(Error::InvalidPubKeyLen(len)),
+            }),
             v => Err(Error::NotPubKey(v.into())),
+        }
+    }
+}
+impl TryFrom<Value> for DescriptorSecretKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::SecKey(seckey) => Ok(seckey),
+            Value::Bytes(bytes) => Ok(match bytes.len() {
+                32 => DescriptorSecretKey::Single(SinglePriv {
+                    // XXX not fully round-trip-able - the (un)compressed flag is lost (bitcoin::PrivateKey::to_bytes()
+                    // does not encode it and PrivateKey::from_slice() always constructs compressed keys) and the
+                    // network is always set to Signet.
+                    key: bitcoin::PrivateKey::from_slice(&bytes, Network::Signet)?,
+                    origin: None,
+                }),
+                78 => Value::from(Xpriv::decode(&bytes)?).try_into()?,
+                len => bail!(Error::InvalidSecKeyLen(len)),
+            }),
+            v => Err(Error::NotSecKey(v.into())),
         }
     }
 }
@@ -500,7 +652,20 @@ impl TryFrom<Value> for bitcoin::Witness {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         let items = val.map_array(Value::into_bytes)?;
-        Ok(bitcoin::Witness::from_slice(&items))
+        Ok(Self::from_slice(&items))
+    }
+}
+impl TryFrom<Value> for bitcoin::PrivateKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        // XXX always uses Signet
+        Ok(Self::new(val.try_into()?, Network::Signet))
+    }
+}
+impl TryFrom<Value> for bitcoin::ecdsa::Signature {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_slice(&val.into_bytes()?)?)
     }
 }
 

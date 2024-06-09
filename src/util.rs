@@ -4,14 +4,15 @@ use std::marker::PhantomData;
 use bitcoin::bip32::{ChildNumber, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::{secp256k1, PublicKey};
-use miniscript::descriptor::{DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, Wildcard};
+use miniscript::descriptor::{
+    DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
+};
 use miniscript::{bitcoin, ForEachKey, MiniscriptKey, TranslatePk, Translator};
 
 use crate::runtime::{Array, Error, Result, Value};
 
 lazy_static! {
-    pub static ref EC: secp256k1::Secp256k1<secp256k1::VerifyOnly> =
-        secp256k1::Secp256k1::verification_only();
+    pub static ref EC: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
 }
 
 pub trait MiniscriptExt<T: miniscript::ScriptContext> {
@@ -72,7 +73,6 @@ impl DeriveExt for DescriptorPublicKey {
         match self {
             DescriptorPublicKey::XPub(mut xpub) => {
                 xpub.derivation_path = xpub.derivation_path.extend(path);
-                // XXX hardened derivation is currently unsupported
                 xpub.wildcard = iif!(is_wildcard, Wildcard::Unhardened, Wildcard::None);
                 Ok(DescriptorPublicKey::XPub(xpub))
             }
@@ -124,7 +124,77 @@ impl DeriveExt for DescriptorPublicKey {
     }
     fn is_deriveable(&self) -> bool {
         // Xpubs are always derivable, even without the * wildcard suffix
-        matches!(self, DescriptorPublicKey::XPub(_))
+        matches!(
+            self,
+            DescriptorPublicKey::XPub(_) | DescriptorPublicKey::MultiXPub(_)
+        )
+    }
+}
+
+// much code duplication, so wow ^.^
+impl DeriveExt for DescriptorSecretKey {
+    fn derive_path<P: DerivePath>(self, path: P, is_wildcard: bool) -> Result<Self> {
+        let path = path.into_derivation_path()?;
+        match self {
+            DescriptorSecretKey::XPrv(mut xprv) => {
+                xprv.derivation_path = xprv.derivation_path.extend(path);
+                // FIXME hardened derivation is unsupported
+                xprv.wildcard = iif!(is_wildcard, Wildcard::Unhardened, Wildcard::None);
+                Ok(DescriptorSecretKey::XPrv(xprv))
+            }
+            DescriptorSecretKey::MultiXPrv(mut mxprv) => {
+                mxprv.derivation_paths = DerivPaths::new(
+                    mxprv
+                        .derivation_paths
+                        .into_paths()
+                        .into_iter()
+                        .map(|mx_path| mx_path.extend(&path))
+                        .collect(),
+                )
+                .expect("path cannot be empty");
+                mxprv.wildcard = iif!(is_wildcard, Wildcard::Unhardened, Wildcard::None);
+                Ok(DescriptorSecretKey::MultiXPrv(mxprv))
+            }
+            DescriptorSecretKey::Single(_) => bail!(Error::NonDeriveableSingle),
+        }
+    }
+
+    fn derive_multi<P: DerivePath>(self, paths: &[P], is_wildcard: bool) -> Result<Self> {
+        let paths = paths
+            .into_iter()
+            .map(|p| Ok(p.clone().into_derivation_path()?))
+            .collect::<Result<Vec<_>>>()?;
+
+        // full_derivation_paths() is not available on DescriptorSecretKey
+        let parent_paths = self.to_public(&EC)?.full_derivation_paths();
+
+        let child_paths = paths
+            .into_iter()
+            .flat_map(|child_path| {
+                parent_paths
+                    .iter()
+                    .map(move |parent_path| parent_path.extend(child_path.clone()))
+            })
+            .collect::<Vec<_>>();
+
+        let (origin, xkey) = match self {
+            DescriptorSecretKey::XPrv(xprv) => (xprv.origin, xprv.xkey),
+            DescriptorSecretKey::MultiXPrv(mxpriv) => (mxpriv.origin, mxpriv.xkey),
+            DescriptorSecretKey::Single(_) => bail!(Error::NonDeriveableSingle),
+        };
+        Ok(DescriptorSecretKey::MultiXPrv(DescriptorMultiXKey {
+            origin: origin,
+            xkey: xkey,
+            derivation_paths: DerivPaths::new(child_paths).expect("cannot be empty"),
+            wildcard: iif!(is_wildcard, Wildcard::Unhardened, Wildcard::None),
+        }))
+    }
+    fn is_deriveable(&self) -> bool {
+        // Xprvs are always derivable, even without the * wildcard suffix
+        matches!(
+            self,
+            DescriptorSecretKey::XPrv(_) | DescriptorSecretKey::MultiXPrv(_)
+        )
     }
 }
 impl DeriveExt for crate::PolicyDpk {
@@ -199,7 +269,8 @@ impl DeriveExt for crate::DescriptorDpk {
 impl DeriveExt for Value {
     fn derive_path<P: DerivePath>(self, path: P, is_wildcard: bool) -> Result<Self> {
         Ok(match self {
-            Value::PubKey(key) => key.derive_path(path, is_wildcard)?.into(),
+            Value::PubKey(pubkey) => pubkey.derive_path(path, is_wildcard)?.into(),
+            Value::SecKey(seckey) => seckey.derive_path(path, is_wildcard)?.into(),
             Value::Descriptor(desc) => desc.derive_path(path, is_wildcard)?.into(),
             Value::Policy(policy) => policy.derive_path(path, is_wildcard)?.into(),
             Value::Array(array) => array.derive_path(path, is_wildcard)?.into(),
@@ -208,7 +279,8 @@ impl DeriveExt for Value {
     }
     fn derive_multi<P: DerivePath>(self, paths: &[P], is_wildcard: bool) -> Result<Self> {
         Ok(match self {
-            Value::PubKey(key) => key.derive_multi(paths, is_wildcard)?.into(),
+            Value::PubKey(pubkey) => pubkey.derive_multi(paths, is_wildcard)?.into(),
+            Value::SecKey(seckey) => seckey.derive_multi(paths, is_wildcard)?.into(),
             Value::Descriptor(desc) => desc.derive_multi(paths, is_wildcard)?.into(),
             Value::Policy(policy) => policy.derive_multi(paths, is_wildcard)?.into(),
             Value::Array(array) => array.derive_multi(paths, is_wildcard)?.into(),
@@ -217,7 +289,8 @@ impl DeriveExt for Value {
     }
     fn is_deriveable(&self) -> bool {
         match self {
-            Value::PubKey(key) => DeriveExt::is_deriveable(key),
+            Value::PubKey(pubkey) => DeriveExt::is_deriveable(pubkey),
+            Value::SecKey(seckey) => DeriveExt::is_deriveable(seckey),
             Value::Descriptor(desc) => DeriveExt::is_deriveable(desc),
             Value::Policy(policy) => policy.is_deriveable(),
             Value::Array(array) => array.is_deriveable(),

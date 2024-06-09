@@ -2,14 +2,16 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 
+use miniscript::{bitcoin, descriptor};
+
 use bitcoin::{
     hashes, hashes::Hash, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, ScriptBuf,
     Transaction,
 };
-use miniscript::{bitcoin, DescriptorPublicKey};
+use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
 use crate::parser::Expr;
-use crate::util::{fmt_quoted_str, PrettyDisplay};
+use crate::util::{fmt_quoted_str, PrettyDisplay, EC};
 use crate::{error, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
@@ -31,6 +33,7 @@ pub enum Value {
     Transaction(Transaction),
     Network(Network),
     PubKey(DescriptorPublicKey),
+    SecKey(DescriptorSecretKey),
     Policy(Policy),
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
@@ -93,6 +96,7 @@ impl_from_variant!(Symbol, Value);
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
+impl_from_variant!(DescriptorSecretKey, Value, SecKey);
 impl_from_variant!(ScriptBuf, Value, Script);
 impl_from_variant!(Address, Value);
 impl_from_variant!(Network, Value);
@@ -111,31 +115,11 @@ impl From<&str> for Value {
 
 // From Value to the underlying enum inner type
 // Simple extraction of the enum variant, with no specialized type coercion logic
-macro_rules! impl_simple_into_variant {
-    ($type:path, $variant:ident, $into_fn_name:ident, $error:ident) => {
-        impl TryFrom<Value> for $type {
-            type Error = Error;
-            fn try_from(value: Value) -> Result<Self> {
-                match value {
-                    Value::$variant(x) => Ok(x),
-                    v => Err(Error::$error(v.into())),
-                }
-            }
-        }
-        impl Value {
-            pub fn $into_fn_name(self) -> Result<$type> {
-                self.try_into()
-            }
-        }
-    };
-}
 impl_simple_into_variant!(bool, Bool, into_bool, NotBool);
 impl_simple_into_variant!(Number, Number, into_number, NotNumber);
 impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
-impl_simple_into_variant!(ScriptBuf, Script, into_script, NotScript);
-impl_simple_into_variant!(Network, Network, into_network, NotNetwork);
 
 // From Value to f64 primitive, with auto-coercion for integers
 impl TryFrom<Value> for f64 {
@@ -190,11 +174,34 @@ impl_int_num_conv!(isize, into_isize);
 impl TryFrom<Value> for Vec<u8> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
+        use descriptor::SinglePubKey::{FullKey as Full, XOnly};
+        use descriptor::{DescriptorPublicKey as Dpk, DescriptorSecretKey as Dsk, SinglePub};
         Ok(match value {
             Value::Bytes(bytes) => bytes,
             Value::String(string) => string.into_bytes(),
             Value::Script(script) => script.into_bytes(),
             Value::Transaction(tx) => bitcoin::consensus::serialize(&tx),
+            // XXX PubKey/SecKey not fully round-trip-able - only the key is encoded, without the bip32 `origin` field associated with it
+            Value::PubKey(dpk) => match dpk {
+                Dpk::XPub(xpub) => xpub
+                    .xkey
+                    .derive_pub(&EC, &xpub.derivation_path)?
+                    .encode()
+                    .to_vec(),
+                Dpk::Single(SinglePub { key: Full(pk), .. }) => pk.to_bytes(),
+                Dpk::Single(SinglePub { key: XOnly(pk), .. }) => pk.serialize().to_vec(),
+                Dpk::MultiXPub(_) => bail!(Error::InvalidMultiXpub),
+            },
+            Value::SecKey(dsk) => match dsk {
+                Dsk::XPrv(xprv) => xprv
+                    .xkey
+                    .derive_priv(&EC, &xprv.derivation_path)?
+                    .encode()
+                    .to_vec(),
+                // XXX not fully round-trip-able - bitcoin::PrivateKey::to_bytes() does not preserve the compressed/uncompressed flag
+                Dsk::Single(sk) => sk.key.to_bytes(),
+                Dsk::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
+            },
             v => bail!(Error::NotBytesLike(v.into())),
         })
     }
@@ -303,6 +310,7 @@ impl Value {
     pub fn type_of(&self) -> &'static str {
         match self {
             Value::PubKey(_) => "pubkey",
+            Value::SecKey(_) => "seckey",
             Value::Bool(_) => "bool",
             Value::Bytes(_) => "bytes",
             Value::String(_) => "string",
@@ -396,6 +404,7 @@ impl fmt::Display for Value {
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
+            Value::SecKey(x) => write!(f, "{}", x),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(None)),

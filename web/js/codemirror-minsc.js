@@ -24,11 +24,14 @@ CodeMirror.defineSimpleMode("minsc",{
     // Dates
     {regex: /\d{4}-\d{1,2}-\d{1,2}T(\d{1,2}:\d{1,2}(:\d{1,2})?Z?)?\b/, token: "number"},
 
-    // Xpubs, single keys, bytes & hashes
-    {regex: /\b([a-fA-F0-9]{8}|[a-fA-F0-9]{40,70}|0x[a-fA-F0-9]*|[xt]pub[0-9a-zA-Z]{100,120})\b/, token: "number"},
+    // Xpubs/Xprvs, single keys, bytes & hashes
+    {regex: /\b([a-fA-F0-9]{8}|[a-fA-F0-9]{40,70}|0x[a-fA-F0-9]*|[xt](?:pub|prv)[0-9a-zA-Z]{100,120})\b/, token: "number"},
+
+    // WIF private key
+    {regex: /\b[KLc][1-9A-HJ-NP-Za-km-z]{51}|[59][1-9A-HJ-NP-Za-km-z]{50}\b/, token: "number"},
 
     // Addresses (Bech32 & Base58check)
-    {regex: /\b[123][0-9a-zA-Z]{25,34}|((bc|tb|bcrt)1[0-9a-z]{38,59}|(BC|TB|BCRT)1[0-9A-Z]{38,59})\b/, token: "number"},
+    {regex: /\b[123][1-9A-HJ-NP-Za-km-z]{25,34}|((bc|tb|bcrt)1[0-9a-z]{38,59}|(BC|TB|BCRT)1[0-9A-Z]{38,59})\b/, token: "number"},
 
     // Numbers
     {regex: /\b-?\d+(?:\.\d+)?\b/, token: "number"},

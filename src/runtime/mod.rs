@@ -142,7 +142,7 @@ fn eval_andor(operands: &[Expr], scope: &ScopeRef, andor: AndOr) -> Result<Value
     let first_operand = operands[0].eval(scope)?;
     match first_operand {
         Value::Bool(first_bool) => eval_bool_andor(first_bool, &operands[1..], scope, andor),
-        Value::Policy(_) | Value::WithProb(_, _) | Value::PubKey(_) => {
+        Value::Policy(_) | Value::WithProb(_, _) | Value::PubKey(_) | Value::SecKey(_) => {
             let policies = [&[first_operand], &eval_exprs(scope, &operands[1..])?[..]].concat();
             stdlib::miniscript::multi_andor(andor, policies).map(Into::into)
         }
@@ -236,7 +236,9 @@ impl Evaluate for ast::Infix {
 impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value, scope: &ScopeRef) -> Result<Value> {
         use ast::InfixOp::*;
-        use Value::{Array, Bytes, Number as Num, Policy, PubKey, Script, String, WithProb};
+        use Value::{
+            Array, Bytes, Number as Num, Policy, PubKey, Script, SecKey, String, WithProb,
+        };
 
         Ok(match (self, lhs, rhs) {
             // == != for all types
@@ -272,17 +274,20 @@ impl ast::InfixOp {
 
             // + for taproot construction (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
-            | (Add, k @ Bytes(_), s @ Script(_) | s @ Policy(_) | s @ PubKey(_) | s @ Array(_)) => {
-                stdlib::taproot::tr(k, Some(s), &scope.borrow())?
-            }
+            | (Add, k @ SecKey(_), s)
+            | (
+                Add,
+                k @ Bytes(_),
+                s @ Script(_) | s @ Policy(_) | s @ PubKey(_) | s @ SecKey(_) | s @ Array(_),
+            ) => stdlib::taproot::tr(k, Some(s), &scope.borrow())?,
 
             // * to repeat script fragments
             (Multiply, Script(s), Num(Int(n))) | (Multiply, Num(Int(n)), Script(s)) => {
                 stdlib::btc::repeat_script(s, n.try_into()?).into()
             }
 
-            // @ to assign execution probabilities (Script/Policy, or a PubKey coerced into a pk() Policy)
-            (Prob, Num(prob), v @ Policy(_) | v @ Script(_) | v @ PubKey(_)) => {
+            // @ to assign execution probabilities (Script/Policy, or a PubKey/SecKey coerced into a pk() Policy)
+            (Prob, Num(prob), v @ Policy(_) | v @ Script(_) | v @ PubKey(_) | v @ SecKey(_)) => {
                 WithProb(prob.into_usize()?, v.into())
             }
 
@@ -344,6 +349,7 @@ impl Evaluate for Expr {
 
             Expr::Address(x) => Value::Address(x.clone().assume_checked()),
             Expr::PubKey(x) => Value::PubKey(x.clone()),
+            Expr::SecKey(x) => Value::SecKey(x.clone()),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::String(x) => Value::String(x.clone()),
             Expr::Int(x) => Value::Number(Number::Int(*x)),

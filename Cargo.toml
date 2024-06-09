@@ -28,10 +28,15 @@ wasm-bindgen = { version = "0.2.65", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 
+# needed to enable 'rand-std' (rust-miniscript does not provide a way to propagate the feature)
+bitcoin = { version = "0.31.0", features = ["std", "secp-recovery", "rand", "rand-std"] }
+# needed to enable 'js' (enabled for the 'wasm' feature below)
+getrandom = { version = "0.2" }
+
 [features]
 # default = ["wee_alloc"]
 default = [ "wasm", "playground" ]
-wasm = [ "wasm-bindgen" ]
+wasm = [ "wasm-bindgen", "getrandom/js" ]
 playground = [ "wasm", "serde", "wasm-bindgen/serde-serialize", "console_error_panic_hook" ]
 
 [lib]
