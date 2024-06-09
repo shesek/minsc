@@ -197,6 +197,9 @@ pub enum RuntimeError {
     #[error("Invalid pubkey key length: {0} (expected 32 or 33)")]
     InvalidPubKeyLen(usize),
 
+    #[error("Invalid secret key length {0} (expected 32 for single key or 78 for xpub)")]
+    InvalidSecKeyLen(usize),
+
     #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash)")]
     TaprootInvalidTrUse,
 

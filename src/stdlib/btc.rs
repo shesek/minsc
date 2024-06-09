@@ -402,7 +402,11 @@ impl TryFrom<Value> for secp256k1::SecretKey {
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value.try_into()? {
             DescriptorSecretKey::Single(single_priv) => single_priv.key.inner,
-            DescriptorSecretKey::XPrv(dxprv) => dxprv.xkey.private_key,
+            DescriptorSecretKey::XPrv(xprv) => {
+                xprv.xkey
+                    .derive_priv(&EC, &xprv.derivation_path)?
+                    .private_key
+            }
             DescriptorSecretKey::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
         })
     }
@@ -416,7 +420,7 @@ impl TryFrom<Value> for secp256k1::Keypair {
 impl TryFrom<Value> for secp256k1::Message {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        Ok(secp256k1::Message::from_digest_slice(&value.into_bytes()?)?)
+        Ok(Self::from_digest_slice(&value.into_bytes()?)?)
     }
 }
 
@@ -450,12 +454,15 @@ impl TryFrom<Value> for DescriptorSecretKey {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::SecKey(seckey) => Ok(seckey),
-            Value::Bytes(_) => {
-                Ok(DescriptorSecretKey::Single(SinglePriv {
-                    key: value.try_into()?,
+            Value::Bytes(bytes) => Ok(match bytes.len() {
+                32 => DescriptorSecretKey::Single(SinglePriv {
+                    // XXX always uses Signet
+                    key: bitcoin::PrivateKey::from_slice(&bytes, Network::Signet)?,
                     origin: None,
-                }))
-            }
+                }),
+                78 => Value::from(Xpriv::decode(&bytes)?).try_into()?,
+                len => bail!(Error::InvalidSecKeyLen(len)),
+            }),
             v => Err(Error::NotSecKey(v.into())),
         }
     }
@@ -617,7 +624,7 @@ impl TryFrom<Value> for bitcoin::PrivateKey {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         // XXX always uses Signet
-        Ok(Self::from_slice(&val.into_bytes()?, Network::Signet)?)
+        Ok(Self::new(val.try_into()?, Network::Signet))
     }
 }
 
