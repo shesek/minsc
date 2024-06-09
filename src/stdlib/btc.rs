@@ -46,6 +46,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("genkey", fns::genkey).unwrap();
     scope.set_fn("sign::ecdsa", fns::signEcdsa).unwrap();
     scope.set_fn("sign::schnorr", fns::signSchnorr).unwrap();
+    scope.set_fn("verify::ecdsa", fns::verifyEcdsa).unwrap();
+    scope.set_fn("verify::schnorr", fns::verifySchnorr).unwrap();
 
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("script::strip", fns::scriptStrip).unwrap();
@@ -256,7 +258,7 @@ pub mod fns {
     }
 
     /// Sign the given message (hash) using ECDSA
-    /// sign::ecdsa(SecKey, Bytes[, Bool compact_sig])
+    /// sign::ecdsa(SecKey, Bytes, Bool compact_sig=false)
     pub fn signEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
         let (seckey, msg, compact_sig): (_, _, Option<bool>) = args.args_into()?;
         let sig = EC.sign_ecdsa(&msg, &seckey);
@@ -276,6 +278,18 @@ pub mod fns {
 
         let sig = EC.sign_schnorr_with_rng(&msg, &keypair, &mut thread_rng());
         Ok(sig.serialize().to_vec().into())
+    }
+
+    /// verify::ecdsa(PubKey, Bytes msg, Bytes signature)
+    pub fn verifyEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (pk, msg, sig) = args.args_into()?;
+        Ok(EC.verify_ecdsa(&msg, &sig, &pk).is_ok().into())
+    }
+
+    /// verify::schnorr(PubKey, Bytes msg, Bytes signature)
+    pub fn verifySchnorr(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (pk, msg, sig) = args.args_into()?;
+        Ok(EC.verify_schnorr(&sig, &msg, &pk).is_ok().into())
     }
 
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
@@ -405,6 +419,15 @@ impl TryFrom<Value> for secp256k1::SecretKey {
         })
     }
 }
+impl TryFrom<Value> for secp256k1::PublicKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(DescriptorPublicKey::try_from(val)?
+            .at_derivation_index(0)?
+            .derive_public_key(&EC)?
+            .inner)
+    }
+}
 impl TryFrom<Value> for secp256k1::Keypair {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -415,6 +438,17 @@ impl TryFrom<Value> for secp256k1::Message {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(Self::from_digest_slice(&value.into_bytes()?)?)
+    }
+}
+impl TryFrom<Value> for secp256k1::ecdsa::Signature {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        let bytes = value.into_bytes()?;
+        Ok(if bytes.len() == 64 {
+            Self::from_compact(&bytes)?
+        } else {
+            Self::from_der(&bytes)?
+        })
     }
 }
 
@@ -623,6 +657,12 @@ impl TryFrom<Value> for bitcoin::PrivateKey {
     fn try_from(val: Value) -> Result<Self> {
         // XXX always uses Signet
         Ok(Self::new(val.try_into()?, Network::Signet))
+    }
+}
+impl TryFrom<Value> for bitcoin::ecdsa::Signature {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_slice(&val.into_bytes()?)?)
     }
 }
 

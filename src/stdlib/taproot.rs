@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::sync::Arc;
 
@@ -384,6 +384,18 @@ fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
     Ok(XOnlyPublicKey::from(
         pk.at_derivation_index(0)?.derive_public_key(&EC)?.inner,
     ))
+}
+impl TryFrom<Value> for bitcoin::XOnlyPublicKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        definite_xonly(val.try_into()?)
+    }
+}
+impl TryFrom<Value> for bitcoin::secp256k1::schnorr::Signature {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_slice(&val.into_bytes()?)?)
+    }
 }
 
 impl PrettyDisplay for TaprootSpendInfo {

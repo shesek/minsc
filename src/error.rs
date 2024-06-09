@@ -309,6 +309,9 @@ pub enum RuntimeError {
 
     #[error("Invalid Script: {0}")]
     InvalidScript(#[from] bitcoin::script::Error),
+
+    #[error("ECDSA error: {0}")]
+    Ecdsa(#[from] bitcoin::ecdsa::Error),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {
