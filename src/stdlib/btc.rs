@@ -1,12 +1,11 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use miniscript::bitcoin;
-
 use bitcoin::bip32::{ChildNumber, DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{sha256, sha256d, Hash};
 use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
+use bitcoin::secp256k1::rand::{thread_rng, Rng};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
     absolute::LockTime, address, hex::DisplayHex, secp256k1, taproot::TaprootSpendInfo, Address,
@@ -248,8 +247,6 @@ pub mod fns {
     /// Generate a new random Xpriv
     /// genkey(Network = Signet) -> SecKey
     pub fn genkey(args: Array, _: &ScopeRef) -> Result<Value> {
-        use secp256k1::rand::{thread_rng, Rng};
-
         let network = args
             .arg_into::<Option<Network>>()?
             .unwrap_or(Network::Signet);
@@ -277,11 +274,8 @@ pub mod fns {
     pub fn signSchnorr(args: Array, _: &ScopeRef) -> Result<Value> {
         let (keypair, msg): (secp256k1::Keypair, secp256k1::Message) = args.args_into()?;
 
-        // XXX rust-miniscript doesn't support enabling the `bitcoin/rand-std` feature to transitively enable
-        // `secp256k1/rand-std`, which is needed for signing with auxiliary random data as advised by BIP 340.
-        // (bitcoind doesn't add random data either: https://bitcoin.stackexchange.com/q/119042/11442)
-        let sig = EC.sign_schnorr_no_aux_rand(&msg, &keypair);
-        Ok(Value::Bytes(sig.serialize().to_vec()))
+        let sig = EC.sign_schnorr_with_rng(&msg, &keypair, &mut thread_rng());
+        Ok(sig.serialize().to_vec().into())
     }
 
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
