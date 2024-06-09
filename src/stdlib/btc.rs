@@ -489,7 +489,9 @@ impl TryFrom<Value> for DescriptorSecretKey {
             Value::SecKey(seckey) => Ok(seckey),
             Value::Bytes(bytes) => Ok(match bytes.len() {
                 32 => DescriptorSecretKey::Single(SinglePriv {
-                    // XXX always uses Signet
+                    // XXX not fully round-trip-able - the (un)compressed flag is lost (bitcoin::PrivateKey::to_bytes()
+                    // does not encode it and PrivateKey::from_slice() always constructs compressed keys) and the
+                    // network is always set to Signet.
                     key: bitcoin::PrivateKey::from_slice(&bytes, Network::Signet)?,
                     origin: None,
                 }),
