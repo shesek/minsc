@@ -13,8 +13,8 @@ use bitcoin::{
     Amount, Network, Opcode, Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
 use miniscript::descriptor::{
-    self, Descriptor, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePub,
-    SinglePubKey,
+    self, Descriptor, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv,
+    SinglePub, SinglePubKey,
 };
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
@@ -43,6 +43,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("pubkey", fns::pubkey).unwrap();
 
+    scope.set_fn("seckey", fns::seckey).unwrap();
     scope.set_fn("genkey", fns::genkey).unwrap();
     scope.set_fn("sign::ecdsa", fns::signEcdsa).unwrap();
     scope.set_fn("sign::schnorr", fns::signSchnorr).unwrap();
@@ -239,8 +240,13 @@ pub mod fns {
         Ok(tx.into())
     }
 
-    /// Generate a new random SecKey over an Xpriv
-    /// genkey([Network = Signet]) -> SecKey
+    /// seckey(Bytes|SecKey) -> SecKey
+    pub fn seckey(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::SecKey(args.arg_into()?))
+    }
+
+    /// Generate a new random Xpriv
+    /// genkey(Network = Signet) -> SecKey
     pub fn genkey(args: Array, _: &ScopeRef) -> Result<Value> {
         use secp256k1::rand::{thread_rng, Rng};
 
@@ -418,7 +424,6 @@ impl TryFrom<Value> for secp256k1::Message {
 
 impl_simple_into_variant!(ScriptBuf, Script, into_script, NotScript);
 impl_simple_into_variant!(Network, Network, into_network, NotNetwork);
-impl_simple_into_variant!(DescriptorSecretKey, SecKey, into_seckey, NotSecKey);
 
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
@@ -437,6 +442,21 @@ impl TryFrom<Value> for DescriptorPublicKey {
                 Ok(DescriptorPublicKey::Single(SinglePub { key, origin: None }))
             }
             v => Err(Error::NotPubKey(v.into())),
+        }
+    }
+}
+impl TryFrom<Value> for DescriptorSecretKey {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        match value {
+            Value::SecKey(seckey) => Ok(seckey),
+            Value::Bytes(_) => {
+                Ok(DescriptorSecretKey::Single(SinglePriv {
+                    key: value.try_into()?,
+                    origin: None,
+                }))
+            }
+            v => Err(Error::NotSecKey(v.into())),
         }
     }
 }
@@ -590,7 +610,14 @@ impl TryFrom<Value> for bitcoin::Witness {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         let items = val.map_array(Value::into_bytes)?;
-        Ok(bitcoin::Witness::from_slice(&items))
+        Ok(Self::from_slice(&items))
+    }
+}
+impl TryFrom<Value> for bitcoin::PrivateKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        // XXX always uses Signet
+        Ok(Self::from_slice(&val.into_bytes()?, Network::Signet)?)
     }
 }
 

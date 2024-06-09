@@ -507,6 +507,10 @@
       "[native]"
     ],
     [
+      "seckey",
+      "[native]"
+    ],
+    [
       "segwitv0",
       "[native]"
     ],
