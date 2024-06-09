@@ -169,11 +169,11 @@ ArrayAccessFixFloat: Expr = <array:ArrayAccessLHS> "." <two_indices:FLOAT> =>? {
 };
 ArrayAccess = { ArrayAccess_, ArrayAccessFixFloat };
 
-// An xpub or standalone public key (33 bytes or 32 for x-only, uncompressed is unsupported)
+// An xpub or standalone public key with origin (33 bytes or 32 for x-only, uncompressed is unsupported)
 PubKey: Expr = PubKey_ =>? Ok(Expr::PubKey(<>.parse().map_err(ParseError::from)?));
 PubKey_ = { XPUB, SINGLE_PK_ORIG };
 
-// An xprv. Standalone private keys are currently unsupported.
+// An xprv. Standalone seckeys can be constructed via seckey(0x112233..)
 SecKey: Expr = XPRV =>? Ok(Expr::SecKey(<>.parse().map_err(ParseError::from)?));
 
 Bytes: Expr = {
