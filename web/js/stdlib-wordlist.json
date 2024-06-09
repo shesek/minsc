@@ -639,6 +639,14 @@
       "$max_iterations, $condition, $loop_body"
     ],
     [
+      "verify::ecdsa",
+      "[native]"
+    ],
+    [
+      "verify::schnorr",
+      "[native]"
+    ],
+    [
       "warn",
       "[native]"
     ],
