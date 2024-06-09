@@ -378,7 +378,7 @@ impl From<Xpub> for Value {
         Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
             xkey: xpub,
             derivation_path: DerivationPath::master(),
-            wildcard: descriptor::Wildcard::Unhardened,
+            wildcard: descriptor::Wildcard::None,
             origin: if xpub.depth > 0 {
                 Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
             } else {
@@ -393,7 +393,7 @@ impl From<Xpriv> for Value {
         Value::SecKey(DescriptorSecretKey::XPrv(DescriptorXKey {
             xkey: xprv,
             derivation_path: DerivationPath::master(),
-            wildcard: descriptor::Wildcard::Unhardened,
+            wildcard: descriptor::Wildcard::None,
             origin: if xprv.depth > 0 {
                 Some((xprv.parent_fingerprint, [xprv.child_number][..].into()))
             } else {
@@ -411,6 +411,7 @@ impl TryFrom<Value> for secp256k1::SecretKey {
         Ok(match value.try_into()? {
             DescriptorSecretKey::Single(single_priv) => single_priv.key.inner,
             DescriptorSecretKey::XPrv(xprv) => {
+                // TODO derive wildcards (similarly to pubkeys via at_derivation_index)
                 xprv.xkey
                     .derive_priv(&EC, &xprv.derivation_path)?
                     .private_key
