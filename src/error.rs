@@ -154,8 +154,11 @@ pub enum RuntimeError {
     )]
     InvalidDerivationCode,
 
-    #[error("Unexpected multi-path Xpriv, only single path is supported")]
+    #[error("Unexpected multi-path Xpriv, only single-path Xprivs or single keys are accepted")]
     InvalidMultiXprv,
+
+    #[error("Unexpected multi-path Xpub, only single-path Xpubs or single keys are accepted")]
+    InvalidMultiXpub,
 
     #[error("Policy probabilities are only supported for OR with 2 branches")]
     InvalidPolicyProb,

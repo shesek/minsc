@@ -11,7 +11,7 @@ use bitcoin::{
 use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
 use crate::parser::Expr;
-use crate::util::{fmt_quoted_str, PrettyDisplay};
+use crate::util::{fmt_quoted_str, PrettyDisplay, EC};
 use crate::{error, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
@@ -174,11 +174,34 @@ impl_int_num_conv!(isize, into_isize);
 impl TryFrom<Value> for Vec<u8> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
+        use descriptor::SinglePubKey::{FullKey as Full, XOnly};
+        use descriptor::{DescriptorPublicKey as Dpk, DescriptorSecretKey as Dsk, SinglePub};
         Ok(match value {
             Value::Bytes(bytes) => bytes,
             Value::String(string) => string.into_bytes(),
             Value::Script(script) => script.into_bytes(),
             Value::Transaction(tx) => bitcoin::consensus::serialize(&tx),
+            // XXX PubKey/SecKey not fully round-trip-able - only the key is encoded, without the bip32 `origin` field associated with it
+            Value::PubKey(dpk) => match dpk {
+                Dpk::XPub(xpub) => xpub
+                    .xkey
+                    .derive_pub(&EC, &xpub.derivation_path)?
+                    .encode()
+                    .to_vec(),
+                Dpk::Single(SinglePub { key: Full(pk), .. }) => pk.to_bytes(),
+                Dpk::Single(SinglePub { key: XOnly(pk), .. }) => pk.serialize().to_vec(),
+                Dpk::MultiXPub(_) => bail!(Error::InvalidMultiXpub),
+            },
+            Value::SecKey(dsk) => match dsk {
+                Dsk::XPrv(xprv) => xprv
+                    .xkey
+                    .derive_priv(&EC, &xprv.derivation_path)?
+                    .encode()
+                    .to_vec(),
+                // XXX not fully round-trip-able - bitcoin::PrivateKey::to_bytes() does not preserve the compressed/uncompressed flag
+                Dsk::Single(sk) => sk.key.to_bytes(),
+                Dsk::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
+            },
             v => bail!(Error::NotBytesLike(v.into())),
         })
     }
