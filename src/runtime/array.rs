@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::{fmt, mem, ops, vec};
 
@@ -122,6 +123,36 @@ impl<T: FromValue> TryFrom<Array> for Vec<T> {
     type Error = Error;
     fn try_from(arr: Array) -> Result<Vec<T>> {
         arr.into_iter().collect_into()
+    }
+}
+
+// Generic conversion from Array into a HashSet of any convertible type
+impl<T: FromValue + std::hash::Hash + Eq> TryFrom<Array> for HashSet<T> {
+    type Error = Error;
+    fn try_from(arr: Array) -> Result<HashSet<T>> {
+        arr.into_iter().map(T::from_value).collect()
+    }
+}
+// Generic conversion from a tagged Array into a HashMap of any convertible key/val
+impl<K: FromValue + std::hash::Hash + Eq, V: FromValue> TryFrom<Array> for HashMap<K, V> {
+    type Error = Error;
+    fn try_from(arr: Array) -> Result<HashMap<K, V>> {
+        arr.into_iter().map(<(K, V)>::from_value).collect()
+    }
+}
+
+// Generic conversion from Array into a BTreeSet of any convertible type
+impl<T: FromValue + Eq + Ord> TryFrom<Array> for BTreeSet<T> {
+    type Error = Error;
+    fn try_from(arr: Array) -> Result<BTreeSet<T>> {
+        arr.into_iter().map(T::from_value).collect()
+    }
+}
+// Generic conversion from a tagged Array into a BTreeMap of any convertible key/val
+impl<K: FromValue + Ord, V: FromValue> TryFrom<Array> for BTreeMap<K, V> {
+    type Error = Error;
+    fn try_from(arr: Array) -> Result<BTreeMap<K, V>> {
+        arr.into_iter().map(<(K, V)>::from_value).collect()
     }
 }
 

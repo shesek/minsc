@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
@@ -289,22 +290,26 @@ pub trait FromValueMarker {}
 impl<T: TryFrom<Value, Error = Error>> FromValueMarker for T {}
 impl FromValueMarker for Value {}
 
-// Generic conversion from Value::Array into a Vec of any convertible type
-impl<T: FromValue> TryFrom<Value> for Vec<T> {
-    type Error = Error;
-    fn try_from(val: Value) -> Result<Vec<T>> {
-        val.into_array()?.try_into()
-    }
+// Generic conversion from a Value containing an Array into a Vec, HashSet, HashMap, BTreeSet,
+// BTreeMap or 1/2/3-tuples of any FromValue type. Delegated to the inner Array's TryFrom.
+macro_rules! impl_delegate_array_conv {
+    ($type:ty, $($param:tt)*) => {
+        impl<$($param)*> TryFrom<Value> for $type {
+            type Error = Error;
+            fn try_from(val: Value) -> Result<$type> {
+                val.into_array()?.try_into()
+            }
+        }
+    };
 }
-
-// Generic conversion from Value::Array into a 2-tuple of any convertible type
-// Other tuple lengths are supported on the inner Array.
-impl<A: FromValue, B: FromValue> TryFrom<Value> for (A, B) {
-    type Error = Error;
-    fn try_from(val: Value) -> Result<(A, B)> {
-        val.into_array()?.try_into()
-    }
-}
+impl_delegate_array_conv!(Vec<T>, T: FromValue);
+impl_delegate_array_conv!(HashSet<T>, T: FromValue + std::hash::Hash + Eq);
+impl_delegate_array_conv!(BTreeSet<T>, T: FromValue + Eq + Ord);
+impl_delegate_array_conv!(BTreeMap<K, V>, K: FromValue + Ord, V: FromValue);
+impl_delegate_array_conv!(HashMap<K, V>, K: FromValue + std::hash::Hash + Eq, V: FromValue);
+impl_delegate_array_conv!((A, ), A: FromValue);
+impl_delegate_array_conv!((A, B), A: FromValue, B: FromValue);
+impl_delegate_array_conv!((A, B, C), A: FromValue, B: FromValue, C: FromValue);
 
 //
 // Value impl
