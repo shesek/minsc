@@ -22,9 +22,10 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         .unwrap();
     scope.set_fn("psbt::sign", fns::sign).unwrap();
     scope.set_fn("psbt::try_sign", fns::try_sign).unwrap();
-    scope.set_fn("psbt::sighash", fns::sighash).unwrap();
     scope.set_fn("psbt::extract", fns::extract).unwrap();
+
     scope.set_fn("psbt::fee", fns::fee).unwrap();
+    scope.set_fn("psbt::sighash", fns::sighash).unwrap();
 }
 
 impl TryFrom<Value> for Psbt {
@@ -89,31 +90,6 @@ pub mod fns {
         Ok(Value::array_of((psbt, errors)))
     }
 
-    /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
-    /// Also available as `tx(Psbt)` (without `finalize`, for pre-finalized PSBT only)
-    pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
-        if finalize.unwrap_or(false) {
-            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
-        }
-        Ok(psbt.extract(&EC)?.into())
-    }
-
-    /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes
-    pub fn sighash(args: Array, _: &ScopeRef) -> Result<Value> {
-        use bitcoin::sighash::SighashCache;
-        let (psbt, input_index, tapleaf_hash): (Psbt, _, _) = args.args_into()?;
-        let mut sighash_cache = SighashCache::new(&psbt.unsigned_tx);
-
-        let sighash_msg = psbt.sighash_msg(input_index, &mut sighash_cache, tapleaf_hash)?;
-        Ok(sighash_msg.to_secp_msg()[..].to_vec().into())
-    }
-
-    /// psbt::fee(Psbt) -> Int
-    pub fn fee(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()?)
-    }
-
     // psbt::sign(Psbt, SigningKeys, Bool finalize=false) -> Psbt
     //
     // Attempt to sign all transaction inputs, raising an error if any fail.
@@ -157,6 +133,31 @@ pub mod fns {
             .collect::<Vec<_>>();
 
         Ok(Value::array_of((psbt, signed, failed)))
+    }
+
+    /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
+    /// Also available as `tx(Psbt)` (without `finalize`, for pre-finalized PSBT only)
+    pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
+        if finalize.unwrap_or(false) {
+            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
+        }
+        Ok(psbt.extract(&EC)?.into())
+    }
+
+    /// psbt::fee(Psbt) -> Int
+    pub fn fee(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()?)
+    }
+
+    /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes
+    pub fn sighash(args: Array, _: &ScopeRef) -> Result<Value> {
+        use bitcoin::sighash::SighashCache;
+        let (psbt, input_index, tapleaf_hash): (Psbt, _, _) = args.args_into()?;
+        let mut sighash_cache = SighashCache::new(&psbt.unsigned_tx);
+
+        let sighash_msg = psbt.sighash_msg(input_index, &mut sighash_cache, tapleaf_hash)?;
+        Ok(sighash_msg.to_secp_msg()[..].to_vec().into())
     }
 }
 

@@ -463,6 +463,50 @@
       "$n, $val"
     ],
     [
+      "psbt",
+      "[native]"
+    ],
+    [
+      "psbt::combine",
+      "[native]"
+    ],
+    [
+      "psbt::create",
+      "[native]"
+    ],
+    [
+      "psbt::extract",
+      "[native]"
+    ],
+    [
+      "psbt::fee",
+      "[native]"
+    ],
+    [
+      "psbt::finalize",
+      "[native]"
+    ],
+    [
+      "psbt::sighash",
+      "[native]"
+    ],
+    [
+      "psbt::sign",
+      "[native]"
+    ],
+    [
+      "psbt::try_finalize",
+      "[native]"
+    ],
+    [
+      "psbt::try_sign",
+      "[native]"
+    ],
+    [
+      "psbt::update",
+      "[native]"
+    ],
+    [
       "pubkey",
       "[native]"
     ],
