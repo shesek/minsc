@@ -686,7 +686,19 @@ impl TryFrom<Value> for Xpriv {
 impl TryFrom<Value> for bip32::Fingerprint {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        Ok(val.into_bytes()?.as_slice().try_into()?)
+        Ok(match val {
+            Value::Bytes(bytes) => bytes.as_slice().try_into()?,
+            Value::PubKey(ref dpk) => match dpk {
+                // For xpubd, get the fingerprint of the final derivation (not the master_fingerprint()'s)
+                DescriptorPublicKey::XPub(_) => Xpub::try_from(val)?.fingerprint(),
+                // For single keys the master_fingerprint() is the same as the final fingerprint
+                DescriptorPublicKey::Single(_) => dpk.master_fingerprint(),
+                DescriptorPublicKey::MultiXPub(_) => bail!(Error::InvalidMultiXpub),
+            },
+            // Convert SecKey to PubKey, then get its Fingerprint
+            Value::SecKey(_) => Value::PubKey(val.try_into()?).try_into()?,
+            other => bail!(Error::NotFingerprintLike(other.into())),
+        })
     }
 }
 impl TryFrom<Value> for DerivationPath {

@@ -104,6 +104,9 @@ pub enum RuntimeError {
     #[error("Expected a transaction as object, raw bytes or tagged list, not {0:?}")]
     NotTxLike(Box<Value>),
 
+    #[error("Expected a bip32 fingerprint as bytes or key, not {0:?}")]
+    NotFingerprintLike(Box<Value>),
+
     #[error("Expected raw Script or Bytes, not {0:?}. Perhaps you meant to use explicitScript()/scriptPubKey()?")]
     InvalidScriptConstructor(Box<Value>),
 

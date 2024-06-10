@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 
+use bitcoin::bip32::{DerivationPath, Fingerprint, Xpriv};
 use bitcoin::psbt::{self, Psbt};
-use bitcoin::{bip32::Xpriv, PrivateKey, PublicKey, TxIn, TxOut};
-use miniscript::bitcoin;
+use bitcoin::{secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
@@ -150,7 +151,7 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "sighash_type" => psbt_input.sighash_type = Some(val.try_into()?),
             "redeem_script" => psbt_input.redeem_script = Some(val.try_into()?),
             "witness_script" => psbt_input.witness_script = Some(val.try_into()?),
-            "bip32_derivation" => psbt_input.bip32_derivation = val.try_into()?,
+            "bip32_derivation" | "sources" => psbt_input.bip32_derivation = bip32_derivation(val)?,
             "final_script_sig" => psbt_input.final_script_sig = Some(val.try_into()?),
             "final_script_witness" => psbt_input.final_script_witness = Some(val.try_into()?),
             "ripemd160_preimages" => psbt_input.ripemd160_preimages = val.try_into()?,
@@ -213,6 +214,49 @@ impl TryFrom<Value> for PsbtCoin {
     fn try_from(value: Value) -> Result<Self> {
         let (input, spent_utxo) = value.tagged_or_tuple("input", "utxo")?;
         Ok(Self(input, spent_utxo))
+    }
+}
+
+fn bip32_derivation(
+    val: Value,
+) -> Result<BTreeMap<secp256k1::PublicKey, (Fingerprint, DerivationPath)>> {
+    // Intermediate decoding into btc::KeySource for specialized decoding logic,
+    // then into the psbt::Inputs's bip32_derivation field type.
+    Ok(Vec::try_from(val)?
+        .into_iter()
+        .map(|KeyWithSource(pk, fingerprint, path)| (pk, (fingerprint, path)))
+        .collect())
+}
+pub struct KeyWithSource(
+    pub secp256k1::PublicKey,
+    pub Fingerprint,
+    pub DerivationPath,
+);
+impl TryFrom<Value> for KeyWithSource {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(match val {
+            // May be provided as a tuple/tagged array mapping from `pk` to the `source`,
+            // where `source` is a tuple/tagged array of $fingerprint:$derivation_path.
+            // For example: `$single_pk1: 0x1223344:[2,5]`
+            // Or in long-form: `$single_pk1: [ "fingerprint": 0x11223344, "derivation_path": [2,5] ]`
+            // Or even longer: `[ "pubkey": $single_pk1, "source": [ "fingerprint": 0x11223344, "derivation_path": [2,5] ] ]`
+            Value::Array(_) => {
+                let (pk, source): (_, Value) = val.tagged_or_tuple("pubkey", "source")?;
+                let (fingerprint, derivation_path) =
+                    source.tagged_or_tuple("fingerprint", "derivation_path")?;
+                Self(pk, fingerprint, derivation_path)
+            }
+            // Or any value coercible into a PubKey/SecKey, using the origin/derivation associated with it
+            // For example, `xpub123/1/10` would set the final key's origin to `[fingerprint(xpub123), [1, 10]]`
+            _ => {
+                let dpk = miniscript::DescriptorPublicKey::try_from(val)?;
+                let fingerprint = dpk.master_fingerprint();
+                let derivation_path = dpk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                let final_pk = dpk.at_derivation_index(0)?.derive_public_key(&EC)?.inner;
+                Self(final_pk, fingerprint, derivation_path)
+            }
+        })
     }
 }
 
