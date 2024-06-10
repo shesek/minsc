@@ -12,15 +12,19 @@ use crate::util::EC;
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
-    scope.set_fn("psbt", fns::psbt).unwrap();
-    scope.set_fn("psbt::create", fns::psbt).unwrap();
+    scope.set_fn("psbt", fns::create).unwrap();
+    scope.set_fn("psbt::create", fns::create).unwrap();
     scope.set_fn("psbt::update", fns::update).unwrap();
     scope.set_fn("psbt::combine", fns::combine).unwrap();
     scope.set_fn("psbt::finalize", fns::finalize).unwrap();
-    scope.set_fn("psbt::extract", fns::extract).unwrap();
-    scope.set_fn("psbt::sighash", fns::sighash).unwrap();
-    scope.set_fn("psbt::fee", fns::fee).unwrap();
+    scope
+        .set_fn("psbt::try_finalize", fns::try_finalize)
+        .unwrap();
     scope.set_fn("psbt::sign", fns::sign).unwrap();
+    scope.set_fn("psbt::try_sign", fns::try_sign).unwrap();
+    scope.set_fn("psbt::sighash", fns::sighash).unwrap();
+    scope.set_fn("psbt::extract", fns::extract).unwrap();
+    scope.set_fn("psbt::fee", fns::fee).unwrap();
 }
 
 impl TryFrom<Value> for Psbt {
@@ -38,12 +42,10 @@ impl TryFrom<Value> for Psbt {
 
 #[allow(non_snake_case)]
 pub mod fns {
-    use std::collections::BTreeMap;
-
     use super::*;
 
     /// psbt(Transaction|Bytes|Array<Tagged>) -> Psbt
-    pub fn psbt(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn create(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::Psbt(args.arg_into()?))
     }
 
@@ -77,7 +79,7 @@ pub mod fns {
     /// psbt::try_finalize(Psbt) -> [Psbt, Array<String>]
     ///
     /// Try finalizing the PSBT, returning it with all the inputs that could be finalized
-    /// an an array of errors for the input that couldn't.
+    /// and an array of errors for the input that could not.
     pub fn try_finalize(args: Array, _: &ScopeRef) -> Result<Value> {
         let mut psbt: Psbt = args.arg_into()?;
         let errors = match psbt.finalize_mut(&EC) {
@@ -112,35 +114,36 @@ pub mod fns {
         Ok(args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()?)
     }
 
-    // psbt::sign(Psbt, SecKey<Xpriv>) -> [Psbt, Signed, Failed]
-    // psbt::sign(Psbt, Array<SecKey<Xpriv>>) -> [Psbt, Signed, Failed]
-    // psbt::sign(Psbt, Array<PubKey<Single>:SecKey<Single>>) -> [Psbt, Signed, Failed]
+    // psbt::sign(Psbt, SigningKeys, Bool finalize=false) -> Psbt
     //
-    // where `Signed` is an `Array<Int:Array<PubKey>>` mapping input indexes to the PubKeys
-    // used to sign them, and `Failed` is an `Array<Int:String>` mapping input indexes
-    // to the error encountered while trying to sign them.
+    // Attempt to sign all transaction inputs, raising an error if any fail.
+    //
+    // SigningKeys can be provided as a Xpriv, an array of Xprivs, or a tagged map from single PubKeys to single SecKeys
     pub fn sign(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (mut psbt, seckeys): (Psbt, Value) = args.args_into()?;
-        let signing_result = match seckeys {
-            Value::Array(seckeys) => {
-                if let Some(Value::Array(_)) = seckeys.get(0) {
-                    // Keys provided as tagged array of [ $single_pk1: $single_sk1, $single_pk2: $single_sk2, ... ]
-                    psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(seckeys)?, &EC)
-                } else {
-                    // Keys provided as [ $xpriv1, $xpriv2, ... ]
-                    // FIXME: does not work because Xpriv does not implement Ord
-                    //psbt.sign(&BTreeSet::<Xpriv>::try_from(seckeys), &EC)
-                    bail!(Error::InvalidArguments);
-                }
-            }
-            // Provided as a single Xpriv
-            seckey => psbt.sign(&Xpriv::try_from(seckey)?, &EC),
-        };
-        let (signed, failed) = match signing_result {
-            Ok(signed) => (signed, BTreeMap::new()),
-            // Failures are returned without raising an error
-            Err((signed, failed)) => (signed, failed),
-        };
+        let (mut psbt, keys, finalize): (_, _, Option<bool>) = args.args_into()?;
+
+        let (_signed, failed) = sign_psbt(&mut psbt, keys)?;
+        ensure!(failed.is_empty(), Error::PsbtSigning(failed));
+        // XXX check signed?
+
+        if finalize.unwrap_or(false) {
+            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
+        }
+
+        Ok(psbt.into())
+    }
+
+    // psbt::try_sign(Psbt, SigningKeys) -> [Psbt, Signed, Failed]
+    //
+    // Attempt to sign all transaction inputs, returning the a modified PSBT with the successfully signed inputs even if some fail.
+    //
+    // Returned with `Signed` as an `Array<Int:Array<PubKey>>` mapping input indexes to the PubKeys used to sign them
+    // and `Failed` as an `Array<Int:String>` mapping input indexes to the error encountered while trying to sign them.
+    pub fn try_sign(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (mut psbt, keys) = args.args_into()?;
+
+        let (signed, failed) = sign_psbt(&mut psbt, keys)?;
+
         let signed = signed
             .into_iter()
             .map(|(input_index, pks)| {
@@ -174,6 +177,29 @@ fn psbt_from_tags(tags: Array) -> Result<Psbt> {
     update_psbt(&mut psbt, tags)?;
 
     Ok(psbt)
+}
+
+fn sign_psbt(psbt: &mut Psbt, seckeys: Value) -> Result<(psbt::SigningKeys, psbt::SigningErrors)> {
+    let signing_result = match seckeys {
+        Value::Array(seckeys) => {
+            if let Some(Value::Array(_)) = seckeys.get(0) {
+                // Keys provided as tagged array of [ $single_pk1: $single_sk1, $single_pk2: $single_sk2, ... ]
+                psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(seckeys)?, &EC)
+            } else {
+                // Keys provided as [ $xpriv1, $xpriv2, ... ]
+                // FIXME: does not work because Xpriv does not implement Ord
+                //psbt.sign(&BTreeSet::<Xpriv>::try_from(seckeys), &EC)
+                bail!(Error::InvalidArguments);
+            }
+        }
+        // Provided as a single Xpriv
+        seckey => psbt.sign(&Xpriv::try_from(seckey)?, &EC),
+    };
+    // Returns input signing failures in the the Ok variant. An Err is only raised if the `seckeys` argument is invalid.
+    Ok(match signing_result {
+        Ok(signed) => (signed, BTreeMap::new()),
+        Err((signed, failed)) => (signed, failed),
+    })
 }
 
 fn mut_input(psbt: &mut Psbt, vin: usize) -> Result<&mut psbt::Input> {

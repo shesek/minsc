@@ -1,6 +1,6 @@
 use std::result::Result as StdResult;
 
-use miniscript::bitcoin::{
+use bitcoin::{
     self, amount, bip32, hashes, hex, key, network, script, taproot, witness_program,
 };
 use miniscript::policy::compiler::CompilerError;
@@ -268,6 +268,9 @@ pub enum RuntimeError {
 
     #[error("PSBT finalization errors: {}", .0.into_iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))]
     PsbtFinalize(Vec<miniscript::psbt::Error>),
+
+    #[error("PSBT signing errors: {}", .0.into_iter().map(|(i, e)| format!("input #{}: {}", i, e)).collect::<Vec<_>>().join(", "))]
+    PsbtSigning(bitcoin::psbt::SigningErrors),
 
     #[error("Missing \"input\" field to construct the PSBT transaction input")]
     PsbtAddInMissingTxIn,
