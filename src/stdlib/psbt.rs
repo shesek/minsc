@@ -20,6 +20,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::extract", fns::extract).unwrap();
     scope.set_fn("psbt::sighash", fns::sighash).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
+    scope.set_fn("psbt::sign", fns::sign).unwrap();
 }
 
 impl TryFrom<Value> for Psbt {
@@ -109,6 +110,50 @@ pub mod fns {
     /// psbt::fee(Psbt) -> Int
     pub fn fee(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()?)
+    }
+
+    // psbt::sign(Psbt, SecKey<Xpriv>) -> [Psbt, Signed, Failed]
+    // psbt::sign(Psbt, Array<SecKey<Xpriv>>) -> [Psbt, Signed, Failed]
+    // psbt::sign(Psbt, Array<PubKey<Single>:SecKey<Single>>) -> [Psbt, Signed, Failed]
+    //
+    // where `Signed` is an `Array<Int:Array<PubKey>>` mapping input indexes to the PubKeys
+    // used to sign them, and `Failed` is an `Array<Int:String>` mapping input indexes
+    // to the error encountered while trying to sign them.
+    pub fn sign(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (mut psbt, seckeys): (Psbt, Value) = args.args_into()?;
+        let signing_result = match seckeys {
+            Value::Array(seckeys) => {
+                if let Some(Value::Array(_)) = seckeys.get(0) {
+                    // Keys provided as tagged array of [ $single_pk1: $single_sk1, $single_pk2: $single_sk2, ... ]
+                    psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(seckeys)?, &EC)
+                } else {
+                    // Keys provided as [ $xpriv1, $xpriv2, ... ]
+                    // FIXME: does not work because Xpriv does not implement Ord
+                    //psbt.sign(&BTreeSet::<Xpriv>::try_from(seckeys), &EC)
+                    bail!(Error::InvalidArguments);
+                }
+            }
+            // Provided as a single Xpriv
+            seckey => psbt.sign(&Xpriv::try_from(seckey)?, &EC),
+        };
+        let (signed, failed) = match signing_result {
+            Ok(signed) => (signed, BTreeMap::new()),
+            // Failures are returned without raising an error
+            Err((signed, failed)) => (signed, failed),
+        };
+        let signed = signed
+            .into_iter()
+            .map(|(input_index, pks)| {
+                let pks = pks.into_iter().map(Value::from).collect::<Vec<_>>();
+                Value::array_of((input_index, pks))
+            })
+            .collect::<Vec<_>>();
+        let failed = failed
+            .into_iter()
+            .map(|(input_index, error)| Value::array_of((input_index, error.to_string())))
+            .collect::<Vec<_>>();
+
+        Ok(Value::array_of((psbt, signed, failed)))
     }
 }
 

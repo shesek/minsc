@@ -361,16 +361,25 @@ impl Value {
 // Convert from Bitcoin types to Value
 
 impl From<XOnlyPublicKey> for Value {
-    fn from(key: XOnlyPublicKey) -> Self {
+    fn from(pk: XOnlyPublicKey) -> Self {
         Value::PubKey(DescriptorPublicKey::Single(SinglePub {
-            key: SinglePubKey::XOnly(key),
+            key: SinglePubKey::XOnly(pk),
             origin: None,
         }))
     }
 }
 impl From<TweakedPublicKey> for Value {
-    fn from(key: TweakedPublicKey) -> Self {
-        key.to_inner().into()
+    fn from(pk: TweakedPublicKey) -> Self {
+        pk.to_inner().into()
+    }
+}
+
+impl From<bitcoin::PublicKey> for Value {
+    fn from(pk: bitcoin::PublicKey) -> Self {
+        Value::PubKey(DescriptorPublicKey::Single(SinglePub {
+            key: SinglePubKey::FullKey(pk),
+            origin: None,
+        }))
     }
 }
 
