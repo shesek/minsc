@@ -181,6 +181,7 @@ fn psbt_from_tags(tags: Array) -> Result<Psbt> {
 }
 
 fn sign_psbt(psbt: &mut Psbt, seckeys: Value) -> Result<(psbt::SigningKeys, psbt::SigningErrors)> {
+    // TODO support signing with MultiXpriv
     let signing_result = match seckeys {
         Value::Array(seckeys) => {
             if let Some(Value::Array(_)) = seckeys.get(0) {
@@ -188,9 +189,7 @@ fn sign_psbt(psbt: &mut Psbt, seckeys: Value) -> Result<(psbt::SigningKeys, psbt
                 psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(seckeys)?, &EC)
             } else {
                 // Keys provided as [ $xpriv1, $xpriv2, ... ]
-                // FIXME: does not work because Xpriv does not implement Ord
-                //psbt.sign(&BTreeSet::<Xpriv>::try_from(seckeys), &EC)
-                bail!(Error::InvalidArguments);
+                psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)
             }
         }
         // Provided as a single Xpriv
@@ -416,6 +415,7 @@ impl TryFrom<Value> for PsbtAddOut {
 fn bip32_derivation(
     val: Value,
 ) -> Result<BTreeMap<secp256k1::PublicKey, (Fingerprint, DerivationPath)>> {
+    // TODO support MultiXpub/Prv as multiple KeyWithSource
     let key_sources: Vec<KeyWithSource> = match val {
         Value::Array(array) => array.into_iter().collect_into()?,
         single => vec![single.try_into()?],

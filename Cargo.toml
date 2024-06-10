@@ -46,3 +46,8 @@ crate-type = ["cdylib", "lib"]
 lto = true
 # webpack fail wasm compilation without this
 opt-level = "s"
+
+# Needed for https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
+[patch.crates-io.bitcoin]
+git = "https://github.com/shesek/rust-bitcoin"
+rev = "ca27d93c712441762f97edccd1045ad08202ab72" # 202406-getkey-vec-v0.31.2
