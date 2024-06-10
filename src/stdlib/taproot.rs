@@ -71,7 +71,7 @@ pub mod fns {
 
         if with_parity.unwrap_or(false) {
             let parity = tapinfo.output_key_parity().to_u8() as i64;
-            Ok(Value::array(vec![key.into(), parity.into()]))
+            Ok(Value::arr2(key, parity))
         } else {
             Ok(key.into())
         }
@@ -102,7 +102,7 @@ pub mod fns {
                 let script = script_ver.0.clone();
                 let version = vec![script_ver.1.to_consensus()];
                 let ctrl = tapinfo.control_block(script_ver).unwrap().serialize();
-                Value::array(vec![script.into(), version.into(), ctrl.into()])
+                Value::arr3(script, version, ctrl)
             })
             .collect();
 
