@@ -269,6 +269,12 @@ pub enum RuntimeError {
     #[error("PSBT finalization errors: {}", .0.into_iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))]
     PsbtFinalize(Vec<miniscript::psbt::Error>),
 
+    #[error("Missing \"input\" field to construct the PSBT transaction input")]
+    PsbtAddInMissingTxIn,
+
+    #[error("Missing \"output\" field to construct the PSBT transaction output")]
+    PsbtAddOutMissingTxOut,
+
     // Generic error raised from user-land Minsc code
     #[error("Exception: {0}")]
     ScriptException(String),

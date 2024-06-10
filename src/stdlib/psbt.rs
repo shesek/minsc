@@ -194,11 +194,13 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
             "xpub" => psbt.xpub = val.try_into()?,
             "proprietary" => psbt.proprietary = val.try_into()?,
             "unknown" => psbt.unknown = val.try_into()?,
+            // Update PSBT fields for existing inputs
             "inputs" => {
                 for (vin, in_tags) in mapped_or_all(val, psbt.inputs.len())? {
                     update_input(mut_input(psbt, vin)?, in_tags)?;
                 }
             }
+            // Update PSBT fields for existing outputs
             "outputs" => {
                 for (vout, out_tags) in mapped_or_all(val, psbt.outputs.len())? {
                     update_output(mut_output(psbt, vout)?, out_tags)?;
@@ -206,30 +208,23 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
             }
             "combine" => psbt.combine(val.try_into()?)?,
 
-            // Shortcut for setting just the `witness_utxo` of multiple inputs
-            // (non-segwit inputs may be set manually through `inputs`)
-            "utxos" | "witness_utxos" => {
-                for (vin, spent_utxo) in mapped_or_all(val, psbt.inputs.len())? {
-                    mut_input(psbt, vin)?.witness_utxo = Some(spent_utxo);
+            // Shortcut for adding a Transaction TxIn and Psbt Input in one go.
+            // Must include the "input" field with the input (or just the input's prevout) to add to the transaction,
+            // and can additionally contain any of the PSBT input fields.
+            "add_inputs" => {
+                for PsbtAddIn(input, psbt_input) in val.into_vec_of()? {
+                    psbt.unsigned_tx.input.push(input);
+                    psbt.inputs.push(psbt_input);
                 }
             }
 
-            // Shortcut for adding a Coin as a Transaction input and as a Psbt Input with the `witness_utxo` field.
-            // (non-segwit inputs may be set manually through `inputs`)
-            //
-            // Coin consists of a tx input (or just its outpoint) alongside the spent txout.
-            // All of the following are valid Coin definitions:
-            // [ "input": [ "prevout": $txid:0, "sequence": 0, ... ], "utxo": [ "scriptPubKey": wpkh($alice), "amount": 0.01 BTC ] ]
-            // [ "input": $txid:0, "utxo": wpkh($alice):1000000 ]
-            // [ $txid:0, wpkh($alice):0.1 BTC]
-            // ($txid:0):(wpkh($alice):0.1 BTC)
-            // $outpoint:$utxo
-            "coins" => {
-                for PsbtCoin(input, spent_utxo) in val.into_vec_of()? {
-                    psbt.unsigned_tx.input.push(input);
-                    let mut psbt_input = psbt::Input::default();
-                    psbt_input.witness_utxo = Some(spent_utxo);
-                    psbt.inputs.push(psbt_input);
+            // Shortcut for adding a Transaction TxOut and Psbt Output in one go.
+            // Must include the "output" field with the output to add to the transaction,
+            // and can additionally contain any of the PSBT output fields.
+            "add_outputs" => {
+                for PsbtAddOut(input, psbt_input) in val.into_vec_of()? {
+                    psbt.unsigned_tx.output.push(input);
+                    psbt.outputs.push(psbt_input);
                 }
             }
 
@@ -329,44 +324,63 @@ fn mapped_or_all<T: FromValue>(arr: Value, expected_all_length: usize) -> Result
     Ok(<Vec<T>>::try_from(arr)?.into_iter().enumerate().collect())
 }
 
-struct PsbtCoin(TxIn, psbt::Input);
-impl TryFrom<Value> for PsbtCoin {
+struct PsbtAddIn(TxIn, psbt::Input);
+impl TryFrom<Value> for PsbtAddIn {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        let mut input = TxIn::default();
+        // Extract the "input" tag to construct the tx input, collecting the other PSBT tags and forwarding them to update_input()
+        let mut tx_input = None;
+        let psbt_input_tags = value
+            .into_tags()?
+            .into_iter()
+            .filter_map(|(tag, val)| {
+                if tag == "input" {
+                    tx_input = Some(val);
+                    None
+                } else {
+                    Some(Value::array_of((tag, val)))
+                }
+            })
+            .collect();
+        let tx_input = tx_input
+            .ok_or(Error::PsbtAddInMissingTxIn)?
+            .try_into()
+            .map_err(|e| Error::TagError("input".into(), Box::new(e)))?;
+
         let mut psbt_input = psbt::Input::default();
-        let mut descriptor = None;
-        let mut amount = None;
-        value.for_each_tag(|tag, val| {
-            match tag {
-                "input" => input = val.try_into()?,
-                "witness_utxo" | "utxo" => psbt_input.witness_utxo = Some(val.try_into()?),
-                "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
-                "bip32_derivation" | "key_source" => {
-                    psbt_input.bip32_derivation = val.try_into()?
-                }
-                "descriptor" => {
-                    let descriptor_ = val.try_into()?;
-                    psbt_input.update_with_descriptor_unchecked(&descriptor_)?;
-                    descriptor = Some(descriptor_);
-                }
-                "utxo_amount" => amount = Some(val.try_into()?),
-                _ => bail!(Error::TagUnknown),
-            }
-            Ok(())
-        })?;
+        update_input(&mut psbt_input, Array(psbt_input_tags))?;
 
-        // Automatically fill in the `utxo` if the descriptor and amount are known
-        if let (Some(descriptor), Some(amount), None) =
-            (descriptor, amount, &psbt_input.witness_utxo)
-        {
-            psbt_input.witness_utxo = Some(TxOut {
-                script_pubkey: descriptor.script_pubkey(),
-                value: amount,
-            });
-        }
+        Ok(PsbtAddIn(tx_input, psbt_input))
+    }
+}
 
-        Ok(PsbtCoin(input, psbt_input))
+struct PsbtAddOut(TxOut, psbt::Output);
+impl TryFrom<Value> for PsbtAddOut {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        // Extract the "output" tag to construct the tx output, collecting the other PSBT tags and forwarding them to update_output()
+        let mut tx_output = None;
+        let psbt_outputs_tags = value
+            .into_tags()?
+            .into_iter()
+            .filter_map(|(tag, val)| {
+                if tag == "output" {
+                    tx_output = Some(val);
+                    None
+                } else {
+                    Some(Value::array_of((tag, val)))
+                }
+            })
+            .collect();
+        let tx_output = tx_output
+            .ok_or(Error::PsbtAddOutMissingTxOut)?
+            .try_into()
+            .map_err(|e| Error::TagError("output".into(), Box::new(e)))?;
+
+        let mut psbt_output = psbt::Output::default();
+        update_output(&mut psbt_output, Array(psbt_outputs_tags))?;
+
+        Ok(PsbtAddOut(tx_output, psbt_output))
     }
 }
 
