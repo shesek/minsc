@@ -4,6 +4,7 @@ use std::convert::{TryFrom, TryInto};
 use bitcoin::bip32::{DerivationPath, Fingerprint, Xpriv};
 use bitcoin::psbt::{self, Psbt};
 use bitcoin::{secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
+use miniscript::psbt::PsbtExt;
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
@@ -15,6 +16,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::create", fns::psbt).unwrap();
     scope.set_fn("psbt::update", fns::update).unwrap();
     scope.set_fn("psbt::combine", fns::combine).unwrap();
+    scope.set_fn("psbt::sighash", fns::sighash).unwrap();
 }
 
 impl TryFrom<Value> for Psbt {
@@ -36,19 +38,19 @@ pub mod fns {
 
     use super::*;
 
-    // psbt(Transaction|Bytes|Array<Tagged>) -> Psbt
+    /// psbt(Transaction|Bytes|Array<Tagged>) -> Psbt
     pub fn psbt(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::Psbt(args.arg_into()?))
     }
 
-    // psbt::update(Psbt, Array<Tagged>) -> Psbt
+    /// psbt::update(Psbt, Array<Tagged>) -> Psbt
     pub fn update(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, tags) = args.args_into()?;
         update_psbt(&mut psbt, tags)?;
         Ok(Value::Psbt(psbt))
     }
 
-    // psbt::combine(Array<Psbt>) -> Psbt
+    /// psbt::combine(Array<Psbt>) -> Psbt
     pub fn combine(args: Array, _: &ScopeRef) -> Result<Value> {
         let mut psbts: Vec<Psbt> = args.arg_into()?;
         ensure!(!psbts.is_empty(), Error::InvalidArguments);
@@ -57,6 +59,16 @@ pub mod fns {
             psbt.combine(other_psbt)?;
         }
         Ok(Value::Psbt(psbt))
+    }
+
+    /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes
+    pub fn sighash(args: Array, _: &ScopeRef) -> Result<Value> {
+        use bitcoin::sighash::SighashCache;
+        let (psbt, input_index, tapleaf_hash): (Psbt, _, _) = args.args_into()?;
+        let mut sighash_cache = SighashCache::new(&psbt.unsigned_tx);
+
+        let sighash_msg = psbt.sighash_msg(input_index, &mut sighash_cache, tapleaf_hash)?;
+        Ok(sighash_msg.to_secp_msg()[..].to_vec().into())
     }
 }
 

@@ -360,6 +360,9 @@ pub enum RuntimeError {
 
     #[error("Failed parsing taproot signature: {0}")]
     SigFromSlice(#[from] bitcoin::taproot::SigFromSliceError),
+
+    #[error("PSBT SigHash error: {0}")]
+    PsbtSigHash(#[from] miniscript::psbt::SighashError),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {
