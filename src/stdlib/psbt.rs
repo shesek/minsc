@@ -16,6 +16,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::create", fns::psbt).unwrap();
     scope.set_fn("psbt::update", fns::update).unwrap();
     scope.set_fn("psbt::combine", fns::combine).unwrap();
+    scope.set_fn("psbt::finalize", fns::finalize).unwrap();
     scope.set_fn("psbt::sighash", fns::sighash).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
 }
@@ -60,6 +61,17 @@ pub mod fns {
             psbt.combine(other_psbt)?;
         }
         Ok(Value::Psbt(psbt))
+    }
+
+    /// psbt::finalize(Psbt) -> [Psbt, Array<String error>]
+    pub fn finalize(args: Array, _: &ScopeRef) -> Result<Value> {
+        let mut psbt: Psbt = args.arg_into()?;
+        // Failures are returned without raising an error
+        let errors = match psbt.finalize_mut(&EC) {
+            Ok(()) => vec![],
+            Err(errors) => errors.iter().map(|e| Value::from(e.to_string())).collect(),
+        };
+        Ok(Value::arr2(psbt, errors))
     }
 
     /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes

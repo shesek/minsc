@@ -349,9 +349,6 @@ pub enum RuntimeError {
     #[error("ECDSA error: {0}")]
     Ecdsa(#[from] bitcoin::ecdsa::Error),
 
-    #[error("PSBT error: {0}")]
-    Psbt(#[from] bitcoin::psbt::Error),
-
     #[error("Failed extracting PSBT tx: {0}")]
     PsbtExtractTx(#[from] bitcoin::psbt::ExtractTxError),
 
@@ -360,6 +357,12 @@ pub enum RuntimeError {
 
     #[error("Failed parsing taproot signature: {0}")]
     SigFromSlice(#[from] bitcoin::taproot::SigFromSliceError),
+
+    #[error("PSBT error: {0}")]
+    Psbt(#[from] bitcoin::psbt::Error),
+
+    #[error("Miniscript PSBT error: {0}")]
+    MiniscriptPsbt(#[from] miniscript::psbt::Error),
 
     #[error("PSBT SigHash error: {0}")]
     PsbtSigHash(#[from] miniscript::psbt::SighashError),
