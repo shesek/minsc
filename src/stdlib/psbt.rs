@@ -72,7 +72,7 @@ pub mod fns {
             Ok(()) => vec![],
             Err(errors) => errors.iter().map(|e| Value::from(e.to_string())).collect(),
         };
-        Ok(Value::arr2(psbt, errors))
+        Ok(Value::array_of((psbt, errors)))
     }
 
     /// psbt::extract(Psbt, Bool finalize=false) -> Transaction

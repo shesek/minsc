@@ -74,6 +74,11 @@ impl From<f64> for Value {
         Number::Float(n).into()
     }
 }
+impl From<u8> for Value {
+    fn from(num: u8) -> Value {
+        Number::Int(num.into()).into()
+    }
+}
 impl From<usize> for Value {
     fn from(num: usize) -> Value {
         // TODO this should use TryFrom
@@ -400,6 +405,9 @@ impl Value {
 
     pub fn array(elements: Vec<Value>) -> Self {
         Value::Array(Array(elements))
+    }
+    pub fn array_of(array: impl Into<Array>) -> Self {
+        Value::Array(array.into())
     }
     pub fn arr1(a: impl Into<Value>) -> Value {
         Self::array(vec![a.into()])

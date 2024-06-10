@@ -71,7 +71,7 @@ pub mod fns {
 
         if with_parity.unwrap_or(false) {
             let parity = tapinfo.output_key_parity().to_u8() as i64;
-            Ok(Value::arr2(key, parity))
+            Ok(Value::array_of((key, parity)))
         } else {
             Ok(key.into())
         }
@@ -89,7 +89,7 @@ pub mod fns {
         }))
     }
 
-    /// tr::scripts(TapInfo) -> Array<(Script, Bytes version, Bytes control_block)>
+    /// tr::scripts(TapInfo) -> Array<(Script, Int version, Bytes control_block)>
     ///
     /// Get the scripts in this TapInfo with their control blocks
     pub fn scripts(args: Array, _: &ScopeRef) -> Result<Value> {
@@ -99,10 +99,8 @@ pub mod fns {
             .script_map()
             .keys()
             .map(|script_ver| {
-                let script = script_ver.0.clone();
-                let version = vec![script_ver.1.to_consensus()];
                 let ctrl = tapinfo.control_block(script_ver).unwrap().serialize();
-                Value::arr3(script, version, ctrl)
+                Value::array_of((script_ver.0.clone(), script_ver.1.to_consensus(), ctrl))
             })
             .collect();
 

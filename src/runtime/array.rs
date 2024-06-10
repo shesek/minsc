@@ -118,6 +118,23 @@ impl IntoIterator for Array {
     }
 }
 
+// Generic conversion from 1/2/3-tuples of any convertible type into an Array
+impl<A: Into<Value>> From<(A,)> for Array {
+    fn from((a,): (A,)) -> Self {
+        Array(vec![a.into()])
+    }
+}
+impl<A: Into<Value>, B: Into<Value>> From<(A, B)> for Array {
+    fn from((a, b): (A, B)) -> Self {
+        Array(vec![a.into(), b.into()])
+    }
+}
+impl<A: Into<Value>, B: Into<Value>, C: Into<Value>> From<(A, B, C)> for Array {
+    fn from((a, b, c): (A, B, C)) -> Self {
+        Array(vec![a.into(), b.into(), c.into()])
+    }
+}
+
 // Generic conversion from Array into a Vec of any convertible type
 impl<T: FromValue> TryFrom<Array> for Vec<T> {
     type Error = Error;
