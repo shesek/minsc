@@ -248,7 +248,9 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "sighash_type" => psbt_input.sighash_type = Some(val.try_into()?),
             "redeem_script" => psbt_input.redeem_script = Some(val.try_into()?),
             "witness_script" => psbt_input.witness_script = Some(val.try_into()?),
-            "bip32_derivation" | "sources" => psbt_input.bip32_derivation = bip32_derivation(val)?,
+            "bip32_derivation" | "key_source" => {
+                psbt_input.bip32_derivation = bip32_derivation(val)?
+            }
             "final_script_sig" => psbt_input.final_script_sig = Some(val.try_into()?),
             "final_script_witness" => psbt_input.final_script_witness = Some(val.try_into()?),
             "ripemd160_preimages" => psbt_input.ripemd160_preimages = val.try_into()?,
@@ -277,7 +279,7 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
         match tag {
             "redeem_script" => psbt_output.redeem_script = Some(val.try_into()?),
             "witness_script" => psbt_output.witness_script = Some(val.try_into()?),
-            "bip32_derivation" => psbt_output.bip32_derivation = val.try_into()?,
+            "bip32_derivation" | "key_source" => psbt_output.bip32_derivation = val.try_into()?,
             "tap_internal_key" => psbt_output.tap_internal_key = Some(val.try_into()?),
             // TOOD "tap_tree" => psbt_output.tap_internal_key = Some(val.try_into()?),
             "tap_key_origins" => psbt_output.tap_key_origins = val.try_into()?,
@@ -311,23 +313,59 @@ fn mapped_or_all<T: FromValue>(arr: Value, expected_all_length: usize) -> Result
     Ok(<Vec<T>>::try_from(arr)?.into_iter().enumerate().collect())
 }
 
-struct PsbtCoin(TxIn, TxOut);
+struct PsbtCoin(TxIn, psbt::Input);
 impl TryFrom<Value> for PsbtCoin {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        let (input, spent_utxo) = value.tagged_or_tuple("input", "utxo")?;
-        Ok(Self(input, spent_utxo))
+        let mut input = TxIn::default();
+        let mut psbt_input = psbt::Input::default();
+        let mut descriptor = None;
+        let mut amount = None;
+        value.for_each_tag(|tag, val| {
+            match tag {
+                "input" => input = val.try_into()?,
+                "witness_utxo" | "utxo" => psbt_input.witness_utxo = Some(val.try_into()?),
+                "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
+                "bip32_derivation" | "key_source" => {
+                    psbt_input.bip32_derivation = val.try_into()?
+                }
+                "descriptor" => {
+                    let descriptor_ = val.try_into()?;
+                    psbt_input.update_with_descriptor_unchecked(&descriptor_)?;
+                    descriptor = Some(descriptor_);
+                }
+                "utxo_amount" => amount = Some(val.try_into()?),
+                _ => bail!(Error::TagUnknown),
+            }
+            Ok(())
+        })?;
+
+        // Automatically fill in the `utxo` if the descriptor and amount are known
+        if let (Some(descriptor), Some(amount), None) =
+            (descriptor, amount, &psbt_input.witness_utxo)
+        {
+            psbt_input.witness_utxo = Some(TxOut {
+                script_pubkey: descriptor.script_pubkey(),
+                value: amount,
+            });
+        }
+
+        Ok(PsbtCoin(input, psbt_input))
     }
 }
 
+// BIP32 key sources. May be provided as a single Xpub/Xpriv, as an array of Xpubs/Xprivs,
+// or as map of single PubKey to KeySource. (examples in KeyWithSource below)
 fn bip32_derivation(
     val: Value,
 ) -> Result<BTreeMap<secp256k1::PublicKey, (Fingerprint, DerivationPath)>> {
-    // Intermediate decoding into btc::KeySource for specialized decoding logic,
-    // then into the psbt::Inputs's bip32_derivation field type.
-    Ok(Vec::try_from(val)?
+    let key_sources: Vec<KeyWithSource> = match val {
+        Value::Array(array) => array.into_iter().collect_into()?,
+        single => vec![single.try_into()?],
+    };
+    Ok(key_sources
         .into_iter()
-        .map(|KeyWithSource(pk, fingerprint, path)| (pk, (fingerprint, path)))
+        .map(|ks| (ks.0, (ks.1, ks.2)))
         .collect())
 }
 pub struct KeyWithSource(
@@ -339,7 +377,7 @@ impl TryFrom<Value> for KeyWithSource {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
-            // May be provided as a tuple/tagged array mapping from `pk` to the `source`,
+            // May be provided as an array mapping from `pk` to the `source`,
             // where `source` is a tuple/tagged array of $fingerprint:$derivation_path.
             // For example: `$single_pk1: 0x1223344:[2,5]`
             // Or in long-form: `$single_pk1: [ "fingerprint": 0x11223344, "derivation_path": [2,5] ]`
