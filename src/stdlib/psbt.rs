@@ -64,10 +64,21 @@ pub mod fns {
         Ok(Value::Psbt(psbt))
     }
 
-    /// psbt::finalize(Psbt) -> [Psbt, Array<String error>]
+    /// psbt::finalize(Psbt) -> Psbt
+    ///
+    /// Finalize the PSBT, raising an error if any of the inputs failed to finalize
     pub fn finalize(args: Array, _: &ScopeRef) -> Result<Value> {
         let mut psbt: Psbt = args.arg_into()?;
-        // Failures are returned without raising an error
+        psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
+        Ok(psbt.into())
+    }
+
+    /// psbt::try_finalize(Psbt) -> [Psbt, Array<String>]
+    ///
+    /// Try finalizing the PSBT, returning it with all the inputs that could be finalized
+    /// an an array of errors for the input that couldn't.
+    pub fn try_finalize(args: Array, _: &ScopeRef) -> Result<Value> {
+        let mut psbt: Psbt = args.arg_into()?;
         let errors = match psbt.finalize_mut(&EC) {
             Ok(()) => vec![],
             Err(errors) => errors.iter().map(|e| Value::from(e.to_string())).collect(),
@@ -79,9 +90,8 @@ pub mod fns {
     /// Also available as `tx(Psbt)` (without `finalize`, for pre-finalized PSBT only)
     pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
-        // Failures during pre-signing finalization do raise an error
         if finalize.unwrap_or(false) {
-            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalizeErrors)?;
+            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
         }
         Ok(psbt.extract(&EC)?.into())
     }
