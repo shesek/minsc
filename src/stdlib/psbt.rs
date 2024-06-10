@@ -240,6 +240,8 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
 }
 
 fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
+    let mut descriptor = None;
+    let mut utxo_amount = None;
     tags.for_each_tag(|tag, val| {
         match tag {
             "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
@@ -265,13 +267,27 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "tap_merkle_root" => psbt_input.tap_merkle_root = Some(val.try_into()?),
             "proprietary" => psbt_input.proprietary = val.try_into()?,
             "unknown" => psbt_input.unknown = val.try_into()?,
-            "descriptor" => psbt_input
-                .update_with_descriptor_unchecked(&val.try_into()?)
-                .map(|_| ())?,
+            "descriptor" => {
+                let descriptor_ = val.try_into()?;
+                psbt_input.update_with_descriptor_unchecked(&descriptor_)?;
+                descriptor = Some(descriptor_);
+            }
+            // Keep the amount to later construct the utxo
+            "amount" | "utxo_amount" => utxo_amount = Some(val.try_into()?),
             _ => bail!(Error::TagUnknown),
         }
         Ok(())
-    })
+    })?;
+    // Automatically fill in the `witness_utxo` if the `descriptor`` and `utxo_amount` are known
+    if let (Some(descriptor), Some(utxo_amount), None) =
+        (descriptor, utxo_amount, &psbt_input.witness_utxo)
+    {
+        psbt_input.witness_utxo = Some(TxOut {
+            script_pubkey: descriptor.script_pubkey(),
+            value: utxo_amount,
+        });
+    }
+    Ok(())
 }
 
 fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
