@@ -369,6 +369,9 @@ pub enum RuntimeError {
 
     #[error("PSBT SigHash error: {0}")]
     PsbtSigHash(#[from] miniscript::psbt::SighashError),
+
+    #[error("PSBT update error: {0}")]
+    PsbtUtxoUpdate(#[from] miniscript::psbt::UtxoUpdateError),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {

@@ -4,7 +4,7 @@ use std::convert::{TryFrom, TryInto};
 use bitcoin::bip32::{DerivationPath, Fingerprint, Xpriv};
 use bitcoin::psbt::{self, Psbt};
 use bitcoin::{secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
-use miniscript::psbt::PsbtExt;
+use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
@@ -263,6 +263,9 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "tap_merkle_root" => psbt_input.tap_merkle_root = Some(val.try_into()?),
             "proprietary" => psbt_input.proprietary = val.try_into()?,
             "unknown" => psbt_input.unknown = val.try_into()?,
+            "descriptor" => psbt_input
+                .update_with_descriptor_unchecked(&val.try_into()?)
+                .map(|_| ())?,
             _ => bail!(Error::TagUnknown),
         }
         Ok(())
@@ -280,6 +283,9 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
             "tap_key_origins" => psbt_output.tap_key_origins = val.try_into()?,
             "proprietary" => psbt_output.proprietary = val.try_into()?,
             "unknown" => psbt_output.unknown = val.try_into()?,
+            "descriptor" => psbt_output
+                .update_with_descriptor_unchecked(&val.try_into()?)
+                .map(|_| ())?,
             _ => bail!(Error::TagUnknown),
         }
         Ok(())

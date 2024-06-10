@@ -243,6 +243,12 @@ impl TryFrom<Value> for Descriptor {
         }
     }
 }
+impl TryFrom<Value> for miniscript::Descriptor<miniscript::DefiniteDescriptorKey> {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(Descriptor::try_from(value)?.at_derivation_index(0)?)
+    }
+}
 impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
