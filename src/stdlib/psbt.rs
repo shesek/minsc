@@ -17,6 +17,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::update", fns::update).unwrap();
     scope.set_fn("psbt::combine", fns::combine).unwrap();
     scope.set_fn("psbt::sighash", fns::sighash).unwrap();
+    scope.set_fn("psbt::fee", fns::fee).unwrap();
 }
 
 impl TryFrom<Value> for Psbt {
@@ -69,6 +70,11 @@ pub mod fns {
 
         let sighash_msg = psbt.sighash_msg(input_index, &mut sighash_cache, tapleaf_hash)?;
         Ok(sighash_msg.to_secp_msg()[..].to_vec().into())
+    }
+
+    /// psbt::fee(Psbt) -> Int
+    pub fn fee(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()?)
     }
 }
 

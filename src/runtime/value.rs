@@ -80,6 +80,12 @@ impl From<usize> for Value {
         Number::Int(num.try_into().unwrap()).into()
     }
 }
+impl TryFrom<u64> for Value {
+    type Error = Error;
+    fn try_from(num: u64) -> Result<Self> {
+        Ok(Value::Number(Number::Int(num.try_into()?)))
+    }
+}
 
 // From NativeFunction/UserFunction to Value
 impl<T: Into<Function>> From<T> for Value {
