@@ -15,6 +15,7 @@ use miniscript::descriptor::{
     self, Descriptor, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv,
     SinglePub, SinglePubKey,
 };
+use miniscript::psbt::PsbtExt;
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
 use crate::runtime::scope::{Mutable, ScopeRef};
@@ -530,7 +531,7 @@ impl TryFrom<Value> for Transaction {
         Ok(match value {
             Value::Transaction(tx) => tx,
             Value::Bytes(bytes) => bitcoin::consensus::deserialize(&bytes)?,
-            Value::Psbt(psbt) => psbt.extract_tx()?,
+            Value::Psbt(psbt) => psbt.extract(&EC)?,
 
             // From tagged [ "version": $version, "locktime": $locktime, "inputs": [ .. ], "outputs": [ .. ] ]
             Value::Array(_) => {

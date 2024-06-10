@@ -266,6 +266,9 @@ pub enum RuntimeError {
     #[error("PSBT output #{0} does not exists")]
     PsbtOutputNotFound(usize),
 
+    #[error("PSBT finalization errors: {}", .0.into_iter().map(ToString::to_string).collect::<Vec<_>>().join(", "))]
+    PsbtFinalizeErrors(Vec<miniscript::psbt::Error>),
+
     // Generic error raised from user-land Minsc code
     #[error("Exception: {0}")]
     ScriptException(String),

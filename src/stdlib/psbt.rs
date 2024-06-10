@@ -17,6 +17,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::update", fns::update).unwrap();
     scope.set_fn("psbt::combine", fns::combine).unwrap();
     scope.set_fn("psbt::finalize", fns::finalize).unwrap();
+    scope.set_fn("psbt::extract", fns::extract).unwrap();
     scope.set_fn("psbt::sighash", fns::sighash).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
 }
@@ -72,6 +73,17 @@ pub mod fns {
             Err(errors) => errors.iter().map(|e| Value::from(e.to_string())).collect(),
         };
         Ok(Value::arr2(psbt, errors))
+    }
+
+    /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
+    /// Also available as `tx(Psbt)` (without `finalize`, for pre-finalized PSBT only)
+    pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
+        // Failures during pre-signing finalization do raise an error
+        if finalize.unwrap_or(false) {
+            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalizeErrors)?;
+        }
+        Ok(psbt.extract(&EC)?.into())
     }
 
     /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes
