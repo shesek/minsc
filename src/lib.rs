@@ -29,6 +29,7 @@ use miniscript::{descriptor, policy};
 
 pub type PolicyDpk = policy::concrete::Policy<descriptor::DescriptorPublicKey>;
 pub type DescriptorDpk = descriptor::Descriptor<descriptor::DescriptorPublicKey>;
+pub type DescriptorDef = descriptor::Descriptor<descriptor::DefiniteDescriptorKey>;
 pub type MiniscriptDpk<Ctx> = miniscript::Miniscript<descriptor::DescriptorPublicKey, Ctx>;
 
 /// Evaluate the given expression in the default global scope

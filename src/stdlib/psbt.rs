@@ -8,7 +8,7 @@ use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
-use crate::util::EC;
+use crate::{util::EC, DescriptorDef};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -299,7 +299,8 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
         }
         Ok(())
     })?;
-    // Automatically fill in the `witness_utxo` if the `descriptor`` and `utxo_amount` are known
+
+    // Automatically fill in the `witness_utxo` if both the `descriptor` and `utxo_amount` are known
     if let (Some(descriptor), Some(utxo_amount), None) =
         (descriptor, utxo_amount, &psbt_input.witness_utxo)
     {
@@ -308,6 +309,7 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             value: utxo_amount,
         });
     }
+
     Ok(())
 }
 
@@ -354,7 +356,7 @@ struct PsbtAddIn(TxIn, psbt::Input);
 impl TryFrom<Value> for PsbtAddIn {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        // Extract the "input" tag to construct the tx input, collecting the other PSBT tags and forwarding them to update_input()
+        // Extract the "input" tag to construct the tx input, collecting and forwarding the other PSBT tags to `update_input()`
         let mut tx_input = None;
         let psbt_input_tags = value
             .into_tags()?
@@ -368,6 +370,7 @@ impl TryFrom<Value> for PsbtAddIn {
                 }
             })
             .collect();
+
         let tx_input = tx_input
             .ok_or(Error::PsbtAddInMissingTxIn)?
             .try_into()
@@ -384,24 +387,56 @@ struct PsbtAddOut(TxOut, psbt::Output);
 impl TryFrom<Value> for PsbtAddOut {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        // Extract the "output" tag to construct the tx output, collecting the other PSBT tags and forwarding them to update_output()
         let mut tx_output = None;
+        let mut amount = None;
+        let mut descriptor: Option<DescriptorDef> = None;
+
+        // Extract tags for tx output construction, collecting and forwarding the rest to `update_output()`
         let psbt_outputs_tags = value
             .into_tags()?
             .into_iter()
-            .filter_map(|(tag, val)| {
-                if tag == "output" {
-                    tx_output = Some(val);
-                    None
-                } else {
-                    Some(Value::array_of((tag, val)))
+            .filter_map(|(tag, val)| -> Option<Result<Value>> {
+                match tag.as_str() {
+                    // Extract the "output" tag to construct the tx output from
+                    "output" => match val.try_into() {
+                        Ok(tx_output_) => {
+                            tx_output = Some(tx_output_);
+                            None // don't forward
+                        }
+                        Err(e) => Some(Err(Error::TagError("output".into(), Box::new(e)))),
+                    },
+                    // Alternatively, the tx output can be constructed from the `amount` and the `descriptor` fields
+                    "amount" => match val.try_into() {
+                        Ok(amount_) => {
+                            amount = Some(amount_);
+                            None // don't forward
+                        }
+                        Err(e) => Some(Err(Error::TagError("amount".into(), Box::new(e)))),
+                    },
+                    "descriptor" => match val.clone().try_into() {
+                        Ok(descriptor_) => {
+                            // Keep the descriptor for tx output construction, but also forward it to `update_psbt()`
+                            descriptor = Some(descriptor_);
+                            Some(Ok(Value::array_of((tag, val))))
+                        }
+                        Err(e) => Some(Err(Error::TagError("descriptor".into(), Box::new(e)))),
+                    },
+
+                    // Collect all other PSBT fields to forward to `update_output()`
+                    _ => Some(Ok(Value::array_of((tag, val)))),
                 }
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
+
+        // Automatically fill in the `tx_output` if both the `descriptor` and `amount` are known
         let tx_output = tx_output
-            .ok_or(Error::PsbtAddOutMissingTxOut)?
-            .try_into()
-            .map_err(|e| Error::TagError("output".into(), Box::new(e)))?;
+            .or_else(|| {
+                descriptor.zip(amount).map(|(descriptor, amount)| TxOut {
+                    script_pubkey: descriptor.script_pubkey(),
+                    value: amount,
+                })
+            })
+            .ok_or(Error::PsbtAddOutMissingTxOut)?;
 
         let mut psbt_output = psbt::Output::default();
         update_output(&mut psbt_output, Array(psbt_outputs_tags))?;
