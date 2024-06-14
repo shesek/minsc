@@ -887,7 +887,7 @@ impl PrettyDisplay for Transaction {
         let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
             util::indentation_params(indent);
         let field_sep = format!("{newline_or_space}{:inner_indent_w$}", "");
-        write!(f, r#"tx([{field_sep}"version": {}"#, self.version.0)?;
+        write!(f, r#"tx [{field_sep}"version": {}"#, self.version.0)?;
         if self.lock_time != LockTime::ZERO {
             write!(f, r#",{field_sep}"locktime": {}"#, self.lock_time)?;
         }
@@ -935,7 +935,7 @@ impl PrettyDisplay for Transaction {
                 },
             )?;
         }
-        write!(f, "{newline_or_space}{:indent_w$}])", "")
+        write!(f, "{newline_or_space}{:indent_w$}]", "")
     }
 
     fn prefer_multiline_anyway(&self) -> bool {
