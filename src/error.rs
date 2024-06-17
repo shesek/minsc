@@ -1,8 +1,6 @@
 use std::result::Result as StdResult;
 
-use bitcoin::{
-    self, amount, bip32, hashes, hex, key, network, script, taproot, witness_program,
-};
+use bitcoin::{self, amount, bip32, hashes, hex, key, network, script, taproot, witness_program};
 use miniscript::policy::compiler::CompilerError;
 use miniscript::{descriptor, TranslateErr};
 
@@ -104,7 +102,9 @@ pub enum RuntimeError {
     #[error("Expected a transaction as object, raw bytes or tagged list, not {0:?}")]
     NotTxLike(Box<Value>),
 
-    #[error("Expected a bip32 fingerprint as bytes or key, not {0:?}")]
+    #[error(
+        "Expected a 4 bytes BIP32 fingerprint or a key to compute the fingerprint for, not {0:?}"
+    )]
     NotFingerprintLike(Box<Value>),
 
     #[error("Expected raw Script or Bytes, not {0:?}. Perhaps you meant to use explicitScript()/scriptPubKey()?")]

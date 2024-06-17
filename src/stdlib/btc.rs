@@ -697,9 +697,15 @@ impl TryFrom<Value> for bip32::Fingerprint {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
-            Value::Bytes(bytes) => bytes.as_slice().try_into()?,
+            Value::Bytes(ref bytes) => match bytes.len() {
+                // Use 4 bytes long values as an explicit BIP32 fingerprint
+                4 => bytes.as_slice().try_into()?,
+                // Convert 32/33/78 bytes (ecdsa/xonly/xpub) into a PubKey first, then get their fingerprint
+                32 | 33 | 78 => Value::PubKey(val.try_into()?).try_into()?,
+                _ => bail!(Error::NotFingerprintLike(val.into())),
+            },
             Value::PubKey(ref dpk) => match dpk {
-                // For xpubd, get the fingerprint of the final derivation (not the master_fingerprint()'s)
+                // For xpubs, get the fingerprint of the final derivation key (not the master_fingerprint()'s)
                 DescriptorPublicKey::XPub(_) => Xpub::try_from(val)?.fingerprint(),
                 // For single keys the master_fingerprint() is the same as the final fingerprint
                 DescriptorPublicKey::Single(_) => dpk.master_fingerprint(),
