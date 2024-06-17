@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 
-use bitcoin::bip32::{DerivationPath, Fingerprint, Xpriv};
+use bitcoin::bip32::{KeySource, Xpriv};
 use bitcoin::psbt::{self, Psbt};
 use bitcoin::{secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
@@ -447,9 +447,7 @@ impl TryFrom<Value> for PsbtAddOut {
 
 // BIP32 key sources. May be provided as a single Xpub/Xpriv, as an array of Xpubs/Xprivs,
 // or as map of single PubKey to KeySource. (examples in KeyWithSource below)
-fn bip32_derivation(
-    val: Value,
-) -> Result<BTreeMap<secp256k1::PublicKey, (Fingerprint, DerivationPath)>> {
+fn bip32_derivation(val: Value) -> Result<BTreeMap<secp256k1::PublicKey, KeySource>> {
     // TODO support MultiXpub/Prv as multiple KeyWithSource
     let key_sources: Vec<KeyWithSource> = match val {
         Value::Array(array) => array.into_iter().collect_into()?,
@@ -457,14 +455,11 @@ fn bip32_derivation(
     };
     Ok(key_sources
         .into_iter()
-        .map(|ks| (ks.0, (ks.1, ks.2)))
+        .map(|KeyWithSource(key, source)| (key, source))
         .collect())
 }
-pub struct KeyWithSource(
-    pub secp256k1::PublicKey,
-    pub Fingerprint,
-    pub DerivationPath,
-);
+pub struct KeyWithSource(pub secp256k1::PublicKey, pub KeySource);
+
 impl TryFrom<Value> for KeyWithSource {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
@@ -474,11 +469,12 @@ impl TryFrom<Value> for KeyWithSource {
             // For example: `$single_pk1: 0x1223344:[2,5]`
             // Or in long-form: `$single_pk1: [ "fingerprint": 0x11223344, "derivation_path": [2,5] ]`
             // Or even longer: `[ "pubkey": $single_pk1, "source": [ "fingerprint": 0x11223344, "derivation_path": [2,5] ] ]`
+            // The fingerprint may also be provided as a key to compute the fingerprint for, for example: `$single_pk1: xpub123:[2,5]`
             Value::Array(_) => {
                 let (pk, source): (_, Value) = val.tagged_or_tuple("pubkey", "source")?;
                 let (fingerprint, derivation_path) =
                     source.tagged_or_tuple("fingerprint", "derivation_path")?;
-                Self(pk, fingerprint, derivation_path)
+                Self(pk, (fingerprint, derivation_path))
             }
             // Or any value coercible into a PubKey/SecKey, using the origin/derivation associated with it
             // For example, `xpub123/1/10` would set the final key's origin to `[fingerprint(xpub123), [1, 10]]`
@@ -487,7 +483,7 @@ impl TryFrom<Value> for KeyWithSource {
                 let fingerprint = dpk.master_fingerprint();
                 let derivation_path = dpk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
                 let final_pk = dpk.at_derivation_index(0)?.derive_public_key(&EC)?.inner;
-                Self(final_pk, fingerprint, derivation_path)
+                Self(final_pk, (fingerprint, derivation_path))
             }
         })
     }
