@@ -65,7 +65,6 @@ pub fn relative_time_to_seq(
 pub fn parse_datetime(s: &str) -> Result<NaiveDateTime, ParseError> {
     // Date always suffixed with T, hours optionally suffixed with Z
     let s = s.trim_end_matches('Z');
-    eprintln!("parsing {}", s);
     let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").or_else(|_| {
         NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").or_else(|_| -> Result<_, ParseError> {
             Ok(NaiveDate::parse_from_str(s, "%Y-%m-%dT")?.and_hms(0, 0, 0))

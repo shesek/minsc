@@ -18,7 +18,7 @@ NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0
 TR_UNSPENDABLE = NUMS; // the default for tr()
 
 // Some aliases
-PubKey=pubkey, Transaction=transaction, tx=transaction;
+PubKey=pubkey, SecKey=seckey, sk=seckey, transaction=tx, Transaction=tx;
 
 // Common type checks
 fn isArray($x) = typeof($x) == "array";

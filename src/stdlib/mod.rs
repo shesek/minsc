@@ -181,8 +181,7 @@ pub mod fns {
     /// Scripts are serialized, Strings are converted to Bytes, Bytes are returned as-is
     /// bytes(Script|Bytes|String) -> Bytes
     pub fn bytes(args: Array, _: &ScopeRef) -> Result<Value> {
-        let bytes: Vec<u8> = args.arg_into()?;
-        Ok(bytes.into())
+        Ok(Value::Bytes(args.arg_into()?))
     }
 
     /// le64(Number) -> Bytes

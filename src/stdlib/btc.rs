@@ -39,21 +39,23 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
     // Functions
     scope.set_fn("address", fns::address).unwrap();
-    scope.set_fn("transaction", fns::transaction).unwrap();
+    scope.set_fn("tx", fns::tx).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("pubkey", fns::pubkey).unwrap();
 
     scope.set_fn("seckey", fns::seckey).unwrap();
     scope.set_fn("genkey", fns::genkey).unwrap();
-    scope.set_fn("sign::ecdsa", fns::signEcdsa).unwrap();
-    scope.set_fn("sign::schnorr", fns::signSchnorr).unwrap();
-    scope.set_fn("verify::ecdsa", fns::verifyEcdsa).unwrap();
-    scope.set_fn("verify::schnorr", fns::verifySchnorr).unwrap();
+    scope.set_fn("ecdsa::sign", fns::ecdsa_sign).unwrap();
+    scope.set_fn("ecdsa::verify", fns::ecdsa_verify).unwrap();
+    scope.set_fn("schnorra::sign", fns::schnorr_sign).unwrap();
+    scope
+        .set_fn("schnorr::verify", fns::schnorr_verify)
+        .unwrap();
 
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
-    scope.set_fn("script::strip", fns::scriptStrip).unwrap();
-    scope.set_fn("script::wiz", fns::scriptWiz).unwrap();
-    scope.set_fn("script::bitide", fns::scriptBitIde).unwrap();
+    scope.set_fn("script::strip", fns::script_strip).unwrap();
+    scope.set_fn("script::wiz", fns::script_wiz).unwrap();
+    scope.set_fn("script::bitide", fns::script_bitide).unwrap();
 
     // Constants
     scope
@@ -232,14 +234,12 @@ pub mod fns {
     /// Cast SecKey/Bytes into a PubKey
     /// pubkey(SecKey|Bytes|PubKey) -> PubKey
     pub fn pubkey(args: Array, _: &ScopeRef) -> Result<Value> {
-        let pubkey: DescriptorPublicKey = args.arg_into()?;
-        Ok(pubkey.into())
+        Ok(Value::PubKey(args.arg_into()?))
     }
 
     /// transaction(Bytes|TaggedArray|Transaction) -> Transaction
-    pub fn transaction(args: Array, _: &ScopeRef) -> Result<Value> {
-        let tx: Transaction = args.arg_into()?;
-        Ok(tx.into())
+    pub fn tx(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::Transaction(args.arg_into()?))
     }
 
     /// seckey(Bytes|SecKey) -> SecKey
@@ -260,7 +260,7 @@ pub mod fns {
 
     /// Sign the given message (hash) using ECDSA
     /// sign::ecdsa(SecKey, Bytes, Bool compact_sig=false)
-    pub fn signEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn ecdsa_sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (seckey, msg, compact_sig): (_, _, Option<bool>) = args.args_into()?;
         let sig = EC.sign_ecdsa(&msg, &seckey);
 
@@ -274,7 +274,7 @@ pub mod fns {
 
     /// Sign the given message (hash) using Schnorr
     /// sign::schnorr(SecKey, Bytes)
-    pub fn signSchnorr(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn schnorr_sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (keypair, msg): (secp256k1::Keypair, secp256k1::Message) = args.args_into()?;
 
         let sig = EC.sign_schnorr_with_rng(&msg, &keypair, &mut thread_rng());
@@ -282,13 +282,13 @@ pub mod fns {
     }
 
     /// verify::ecdsa(PubKey, Bytes msg, Bytes signature)
-    pub fn verifyEcdsa(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn ecdsa_verify(args: Array, _: &ScopeRef) -> Result<Value> {
         let (pk, msg, sig) = args.args_into()?;
         Ok(EC.verify_ecdsa(&msg, &sig, &pk).is_ok().into())
     }
 
     /// verify::schnorr(PubKey, Bytes msg, Bytes signature)
-    pub fn verifySchnorr(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn schnorr_verify(args: Array, _: &ScopeRef) -> Result<Value> {
         let (pk, msg, sig) = args.args_into()?;
         Ok(EC.verify_schnorr(&sig, &msg, &pk).is_ok().into())
     }
@@ -306,7 +306,7 @@ pub mod fns {
 
     /// script::strip(Script) -> Script
     /// Strip debug markers from the given Script
-    pub fn scriptStrip(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn script_strip(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(args
             .arg_into::<ScriptBuf>()?
             .strip_markers(SCRIPT_MARKER_MAGIC_BYTES)?
@@ -315,7 +315,7 @@ pub mod fns {
 
     /// script::wiz(Script) -> Symbol
     /// Encode the Script in a Scriptwiz-compatible format (newlines, stack labels & comments)
-    pub fn scriptWiz(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn script_wiz(args: Array, _: &ScopeRef) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut wiz_str = String::new();
         fmt_script(&mut wiz_str, &script, ScriptFmt::ScriptWiz, Some(0))?;
@@ -325,7 +325,7 @@ pub mod fns {
 
     /// script::bitide(Script) -> Symbol
     /// Encode the Script in a BitIDE-compatible format (newlines, stack labels & comments)
-    pub fn scriptBitIde(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn script_bitide(args: Array, _: &ScopeRef) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut bitide_str = String::new();
         fmt_script(&mut bitide_str, &script, ScriptFmt::BitIde, Some(0))?;

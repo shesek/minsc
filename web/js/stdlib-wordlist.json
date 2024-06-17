@@ -187,6 +187,10 @@
       "[native]"
     ],
     [
+      "SecKey",
+      "[native]"
+    ],
+    [
       "Symbol",
       "[native]"
     ],
@@ -264,6 +268,14 @@
     ],
     [
       "debug",
+      "[native]"
+    ],
+    [
+      "ecdsa::sign",
+      "[native]"
+    ],
+    [
+      "ecdsa::verify",
       "[native]"
     ],
     [
@@ -416,7 +428,7 @@
     ],
     [
       "mark::ctx",
-      "$context, $fn"
+      "$$context, $$fn"
     ],
     [
       "mark::label",
@@ -531,6 +543,14 @@
       "$n"
     ],
     [
+      "schnorr::verify",
+      "[native]"
+    ],
+    [
+      "schnorra::sign",
+      "[native]"
+    ],
+    [
       "script",
       "[native]"
     ],
@@ -571,15 +591,11 @@
       "[native]"
     ],
     [
-      "sign::ecdsa",
-      "[native]"
-    ],
-    [
-      "sign::schnorr",
-      "[native]"
-    ],
-    [
       "singleDescriptors",
+      "[native]"
+    ],
+    [
+      "sk",
       "[native]"
     ],
     [
@@ -609,10 +625,6 @@
     [
       "tail",
       "$arr"
-    ],
-    [
-      "tap",
-      "$value, $fn"
     ],
     [
       "tapscript",
@@ -681,14 +693,6 @@
     [
       "unrollLoop",
       "$max_iterations, $condition, $loop_body"
-    ],
-    [
-      "verify::ecdsa",
-      "[native]"
-    ],
-    [
-      "verify::schnorr",
-      "[native]"
     ],
     [
       "warn",
