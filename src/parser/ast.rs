@@ -45,8 +45,12 @@ impl_from_variant!(String, Expr, String);
 pub enum Stmt {
     FnDef(FnDef),
     Assign(Assign),
-    Call(CallStmt),
     If(IfStmt),
+
+    // An expression used in a statement position. The evaluated return value is
+    // discarded, but this can be useful for expressions that produce side effects
+    // like logging and exceptions.
+    ExprStmt(ExprStmt),
 }
 
 /// A collection of statements and a final expression used as the return value.
@@ -228,8 +232,8 @@ pub struct Assignment {
 
 /// A call statement whose return value is discarded
 #[derive(Debug, Clone)]
-pub struct CallStmt(pub Call);
-impl_from_variant!(CallStmt, Stmt, Call);
+pub struct ExprStmt(pub Expr);
+impl_from_variant!(ExprStmt, Stmt, ExprStmt);
 
 #[derive(Debug, Clone)]
 pub struct IfStmt {

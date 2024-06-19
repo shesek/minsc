@@ -50,8 +50,8 @@ Return = {
 Stmt = {
   FnDef,
   Assign,
-  CallStmt,
   IfStmt,
+  ExprStmt,
 }
 
 // All possible expressions. Includes SimpleExpr & SExpr
@@ -355,8 +355,6 @@ FnDef: Stmt = {
         ast::FnDef { ident, signature, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
 }
 
-CallStmt: Stmt = <Call_> ";" => ast::CallStmt(<>).into();
-
 IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmts> "}" <else_body:IfStmtElse?> =>
     ast::IfStmt { condition: condition.into(), then_body: then_body.into(), else_body: else_body.into() }.into();
 IfStmtElse: ast::Stmts = {
@@ -364,6 +362,11 @@ IfStmtElse: ast::Stmts = {
   // allow nested `else if` statements without `{}`
   "else" <IfStmt> => ast::Stmts(vec![<>]),
 };
+
+// An expression used in a statement position. The evaluated return value is
+// discarded, but this can be useful for expressions that produce side effects
+// like logging and exceptions.
+ExprStmt: Stmt = <Expr> ";" => ast::ExprStmt(<>).into();
 
 // Helpers
 

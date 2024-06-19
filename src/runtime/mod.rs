@@ -49,9 +49,10 @@ impl Execute for ast::FnDef {
     }
 }
 
-impl Execute for ast::CallStmt {
+// Evaluate the Stmt's inner Expr, discarding its return value.
+// The Expr may produce side-effects like logging and exceptions.
+impl Execute for ast::ExprStmt {
     fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
-        // Run the inner Call expression, discarding its return value
         self.0.eval(&scope.as_readonly()).map(|_| ())
     }
 }
@@ -74,7 +75,7 @@ impl Execute for ast::Stmt {
             Stmt::FnDef(x) => x.exec(scope),
             Stmt::Assign(x) => x.exec(scope),
             Stmt::If(x) => x.exec(scope),
-            Stmt::Call(x) => x.exec(scope),
+            Stmt::ExprStmt(x) => x.exec(scope),
         }
     }
 }
