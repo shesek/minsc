@@ -110,22 +110,22 @@ IdentTerm: ast::Ident = IDENT => ast::Ident(<>.into());
 Ident: Expr = IdentTerm => Expr::Ident(<>);
 
 Call: Expr = Call_ => Expr::Call(<>);
-Call_: ast::Call = { SimpleCall_, ExprCall_, PipeCall_, LitArrCall_ };
+Call_: ast::Call = { SimpleCall_, ExprCall_, PipeCall_};
 SimpleCall: Expr = SimpleCall_ => Expr::Call(<>);
-LitArrCall: Expr = LitArrCall_ => Expr::Call(<>);
+
+// Call arguments. A single literal array argument (ArraySquare) may
+// be provided without wrapping parenthesis, e.g. `tx [ "version": 2]`
+CallArgs = { Paren<List0<Expr, ",">>, ArraySquare => vec![<>] };
 
 // A call with a simple Ident as the function, e.g. foo(123)
-SimpleCall_: ast::Call = <func:Ident> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args };
+SimpleCall_: ast::Call = <func:Ident> <args:CallArgs> => ast::Call { func: func.into(), args };
 
 // A call with an expression as the function, e.g. foo(1)(2) or {|a| a+1}(2)
-ExprCall_: ast::Call = <func:ExprCallFunc> <args:Paren<List0<Expr, ",">>> => ast::Call { func: func.into(), args };
+ExprCall_: ast::Call = <func:ExprCallFunc> <args:CallArgs> => ast::Call { func: func.into(), args };
 ExprCallFunc: Expr = { WrapExpr, Call, ArrayAccess };
 
-// A call with a literal array as a single argument, e.g. tx [ "version": 2, ... ]
-LitArrCall_: ast::Call = <func:Ident> <arg:ArraySquare> =>  ast::Call { func: func.into(), args: vec![ arg ] };
-
 // Pipe call, e.g. `$first_arg | func($extra_args...)` -> `func($first_arg, $extra_args...)`
-PipeCall_: ast::Call = <first_arg:PipeCallLHS> "|" <func:PipeCallFunc> <extra_args:Paren<List0<Expr, ",">>> =>
+PipeCall_: ast::Call = <first_arg:PipeCallLHS> "|" <func:PipeCallFunc> <extra_args:CallArgs> =>
   ast::Call { func: func.into(), args: prepend(extra_args, first_arg) };
 PipeCallLHS = { SExpr, ArrayAccess, Duration };
 PipeCallFunc = { Ident, WrapExpr };
@@ -225,7 +225,7 @@ ChildDeriveWildcard = { "/*", "/ *" };
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
 ScriptFragPart = { ScriptFragPart_, ScriptFragPart_Infix };
 ScriptFragPart_ = {
-  Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, LitArrCall, ArrayAccess,
+  Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, ArrayAccess,
   ScriptFragPart_Mark, BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
 };
 // Cannot allow all Infix operators because < > conflicts
