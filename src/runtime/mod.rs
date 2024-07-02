@@ -338,7 +338,7 @@ impl Evaluate for Expr {
             Expr::And(x) => x.eval(scope)?,
             Expr::Thresh(x) => x.eval(scope).ctx("of")?,
             Expr::Block(x) => x.eval(scope)?,
-            Expr::Array(x) => x.eval(scope).ctx("[]")?,
+            Expr::Array(x) => x.eval(scope)?, // .ctx("[]")?,
             Expr::ArrayAccess(x) => x.eval(scope).ctx("dot access")?,
             Expr::ChildDerive(x) => x.eval(scope).ctx("/ operator")?,
             Expr::ScriptFrag(x) => x.eval(scope).ctx("`` script")?,

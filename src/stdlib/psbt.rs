@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 
-use bitcoin::bip32::{KeySource, Xpriv};
+use bitcoin::bip32::{self, Xpriv};
 use bitcoin::psbt::{self, Psbt};
 use bitcoin::{secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
@@ -111,7 +111,7 @@ pub mod fns {
 
     // psbt::try_sign(Psbt, SigningKeys) -> [Psbt, Signed, Failed]
     //
-    // Attempt to sign all transaction inputs, returning the a modified PSBT with the successfully signed inputs even if some fail.
+    // Attempt to sign all transaction inputs, returning a modified PSBT with the successfully signed inputs even if some fail.
     //
     // Returned with `Signed` as an `Array<Int:Array<PubKey>>` mapping input indexes to the PubKeys used to sign them
     // and `Failed` as an `Array<Int:String>` mapping input indexes to the error encountered while trying to sign them.
@@ -136,7 +136,7 @@ pub mod fns {
     }
 
     /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
-    /// Also available as `tx(Psbt)` (without `finalize`, for pre-finalized PSBT only)
+    /// Also possible via `tx(Psbt)` (without the `finalize` option, for pre-finalized PSBT only)
     pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
         if finalize.unwrap_or(false) {
@@ -164,7 +164,7 @@ pub mod fns {
 fn psbt_from_tags(tags: Array) -> Result<Psbt> {
     let mut tags = tags.check_varlen(1, usize::MAX)?;
 
-    // The first tag must be te tx to initialize the PSBT with
+    // The first tag must be the tx to initialize the PSBT with
     let (first_tag, tx_val): (String, Value) = tags.0.remove(0).try_into()?; // safe to remove() because the length was checked
     ensure!(
         first_tag == "tx" || first_tag == "unsigned_tx",
@@ -220,13 +220,11 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
             "xpub" => psbt.xpub = val.try_into()?,
             "proprietary" => psbt.proprietary = val.try_into()?,
             "unknown" => psbt.unknown = val.try_into()?,
-            // Update PSBT fields for existing inputs
             "inputs" => {
                 for (vin, in_tags) in mapped_or_all(val, psbt.inputs.len())? {
                     update_input(mut_input(psbt, vin)?, in_tags)?;
                 }
             }
-            // Update PSBT fields for existing outputs
             "outputs" => {
                 for (vout, out_tags) in mapped_or_all(val, psbt.outputs.len())? {
                     update_output(mut_output(psbt, vout)?, out_tags)?;
@@ -238,8 +236,8 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
             // Must include the "input" field with the input (or just the input's prevout) to add to the transaction,
             // and can additionally contain any of the PSBT input fields.
             "add_inputs" => {
-                for PsbtAddIn(input, psbt_input) in val.into_vec_of()? {
-                    psbt.unsigned_tx.input.push(input);
+                for PsbtAddIn(tx_input, psbt_input) in val.into_vec_of()? {
+                    psbt.unsigned_tx.input.push(tx_input);
                     psbt.inputs.push(psbt_input);
                 }
             }
@@ -248,9 +246,9 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
             // Must include the "output" field with the output to add to the transaction,
             // and can additionally contain any of the PSBT output fields.
             "add_outputs" => {
-                for PsbtAddOut(input, psbt_input) in val.into_vec_of()? {
-                    psbt.unsigned_tx.output.push(input);
-                    psbt.outputs.push(psbt_input);
+                for PsbtAddOut(tx_output, psbt_output) in val.into_vec_of()? {
+                    psbt.unsigned_tx.output.push(tx_output);
+                    psbt.outputs.push(psbt_output);
                 }
             }
 
@@ -320,7 +318,7 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
             "witness_script" => psbt_output.witness_script = Some(val.try_into()?),
             "bip32_derivation" | "key_source" => psbt_output.bip32_derivation = val.try_into()?,
             "tap_internal_key" => psbt_output.tap_internal_key = Some(val.try_into()?),
-            // TOOD "tap_tree" => psbt_output.tap_internal_key = Some(val.try_into()?),
+            // TODO "tap_tree" => psbt_output.tap_tree = Some(val.try_into()?),
             "tap_key_origins" => psbt_output.tap_key_origins = val.try_into()?,
             "proprietary" => psbt_output.proprietary = val.try_into()?,
             "unknown" => psbt_output.unknown = val.try_into()?,
@@ -349,7 +347,7 @@ fn mapped_or_all<T: FromValue>(arr: Value, expected_all_length: usize) -> Result
         arr.len() == expected_all_length,
         Error::InvalidLength(arr.len(), expected_all_length)
     );
-    Ok(<Vec<T>>::try_from(arr)?.into_iter().enumerate().collect())
+    Ok(Vec::<T>::try_from(arr)?.into_iter().enumerate().collect())
 }
 
 struct PsbtAddIn(TxIn, psbt::Input);
@@ -447,7 +445,7 @@ impl TryFrom<Value> for PsbtAddOut {
 
 // BIP32 key sources. May be provided as a single Xpub/Xpriv, as an array of Xpubs/Xprivs,
 // or as map of single PubKey to KeySource. (examples in KeyWithSource below)
-fn bip32_derivation(val: Value) -> Result<BTreeMap<secp256k1::PublicKey, KeySource>> {
+fn bip32_derivation(val: Value) -> Result<BTreeMap<secp256k1::PublicKey, bip32::KeySource>> {
     // TODO support MultiXpub/Prv as multiple KeyWithSource
     let key_sources: Vec<KeyWithSource> = match val {
         Value::Array(array) => array.into_iter().collect_into()?,
@@ -458,10 +456,11 @@ fn bip32_derivation(val: Value) -> Result<BTreeMap<secp256k1::PublicKey, KeySour
         .map(|KeyWithSource(key, source)| (key, source))
         .collect())
 }
-pub struct KeyWithSource(pub secp256k1::PublicKey, pub KeySource);
+pub struct KeyWithSource(pub secp256k1::PublicKey, pub bip32::KeySource);
 
 impl TryFrom<Value> for KeyWithSource {
     type Error = Error;
+
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
             // May be provided as an array mapping from `pk` to the `source`,
@@ -476,7 +475,7 @@ impl TryFrom<Value> for KeyWithSource {
                     source.tagged_or_tuple("fingerprint", "derivation_path")?;
                 Self(pk, (fingerprint, derivation_path))
             }
-            // Or any value coercible into a PubKey/SecKey, using the origin/derivation associated with it
+            // Or any value coercible into a PubKey/SecKey, using the origin/derivation associated with it.
             // For example, `xpub123/1/10` would set the final key's origin to `[fingerprint(xpub123), [1, 10]]`
             _ => {
                 let dpk = miniscript::DescriptorPublicKey::try_from(val)?;

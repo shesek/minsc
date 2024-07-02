@@ -66,7 +66,7 @@ Expr = {
   Duration,
 };
 
-// A reduce set of expressions for use where Expr cannot be parsed unambiguously
+// A reduced set of expressions for use where Expr cannot be parsed unambiguously
 // Includes SExpr, which can contain any wrapped expression
 SimpleExpr = {
   SExpr,
@@ -175,7 +175,8 @@ ArrayAccessFixFloat: Expr = <array:ArrayAccessLHS> "." <two_indices:FLOAT> =>? {
 };
 ArrayAccess = { ArrayAccess_, ArrayAccessFixFloat };
 
-// An xpub or standalone public key with origin (33 bytes or 32 for x-only, uncompressed is unsupported)
+// An xpub or standalone public key with bip32 origin (33 bytes or 32 for x-only, uncompressed is unsupported)
+// Standalone keys with no origin are indistinguishable from other Bytes, and so are constructed as such and later coerced.
 PubKey: Expr = PubKey_ =>? Ok(Expr::PubKey(<>.parse().map_err(ParseError::from)?));
 PubKey_ = { XPUB, SINGLE_PK_ORIG };
 
@@ -239,10 +240,10 @@ ScriptFragPart_Mark: Expr = {
   "@" <IDENT> => call("mark::label", vec![Expr::String(<>.to_string())]),
   "@" <ParenOrCurly<Expr>> => call("mark::label", vec![<>]),
 
-  // #["COMMENT"]
+  // #"COMMENT"
   "#" <ScriptFragPart_RHS> => call("mark::comment", vec![<>]),
 
-  // @KIND("BODY"), @("KIND, "BODY")
+  // @KIND(), @KIND("BODY"), @("KIND, "BODY")
   "@" <kind:IDENT> <body:Paren<Expr?>> => call("mark", vec![kind.to_string().into(), body.unwrap_or_else(|| "".to_string().into()) ]),
   "@" <Paren<(<Expr> "," <Expr>)>> => call("mark", vec![<>.0, <>.1]),
 
@@ -250,16 +251,16 @@ ScriptFragPart_Mark: Expr = {
   ScriptMarkCtx,
 };
 
-// Defined separately because it is allowed outside ``
+// Defined separately because it is also allowed outside ``
 ScriptMarkCtx: Expr = "@@" <Paren<(<Expr> "," <Expr>)>> =>
   // Wraps the body expression in a dynamically-scoped function, to be evaluated from within the `mark::ctx()` scope.
-  call("mark::ctx", vec![<>.0, ast::FnExpr { signature: vec![], body: <>.1.into(), dynamic_scoping: true }.into()]);
+  call("mark::ctx", vec![<>.0, ast::FnExpr { params: vec![], body: <>.1.into(), dynamic_scoping: true }.into()]);
 
 
 // Anonymous function expression
-FnExpr: Expr = <dyn_scoping:"dyn"?> <signature:FnExprSignature> <body:Expr> =>
-    ast::FnExpr { signature, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
-FnExprSignature = {
+FnExpr: Expr = <dyn_scoping:"dyn"?> <params:FnExprParams> <body:Expr> =>
+    ast::FnExpr { params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
+FnExprParams = {
   "|" <List0<IdentTerm, ",">> "|",
   // No arguments should already be captured by the `List0`, but for some reason it isn't.
   // Possibly because `||` is also a terminal for policy OR?
@@ -347,10 +348,10 @@ Assignment: ast::Assignment = <lhs:IdentTerm> "=" <rhs:Expr> =>
     ast::Assignment { lhs, rhs };
 
 FnDef: Stmt = {
-    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> "=" <body:Expr> ";" =>
-        ast::FnDef { ident, signature, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
-    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <signature:Paren<List0<IdentTerm, ",">>> <body:BlockExpr> ";"? =>
-        ast::FnDef { ident, signature, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
+    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <params:Paren<List0<IdentTerm, ",">>> "=" <body:Expr> ";" =>
+        ast::FnDef { ident, params, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
+    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <params:Paren<List0<IdentTerm, ",">>> <body:BlockExpr> ";"? =>
+        ast::FnDef { ident, params, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
 }
 
 IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmts> "}" <else_body:IfStmtElse?> =>

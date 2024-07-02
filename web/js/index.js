@@ -179,7 +179,7 @@ share_el.addEventListener('click', _ => {
   }
 })
 
-// Enabled for the main editor and read-only view
+// Enabled for the main editor and read-only views
 const full_screen_keys = {
   "F11": cm => cm.setOption("fullScreen", !cm.getOption("fullScreen")),
   "Esc": cm => cm.getOption("fullScreen") && cm.setOption("fullScreen", false),

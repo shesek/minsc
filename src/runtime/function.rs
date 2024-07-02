@@ -14,7 +14,7 @@ pub enum Function {
 #[derive(Clone)]
 pub struct UserFunction {
     pub ident: Option<Ident>,
-    pub signature: Vec<Ident>,
+    pub params: Vec<Ident>,
     pub body: Expr,
     pub scope: Option<ScopeRef>,
 }
@@ -48,9 +48,9 @@ impl Call for UserFunction {
     fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
         let _call = || {
             ensure!(
-                self.signature.len() == args.len(),
+                self.params.len() == args.len(),
                 Error::InvalidArgumentsError(
-                    Error::InvalidLength(args.len(), self.signature.len()).into(),
+                    Error::InvalidLength(args.len(), self.params.len()).into(),
                 )
             );
             // For lexically-scoped functions, create a child scope of the scope where the function was defined.
@@ -59,7 +59,7 @@ impl Call for UserFunction {
             {
                 let mut scope = scope.borrow_mut();
                 for (index, value) in args.into_iter().enumerate() {
-                    let ident = self.signature.get(index).unwrap();
+                    let ident = self.params.get(index).unwrap();
                     scope.set(ident.clone(), value)?;
                 }
             }
@@ -107,7 +107,7 @@ impl Function {
     pub fn from_def(fn_def: ast::FnDef, scope: ScopeRef) -> Self {
         UserFunction {
             ident: Some(fn_def.ident),
-            signature: fn_def.signature,
+            params: fn_def.params,
             body: fn_def.body,
             scope: iif!(!fn_def.dynamic_scoping, Some(scope), None),
         }
@@ -118,7 +118,7 @@ impl Function {
     pub fn from_expr(fn_expr: ast::FnExpr, scope: ScopeRef) -> Self {
         UserFunction {
             ident: None,
-            signature: fn_expr.signature,
+            params: fn_expr.params,
             body: *fn_expr.body,
             scope: iif!(!fn_expr.dynamic_scoping, Some(scope), None),
         }
@@ -143,12 +143,14 @@ impl PartialEq for Function {
 
 impl fmt::Debug for UserFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("UserFunction")
-            .field("ident", &self.ident)
-            .field("signature", &self.signature)
-            .field("body", &self.body)
-            .field("scoping", &iif!(self.scope.is_some(), "lexical", "dynamic"))
-            .finish()
+        let mut fd = f.debug_struct("UserFunction");
+        fd.field("ident", &self.ident)
+            .field("params", &self.params)
+            .field("body", &self.body);
+        if self.scope.is_none() {
+            fd.field("dynamic_scope", &true);
+        }
+        fd.finish()
     }
 }
 
@@ -170,11 +172,11 @@ impl fmt::Display for UserFunction {
             write!(f, "{}", ident)?;
         }
         write!(f, "(")?;
-        for (i, arg_name) in self.signature.iter().enumerate() {
+        for (i, param_name) in self.params.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", arg_name)?;
+            write!(f, "{}", param_name)?;
         }
         write!(f, ")")
     }

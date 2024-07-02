@@ -48,16 +48,17 @@ pub enum Stmt {
     If(IfStmt),
 
     // An expression used in a statement position. The evaluated return value is
-    // discarded, but this can be useful for expressions that produce side effects
-    // like logging and exceptions.
+    // discarded, but this can be useful for expressions that produce non-scope
+    // side effects (i.e. logging and exceptions).
     ExprStmt(ExprStmt),
 }
 
-/// A collection of statements and a final expression used as the return value.
+/// A collection of statements with a return value
 /// Represents the main program, function bodies and block expressions
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
+    /// may be None for top-level Programs where the evaluation of `main()` is returned instead
     pub return_value: Option<Box<Expr>>,
 }
 impl_from_variant!(Block, Expr);
@@ -145,7 +146,7 @@ impl_from_variant!(ScriptFrag, Expr);
 /// An anonymous function expression
 #[derive(Debug, Clone)]
 pub struct FnExpr {
-    pub signature: Vec<Ident>,
+    pub params: Vec<Ident>,
     pub body: Box<Expr>,
     pub dynamic_scoping: bool,
 }
@@ -213,7 +214,7 @@ impl_from_variant!(BtcAmount, Expr);
 #[derive(Debug, Clone)]
 pub struct FnDef {
     pub ident: Ident,
-    pub signature: Vec<Ident>,
+    pub params: Vec<Ident>,
     pub body: Expr,
     pub dynamic_scoping: bool,
 }
@@ -244,7 +245,7 @@ pub struct IfStmt {
 impl_from_variant!(IfStmt, Stmt, If);
 
 /// A collection of statements with no return value
-/// Used for library files and as the body of if statements
+/// Used for library files and the body of if statements
 #[derive(Debug, Clone)]
 pub struct Stmts(pub Vec<Stmt>);
 

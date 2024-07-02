@@ -32,7 +32,6 @@ use crate::runtime::{Array, Error, FromValue, Result, Value};
 impl Array {
     /// Transform a tagged Value::Array into a Vec of tag names and their values
     pub fn into_tags(self) -> Result<Vec<(String, Value)>> {
-        // handled via the TryFrom<Value> implementations for Vec<T> and (A, B) in runtime.rs
         self.try_into()
             .map_err(|e| Error::InvalidTaggedList(Box::new(e)))
     }

@@ -42,12 +42,11 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("tx", fns::tx).unwrap();
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("pubkey", fns::pubkey).unwrap();
-
     scope.set_fn("seckey", fns::seckey).unwrap();
     scope.set_fn("genkey", fns::genkey).unwrap();
     scope.set_fn("ecdsa::sign", fns::ecdsa_sign).unwrap();
     scope.set_fn("ecdsa::verify", fns::ecdsa_verify).unwrap();
-    scope.set_fn("schnorra::sign", fns::schnorr_sign).unwrap();
+    scope.set_fn("schnorr::sign", fns::schnorr_sign).unwrap();
     scope
         .set_fn("schnorr::verify", fns::schnorr_verify)
         .unwrap();
@@ -237,7 +236,7 @@ pub mod fns {
         Ok(Value::PubKey(args.arg_into()?))
     }
 
-    /// transaction(Bytes|TaggedArray|Transaction) -> Transaction
+    /// tx(Bytes|Array<Tagged>|Transaction) -> Transaction
     pub fn tx(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::Transaction(args.arg_into()?))
     }
@@ -259,9 +258,10 @@ pub mod fns {
     }
 
     /// Sign the given message (hash) using ECDSA
-    /// sign::ecdsa(SecKey, Bytes, Bool compact_sig=false)
+    /// ecdsa::sign(SecKey, Bytes, Bool compact_sig=false)
     pub fn ecdsa_sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (seckey, msg, compact_sig): (_, _, Option<bool>) = args.args_into()?;
+
         let sig = EC.sign_ecdsa(&msg, &seckey);
 
         Ok(if compact_sig.unwrap_or(false) {
@@ -272,8 +272,15 @@ pub mod fns {
         .into())
     }
 
+    /// Verify the given signature using ECDSA
+    /// ecdsa::verify(PubKey, Bytes msg, Bytes signature) -> Bool
+    pub fn ecdsa_verify(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (pk, msg, sig) = args.args_into()?;
+        Ok(EC.verify_ecdsa(&msg, &sig, &pk).is_ok().into())
+    }
+
     /// Sign the given message (hash) using Schnorr
-    /// sign::schnorr(SecKey, Bytes)
+    /// schnorr::sign(SecKey, Bytes) -> Bytes
     pub fn schnorr_sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (keypair, msg): (secp256k1::Keypair, secp256k1::Message) = args.args_into()?;
 
@@ -281,13 +288,8 @@ pub mod fns {
         Ok(sig.serialize().to_vec().into())
     }
 
-    /// verify::ecdsa(PubKey, Bytes msg, Bytes signature)
-    pub fn ecdsa_verify(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (pk, msg, sig) = args.args_into()?;
-        Ok(EC.verify_ecdsa(&msg, &sig, &pk).is_ok().into())
-    }
-
-    /// verify::schnorr(PubKey, Bytes msg, Bytes signature)
+    /// Verify the given signature using Schnorr
+    /// schnorr::verify(PubKey, Bytes msg, Bytes signature) -> Bool
     pub fn schnorr_verify(args: Array, _: &ScopeRef) -> Result<Value> {
         let (pk, msg, sig) = args.args_into()?;
         Ok(EC.verify_schnorr(&sig, &msg, &pk).is_ok().into())

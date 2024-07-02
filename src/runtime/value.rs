@@ -409,15 +409,6 @@ impl Value {
     pub fn array_of(array: impl Into<Array>) -> Self {
         Value::Array(array.into())
     }
-    pub fn arr1(a: impl Into<Value>) -> Value {
-        Self::array(vec![a.into()])
-    }
-    pub fn arr2(a: impl Into<Value>, b: impl Into<Value>) -> Value {
-        Self::array(vec![a.into(), b.into()])
-    }
-    pub fn arr3(a: impl Into<Value>, b: impl Into<Value>, c: impl Into<Value>) -> Value {
-        Self::array(vec![a.into(), b.into(), c.into()])
-    }
 }
 
 // Parse & evaluate the string code in the default global scope to produce a Value
