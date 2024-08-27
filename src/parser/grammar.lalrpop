@@ -238,7 +238,8 @@ ScriptFragPart_RHS = { SExpr, ArrayAccess };
 ScriptFragPart_Mark: Expr = {
   // @LABEL, @{"LABEL"}, @("LABEL")
   "@" <IDENT> => call("mark::label", vec![Expr::String(<>.to_string())]),
-  "@" <ParenOrCurly<Expr>> => call("mark::label", vec![<>]),
+  "@" <Paren<Expr>> => call("mark::label", vec![<>]),
+  "@" <BlockExpr> => call("mark::label", vec![<>]),
 
   // #"COMMENT"
   "#" <ScriptFragPart_RHS> => call("mark::comment", vec![<>]),
@@ -379,4 +380,3 @@ List1<T, S>: Vec<T> = <l:(<T> S)*> <t:T> => concat(l, Some(t));
 List2<T, S>: Vec<T> = <l:(<T> S)+> <t:T> => concat(l, Some(t));
 
 Paren<T> = "(" <T> ")";
-ParenOrCurly<T> = { "(" <T> ")", "{" <T> "}" };
