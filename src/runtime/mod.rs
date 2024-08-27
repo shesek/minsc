@@ -61,7 +61,7 @@ impl Execute for ast::IfStmt {
     fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
         if self.condition.eval(&scope.as_readonly())?.into_bool()? {
             self.then_body.exec(scope)
-        } else if let Some(else_body) = &*self.else_body {
+        } else if let Some(else_body) = &self.else_body {
             else_body.exec(scope)
         } else {
             Ok(())

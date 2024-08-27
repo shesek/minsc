@@ -239,8 +239,8 @@ impl_from_variant!(ExprStmt, Stmt, ExprStmt);
 #[derive(Debug, Clone)]
 pub struct IfStmt {
     pub condition: Expr,
-    pub then_body: Box<Stmts>,
-    pub else_body: Box<Option<Stmts>>,
+    pub then_body: Stmts,
+    pub else_body: Option<Stmts>,
 }
 impl_from_variant!(IfStmt, Stmt, If);
 
