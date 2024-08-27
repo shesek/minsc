@@ -34,17 +34,12 @@ match {
 
 // Top-level program
 // Can have a final return value or use the main() function instead
-pub Program: Expr = <stmts:Stmt*> <ret:Return?> =>
+pub Program: Expr = <stmts:Stmt*> <ret:Expr?> =>
   ast::Block { stmts, return_value: ret.map(Into::into) }.into();
 
 // A collection of statements with no return value
 // Used for library files and for the body of if statements
 pub Stmts: ast::Stmts = <stmts:Stmt*> => ast::Stmts(stmts);
-
-Return = {
-  Expr, // the preferred form
-  "return" <Expr> ";"?, // if you insist
-};
 
 // All possible statements
 Stmt = {
@@ -143,7 +138,8 @@ Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
   ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
 
 // A { .. } block expression with a final return value
-BlockExpr: Expr = "{" <stmts:Stmt*> <ret:Return> "}" =>
+
+BlockExpr: Expr = "{" <stmts:Stmt*> <ret:Expr> "}" =>
   ast::Block { stmts, return_value: Some(ret.into()) }.into();
 
 Array = { ArraySquare, ArrayCurly }

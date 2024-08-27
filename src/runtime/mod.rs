@@ -314,10 +314,9 @@ impl Evaluate for ast::Block {
         for stmt in &self.stmts {
             stmt.exec(&scope)?;
         }
-        let scope = scope.as_readonly();
+        let scope = scope.into_readonly();
         if let Some(return_value) = &self.return_value {
-            // The return value is the final expression within the function body,
-            // optionally prefixed with the `return` keyword
+            // The return value is the final expression within the block
             return_value.eval(&scope)
         } else if let Some(main_fn) = scope.borrow().get(&"main".into()) {
             // The return value is the evaluation of main()
