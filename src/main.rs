@@ -1,5 +1,5 @@
 use minsc::{eval, parse, Error, PrettyDisplay};
-use std::{env, fs, io};
+use std::{env, fs, io, process::ExitCode};
 
 fn main_() -> Result<(), Error> {
     let mut args = env::args();
@@ -30,9 +30,12 @@ fn main_() -> Result<(), Error> {
     Ok(())
 }
 
-fn main() {
-    // Print errors using Display rather than Debug
+// Wrap main() to print errors using Display rather than Debug
+fn main() -> ExitCode {
     if let Err(e) = main_() {
-        eprintln!("{}", e)
+        eprintln!("{}", e);
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
