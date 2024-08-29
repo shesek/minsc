@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "build": "./build-assets.sh && webpack",
-    "start": "webpack-dev-server --open -d",
+    "start": "webpack-dev-server --no-client-overlay-warnings",
     "publish-site": "./publish-site.sh"
   },
   "devDependencies": {
