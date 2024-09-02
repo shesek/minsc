@@ -52,7 +52,7 @@ pub mod fns {
     impl_hash_fn!(hash_hash160, hash160);
 
     /// Sign the given message (hash) using ECDSA
-    /// ecdsa::sign(SecKey, Bytes, Bool compact_sig=false)
+    /// ecdsa::sign(SecKey, Bytes msg_hash, Bool compact_sig=false) -> Bytes signature
     pub fn ecdsa_sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (seckey, msg, compact_sig): (_, _, Option<bool>) = args.args_into()?;
 
@@ -67,23 +67,29 @@ pub mod fns {
     }
 
     /// Verify the given signature using ECDSA
-    /// ecdsa::verify(PubKey, Bytes msg, Bytes signature) -> Bool
+    /// ecdsa::verify(PubKey, Bytes msg_hash, Bytes signature) -> Bool
     pub fn ecdsa_verify(args: Array, _: &ScopeRef) -> Result<Value> {
         let (pk, msg, sig) = args.args_into()?;
         Ok(EC.verify_ecdsa(&msg, &sig, &pk).is_ok().into())
     }
 
     /// Sign the given message (hash) using Schnorr
-    /// schnorr::sign(SecKey, Bytes) -> Bytes
+    /// schnorr::sign(SecKey, Bytes msg_hash, Bool aux_rand=false) -> Bytes signature
     pub fn schnorr_sign(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (keypair, msg): (secp256k1::Keypair, secp256k1::Message) = args.args_into()?;
+        let (keypair, msg, aux_rand): (_, _, Option<bool>) = args.args_into()?;
 
-        let sig = EC.sign_schnorr_with_rng(&msg, &keypair, &mut rand::thread_rng());
-        Ok(sig.serialize().to_vec().into())
+        Ok(if aux_rand.unwrap_or(false) {
+            EC.sign_schnorr_with_rng(&msg, &keypair, &mut rand::thread_rng())
+        } else {
+            EC.sign_schnorr_no_aux_rand(&msg, &keypair)
+        }
+        .serialize()
+        .to_vec()
+        .into())
     }
 
     /// Verify the given signature using Schnorr
-    /// schnorr::verify(PubKey, Bytes msg, Bytes signature) -> Bool
+    /// schnorr::verify(PubKey, Bytes msg_hash, Bytes signature) -> Bool
     pub fn schnorr_verify(args: Array, _: &ScopeRef) -> Result<Value> {
         let (pk, msg, sig) = args.args_into()?;
         Ok(EC.verify_schnorr(&sig, &msg, &pk).is_ok().into())
