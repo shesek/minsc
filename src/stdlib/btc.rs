@@ -1,12 +1,12 @@
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
-use bitcoin::hashes::{sha256d, Hash};
+use bitcoin::hashes::Hash;
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
-    absolute::LockTime, address, hex::DisplayHex, Address, Amount, Network, Opcode,
-    Sequence, SignedAmount, Txid, WitnessProgram, WitnessVersion,
+    absolute::LockTime, address, hex::DisplayHex, Address, Amount, Network, Opcode, Sequence,
+    SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
 use miniscript::descriptor::Descriptor;
 use miniscript::psbt::PsbtExt;
@@ -34,6 +34,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     // Functions
     scope.set_fn("address", fns::address).unwrap();
     scope.set_fn("tx", fns::tx).unwrap();
+    scope.set_fn("txid", fns::txid).unwrap();
+    scope.set_fn("tx::id", fns::txid).unwrap(); // alias
     scope.set_fn("script", fns::script).unwrap();
     scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
     scope.set_fn("script::spk", fns::scriptPubKey).unwrap(); // alias
@@ -145,6 +147,22 @@ pub mod fns {
             .into())
     }
 
+    /// tx(Bytes|Array<Tagged>|Transaction) -> Transaction
+    pub fn tx(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::Transaction(args.arg_into()?))
+    }
+
+    /// txid(Transaction) -> Bytes
+    pub fn txid(args: Array, _: &ScopeRef) -> Result<Value> {
+        let mut txid = Transaction::txid(&args.arg_into()?)
+            .to_byte_array()
+            .to_vec();
+        // Reverse when converted to Bytes to match the standard display order,
+        // reversed back in `TryFrom<Value> for Txid` (below).
+        txid.reverse();
+        Ok(Value::Bytes(txid))
+    }
+
     /// script(Bytes|Script) -> Script
     pub fn script(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
@@ -154,12 +172,7 @@ pub mod fns {
         })
     }
 
-    /// tx(Bytes|Array<Tagged>|Transaction) -> Transaction
-    pub fn tx(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Value::Transaction(args.arg_into()?))
-    }
-
-    /// script::spk(Descriptor|TapInfo|PubKey|Address|Script) -> Script
+    /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
     ///
     /// Descriptors are compiled into their scriptPubKey
     /// TapInfo are returned as their V1 witness program
@@ -326,11 +339,11 @@ impl TryFrom<Value> for OutPoint {
 impl TryFrom<Value> for Txid {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        // Bitcoin's txid bytes needs to be reversed to match how they're commonly presented
-        // XXX Could this result in the wrong behavior?
         let mut bytes = val.into_bytes()?;
+        // Reverse back from the reversed order used for txid display.
+        // fns::txid() (above) does the opposite.
         bytes.reverse();
-        Ok(Txid::from_raw_hash(sha256d::Hash::from_slice(&bytes)?))
+        Ok(Txid::from_slice(&bytes)?)
     }
 }
 impl TryFrom<Value> for Amount {
