@@ -10,8 +10,15 @@ use crate::util::EC;
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
 
-    scope.set_fn("SHA256", fns::SHA256).unwrap();
+    // Hash functions
+    scope.set_fn("hash::sha256", fns::hash_sha256).unwrap();
+    scope.set_fn("hash::sha256d", fns::hash_sha256d).unwrap();
+    scope.set_fn("hash::ripemd160", fns::hash_sha256d).unwrap();
+    scope.set_fn("hash::hash160", fns::hash_hash160).unwrap();
+    // Note: There are none-hash::-prefixed functions (e.g. sha256()) that also exists
+    // but are different, returning a Miniscript Policy requiring the hash preimage
 
+    // Signing & Verification
     scope.set_fn("ecdsa::sign", fns::ecdsa_sign).unwrap();
     scope.set_fn("ecdsa::verify", fns::ecdsa_verify).unwrap();
     scope.set_fn("schnorr::sign", fns::schnorr_sign).unwrap();
@@ -23,12 +30,26 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 pub mod fns {
     use super::*;
 
-    /// SHA256(Bytes preimage) -> Bytes hash
-    pub fn SHA256(args: Array, _: &ScopeRef) -> Result<Value> {
-        let bytes: Vec<u8> = args.arg_into()?;
-        let hash = hashes::sha256::Hash::hash(&bytes);
-        Ok(hash.into())
+    macro_rules! impl_hash_fn {
+        ($fn_name:ident, $hash_mod:ident) => {
+            pub fn $fn_name(args: Array, _: &ScopeRef) -> Result<Value> {
+                let bytes: Vec<u8> = args.arg_into()?;
+                Ok(hashes::$hash_mod::Hash::hash(&bytes).into())
+            }
+        };
     }
+
+    // hash::sha256(Bytes preimage) -> Bytes hash
+    impl_hash_fn!(hash_sha256, sha256);
+
+    // hash::sha256d(Bytes preimage) -> Bytes hash
+    impl_hash_fn!(hash_sha256d, sha256d);
+
+    // hash::ripemd160(Bytes preimage) -> Bytes hash
+    impl_hash_fn!(hash_ripemd160, ripemd160);
+
+    // hash::hash160(Bytes preimage) -> Bytes hash
+    impl_hash_fn!(hash_hash160, hash160);
 
     /// Sign the given message (hash) using ECDSA
     /// ecdsa::sign(SecKey, Bytes, Bool compact_sig=false)
