@@ -1,13 +1,13 @@
 use std::convert::TryInto;
 
-use ::miniscript::bitcoin::hashes::{sha256, Hash};
-
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Execute, Number, Result, Symbol, Value};
 use crate::{time, Library};
 
 pub mod btc;
+pub mod crypto;
 pub mod ctv;
+pub mod keys;
 pub mod miniscript;
 pub mod psbt;
 pub mod script_marker;
@@ -44,7 +44,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("throw", fns::throw).unwrap();
 
         scope.set_fn("le64", fns::le64).unwrap();
-        scope.set_fn("SHA256", fns::SHA256).unwrap();
 
         // Development utilities
         scope.set_fn("debug", fns::debug).unwrap();
@@ -59,10 +58,12 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     }
 
     self::btc::attach_stdlib(scope);
-    self::miniscript::attach_stdlib(scope);
-    self::taproot::attach_stdlib(scope);
-    self::psbt::attach_stdlib(scope);
+    self::crypto::attach_stdlib(scope);
     self::ctv::attach_stdlib(scope);
+    self::keys::attach_stdlib(scope);
+    self::miniscript::attach_stdlib(scope);
+    self::psbt::attach_stdlib(scope);
+    self::taproot::attach_stdlib(scope);
 
     // Standard library implemented in Minsc
     MINSC_STDLIB.exec(scope).unwrap();
@@ -190,17 +191,6 @@ pub mod fns {
     pub fn le64(args: Array, _: &ScopeRef) -> Result<Value> {
         let num: i64 = args.arg_into()?;
         Ok(num.to_le_bytes().to_vec().into())
-    }
-
-    #[allow(non_snake_case)]
-    /// SHA256(Bytes preimage) -> Bytes hash
-    /// Hash some data with SHA256
-    /// Named in upper-case to avoid a conflict with the Miniscript sha256(Bytes) policy function
-    /// (Yes, this is awfully confusing and requires a better solution. :<)
-    pub fn SHA256(args: Array, _: &ScopeRef) -> Result<Value> {
-        let bytes: Vec<u8> = args.arg_into()?;
-        let hash = sha256::Hash::hash(&bytes);
-        Ok(hash.into())
     }
 
     /// debug(Value, Bool multiline=false)
