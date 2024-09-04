@@ -339,11 +339,16 @@ impl TryFrom<Value> for OutPoint {
 impl TryFrom<Value> for Txid {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        let mut bytes = val.into_bytes()?;
-        // Reverse back from the reversed order used for txid display.
-        // fns::txid() (above) does the opposite.
-        bytes.reverse();
-        Ok(Txid::from_slice(&bytes)?)
+        Ok(match val {
+            Value::Bytes(mut bytes) => {
+                // Reverse back from the reversed order used for txid display.
+                // fns::txid() (above) does the opposite.
+                bytes.reverse();
+                Txid::from_slice(&bytes)?
+            }
+            Value::Transaction(tx) => tx.txid(),
+            other => bail!(Error::NotTxidLike(other.into())),
+        })
     }
 }
 impl TryFrom<Value> for Amount {

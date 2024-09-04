@@ -102,6 +102,9 @@ pub enum RuntimeError {
     #[error("Expected a transaction as object, raw bytes or tagged list, not {0:?}")]
     NotTxLike(Box<Value>),
 
+    #[error("Expected txid bytes or tx, not {0:?}")]
+    NotTxidLike(Box<Value>),
+
     #[error(
         "Expected a 4 bytes BIP32 fingerprint or a key to compute the fingerprint for, not {0:?}"
     )]
