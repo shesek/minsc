@@ -21,7 +21,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
     scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope.set_fn("seckey", fns::seckey).unwrap();
-    scope.set_fn("genkey", fns::genkey).unwrap();
+    scope.set_fn("xpriv::rand", fns::xpriv_rand).unwrap();
     scope.set_fn("xpriv::from_seed", fns::xpriv_from_seed).unwrap();
 }
 
@@ -101,8 +101,8 @@ pub mod fns {
     }
 
     /// Generate a new random Xpriv
-    /// genkey(Network = Signet) -> SecKey
-    pub fn genkey(args: Array, _: &ScopeRef) -> Result<Value> {
+    /// xpriv::rand(Network = Signet) -> SecKey
+    pub fn xpriv_rand(args: Array, _: &ScopeRef) -> Result<Value> {
         let network = args
             .arg_into::<Option<Network>>()?
             .unwrap_or(Network::Signet);
