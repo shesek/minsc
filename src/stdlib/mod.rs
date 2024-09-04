@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Execute, Number, Result, Symbol, Value};
-use crate::{time, Library};
+use crate::Library;
 
 pub mod btc;
 pub mod crypto;
@@ -51,7 +51,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("warn", fns::warn).unwrap();
 
         // Constants
-        scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
         scope.set("MAX_NUMBER", i64::MAX).unwrap();
         scope.set("MIN_NUMBER", i64::MIN).unwrap();
     }

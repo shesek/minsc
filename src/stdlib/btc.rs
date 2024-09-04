@@ -44,6 +44,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("script::bitide", fns::script_bitide).unwrap();
 
     // Constants
+    scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
     scope
         .set("SCRIPT_MARKER_MAGIC", SCRIPT_MARKER_MAGIC_BYTES.to_vec())
         .unwrap();
