@@ -12,27 +12,7 @@ pub struct Scope {
     local: HashMap<Ident, Value>,
 }
 
-thread_local! {
-    static ROOT: ScopeRef<ReadOnly> = {
-        let scope = ScopeRef::default();
-        stdlib::attach_stdlib(&scope);
-        scope.into_readonly()
-    };
-}
-
 impl Scope {
-    /// Get a real-only reference to the cached global root scope
-    pub fn root() -> ScopeRef<ReadOnly> {
-        ROOT.with(ScopeRef::make_ref)
-    }
-
-    /// Create a new mutable child scope under the global root scope
-    /// To create a blank root scope with no stdlib, use ScopeRef::default()
-    /// To create an owned root scope with stdlib, use Scope::root().make_copy()
-    pub fn new() -> ScopeRef<Mutable> {
-        Scope::root().child()
-    }
-
     /// Search the local and parent scopes recursively for `key`, returning a copy of its value
     pub fn get(&self, key: &Ident) -> Option<Value> {
         self.local
@@ -107,6 +87,33 @@ impl Scope {
     }
 }
 
+// The global root scope
+thread_local! {
+    static ROOT: ScopeRef<ReadOnly> = {
+        let scope = ScopeRef::default();
+        stdlib::attach_stdlib(&scope);
+        scope.into_readonly()
+    };
+}
+
+impl Scope {
+    /// Get a real-only ScopeRef for the cached global root scope
+    pub fn root() -> ScopeRef<ReadOnly> {
+        ROOT.with(ScopeRef::make_ref)
+    }
+
+    /// Create a new owned child Scope under the global root scope
+    /// To create an owned blank root scope with no stdlib, use Scope::default()
+    pub fn new() -> Scope {
+        Scope::root().child()
+    }
+
+    /// Convert owned Scope into a shared ScopeRef
+    pub fn into_ref<A: ScopeAccess>(self) -> ScopeRef<A> {
+        ScopeRef(Rc::new(RefCell::new(self)), PhantomData)
+    }
+}
+
 /// A shared Scope reference with ReadOnly/Mutable markers, to have compile-time enforcement
 /// for accessing the RefCell interior mutability.
 #[derive(Debug)]
@@ -141,13 +148,12 @@ impl<A: ScopeAccess> ScopeRef<A> {
         ScopeRef(Rc::new(RefCell::new(cloned)), PhantomData)
     }
 
-    // Create a new mutable ScopeRef that is a child of this scope
-    pub fn child(&self) -> ScopeRef<Mutable> {
-        let child = Scope {
+    /// Create a new owned Scope that is a child of this scope
+    pub fn child(&self) -> Scope {
+        Scope {
             parent: Some(self.make_ref()),
             local: HashMap::new(),
-        };
-        ScopeRef(Rc::new(RefCell::new(child)), PhantomData)
+        }
     }
 }
 
@@ -164,6 +170,11 @@ impl ScopeRef<Mutable> {
     }
 }
 
+impl Default for ScopeRef<Mutable> {
+    fn default() -> Self {
+        ScopeRef(Default::default(), PhantomData::<Mutable>)
+    }
+}
 impl Clone for ScopeRef<ReadOnly> {
     fn clone(&self) -> Self {
         self.make_ref()
@@ -174,12 +185,13 @@ impl Clone for ScopeRef<Mutable> {
         self.make_copy()
     }
 }
-impl Default for ScopeRef<Mutable> {
-    fn default() -> Self {
-        ScopeRef(Default::default(), PhantomData::<Mutable>)
+
+/*
+impl<A: ScopeAccess> From<Scope> for ScopeRef<A> {
+    fn from(scope: Scope) -> Self {
+        scope.into_ref()
     }
 }
-/*
 impl From<ScopeRef<Mutable>> for ScopeRef<ReadOnly> {
     fn from(scope: ScopeRef<Mutable>) -> ScopeRef<ReadOnly> {
         self.into_readonly()

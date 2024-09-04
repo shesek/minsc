@@ -55,15 +55,12 @@ impl Call for UserFunction {
             );
             // For lexically-scoped functions, create a child scope of the scope where the function was defined.
             // For dynamically-scoped function, create a child of the caller scope.
-            let scope = self.scope.as_ref().unwrap_or(caller_scope).child();
-            {
-                let mut scope = scope.borrow_mut();
-                for (index, value) in args.into_iter().enumerate() {
-                    let ident = self.params.get(index).unwrap();
-                    scope.set(ident.clone(), value)?;
-                }
+            let mut scope = self.scope.as_ref().unwrap_or(caller_scope).child();
+            for (index, value) in args.into_iter().enumerate() {
+                let ident = self.params.get(index).unwrap();
+                scope.set(ident.clone(), value)?;
             }
-            self.body.eval(&scope.into_readonly())
+            self.body.eval(&scope.into_ref())
         };
         _call().map_err(|e| Error::CallError(self.ident.clone(), e.into()))
     }

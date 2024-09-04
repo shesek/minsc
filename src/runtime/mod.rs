@@ -14,12 +14,12 @@ pub mod value;
 
 pub use array::Array;
 pub use function::{Call, Function};
-pub use scope::{Mutable, Scope, ScopeRef};
+pub use scope::{Mutable, Scope, ScopeRef, ReadOnly};
 pub use value::{FromValue, Number, Number::*, Symbol, Value};
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
-    fn eval(&self, scope: &ScopeRef) -> Result<Value>;
+    fn eval(&self, scope: &ScopeRef<ReadOnly>) -> Result<Value>;
 }
 
 /// Execute a statement. Statements have side-effects and don't have a return value.
@@ -310,7 +310,7 @@ impl ast::InfixOp {
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        let scope = scope.child();
+        let scope = scope.child().into_ref();
         for stmt in &self.stmts {
             stmt.exec(&scope)?;
         }
