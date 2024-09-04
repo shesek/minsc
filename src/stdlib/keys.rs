@@ -7,8 +7,8 @@ use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
 use bitcoin::secp256k1::rand::{thread_rng, Rng};
 use bitcoin::{secp256k1, Network};
 use miniscript::descriptor::{
-    self, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv,
-    SinglePub, SinglePubKey,
+    self, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv, SinglePub,
+    SinglePubKey,
 };
 
 use crate::ast;
@@ -22,6 +22,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope.set_fn("seckey", fns::seckey).unwrap();
     scope.set_fn("genkey", fns::genkey).unwrap();
+    scope.set_fn("xpriv::from_seed", fns::xpriv_from_seed).unwrap();
 }
 
 impl Evaluate for ast::ChildDerive {
@@ -108,6 +109,14 @@ pub mod fns {
         let seed: [u8; 32] = thread_rng().gen();
 
         Ok(Xpriv::new_master(network, &seed).unwrap().into())
+    }
+
+    /// Construct a master Xpriv from a seed value
+    /// xpriv::from_seed(Bytes, Network = Signet) -> SecKey
+    pub fn xpriv_from_seed(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (seed, network): (Vec<u8>, Option<_>) = args.args_into()?;
+        let network = network.unwrap_or(Network::Signet);
+        Ok(Xpriv::new_master(network, &seed)?.into())
     }
 }
 
