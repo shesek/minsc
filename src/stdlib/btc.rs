@@ -137,11 +137,11 @@ pub mod fns {
     use super::*;
 
     /// Generate an address
-    /// address(Script|Descriptor|PubKey|TapInfo|String|Address, Network=Signet) -> Address
+    /// address(Script|Descriptor|PubKey|TapInfo|String|Address, Network=testnet) -> Address
     pub fn address(args: Array, _: &ScopeRef) -> Result<Value> {
         let (spk, network): (Value, Option<Network>) = args.args_into()?;
         let spk = spk.into_spk()?;
-        let network = network.unwrap_or(Network::Signet);
+        let network = network.unwrap_or(Network::Testnet);
 
         Ok(Address::from_script(&spk, network)
             .map_err(|_| Error::NotAddressable(spk.into()))?
@@ -584,9 +584,9 @@ impl PrettyDisplay for Transaction {
                 |f, output, _inner_indent| {
                     // Individual outputs are always displayed as one-liners
                     if let Ok(address) =
-                        Address::from_script(&output.script_pubkey, Network::Signet)
+                        Address::from_script(&output.script_pubkey, Network::Testnet)
                     {
-                        // XXX always uses the Signet version bytes
+                        // XXX always uses the Testnet version bytes
                         write!(f, "{}", address)?;
                     } else {
                         write!(f, "{}", output.script_pubkey.pretty(None))?;

@@ -118,21 +118,21 @@ pub mod fns {
     }
 
     /// Generate a new random Xpriv
-    /// xpriv::rand(Network = Signet) -> SecKey
+    /// xpriv::rand(Network = testnet) -> SecKey
     pub fn xpriv_rand(args: Array, _: &ScopeRef) -> Result<Value> {
         let network = args
             .arg_into::<Option<Network>>()?
-            .unwrap_or(Network::Signet);
+            .unwrap_or(Network::Testnet);
         let seed: [u8; 32] = thread_rng().gen();
 
         Ok(Xpriv::new_master(network, &seed).unwrap().into())
     }
 
     /// Construct a master Xpriv from a seed value
-    /// xpriv::from_seed(Bytes, Network = Signet) -> SecKey
+    /// xpriv::from_seed(Bytes, Network = testnet) -> SecKey
     pub fn xpriv_from_seed(args: Array, _: &ScopeRef) -> Result<Value> {
         let (seed, network): (Vec<u8>, Option<_>) = args.args_into()?;
-        let network = network.unwrap_or(Network::Signet);
+        let network = network.unwrap_or(Network::Testnet);
         Ok(Xpriv::new_master(network, &seed)?.into())
     }
 
@@ -323,8 +323,8 @@ impl TryFrom<Value> for DescriptorSecretKey {
                 32 => DescriptorSecretKey::Single(SinglePriv {
                     // XXX not fully round-trip-able - the (un)compressed flag is lost (bitcoin::PrivateKey::to_bytes()
                     // does not encode it and PrivateKey::from_slice() always constructs compressed keys) and the
-                    // network is always set to Signet.
-                    key: bitcoin::PrivateKey::from_slice(&bytes, Network::Signet)?,
+                    // network is always set to Testnet.
+                    key: bitcoin::PrivateKey::from_slice(&bytes, Network::Testnet)?,
                     origin: None,
                 }),
                 78 => Value::from(Xpriv::decode(&bytes)?).try_into()?,
@@ -347,8 +347,8 @@ impl TryFrom<Value> for bitcoin::PublicKey {
 impl TryFrom<Value> for bitcoin::PrivateKey {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        // XXX always uses Signet
-        Ok(Self::new(val.try_into()?, Network::Signet))
+        // XXX always uses Testnet
+        Ok(Self::new(val.try_into()?, Network::Testnet))
     }
 }
 
