@@ -9,7 +9,7 @@ pub use ast::{Expr, Ident, Stmt, Stmts};
 lalrpop_mod!(
     #[allow(clippy::all)]
     pub grammar,
-    "/src/parser/grammar.rs"
+    "/parser/grammar.rs"
 );
 
 pub type Library = Stmts;
