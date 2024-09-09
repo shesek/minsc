@@ -62,15 +62,16 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
             other_ => other = Some(other_),
         };
 
-        // Display the explicitScript and address of descriptors
+        // Display the explicitScript/scriptPubKey and address of descriptors
         if let (Some(desc), None, None) = (&desc, &script, &addr) {
             // Multi-path descriptors cannot be used to derive scripts/addresses
             if !desc.is_multipath() {
                 addr = Some(desc.to_address(network)?);
-                // Taproot doesn't have an explicitScript
-                if !matches!(desc, Descriptor::Tr(_)) {
-                    script = Some(desc.to_explicit_script()?);
-                }
+                script = Some(match desc {
+                    // Use the scriptPubKey for Taproot descriptor (it has no explicitScript)
+                    Descriptor::Tr(_) => desc.to_script_pubkey()?,
+                    _ => desc.to_explicit_script()?,
+                })
             }
         }
 
