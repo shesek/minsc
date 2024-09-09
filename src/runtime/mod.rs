@@ -14,7 +14,7 @@ pub mod value;
 
 pub use array::Array;
 pub use function::{Call, Function};
-pub use scope::{Mutable, Scope, ScopeRef, ReadOnly};
+pub use scope::{Mutable, ReadOnly, Scope, ScopeRef};
 pub use value::{FromValue, Number, Number::*, Symbol, Value};
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
@@ -257,14 +257,17 @@ impl ast::InfixOp {
             (Gte, Num(Float(a)), Num(Float(b))) => (a >= b).into(),
             (Lte, Num(Float(a)), Num(Float(b))) => (a <= b).into(),
 
-            // + - * for numbers (integers and floats cannot be mixed)
+            // + - * % for numbers (integers and floats cannot be mixed)
+            // (/ handled separately, overloaded for bip32 derivation)
             (Add, Num(Int(a)), Num(Int(b))) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
             (Subtract, Num(Int(a)), Num(Int(b))) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
             (Multiply, Num(Int(a)), Num(Int(b))) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
+            (Mod, Num(Int(a)), Num(Int(b))) => (a % b).into(),
 
             (Add, Num(Float(a)), Num(Float(b))) => (a + b).into(),
             (Subtract, Num(Float(a)), Num(Float(b))) => (a - b).into(),
             (Multiply, Num(Float(a)), Num(Float(b))) => (a * b).into(),
+            (Mod, Num(Float(a)), Num(Float(b))) => (a % b).into(),
 
             // + for arrays, bytes and strings
             (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),

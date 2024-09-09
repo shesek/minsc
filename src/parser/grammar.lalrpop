@@ -277,6 +277,7 @@ InfixOpScriptSafe: ast::InfixOp = {
   "+" => ast::InfixOp::Add,
   "-" => ast::InfixOp::Subtract,
   "*" => ast::InfixOp::Multiply,
+  "%" => ast::InfixOp::Mod,
   "==" => ast::InfixOp::Eq,
   "!=" => ast::InfixOp::NotEq,
 };
