@@ -58,6 +58,7 @@ Expr = {
   ChildDerive,
   FnExpr,
   Infix,
+  ColonOp,
   Duration,
 };
 
@@ -77,13 +78,14 @@ SExpr = {
   Ident,
   Bytes,
   String,
-  Call,
-  Array,
   DateTime,
   BtcAmount,
   Address,
   PubKey,
   SecKey,
+
+  Call,
+  Array,
   ScriptFrag,
   ScriptMarkCtx,
 
@@ -218,13 +220,13 @@ ChildDerivePart: Expr = {
 ChildDeriveWildcard = { "/*", "/ *" };
 
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
-ScriptFragPart = { ScriptFragPart_, ScriptFragPart_Infix };
-ScriptFragPart_ = {
+ScriptFragPart = {
   Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, ArrayAccess,
-  ScriptFragPart_Mark, BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
+  BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
+  ScriptFragPart_Infix, ScriptFragPart_Mark,
 };
 // Cannot allow all Infix operators because < > conflicts
-ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart_> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_RHS> =>
+ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_RHS> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
 
 ScriptFragPart_RHS = { SExpr, ArrayAccess };
@@ -264,36 +266,36 @@ FnExprParams = {
   "||" => vec![],
 };
 
-// Infix op with two operands
-Infix: Expr = <lhs:InfixLhs> <op:InfixOp> <rhs:Expr> =>
+// Binary infix operators with left associativity
+Infix: Expr = <lhs:InfixLHS> <op:InfixOp> <rhs:InfixRHS> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
-
-InfixLhs = { SimpleExpr, Duration, ChildDerive };
-
-InfixOp: ast::InfixOp = { InfixOpScriptSafe, InfixOpNonScript };
-
-// Can be used everywhere
+InfixRHS = { SimpleExpr, And, Or, ChildDerive, Duration }; // Expr - IfExpr - FnExpr - Infix - InfixColon
+InfixLHS = { InfixRHS, Infix }; // left-associative recursion
+InfixOp = { InfixOpScriptSafe, InfixOpNonScript };
 InfixOpScriptSafe: ast::InfixOp = {
+  // Can be used everywhere, including ScriptFag
   "+" => ast::InfixOp::Add,
   "-" => ast::InfixOp::Subtract,
   "*" => ast::InfixOp::Multiply,
   "==" => ast::InfixOp::Eq,
   "!=" => ast::InfixOp::NotEq,
-  ":" => ast::InfixOp::Colon,
 };
-// Cannot be used within a ScriptFrag
 InfixOpNonScript: ast::InfixOp = {
-  // > and < conflict with the <$data> syntax
+  // Cannot be used within a ScriptFrag
   ">" => ast::InfixOp::Gt,
   "<" => ast::InfixOp::Lt,
-  // could be allowed in ScriptFrag but seems weird to
   ">=" => ast::InfixOp::Gte,
   "<=" => ast::InfixOp::Lte,
 };
 
+// Colon tuple constructor operator. Defined separately from Infix to use right associativity.
+ColonOp: Expr = <lhs:ColonLHS> ":" <rhs:ColonRHS> =>
+   ast::Infix { op: ast::InfixOp::Colon, lhs: lhs.into(), rhs: rhs.into() }.into();
+ColonLHS = { SimpleExpr, And, Or, SlashOp, Duration, Infix }; // Expr - IfExpr - FnExpr - ColonOp
+ColonRHS = { ColonLHS, ColonOp, FnExpr, IfExpr }; // right-associative recursion
 
-// This is defined separately from InfixOp with less options for the LHS/RHS, so that
-// it can be used unambiguously as an AndOrBranch element without requiring parenthesis.
+// Probability assignment operator. Defined separately from Infix with less options for the LHS/RHS,
+// so that it can be used unambiguously as an AndOrBranch element without requiring parenthesis.
 InfixProb: Expr = <lhs:SExpr> "@" <rhs:SimpleExpr> =>
   ast::Infix { op: ast::InfixOp::Prob, lhs: lhs.into(), rhs: rhs.into() }.into();
 

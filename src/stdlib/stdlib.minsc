@@ -40,7 +40,7 @@ fn isEmpty($arr) = len($arr) == 0;
 repeat = fillArray; // alias name for a common fillArray use-case, to repeat Script fragments
 
 fn map($arr, $fn)     = fold($arr, [], |$acc, $el| $acc + [ $fn($el) ]);
-fn filter($arr, $fn)  = fold($arr, [], |$acc, $el| $acc + if $fn($el) then [ $el ] else [ ]);
+fn filter($arr, $fn)  = fold($arr, [], |$acc, $el| $acc + (if $fn($el) then [ $el ] else [ ]));
 fn flatMap($arr, $fn) = fold($arr, [], |$acc, $el| $acc + $fn($el));
 
 fn reduce($arr, $fn) = if !isEmpty($arr) then fold(tail($arr), $arr.0, $fn) else null;
