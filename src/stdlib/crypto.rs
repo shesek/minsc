@@ -1,10 +1,13 @@
+//! Crypto and keys related functionality, including descriptor public/secret keys (used
+//! as the main representation for keys in Minsc) and BIP32 derivation
+
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use bitcoin::bip32::{self, ChildNumber, DerivationPath, Xpriv, Xpub};
 use bitcoin::hashes::{self, sha256, Hash};
 use bitcoin::key::{PublicKey, TweakedPublicKey, XOnlyPublicKey};
-use bitcoin::secp256k1::rand::{thread_rng, Rng};
+use bitcoin::secp256k1::rand::{random, thread_rng, Rng, RngCore};
 use bitcoin::{secp256k1, Network};
 use miniscript::descriptor::{
     self, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv, SinglePub,
@@ -23,7 +26,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope.set_fn("seckey", fns::seckey).unwrap();
     scope.set_fn("xpriv::rand", fns::xpriv_rand).unwrap();
-    scope.set_fn("xpriv::from_seed", fns::xpriv_from_seed).unwrap();
+    scope
+        .set_fn("xpriv::from_seed", fns::xpriv_from_seed)
+        .unwrap();
 
     // Hashes
     scope.set_fn("hash::sha256", fns::hash_sha256).unwrap();
@@ -40,6 +45,12 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope
         .set_fn("schnorr::verify", fns::schnorr_verify)
         .unwrap();
+
+    // Random
+    scope.set_fn("rand::bytes", fns::rand_bytes).unwrap();
+    scope.set_fn("rand::i64", fns::rand_i64).unwrap();
+    scope.set_fn("rand::f64", fns::rand_f64).unwrap();
+
 }
 
 impl Evaluate for ast::ChildDerive {
@@ -117,7 +128,7 @@ pub mod fns {
         Ok(Value::SecKey(args.arg_into()?))
     }
 
-    /// Generate a new random Xpriv
+    /// Generate a new random Xpriv from a 256-bit seed
     /// xpriv::rand(Network = testnet) -> SecKey
     pub fn xpriv_rand(args: Array, _: &ScopeRef) -> Result<Value> {
         let network = args
@@ -199,6 +210,29 @@ pub mod fns {
     pub fn schnorr_verify(args: Array, _: &ScopeRef) -> Result<Value> {
         let (pk, msg, sig) = args.args_into()?;
         Ok(EC.verify_schnorr(&sig, &msg, &pk).is_ok().into())
+    }
+
+    // Generate a random Bytes sequence
+    /// rand::bytes(Int size) -> Bytes
+    pub fn rand_bytes(args: Array, _: &ScopeRef) -> Result<Value> {
+        let size = args.arg_into()?;
+        let mut bytes = vec![0u8; size];
+        thread_rng().fill_bytes(&mut bytes);
+        Ok(bytes.into())
+    }
+
+    /// Generate a random signed 64-bit integer
+    /// rand::i64() -> Int
+    pub fn rand_i64(args: Array, _: &ScopeRef) -> Result<Value> {
+        args.no_args()?;
+        Ok(random::<i64>().into())
+    }
+
+    /// Generate a random 64-bit float in the [0, 1) range
+    /// rand::f64() -> Float
+    pub fn rand_f64(args: Array, _: &ScopeRef) -> Result<Value> {
+        args.no_args()?;
+        Ok(random::<f64>().into())
     }
 }
 
