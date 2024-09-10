@@ -1,7 +1,7 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use bitcoin::bip32::{ChildNumber, IntoDerivationPath};
+use bitcoin::bip32::{ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::{secp256k1, PublicKey};
 use miniscript::descriptor::{
@@ -53,18 +53,43 @@ impl DescriptorExt for crate::DescriptorDpk {
     }
 }
 
-pub trait DeriveExt {
-    fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self>
+pub trait DeriveExt: Sized {
+    /// Always derives when called directly on Xpubs/Xprivs, even if their wildcard modifier
+    /// was not enabled. Calling directly on single keys raises an error.
+    /// For Policies/Descriptors, inner xpubs with wildcards are derived (at least
+    /// one is required) while non-wildcard/single inner keys are left as-is.
+    fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self>;
+
+    fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self>;
+
+    /// Whether there are any Xpubs/Xprivs with wildcards
+    fn has_wildcards(&self) -> bool;
+
+    /// Derive if there are wildcards. Unlike derive_path(), this is a no-op for single and non-wildcard keys
+    fn maybe_derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self>
     where
-        Self: Sized;
-    fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self>
+        Self: Sized,
+    {
+        if self.has_wildcards() {
+            self.derive_path(path, wildcard)
+        } else {
+            Ok(self)
+        }
+    }
+
+    fn maybe_derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self>
     where
-        Self: Sized;
-    fn is_deriveable(&self) -> bool;
+        Self: Sized,
+    {
+        if self.has_wildcards() {
+            self.derive_multi(paths, wildcard)
+        } else {
+            Ok(self)
+        }
+    }
 }
 
-// Used as a trait alias shortcut
-pub trait DerivePath: IntoDerivationPath + Clone {}
+pub trait DerivePath: IntoDerivationPath + Clone {} // trait alias
 impl<T: IntoDerivationPath + Clone> DerivePath for T {}
 
 impl DeriveExt for DescriptorPublicKey {
@@ -101,13 +126,9 @@ impl DeriveExt for DescriptorPublicKey {
 
         let parent_paths = self.full_derivation_paths();
 
-        let child_paths = paths
+        let derived_paths = parent_paths
             .into_iter()
-            .flat_map(|child_path| {
-                parent_paths
-                    .iter()
-                    .map(move |parent_path| parent_path.extend(child_path.clone()))
-            })
+            .flat_map(|parent_path| paths.iter().map(move |path| parent_path.extend(&path)))
             .collect::<Vec<_>>();
 
         let (origin, xkey) = match self {
@@ -118,16 +139,12 @@ impl DeriveExt for DescriptorPublicKey {
         Ok(DescriptorPublicKey::MultiXPub(DescriptorMultiXKey {
             origin: origin,
             xkey: xkey,
-            derivation_paths: DerivPaths::new(child_paths).expect("cannot be empty"),
-            wildcard ,
+            derivation_paths: DerivPaths::new(derived_paths).expect("cannot be empty"),
+            wildcard,
         }))
     }
-    fn is_deriveable(&self) -> bool {
-        // Xpubs are always derivable, even without the * wildcard suffix
-        matches!(
-            self,
-            DescriptorPublicKey::XPub(_) | DescriptorPublicKey::MultiXPub(_)
-        )
+    fn has_wildcards(&self) -> bool {
+        self.has_wildcard()
     }
 }
 
@@ -162,18 +179,13 @@ impl DeriveExt for DescriptorSecretKey {
         let paths = paths
             .into_iter()
             .map(|p| Ok(p.clone().into_derivation_path()?))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<DerivationPath>>>()?;
 
-        // full_derivation_paths() is not available on DescriptorSecretKey
-        let parent_paths = self.to_public(&EC)?.full_derivation_paths();
+        let parent_paths = self.full_derivation_paths();
 
-        let child_paths = paths
+        let derived_paths = parent_paths
             .into_iter()
-            .flat_map(|child_path| {
-                parent_paths
-                    .iter()
-                    .map(move |parent_path| parent_path.extend(child_path.clone()))
-            })
+            .flat_map(|parent_path| paths.iter().map(move |path| parent_path.extend(&path)))
             .collect::<Vec<_>>();
 
         let (origin, xkey) = match self {
@@ -184,87 +196,61 @@ impl DeriveExt for DescriptorSecretKey {
         Ok(DescriptorSecretKey::MultiXPrv(DescriptorMultiXKey {
             origin: origin,
             xkey: xkey,
-            derivation_paths: DerivPaths::new(child_paths).expect("cannot be empty"),
+            derivation_paths: DerivPaths::new(derived_paths).expect("cannot be empty"),
             wildcard,
         }))
     }
-    fn is_deriveable(&self) -> bool {
-        // Xprvs are always derivable, even without the * wildcard suffix
-        matches!(
-            self,
-            DescriptorSecretKey::XPrv(_) | DescriptorSecretKey::MultiXPrv(_)
-        )
+    fn has_wildcards(&self) -> bool {
+        match self {
+            DescriptorSecretKey::Single(..) => false,
+            DescriptorSecretKey::XPrv(xprv) => xprv.wildcard != Wildcard::None,
+            DescriptorSecretKey::MultiXPrv(xprv) => xprv.wildcard != Wildcard::None,
+        }
     }
 }
+
 impl DeriveExt for crate::PolicyDpk {
     fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self> {
-        // ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
         self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-            Ok(pk.clone().derive_path(path.clone(), wildcard)?)
+            Ok(pk.clone().maybe_derive_path(path.clone(), wildcard)?)
         }))
     }
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
-        // ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-            Ok(pk.clone().derive_multi(paths, wildcard)?)
+            Ok(pk.clone().maybe_derive_multi(paths, wildcard)?)
         }))
     }
-    fn is_deriveable(&self) -> bool {
-        self.for_any_key(|key| key.has_wildcard())
+    fn has_wildcards(&self) -> bool {
+        self.for_any_key(DeriveExt::has_wildcards)
     }
 }
-impl<Ctx: miniscript::ScriptContext> DeriveExt for crate::MiniscriptDpk<Ctx> {
-    fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self> {
-        ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
-        let path = path.into_derivation_path()?;
-        Ok(
-            self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-                pk.clone().derive_path(path.clone(), wildcard)
-            }))?,
-        )
-    }
-    fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
-        ensure!(self.is_deriveable(), Error::NonDeriveableNoWildcard);
-        Ok(
-            self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-                pk.clone().derive_multi(paths, wildcard)
-            }))?,
-        )
-    }
-    fn is_deriveable(&self) -> bool {
-        self.for_any_key(|pk| pk.has_wildcard())
-    }
-}
+
 impl DeriveExt for crate::DescriptorDpk {
     fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self> {
-        ensure!(
-            DeriveExt::is_deriveable(&self),
-            Error::NonDeriveableNoWildcard
-        );
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
         Ok(
             self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-                pk.clone().derive_path(path.clone(), wildcard)
+                pk.clone().maybe_derive_path(path.clone(), wildcard)
             }))?,
         )
     }
-
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
-        ensure!(
-            DeriveExt::is_deriveable(&self),
-            Error::NonDeriveableNoWildcard
-        );
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         Ok(
             self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-                pk.clone().derive_multi(paths, wildcard)
+                pk.clone().maybe_derive_multi(paths, wildcard)
             }))?,
         )
     }
-    fn is_deriveable(&self) -> bool {
+    fn has_wildcards(&self) -> bool {
         self.has_wildcard()
     }
 }
+
 impl DeriveExt for Value {
     fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self> {
         Ok(match self {
@@ -286,13 +272,13 @@ impl DeriveExt for Value {
             _ => bail!(Error::NonDeriveableType),
         })
     }
-    fn is_deriveable(&self) -> bool {
+    fn has_wildcards(&self) -> bool {
         match self {
-            Value::PubKey(pubkey) => DeriveExt::is_deriveable(pubkey),
-            Value::SecKey(seckey) => DeriveExt::is_deriveable(seckey),
-            Value::Descriptor(desc) => DeriveExt::is_deriveable(desc),
-            Value::Policy(policy) => policy.is_deriveable(),
-            Value::Array(array) => array.is_deriveable(),
+            Value::PubKey(pubkey) => pubkey.has_wildcards(),
+            Value::SecKey(seckey) => seckey.has_wildcards(),
+            Value::Descriptor(desc) => desc.has_wildcards(),
+            Value::Policy(policy) => policy.has_wildcards(),
+            Value::Array(array) => array.has_wildcards(),
             _ => false,
         }
     }
@@ -300,21 +286,23 @@ impl DeriveExt for Value {
 
 impl DeriveExt for Array {
     fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self> {
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         Ok(Array(
             self.into_iter()
-                .map(|v| v.derive_path(path.clone(), wildcard))
+                .map(|v| v.maybe_derive_path(path.clone(), wildcard))
                 .collect::<Result<_>>()?,
         ))
     }
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         Ok(Array(
             self.into_iter()
-                .map(|v| v.derive_multi(paths, wildcard))
+                .map(|v| v.maybe_derive_multi(paths, wildcard))
                 .collect::<Result<_>>()?,
         ))
     }
-    fn is_deriveable(&self) -> bool {
-        self.iter().any(|v| v.is_deriveable())
+    fn has_wildcards(&self) -> bool {
+        self.iter().any(DeriveExt::has_wildcards)
     }
 }
 
@@ -361,6 +349,45 @@ where
     }
     fn hash160(&mut self, ripemd160: &P::Hash160) -> Result<Q::Hash160> {
         Ok(ripemd160.clone())
+    }
+    // XXX could use miniscript::translate_hash_clone!() if is used std::result:Result or if we avoided replacing Result with a type alias
+}
+
+pub trait DescriptorSecretKeyExt {
+    /// Like `DescriptorPublicKey::full_derivation_paths()`, which isn't available for secret keys
+    fn full_derivation_paths(&self) -> Vec<DerivationPath>;
+}
+impl DescriptorSecretKeyExt for DescriptorSecretKey {
+    fn full_derivation_paths(&self) -> Vec<DerivationPath> {
+        match self {
+            DescriptorSecretKey::MultiXPrv(xprv) => {
+                let origin_path = if let Some((_, ref path)) = xprv.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                };
+                xprv.derivation_paths
+                    .paths()
+                    .iter()
+                    .map(|p| origin_path.extend(p))
+                    .collect()
+            }
+            DescriptorSecretKey::XPrv(ref xpub) => {
+                let origin_path = if let Some((_, ref path)) = xpub.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                };
+                vec![origin_path.extend(&xpub.derivation_path)]
+            }
+            DescriptorSecretKey::Single(ref single) => {
+                vec![if let Some((_, ref path)) = single.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                }]
+            }
+        }
     }
 }
 

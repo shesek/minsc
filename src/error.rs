@@ -155,7 +155,7 @@ pub enum RuntimeError {
     #[error("Invalid arguments")]
     InvalidArguments,
 
-    #[error("Cannot derive policy/descriptor without inner wildcard keys")]
+    #[error("No inner wildcard xpubs to derive")]
     NonDeriveableNoWildcard,
 
     #[error("Data type cannot be derived")]
