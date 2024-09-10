@@ -11,6 +11,10 @@ use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, Polic
 
 pub use crate::runtime::AndOr;
 
+// While technically part of the miniscript crate, the functions and conversions for miniscript::Descriptor{Public,Secret}Key
+// are implemented as part of keys.rs. They are used as the primary representation for keys in Minsc (its Value::{Pub,Sec}Key),
+// even when not used for Miniscript-related stuff.
+
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
 
@@ -32,17 +36,17 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("sh", fns::sh).unwrap();
     // tr() is also available, defined in taproot.rs
 
-    // Expose TRIVIAL (always true) and UNSATISFIABLE (always false) policies
+    // Expose TRIVIAL and UNSATISFIABLE policies
     scope.set("TRIVIAL", Policy::Trivial).unwrap();
     scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
 
-    // Descriptor utility functions
+    // Other descriptor functions
+    scope.set_fn("explicitScript", fns::explicitScript).unwrap();
     scope
-        .set_fn("singleDescriptors", fns::singleDescriptors)
+        .set_fn("descriptor::singles", fns::descriptor_singles)
         .unwrap();
 
-    // Compile descriptor/policy to script
-    scope.set_fn("explicitScript", fns::explicitScript).unwrap();
+    // Policy to Script compilation
     scope.set_fn("tapscript", fns::tapscript).unwrap();
     scope.set_fn("segwitv0", fns::segwitv0).unwrap();
 }
@@ -130,6 +134,10 @@ pub mod fns {
         Ok(Policy::Hash160(args.arg_into()?).into())
     }
 
+    //
+    // Miniscript Descriptor functions
+    //
+
     // wpkh(PubKey) -> Descriptor::Wpkh
     pub fn wpkh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Descriptor::new_wpkh(args.arg_into()?)?.into())
@@ -148,7 +156,7 @@ pub mod fns {
         })
     }
 
-    /// Descriptor::W{sh,pkh} -> Descriptor::ShW{sh,pkh}
+    /// sh(Descriptor::W{sh,pkh}) -> Descriptor::ShW{sh,pkh}
     pub fn sh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Descriptor(desc) => match desc {
@@ -161,28 +169,40 @@ pub mod fns {
         .into())
     }
 
-    /// Descriptor -> Script witnessScript
-    pub fn explicitScript(args: Array, _: &ScopeRef) -> Result<Value> {
-        let descriptor: Descriptor = args.arg_into()?;
-        Ok(descriptor.to_explicit_script()?.into())
-    }
+    //
+    // Policy to Script compilation
+    //
 
-    /// Policy -> Script witnessScript
+    /// tapscript(Policy) -> Script witnessScript
     pub fn tapscript(args: Array, _: &ScopeRef) -> Result<Value> {
         let policy: Policy = args.arg_into()?;
         let miniscript = policy.compile::<miniscript::Tap>()?;
         Ok(miniscript.derive_keys()?.encode().into())
     }
 
-    /// Policy -> Script witnessScript
+    /// segwitv0(Policy) -> Script witnessScript
     pub fn segwitv0(args: Array, _: &ScopeRef) -> Result<Value> {
         let policy: Policy = args.arg_into()?;
         let miniscript = policy.compile::<miniscript::Segwitv0>()?;
         Ok(miniscript.derive_keys()?.encode().into())
     }
 
-    /// Descriptor<Multi> -> Array<Descriptor<Single>>
-    pub fn singleDescriptors(args: Array, _: &ScopeRef) -> Result<Value> {
+
+    //
+    // Descriptor utilities
+    //
+
+    /// explicitScript(Descriptor) -> Script
+    /// Get the Descriptor's underlying Script (before any hashing is done - AKA the witnessScript for Wsh,
+    /// scriptPubKey for Wpkh, or the redeemScript for ShWpkh). Tr descriptors don't have an explicitScript.
+    /// To get the scriptPubKey of descriptors, use scriptPubKey().
+    pub fn explicitScript(args: Array, _: &ScopeRef) -> Result<Value> {
+        let descriptor: Descriptor = args.arg_into()?;
+        Ok(descriptor.to_explicit_script()?.into())
+    }
+
+    /// descriptor::singles(Descriptor<Multi>) -> Array<Descriptor<Single>>
+    pub fn descriptor_singles(args: Array, _: &ScopeRef) -> Result<Value> {
         let desc: Descriptor = args.arg_into()?;
         let descs = desc.into_single_descriptors()?;
         Ok(Value::array(
