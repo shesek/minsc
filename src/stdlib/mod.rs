@@ -190,15 +190,15 @@ pub mod fns {
         Ok(num.to_le_bytes().to_vec().into())
     }
 
-    /// debug(Value, Bool multiline=false)
+    /// debug(Value, Bool single_line=false)
     /// Get the Debug representation of the Value
     pub fn debug(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (val, multiline): (Value, Option<bool>) = args.args_into()?;
-        let debug_str = if multiline.unwrap_or(false) {
+        let (val, single_line): (Value, Option<bool>) = args.args_into()?;
+        let debug_str = if single_line.unwrap_or(false) {
+            format!("{:?}", val)
+        } else {
             // Indent with 2 spaces instead of 4
             format!("{:#?}", val).replace("    ", "  ")
-        } else {
-            format!("{:?}", val)
         };
         // Uses Symbol as a hack to enable syntax highlighting for debug_str in the web playground.
         // This works because the Value's Display returns Symbol strings as-is, with no quoting or escaping.
