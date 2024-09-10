@@ -4,7 +4,7 @@ use std::convert::TryInto;
 use crate::parser::{ast, Expr, Stmt};
 use crate::stdlib;
 
-pub use crate::error::RuntimeError as Error;
+pub use crate::error::{ResultExt, RuntimeError as Error};
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub mod array;
@@ -257,16 +257,17 @@ impl ast::InfixOp {
             (Gte, Num(Float(a)), Num(Float(b))) => (a >= b).into(),
             (Lte, Num(Float(a)), Num(Float(b))) => (a <= b).into(),
 
-            // + - * % for numbers (integers and floats cannot be mixed)
-            // (/ handled separately, overloaded for bip32 derivation)
+            // + - * / % for numbers (integers and floats cannot be mixed)
             (Add, Num(Int(a)), Num(Int(b))) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
             (Subtract, Num(Int(a)), Num(Int(b))) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
             (Multiply, Num(Int(a)), Num(Int(b))) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
+            (Divide, Num(Int(a)), Num(Int(b))) => a.checked_div(b).ok_or(Error::Overflow)?.into(),
             (Mod, Num(Int(a)), Num(Int(b))) => (a % b).into(),
 
             (Add, Num(Float(a)), Num(Float(b))) => (a + b).into(),
             (Subtract, Num(Float(a)), Num(Float(b))) => (a - b).into(),
             (Multiply, Num(Float(a)), Num(Float(b))) => (a * b).into(),
+            (Divide, Num(Float(a)), Num(Float(b))) => (a / b).into(),
             (Mod, Num(Float(a)), Num(Float(b))) => (a % b).into(),
 
             // + for arrays, bytes and strings
@@ -310,6 +311,30 @@ impl ast::InfixOp {
     }
 }
 
+impl Evaluate for ast::SlashOp {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
+        use ast::{InfixOp, SlashRhs};
+
+        // Overloaded for number division and BIP32 derivation, depending on the LHS
+        match self.lhs.eval(scope)? {
+            Value::Number(lhs) => {
+                let rhs = match &self.rhs {
+                    SlashRhs::Expr(expr) => expr.eval(scope)?,
+                    _ => bail!(Error::SlashUnexpectedBip32Mod), // BIP32 modifiers (', h and *) cannot be used with number division
+                };
+                InfixOp::Divide
+                    .apply(lhs.into(), rhs, scope)
+                    .map_err(|e| Error::InfixOpError(InfixOp::Divide, e.into()))
+            }
+            lhs => {
+                // Any non-number is assumed to be a BIP32-derivable type (PubKey, SecKey, Policy, Descriptor or arrays of them)
+                stdlib::crypto::eval_slash_bip32_derive(lhs, &self.rhs, scope)
+                    .box_err(Error::SlashBip32Derive)
+            }
+        }
+    }
+}
+
 impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
@@ -342,10 +367,10 @@ impl Evaluate for Expr {
             Expr::Block(x) => x.eval(scope)?,
             Expr::Array(x) => x.eval(scope)?, // .ctx("[]")?,
             Expr::ArrayAccess(x) => x.eval(scope).ctx("dot access")?,
-            Expr::ChildDerive(x) => x.eval(scope).ctx("/ operator")?,
             Expr::ScriptFrag(x) => x.eval(scope).ctx("`` script")?,
             Expr::FnExpr(x) => x.eval(scope)?, // cannot fail
             Expr::Infix(x) => x.eval(scope)?,  // dedicated error type
+            Expr::SlashOp(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
             Expr::BtcAmount(x) => x.eval(scope).ctx("BTC amount")?, // eval'd into a Number
             Expr::Duration(x) => x.eval(scope).ctx("time duration")?, // eval'd into a Number

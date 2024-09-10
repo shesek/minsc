@@ -11,12 +11,12 @@ use bitcoin::secp256k1::rand::{random, thread_rng, Rng, RngCore};
 use bitcoin::{secp256k1, Network};
 use miniscript::descriptor::{
     self, DescriptorPublicKey, DescriptorSecretKey, DescriptorXKey, SinglePriv, SinglePub,
-    SinglePubKey,
+    SinglePubKey, Wildcard,
 };
 
-use crate::ast;
+use crate::ast::{self, SlashRhs};
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, Error, Evaluate, Float, Int, Result, Value};
+use crate::runtime::{Array, Error, Evaluate, Result, Value};
 use crate::util::{self, DeriveExt, PrettyDisplay, EC};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -50,67 +50,55 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("rand::bytes", fns::rand_bytes).unwrap();
     scope.set_fn("rand::i64", fns::rand_i64).unwrap();
     scope.set_fn("rand::f64", fns::rand_f64).unwrap();
-
 }
 
-impl Evaluate for ast::ChildDerive {
-    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        let mut node = self.parent.eval(scope)?;
+/// BIP32 key derivation using the Slash operator
+pub fn eval_slash_bip32_derive(lhs: Value, rhs: &ast::SlashRhs, scope: &ScopeRef) -> Result<Value> {
+    match rhs {
+        // RHS used for child key derivation with a child code number, hash or multi-path array
+        SlashRhs::Expr(rhs_expr) | SlashRhs::HardenedDerivation(rhs_expr) => {
+            let is_hardened = matches!(rhs, SlashRhs::HardenedDerivation(_));
 
-        // The `/` operator is overloaded for both BIP32 key derivation and number division, depending on the operands.
-        // not the most elegant implementation, should ideally be refactored as an InfixOp.
-        if node.is_number() {
-            ensure!(!self.is_wildcard, Error::InvalidArguments);
-            let mut result = node.into_number()?;
-            for num in &self.path {
-                result = match (result, num.eval(scope)?.into_number()?) {
-                    (Int(a), Int(b)) => Int(a.checked_div(b).ok_or(Error::Overflow)?),
-                    (Float(a), Float(b)) => Float(a / b),
-                    (a, b) => bail!(Error::InfixOpMixedNum(
-                        Box::new(a.into()),
-                        Box::new(b.into())
-                    )),
+            let derivation_path = |child_num| {
+                // Create a DerivationPath with `child_num` as its single derivation step
+                let child_num = if is_hardened {
+                    ChildNumber::from_hardened_idx(child_num)?
+                } else {
+                    ChildNumber::from_normal_idx(child_num)?
                 };
-            }
-            return Ok(Value::Number(result));
-        }
+                Ok(DerivationPath::from(&[child_num][..]))
+            };
 
-        for derivation_step in &self.path {
-            node = match derivation_step.eval(scope)? {
+            match rhs_expr.eval(scope)? {
                 // Derive with a BIP 32 child code index number
                 Value::Number(child_num) => {
-                    let child_num = ChildNumber::from_normal_idx(child_num.into_u32()?)?;
-                    node.derive_path(&[child_num][..], self.is_wildcard)?
+                    lhs.derive_path(derivation_path(child_num.into_u32()?)?, Wildcard::None)
                 }
 
-                // Derive with a hash converted into a series of BIP32 non-hardened derivations using hash_to_child_vec()
+                // Derive with a hash converted into a series of BIP32 non-hardened derivations using Sapio's hash_to_child_vec()
                 Value::Bytes(bytes) => {
+                    ensure!(!is_hardened, Error::InvalidArguments);
                     let hash = sha256::Hash::from_slice(&bytes)?;
-                    node.derive_path(util::hash_to_child_vec(hash), self.is_wildcard)?
+                    lhs.derive_path(util::hash_to_child_vec(hash), Wildcard::None)
                 }
 
                 // Derive a BIP389 Multipath descriptor
                 Value::Array(child_nums) => {
                     let child_paths = child_nums
                         .into_iter()
-                        .map(|c| {
-                            // XXX this doesn't support hashes
-                            let child_num = ChildNumber::from_normal_idx(c.into_u32()?)?;
-                            Ok(DerivationPath::from(&[child_num][..]))
-                        })
+                        .map(|num| derivation_path(num.into_u32()?))
                         .collect::<Result<Vec<_>>>()?;
 
-                    node.derive_multi(&child_paths, self.is_wildcard)?
+                    lhs.derive_multi(&child_paths, Wildcard::None)
                 }
 
                 _ => bail!(Error::InvalidDerivationCode),
             }
         }
-        if self.path.is_empty() {
-            // If there was no path, derive once with an empty path so that is_wildcard is set.
-            node = node.derive_path(&[][..], self.is_wildcard)?;
-        }
-        Ok(node)
+
+        // RHS used to update wildcard modifier (*, *' and *h)
+        SlashRhs::HardenedWildcard => lhs.derive_path(&[][..], Wildcard::Hardened),
+        SlashRhs::UnhardenedWildcard => lhs.derive_path(&[][..], Wildcard::Unhardened),
     }
 }
 

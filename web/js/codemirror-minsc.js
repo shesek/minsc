@@ -57,6 +57,11 @@ CodeMirror.defineSimpleMode("minsc",{
     // PUSH in Script's Debug format
     {regex: /(OP_PUSHBYTES\w*)\s*([a-f0-9]+)\b/, token: ["variable-2", "number"]},
 
+    // BIP32 derivation
+    {regex: /(\d+)(h)\b/, token: ["number", "operator"]}, // hardened derivation step with number literal
+    {regex: /\*h\b/, token: "operator"}, // hardened wildcard
+    {regex: /m\//, token: "operator"},
+
     // Variables
     {regex: /[A-Z$][A-Z0-9_]+\b/, token: "variable-2"}, // different look for all-caps identifiers, typically OP_CODES
     {regex: /[$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*\b/, token: "variable-3"},
@@ -72,6 +77,7 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /\s*@[\w_$:]*/, token: "property"},
     {regex: /(#)\s*("(?:[^\\]|\\.)*?")/, token: ["property", "comment"]},
     {regex: /#/, token: "property"},
+
 
     // Infix operators
     {regex: /[-+\/*<>!;@]|[=!<>]=|&&|\|\||\|/, token: "operator"},

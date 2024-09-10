@@ -17,7 +17,7 @@ pub enum Expr {
     Ident(Ident),
     Array(Array),
     ArrayAccess(ArrayAccess),
-    ChildDerive(ChildDerive),
+    SlashOp(SlashOp),
     ScriptFrag(ScriptFrag),
     FnExpr(FnExpr),
     Infix(Infix),
@@ -130,14 +130,6 @@ pub struct ArrayAccess {
 impl_from_variant!(ArrayAccess, Expr);
 
 #[derive(Debug, Clone)]
-pub struct ChildDerive {
-    pub parent: Box<Expr>,
-    pub path: Vec<Expr>,
-    pub is_wildcard: bool,
-}
-impl_from_variant!(ChildDerive, Expr);
-
-#[derive(Debug, Clone)]
 pub struct ScriptFrag {
     pub fragments: Vec<Expr>,
 }
@@ -152,8 +144,8 @@ pub struct FnExpr {
 }
 impl_from_variant!(FnExpr, Expr);
 
-// An infix operator call with exactly two operands
-// The && || operators which can have any number of operands are handled separately.
+// Binary infix operators
+// The And (&&), Or (||) and Slash (/) operators are overloaded (for policies/derivation) and handled separately
 #[derive(Debug, Clone)]
 pub struct Infix {
     pub op: InfixOp,
@@ -176,11 +168,30 @@ pub enum InfixOp {
     Lte,
     Prob,
     Colon,
+    // Division is handled by the Slash operator and not through Infix, but was made part of this
+    // enum for unified error reporting and so that it can be implemented as part of InfixOp::apply()
+    Divide,
 }
 
 #[derive(Debug, Clone)]
 pub struct Not(pub Box<Expr>);
 impl_from_variant!(Not, Expr);
+
+/// Slash operator. Used for number division and BIP32 derivation.
+#[derive(Debug, Clone)]
+pub struct SlashOp {
+    pub lhs: Box<Expr>,
+    pub rhs: SlashRhs,
+}
+impl_from_variant!(SlashOp, Expr);
+
+#[derive(Debug, Clone)]
+pub enum SlashRhs {
+    Expr(Box<Expr>), // any standard Expr - for number division or BIP32 non-hardened derivation
+    HardenedDerivation(Box<Expr>), // Expr followed by ' or h - for BIP32 hardened derivation
+    UnhardenedWildcard, // * - BIP32 non-hardened wildcard
+    HardenedWildcard, // *h or *' - BIP32 hardened wildcard
+}
 
 // Duration (relative block height or time)
 #[derive(Debug, Clone)]

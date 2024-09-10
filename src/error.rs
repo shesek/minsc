@@ -155,7 +155,7 @@ pub enum RuntimeError {
     #[error("Invalid arguments")]
     InvalidArguments,
 
-    #[error("Cannot derive policy/miniscript/descriptor without inner wildcard keys")]
+    #[error("Cannot derive policy/descriptor without inner wildcard keys")]
     NonDeriveableNoWildcard,
 
     #[error("Data type cannot be derived")]
@@ -208,6 +208,12 @@ pub enum RuntimeError {
 
     #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
     InfixOpMixedNum(Box<Value>, Box<Value>),
+
+    #[error("BIP32 derivation error: {0}")]
+    SlashBip32Derive(#[source] Box<RuntimeError>),
+
+    #[error("Number division cannot be used with BIP32 modifiers (', h and *)")]
+    SlashUnexpectedBip32Mod,
 
     #[error("Invalid merkle root hash: {0}")]
     InvalidMerkleRoot(#[source] hashes::FromSliceError),

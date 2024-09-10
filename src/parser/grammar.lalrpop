@@ -55,7 +55,7 @@ Expr = {
   And,
   Or,
   IfExpr,
-  ChildDerive,
+  SlashOp,
   FnExpr,
   Infix,
   ColonOp,
@@ -103,8 +103,13 @@ Number = { Int, Float };
 Int: Expr = INT =>? Ok(i64::from_str(<>).map_err(ParseError::from)?.into());
 Float: Expr = FLOAT =>? Ok(f64::from_str(<>).map_err(ParseError::from)?.into());
 
-IdentTerm: ast::Ident = IDENT => ast::Ident(<>.into());
 Ident: Expr = IdentTerm => Expr::Ident(<>);
+IdentTerm: ast::Ident = {
+  IDENT => ast::Ident(<>.into()),
+  // 'h' is a keyword token used for bip32 hardened derivation, but it is only usable in places where
+  // identifiers aren't so it is safe not to treat it as a reserved keyword (which would be the default)
+  "h" => ast::Ident(<>.into()),
+};
 
 Call = { SimpleCall, ExprCall, PipeCall };
 
@@ -134,7 +139,7 @@ IfExprThenVal = { BlockExpr, "then" <Expr> };
 
 And: Expr = <List2<AndOrBranch, "&&">> => ast::And(<>).into();
 Or: Expr = <List2<AndOrBranch, "||">> => ast::Or(<>).into();
-AndOrBranch = { SimpleExpr, ChildDerive };
+AndOrBranch = { SimpleExpr, SlashOp };
 
 Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
   ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
@@ -198,27 +203,12 @@ Bytes: Expr = {
 //
 // Bech32 addresses are only supported up to 63 characters. This is OK for Segwit v0/v1 (always 42/62),
 // but may not be sufficient for future versions which can be up to 74 characters long.
-// Supporting them requires resolving the ambiguity with 64-characters long hexadecimal strings.
+// Supporting them requires resolving the ambiguity with "0x"-less 64-characters long hexadecimal strings.
 Address: Expr = ADDRESS =>? Ok(Expr::Address(<>.parse().map_err(ParseError::from)?));
 
 String: Expr = STRING => Expr::string_from_escaped_str(&<>[1..<>.len()-1]);
 
-// BIP32 child key derivation
-ChildDerive: Expr = {
-    <parent:SimpleExpr> "/" <path:List1<ChildDerivePart, "/">> <wildcard:ChildDeriveWildcard?> =>
-      ast::ChildDerive { parent: parent.into(), path, is_wildcard: wildcard.is_some() }.into(),
-    <parent:SimpleExpr> <wildcard:ChildDeriveWildcard> =>
-      ast::ChildDerive { parent: parent.into(), path: vec![], is_wildcard: true }.into(),
-};
-ChildDerivePart: Expr = {
-  SimpleExpr,
-  // For compatibility with the BIP389 multipath descriptor syntax: XPUB/0/<0;1>/9
-  // This can alternatively be expressed using standard Minsc arrays: XPUB/0/[0,1]/9
-  "<" <List2<SimpleExpr, ";">> ">" => ast::Array(<>).into(),
-};
-// Allow `xpub/ *` so that it doesn't look like a comment.
-ChildDeriveWildcard = { "/*", "/ *" };
-
+// Script fragment enclosed in backticks
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
 ScriptFragPart = {
   Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, ArrayAccess,
@@ -269,7 +259,7 @@ FnExprParams = {
 // Binary infix operators with left associativity
 Infix: Expr = <lhs:InfixLHS> <op:InfixOp> <rhs:InfixRHS> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
-InfixRHS = { SimpleExpr, And, Or, ChildDerive, Duration }; // Expr - IfExpr - FnExpr - Infix - InfixColon
+InfixRHS = { SimpleExpr, And, Or, SlashOp, Duration }; // Expr - IfExpr - FnExpr - Infix - ColonOp
 InfixLHS = { InfixRHS, Infix }; // left-associative recursion
 InfixOp = { InfixOpScriptSafe, InfixOpNonScript };
 InfixOpScriptSafe: ast::InfixOp = {
@@ -299,6 +289,29 @@ ColonRHS = { ColonLHS, ColonOp, FnExpr, IfExpr }; // right-associative recursion
 // so that it can be used unambiguously as an AndOrBranch element without requiring parenthesis.
 InfixProb: Expr = <lhs:SExpr> "@" <rhs:SimpleExpr> =>
   ast::Infix { op: ast::InfixOp::Prob, lhs: lhs.into(), rhs: rhs.into() }.into();
+
+// Slash operator (binary & left-associative). Used for both number division and BIP32 derivation.
+// Defined separately from Infix to support BIP32's modifiers (' h *) and BIP389's syntax in the RHS
+SlashOp: Expr = <lhs:SlashLHS> "/" <rhs:SlashRHS> => ast::SlashOp { lhs: lhs.into(), rhs }.into();
+SlashLHS = { SimpleExpr, SlashOp }; // left-associative recursion
+SlashRHS: ast::SlashRhs = {
+  // Number division or BIP32 non-hardened key derivation
+  SimpleExpr => ast::SlashRhs::Expr(<>.into()),
+
+  // BIP32 hardened key derivation
+  <SimpleExpr> HardenedModifier => ast::SlashRhs::HardenedDerivation(<>.into()),
+
+  // BIP32 wildcard modifiers
+  "*" => ast::SlashRhs::UnhardenedWildcard,
+  "*" HardenedModifier => ast::SlashRhs::HardenedWildcard,
+
+  // For compatibility with the BIP389 multipath descriptor syntax: XPUB/0/<0;1>/9
+  // Mixing up hardened and non-hardened is currently unsupported.
+  // Can alternatively be expressed using standard Minsc arrays: XPUB/0/[0,1]/9 or XPUB/0/[0,1]h/9
+  "<" <List2<SimpleExpr, ";">> ">" => ast::SlashRhs::Expr(Box::new(ast::Array(<>).into())),
+  "<" <List2<(<SimpleExpr> HardenedModifier), ";">> ">" => ast::SlashRhs::HardenedDerivation(Box::new(ast::Array(<>).into())),
+};
+HardenedModifier = { "'", "h" };
 
 Not: Expr = "!" <SimpleExpr> =>
   ast::Not(<>.into()).into();
