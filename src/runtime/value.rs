@@ -6,8 +6,7 @@ use std::str::FromStr;
 use miniscript::{bitcoin, descriptor};
 
 use bitcoin::{
-    hashes, hashes::Hash, hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, Psbt,
-    ScriptBuf, Transaction,
+    hex::DisplayHex, taproot::TaprootSpendInfo, Address, Network, Psbt, ScriptBuf, Transaction,
 };
 use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
@@ -222,34 +221,6 @@ impl TryFrom<Value> for Vec<u8> {
         })
     }
 }
-
-// From Value to Hash types +
-// From Hash types to Value
-macro_rules! impl_hash_conv {
-    ($name:path) => {
-        impl TryFrom<Value> for $name {
-            type Error = Error;
-            fn try_from(value: Value) -> Result<Self> {
-                match value {
-                    Value::Bytes(b) => Ok(Self::from_slice(&b)?),
-                    v => Err(Error::NotHashLike(v.into())),
-                }
-            }
-        }
-        impl From<$name> for Value {
-            fn from(hash: $name) -> Self {
-                Value::Bytes(hash.to_byte_array().to_vec())
-            }
-        }
-    };
-}
-impl_hash_conv!(hashes::sha256::Hash);
-impl_hash_conv!(hashes::sha256d::Hash);
-impl_hash_conv!(hashes::ripemd160::Hash);
-impl_hash_conv!(hashes::hash160::Hash);
-impl_hash_conv!(bitcoin::TapNodeHash);
-impl_hash_conv!(bitcoin::TapLeafHash);
-impl_hash_conv!(miniscript::hash256::Hash);
 
 /// Generic conversion from a Value/Option<Value> into T/Option<T> of any TryFrom<Value> type.
 ///

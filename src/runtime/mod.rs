@@ -328,7 +328,7 @@ impl Evaluate for ast::SlashOp {
             }
             lhs => {
                 // Any non-number is assumed to be a BIP32-derivable type (PubKey, SecKey, Policy, Descriptor or arrays of them)
-                stdlib::crypto::eval_slash_bip32_derive(lhs, &self.rhs, scope)
+                stdlib::keys::eval_slash_bip32_derive(lhs, &self.rhs, scope)
                     .box_err(Error::SlashBip32Derive)
             }
         }

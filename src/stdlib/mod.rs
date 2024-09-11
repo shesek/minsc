@@ -7,6 +7,7 @@ use crate::Library;
 pub mod btc;
 pub mod crypto;
 pub mod ctv;
+pub mod keys;
 pub mod miniscript;
 pub mod psbt;
 pub mod script_marker;
@@ -58,6 +59,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     self::btc::attach_stdlib(scope);
     self::crypto::attach_stdlib(scope);
     self::ctv::attach_stdlib(scope);
+    self::keys::attach_stdlib(scope);
     self::miniscript::attach_stdlib(scope);
     self::psbt::attach_stdlib(scope);
     self::taproot::attach_stdlib(scope);
