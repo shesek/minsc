@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 
 use bitcoin::bip32::{self, Xpriv};
-use bitcoin::psbt::{self, Psbt};
+use bitcoin::psbt::{self, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
 use bitcoin::{secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
@@ -91,11 +91,11 @@ pub mod fns {
         Ok(Value::array_of((psbt, errors)))
     }
 
-    // psbt::sign(Psbt, SigningKeys, Bool finalize=false) -> Psbt
+    // psbt::sign(Psbt, SignKeys, Bool finalize=false) -> Psbt
     //
     // Attempt to sign all transaction inputs, raising an error if any fail.
     //
-    // SigningKeys can be provided as a Xpriv, an array of Xprivs, or a tagged map from single PubKeys to single SecKeys
+    // SignKeys can be provided as an Xpriv, array of Xprivs, or a tagged array mapping from single PubKeys to single SecKeys
     pub fn sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, keys, finalize): (_, _, Option<bool>) = args.args_into()?;
 
@@ -110,7 +110,7 @@ pub mod fns {
         Ok(psbt.into())
     }
 
-    // psbt::try_sign(Psbt, SigningKeys) -> [Psbt, Signed, Failed]
+    // psbt::try_sign(Psbt, SignKeys) -> [Psbt, Signed, Failed]
     //
     // Attempt to sign all transaction inputs, returning a modified PSBT with the successfully signed inputs even if some fail.
     //
@@ -124,7 +124,10 @@ pub mod fns {
         let signed = signed
             .into_iter()
             .map(|(input_index, pks)| {
-                let pks = pks.into_iter().map(Value::from).collect::<Vec<_>>();
+                let pks: Vec<Value> = match pks {
+                    SigningKeys::Ecdsa(pks) => pks.into_iter().map(Into::into).collect(),
+                    SigningKeys::Schnorr(pks) => pks.into_iter().map(Into::into).collect(),
+                };
                 Value::array_of((input_index, pks))
             })
             .collect::<Vec<_>>();
@@ -189,7 +192,7 @@ fn psbt_from_tags(tags: Array) -> Result<Psbt> {
     Ok(psbt)
 }
 
-fn sign_psbt(psbt: &mut Psbt, seckeys: Value) -> Result<(psbt::SigningKeys, psbt::SigningErrors)> {
+fn sign_psbt(psbt: &mut Psbt, seckeys: Value) -> Result<(SigningKeysMap, SigningErrors)> {
     // TODO support signing with MultiXpriv
     let signing_result = match seckeys {
         Value::Array(seckeys) => {
@@ -198,7 +201,9 @@ fn sign_psbt(psbt: &mut Psbt, seckeys: Value) -> Result<(psbt::SigningKeys, psbt
                 psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(seckeys)?, &EC)
             } else {
                 // Keys provided as [ $xpriv1, $xpriv2, ... ]
-                psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)
+                bail!(Error::InvalidArguments)
+                // FIXME multi-xpriv not supported by rust-bitcoin - https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
+                //psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)
             }
         }
         // Provided as a single Xpriv

@@ -155,7 +155,7 @@ pub mod fns {
 
     /// txid(Transaction) -> Bytes
     pub fn txid(args: Array, _: &ScopeRef) -> Result<Value> {
-        let mut txid = Transaction::txid(&args.arg_into()?)
+        let mut txid = Transaction::compute_txid(&args.arg_into()?)
             .to_byte_array()
             .to_vec();
         // Reverse when converted to Bytes to match the standard display order,
@@ -347,7 +347,7 @@ impl TryFrom<Value> for Txid {
                 bytes.reverse();
                 Txid::from_slice(&bytes)?
             }
-            Value::Transaction(tx) => tx.txid(),
+            Value::Transaction(tx) => tx.compute_txid(),
             other => bail!(Error::NotTxidLike(other.into())),
         })
     }
@@ -387,6 +387,7 @@ impl TryFrom<Value> for bitcoin::Witness {
         Ok(Self::from_slice(&items))
     }
 }
+
 
 // Display
 

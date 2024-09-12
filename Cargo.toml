@@ -5,7 +5,7 @@ authors = ["Nadav Ivgi <nadav@shesek.info>"]
 edition = "2018"
 include = [ "/src", "/build.rs", "/LICENSE" ]
 
-description = " A Miniscript-based high-level scripting language for Bitcoin contracts"
+description = "A scripting language for Bitcoin"
 repository = "https://github.com/shesek/minsc"
 homepage = "https://min.sc/"
 license = "MIT"
@@ -15,7 +15,7 @@ readme = "README.md"
 lalrpop = { version = "0.21", features = ["lexer"] }
 
 [dependencies]
-miniscript = { version = "11.0", features = ["compiler"] }
+miniscript = { version = "12", features = ["compiler"] }
 
 lalrpop-util = "0.21"
 regex = "1.3.9"
@@ -29,7 +29,7 @@ wee_alloc = { version = "0.4.5", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 
 # needed to enable 'rand-std' (rust-miniscript does not provide a way to propagate the feature)
-bitcoin = { version = "0.31.0", features = ["std", "secp-recovery", "rand", "rand-std"] }
+bitcoin = { version = "0.32", features = ["std", "secp-recovery", "rand", "rand-std"] }
 # needed to enable 'js' (enabled for the 'wasm' feature below)
 getrandom = { version = "0.2" }
 
@@ -46,8 +46,3 @@ crate-type = ["cdylib", "lib"]
 lto = true
 # webpack fail wasm compilation without this
 opt-level = "s"
-
-# Needed for https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
-[patch.crates-io.bitcoin]
-git = "https://github.com/shesek/rust-bitcoin"
-rev = "ca27d93c712441762f97edccd1045ad08202ab72" # 202406-getkey-vec-v0.31.2

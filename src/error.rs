@@ -309,6 +309,15 @@ pub enum RuntimeError {
     #[error("Miniscript compiler error: {0}")]
     MiniscriptCompilerError(#[from] CompilerError),
 
+    #[error("Miniscript threshold error: {0}")]
+    MiniscriptThreshold(#[from] miniscript::ThresholdError),
+
+    #[error("Relative locktime error: {0}")]
+    MiniscriptRelLockTime(#[from] miniscript::RelLockTimeError),
+
+    #[error("Absolute locktime error: {0}")]
+    MiniscriptAbsLockTime(#[from] miniscript::AbsLockTimeError),
+
     #[error("Taproot error: {0}")]
     TaprootError(#[from] taproot::TaprootError),
 
@@ -325,7 +334,7 @@ pub enum RuntimeError {
     Io(#[from] std::io::Error),
 
     #[error("Bitcoin key error: {0}")]
-    BitcoinKey(#[from] key::Error),
+    BitcoinKey(#[from] key::FromSliceError),
 
     #[error("BIP 32 error: {0}")]
     Bip32(#[from] bip32::Error),

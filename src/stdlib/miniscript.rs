@@ -1,8 +1,7 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use bitcoin::Sequence;
-use miniscript::{bitcoin, AbsLockTime, ScriptContext};
+use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, Result, Value};
@@ -55,7 +54,7 @@ impl Evaluate for ast::Thresh {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let thresh_n = self.thresh.eval(&scope)?.into_usize()?;
         let policies = into_policies(self.policies.eval(&scope)?.into_vec()?)?;
-        Ok(Policy::Threshold(thresh_n, policies).into())
+        Ok(Policy::Thresh(Threshold::new(thresh_n, policies)?).into())
     }
 }
 
@@ -69,11 +68,11 @@ pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Policy> {
         }
     } else {
         // Otherwise, simulate it through thresh(). This works similarly, except for not supporting execution probabilities.
-        let thresh_n = match andor {
-            AndOr::And => policies.len(),
-            AndOr::Or => 1,
-        };
-        Policy::Threshold(thresh_n, into_policies(policies)?)
+        let policies = into_policies(policies)?;
+        Policy::Thresh(match andor {
+            AndOr::And => Threshold::and_n(policies),
+            AndOr::Or => Threshold::or_n(policies),
+        })
     })
 }
 
@@ -105,16 +104,14 @@ pub mod fns {
             into_policies(args_iter.collect())?
         };
 
-        Ok(Policy::Threshold(thresh_n, policies).into())
+        Ok(Policy::Thresh(Threshold::new(thresh_n, policies)?).into())
     }
 
     pub fn older(args: Array, _: &ScopeRef) -> Result<Value> {
-        let locktime = Sequence(args.arg_into()?);
-        Ok(Policy::Older(locktime).into())
+        Ok(Policy::Older(args.arg_into()?).into())
     }
     pub fn after(args: Array, _: &ScopeRef) -> Result<Value> {
-        let locktime = AbsLockTime::from_consensus(args.arg_into()?);
-        Ok(Policy::After(locktime).into())
+        Ok(Policy::After(args.arg_into()?).into())
     }
 
     pub fn pk(args: Array, _: &ScopeRef) -> Result<Value> {
@@ -186,7 +183,6 @@ pub mod fns {
         let miniscript = policy.compile::<miniscript::Segwitv0>()?;
         Ok(miniscript.derive_keys()?.encode().into())
     }
-
 
     //
     // Descriptor utilities
@@ -273,6 +269,18 @@ impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(value.into_policy()?.compile()?)
+    }
+}
+impl TryFrom<Value> for miniscript::RelLockTime {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_consensus(val.into_u32()?)?)
+    }
+}
+impl TryFrom<Value> for miniscript::AbsLockTime {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self::from_consensus(val.into_u32()?)?)
     }
 }
 
