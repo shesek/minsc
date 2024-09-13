@@ -91,11 +91,9 @@ pub mod fns {
         Ok(Value::array_of((psbt, errors)))
     }
 
-    // psbt::sign(Psbt, SignKeys, Bool finalize=false) -> Psbt
+    // psbt::sign(Psbt, Xpriv|Array<Xpriv>|Array<SinglePk:SingleSk> sign_keys, Bool finalize=false) -> Psbt
     //
     // Attempt to sign all transaction inputs, raising an error if any fail.
-    //
-    // SignKeys can be provided as an Xpriv, array of Xprivs, or a tagged array mapping from single PubKeys to single SecKeys
     pub fn sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, keys, finalize): (_, _, Option<bool>) = args.args_into()?;
 
@@ -110,7 +108,7 @@ pub mod fns {
         Ok(psbt.into())
     }
 
-    // psbt::try_sign(Psbt, SignKeys) -> [Psbt, Signed, Failed]
+    // psbt::try_sign(Psbt, Xpriv|Array<Xpriv>|Array<SinglePk:SingleSk> sign_keys) -> [Psbt, Signed, Failed]
     //
     // Attempt to sign all transaction inputs, returning a modified PSBT with the successfully signed inputs even if some fail.
     //
@@ -192,22 +190,28 @@ fn psbt_from_tags(tags: Array) -> Result<Psbt> {
     Ok(psbt)
 }
 
-fn sign_psbt(psbt: &mut Psbt, seckeys: Value) -> Result<(SigningKeysMap, SigningErrors)> {
-    // TODO support signing with MultiXpriv
-    let signing_result = match seckeys {
-        Value::Array(seckeys) => {
-            if let Some(Value::Array(_)) = seckeys.get(0) {
-                // Keys provided as tagged array of [ $single_pk1: $single_sk1, $single_pk2: $single_sk2, ... ]
-                psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(seckeys)?, &EC)
-            } else {
+fn sign_psbt(psbt: &mut Psbt, keys_val: Value) -> Result<(SigningKeysMap, SigningErrors)> {
+    let signing_result = match keys_val {
+        Value::Array(keys) if !keys.is_empty() => {
+            // Peek at the first array element to determine its format
+            match keys.get(0).expect("not empty") {
+                // Keys provided as tagged array of [ $single_pk1:$single_sk1, $single_pk2:$single_sk2, ... ]
+                Value::Array(_) => {
+                    psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(keys)?, &EC)
+                }
                 // Keys provided as [ $xpriv1, $xpriv2, ... ]
-                bail!(Error::InvalidArguments)
-                // FIXME multi-xpriv not supported by rust-bitcoin - https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
-                //psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)
+                Value::SecKey(_) => {
+                    bail!(Error::InvalidArguments);
+                    // FIXME multi-xpriv not supported by rust-bitcoin - https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
+                    //psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)
+                }
+                _ => bail!(Error::PsbtInvalidSignKeys),
             }
         }
-        // Provided as a single Xpriv
-        seckey => psbt.sign(&Xpriv::try_from(seckey)?, &EC),
+        // Key provided as a single Xpriv
+        Value::SecKey(_) => psbt.sign(&Xpriv::try_from(keys_val)?, &EC),
+        // TODO support signing with MultiXpriv
+        _ => bail!(Error::PsbtInvalidSignKeys),
     };
     // Returns input signing failures in the the Ok variant. An Err is only raised if the `seckeys` argument is invalid.
     Ok(match signing_result {

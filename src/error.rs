@@ -287,6 +287,9 @@ pub enum RuntimeError {
     #[error("Missing fields to construct PSBT transaction output (amount and scriptPubKey/descriptor are required)")]
     PsbtTxOutMissingFields,
 
+    #[error("Invalid PSBT signing keys. Expected an Xpriv, array of Xprivs, or a tagged array mapping from single PubKeys to single SecKeys")]
+    PsbtInvalidSignKeys,
+
     // Generic error raised from user-land Minsc code
     #[error("Exception: {0}")]
     ScriptException(String),
