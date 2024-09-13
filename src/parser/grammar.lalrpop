@@ -13,6 +13,8 @@ match {
   r"\s*" => { },
   // Skip `//` comments
   r"//[^\n\r]*[\n\r]*" => { },
+  // Skip `/** comments */` -- note the extra *, necessary to allow `XPUB/*` for BIP32 derivation
+  r"/\*\*[^*]*\*+(?:[^/*][^*]*\*+)*/" => { },
 } else {
   // Takes priority over IDENT
   r"BTC|[mu]BTC|bits?|satoshis?|sats?|msats?" => BTC_DENOMINATION,

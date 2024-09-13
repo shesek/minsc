@@ -4,6 +4,7 @@ CodeMirror.defineSimpleMode("minsc",{
   start: [
     // Comments
     {regex: /\/\/.*/, token: "comment"},
+    {regex: /\/\*\*/, token: "comment", next: "comment"},
 
     // @ Execution probability operator
     // Matched early to tell apart from @ used as markers inside script fragments
@@ -86,8 +87,15 @@ CodeMirror.defineSimpleMode("minsc",{
     {regex: /[\{\[\(]/, indent: true},
     {regex: /[\}\]\)]/, dedent: true}
   ],
+  comment: [
+    {regex: /.*?\*\//, token: "comment", next: "start"},
+    {regex: /.*/, token: "comment"}
+  ],
   meta: {
     lineComment: "//",
+    blockCommentStart: "/**", // yes, two *'s
+    blockCommentStart: "*/",
+    dontIndentStates: ["comment"],
     fold: "brace"
   }
 });
