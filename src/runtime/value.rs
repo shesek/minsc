@@ -139,9 +139,19 @@ impl_simple_into_variant!(String, String, into_string, NotString);
 impl TryFrom<Value> for f64 {
     type Error = Error;
     fn try_from(value: Value) -> Result<f64> {
-        Ok(match value.into_number()? {
-            Number::Float(n) => n,
-            Number::Int(n) => n as f64,
+        value.into_number()?.try_into()
+    }
+}
+impl TryFrom<Number> for f64 {
+    type Error = Error;
+    fn try_from(value: Number) -> Result<f64> {
+        Ok(match value {
+            Number::Float(f) => f,
+            Number::Int(n) => {
+                let f = n as f64;
+                ensure!(f as i64 == n, Error::Overflow); // ensure it is within the representable f64 range (-2^53 to 2^53)
+                f
+            }
         })
     }
 }
@@ -154,7 +164,7 @@ macro_rules! impl_int_num_conv {
             fn try_from(number: Number) -> Result<Self> {
                 Ok(match number {
                     Number::Int(n) => n.try_into()?,
-                    Number::Float(n) => bail!(Error::NotInt(n.into())),
+                    Number::Float(f) => bail!(Error::NotInt(f)),
                 })
             }
         }

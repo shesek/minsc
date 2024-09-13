@@ -351,6 +351,12 @@ pub enum RuntimeError {
     #[error("Bytes conversion failed: {0}")]
     TryFromSlice(#[from] std::array::TryFromSliceError),
 
+    #[error("Parse int error: {0}")]
+    ParseInt(#[from] std::num::ParseIntError),
+
+    #[error("Parse float error: {0}")]
+    ParseFloat(#[from] std::num::ParseFloatError),
+
     #[error("fmt Error: {0}")]
     Fmt(#[from] std::fmt::Error),
 

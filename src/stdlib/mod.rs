@@ -145,18 +145,27 @@ pub mod fns {
 
     pub fn int(args: Array, _: &ScopeRef) -> Result<Value> {
         let num = match args.arg_into()? {
-            Number::Int(n) => n,
-            Number::Float(n) if n.is_finite() && n >= i64::MIN as f64 && n <= i64::MAX as f64 => {
-                // rounded down
-                n as i64
-            }
-            Number::Float(_) => bail!(Error::Overflow),
+            Value::Number(num) => match num {
+                Number::Int(n) => n,
+                Number::Float(f) if safe_f64_to_i64(f) => f as i64, // rounded down
+                Number::Float(_) => bail!(Error::Overflow),
+            },
+            Value::String(str) => str.parse()?,
+            _ => bail!(Error::InvalidArguments),
         };
         Ok(num.into())
     }
+    fn safe_f64_to_i64(f: f64) -> bool {
+        f.is_finite() && f >= i64::MIN as f64 && f <= i64::MAX as f64
+    }
 
     pub fn float(args: Array, _: &ScopeRef) -> Result<Value> {
-        let num: f64 = args.arg_into()?; // TryInto coerces ints into floats
+        let num: f64 = match args.arg_into()? {
+            // TryInto coerces ints into floats
+            Value::Number(num) => num.try_into()?,
+            Value::String(str) => str.parse()?,
+            _ => bail!(Error::InvalidArguments),
+        };
         Ok(num.into())
     }
 
