@@ -28,8 +28,15 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     // Dates
     {regex: /\d{4}-\d{1,2}-\d{1,2}T(\d{1,2}:\d{1,2}(:\d{1,2})?Z?)?\b/, token: "number"},
 
-    // Xpubs/Xprvs, single keys, bytes & hashes
-    {regex: /\b([a-fA-F0-9]{8}|[a-fA-F0-9]{40,70}|0x[a-fA-F0-9]*|[xt](?:pub|prv)[0-9a-zA-Z]{100,120})\b/, token: "number"},
+    // Xpubs/Xprvs
+    {regex: /[xt](?:pub|prv)[0-9a-zA-Z]{100,120}\b/, token: "number"},
+
+    // BIP32 key origin fingerprint
+    {regex: /(\[)([a-fA-F0-9]{8})\b/, token: [null,"number"]},
+
+    // Bytes sequences, including keys and hashes in hex
+    {regex: /0x[a-fA-F0-9]*\b/, token: "number"}, // with 0x prefix, any length
+    {regex: /([a-fA-F0-9]{40}|[a-fA-F0-9]{64}|[a-fA-F0-9]{66})\b/, token: "number"}, // no 0x prefix, supported lengths only (for Miniscript compatibility)
 
     // WIF private key
     {regex: /\b[KLc][1-9A-HJ-NP-Za-km-z]{51}|[59][1-9A-HJ-NP-Za-km-z]{50}\b/, token: "number"},
@@ -81,7 +88,6 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /\s*@[\w_$:]*/, token: "property"},
     {regex: /(#)\s*("(?:[^\\]|\\.)*?")/, token: ["property", "comment"]},
     {regex: /#/, token: "property"},
-
 
     // Infix operators
     {regex: /[-+\/*<>!;@]|[=!<>]=|&&|\|\||\|/, token: "operator"},
