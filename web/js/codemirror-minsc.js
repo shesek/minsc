@@ -1,6 +1,9 @@
 import CodeMirror from 'codemirror'
 
-CodeMirror.defineSimpleMode("minsc",{
+let minsc_rules // rules shared for code and output modes
+
+// Mode for Minsc code
+CodeMirror.defineSimpleMode("minsc", minsc_rules = {
   start: [
     // Comments
     {regex: /\/\/.*/, token: "comment"},
@@ -98,4 +101,16 @@ CodeMirror.defineSimpleMode("minsc",{
     dontIndentStates: ["comment"],
     fold: "brace"
   }
+});
+
+// Mode for displaying Minsc's evaluation result
+CodeMirror.defineSimpleMode("minsc-output",{
+  start: [
+    // Highlight 0x-less hex sequences of any length >5 bytes
+    // Not valid as Minsc code and not used to Display Minsc Values, but may appear as Debug output.
+    {regex: /(?:[a-f0-9]{2}){5,}\b/, token: "number"},
+    // Reuse the rest of minsc_rules, except for multi-line comments
+    ...minsc_rules.start.filter(r => r.next != 'comment'),
+  ],
+  // `meta` and `comment` not needed for output
 });

@@ -236,7 +236,7 @@ const readOnlyCodeview = (element, mode) =>
 
 const output_policy = readOnlyCodeview(output_el_policy, 'miniscript')
     , output_desc = readOnlyCodeview(output_el_desc, 'miniscript')
-    , output_script = readOnlyCodeview(output_el_script, 'minsc')
-    , output_tapinfo = readOnlyCodeview(output_el_tapinfo, 'minsc')
-    , output_key = readOnlyCodeview(output_el_key, 'minsc')
-    , output_other = readOnlyCodeview(output_el_other, 'minsc')
+    , output_script = readOnlyCodeview(output_el_script, 'minsc-output')
+    , output_tapinfo = readOnlyCodeview(output_el_tapinfo, 'minsc-output')
+    , output_key = readOnlyCodeview(output_el_key, 'minsc-output')
+    , output_other = readOnlyCodeview(output_el_other, 'minsc-output')
