@@ -59,16 +59,17 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set("MIN_INTEGER", i64::MIN).unwrap();
     }
 
-    self::btc::attach_stdlib(scope);
+    // Standard library functions implemented in Minsc
+    MINSC_STDLIB.exec(scope).unwrap();
+
+    // Submodules
     self::crypto::attach_stdlib(scope);
-    self::ctv::attach_stdlib(scope);
     self::keys::attach_stdlib(scope);
+    self::btc::attach_stdlib(scope); // requires the 'keys' stdlib
+    self::ctv::attach_stdlib(scope); // requires the 'btc' stdlib
     self::miniscript::attach_stdlib(scope);
     self::psbt::attach_stdlib(scope);
     self::taproot::attach_stdlib(scope);
-
-    // Standard library implemented in Minsc
-    MINSC_STDLIB.exec(scope).unwrap();
     ELEMENTS_STDLIB.exec(scope).unwrap();
 }
 

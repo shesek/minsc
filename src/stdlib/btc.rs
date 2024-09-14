@@ -12,42 +12,52 @@ use miniscript::descriptor::Descriptor;
 use miniscript::psbt::PsbtExt;
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
-use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{eval_exprs, Array, Error, Evaluate, Float, Int, Result, Symbol, Value};
+use crate::runtime::{
+    eval_exprs, Array, Error, Evaluate, Execute, Float, Int, Mutable, Result, ScopeRef, Symbol,
+    Value,
+};
 use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, EC};
-use crate::{ast, time};
+use crate::{ast, time, Library};
+
+lazy_static! {
+    static ref BTC_STDLIB: Library = include_str!("btc.minsc").parse().unwrap();
+}
 
 // XXX should this be randomized?
 const SCRIPT_MARKER_MAGIC_BYTES: &[u8] = "SCRIPT MARKER MAGIC BYTES".as_bytes();
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
-    let mut scope = scope.borrow_mut();
+    {
+        let mut scope = scope.borrow_mut();
 
-    // Network types
-    scope.set("signet", Network::Signet).unwrap();
-    scope.set("testnet", Network::Testnet).unwrap();
-    scope.set("regtest", Network::Regtest).unwrap();
-    scope
-        .set("_$$_RECKLESSLY_RISK_MY_BITCOINS_$$_", Network::Bitcoin)
-        .unwrap();
+        // Network types
+        scope.set("signet", Network::Signet).unwrap();
+        scope.set("testnet", Network::Testnet).unwrap();
+        scope.set("regtest", Network::Regtest).unwrap();
+        scope
+            .set("_$$_RECKLESSLY_RISK_MY_BITCOINS_$$_", Network::Bitcoin)
+            .unwrap();
 
-    // Functions
-    scope.set_fn("address", fns::address).unwrap();
-    scope.set_fn("tx", fns::tx).unwrap();
-    scope.set_fn("txid", fns::txid).unwrap();
-    scope.set_fn("tx::id", fns::txid).unwrap(); // alias
-    scope.set_fn("script", fns::script).unwrap();
-    scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
-    scope.set_fn("script::spk", fns::scriptPubKey).unwrap(); // alias
-    scope.set_fn("script::strip", fns::script_strip).unwrap();
-    scope.set_fn("script::wiz", fns::script_wiz).unwrap();
-    scope.set_fn("script::bitide", fns::script_bitide).unwrap();
+        // Functions
+        scope.set_fn("address", fns::address).unwrap();
+        scope.set_fn("tx", fns::tx).unwrap();
+        scope.set_fn("txid", fns::txid).unwrap();
+        scope.set_fn("tx::id", fns::txid).unwrap(); // alias
+        scope.set_fn("script", fns::script).unwrap();
+        scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
+        scope.set_fn("script::spk", fns::scriptPubKey).unwrap(); // alias
+        scope.set_fn("script::strip", fns::script_strip).unwrap();
+        scope.set_fn("script::wiz", fns::script_wiz).unwrap();
+        scope.set_fn("script::bitide", fns::script_bitide).unwrap();
 
-    // Constants
-    scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
-    scope
-        .set("SCRIPT_MARKER_MAGIC", SCRIPT_MARKER_MAGIC_BYTES.to_vec())
-        .unwrap();
+        // Constants
+        scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
+        scope
+            .set("SCRIPT_MARKER_MAGIC", SCRIPT_MARKER_MAGIC_BYTES.to_vec())
+            .unwrap();
+    }
+
+    BTC_STDLIB.exec(scope).unwrap();
 }
 
 impl Evaluate for ast::BtcAmount {
@@ -387,7 +397,6 @@ impl TryFrom<Value> for bitcoin::Witness {
         Ok(Self::from_slice(&items))
     }
 }
-
 
 // Display
 
