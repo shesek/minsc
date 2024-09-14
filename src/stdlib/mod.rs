@@ -41,15 +41,18 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("bytes", fns::bytes).unwrap();
         scope.set_fn("Symbol", fns::Symbol).unwrap();
 
-        scope.set_fn("throw", fns::throw).unwrap();
-
         scope.set_fn("le64", fns::le64).unwrap();
+
+        // Logging & Exceptions
+        // These are the only functions in Minsc that produce side-effects.
+        scope.set_fn("throw", fns::throw).unwrap();
+        scope.set_fn("print", fns::print).unwrap();
+        scope.set_fn("log", fns::log).unwrap();
+        scope.set_fn("warn", fns::warn).unwrap();
 
         // Development utilities
         scope.set_fn("debug", fns::debug).unwrap();
         scope.set_fn("env", fns::env).unwrap();
-        scope.set_fn("log", fns::log).unwrap();
-        scope.set_fn("warn", fns::warn).unwrap();
 
         // Constants
         scope.set("MAX_NUMBER", i64::MAX).unwrap();
@@ -237,24 +240,31 @@ pub mod fns {
         Err(Error::ScriptException(msg))
     }
 
-    /// Log to STDOUT or console.log
-    pub fn log(args: Array, _: &ScopeRef) -> Result<Value> {
+    /// Print to STDOUT or console.log
+    pub fn print(args: Array, _: &ScopeRef) -> Result<Value> {
         let msg = stringify_args(args)?;
 
         #[cfg(target_arch = "wasm32")]
-        crate::wasm::console_log("[LOG]", &msg);
+        crate::wasm::console_log(&msg);
         #[cfg(not(target_arch = "wasm32"))]
-        println!("[LOG] {}", msg);
+        println!("{}", msg);
 
         Ok(true.into())
     }
 
-    /// Log to STDERR or console.error
+    /// [LOG] to STDOUT or console.log
+    pub fn log(mut args: Array, scope: &ScopeRef) -> Result<Value> {
+        // XXX this and warn() should be implemented in Minsc once it has support for varidaric functions
+        args.insert(0, "[LOG]".into());
+        fns::print(args, scope)
+    }
+
+    /// [WARN] to STDERR or console.error
     pub fn warn(args: Array, _: &ScopeRef) -> Result<Value> {
         let msg = stringify_args(args)?;
 
         #[cfg(target_arch = "wasm32")]
-        crate::wasm::console_error("[WARN]", &msg);
+        crate::wasm::console_error(&format!("[WARN] {}", msg));
         #[cfg(not(target_arch = "wasm32"))]
         eprintln!("[WARN] {}", msg);
 
