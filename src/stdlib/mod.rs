@@ -55,8 +55,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("env", fns::env).unwrap();
 
         // Constants
-        scope.set("MAX_NUMBER", i64::MAX).unwrap();
-        scope.set("MIN_NUMBER", i64::MIN).unwrap();
+        scope.set("MAX_INTEGER", i64::MAX).unwrap();
+        scope.set("MIN_INTEGER", i64::MIN).unwrap();
     }
 
     self::btc::attach_stdlib(scope);
