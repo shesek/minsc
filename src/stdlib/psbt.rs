@@ -200,11 +200,7 @@ fn sign_psbt(psbt: &mut Psbt, keys_val: Value) -> Result<(SigningKeysMap, Signin
                     psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(keys)?, &EC)
                 }
                 // Keys provided as [ $xpriv1, $xpriv2, ... ]
-                Value::SecKey(_) => {
-                    bail!(Error::InvalidArguments);
-                    // FIXME multi-xpriv not supported by rust-bitcoin - https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
-                    //psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)
-                }
+                Value::SecKey(_) => psbt.sign(&XprivSet(keys.try_into()?), &EC),
                 _ => bail!(Error::PsbtInvalidSignKeys),
             }
         }
@@ -569,5 +565,23 @@ impl TryFrom<Value> for psbt::raw::ProprietaryKey {
             subtype: subtype.try_into()?,
             key,
         })
+    }
+}
+
+// GetKey wrapper around Vec<Xpriv>, needed as a workaround for https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
+// Could otherwise directly use `psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)`
+struct XprivSet(Vec<Xpriv>);
+impl psbt::GetKey for XprivSet {
+    type Error = <Xpriv as psbt::GetKey>::Error;
+
+    fn get_key<C: secp256k1::Signing>(
+        &self,
+        key_request: psbt::KeyRequest,
+        secp: &secp256k1::Secp256k1<C>,
+    ) -> std::result::Result<Option<PrivateKey>, Self::Error> {
+        self.0
+            .iter()
+            .find_map(|xpriv| xpriv.get_key(key_request.clone(), secp).transpose())
+            .transpose()
     }
 }
