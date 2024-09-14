@@ -183,10 +183,6 @@
       "[native]"
     ],
     [
-      "SHA256",
-      "[native]"
-    ],
-    [
       "SecKey",
       "[native]"
     ],
@@ -271,6 +267,10 @@
       "[native]"
     ],
     [
+      "descriptor::singles",
+      "[native]"
+    ],
+    [
       "ecdsa::sign",
       "[native]"
     ],
@@ -331,15 +331,27 @@
       "[native]"
     ],
     [
-      "genkey",
-      "[native]"
-    ],
-    [
       "hash160",
       "[native]"
     ],
     [
       "hash256",
+      "[native]"
+    ],
+    [
+      "hash::hash160",
+      "[native]"
+    ],
+    [
+      "hash::ripemd160",
+      "[native]"
+    ],
+    [
+      "hash::sha256",
+      "[native]"
+    ],
+    [
+      "hash::sha256d",
       "[native]"
     ],
     [
@@ -515,11 +527,27 @@
       "[native]"
     ],
     [
+      "psbt::tx",
+      "[native]"
+    ],
+    [
       "psbt::update",
       "[native]"
     ],
     [
       "pubkey",
+      "[native]"
+    ],
+    [
+      "rand::bytes",
+      "[native]"
+    ],
+    [
+      "rand::f64",
+      "[native]"
+    ],
+    [
+      "rand::i64",
       "[native]"
     ],
     [
@@ -531,10 +559,6 @@
       "$arr, $fn"
     ],
     [
-      "repeat",
-      "[native]"
-    ],
-    [
       "ripemd160",
       "[native]"
     ],
@@ -543,11 +567,11 @@
       "$n"
     ],
     [
-      "schnorr::verify",
+      "schnorr::sign",
       "[native]"
     ],
     [
-      "schnorra::sign",
+      "schnorr::verify",
       "[native]"
     ],
     [
@@ -556,6 +580,10 @@
     ],
     [
       "script::bitide",
+      "[native]"
+    ],
+    [
+      "script::spk",
       "[native]"
     ],
     [
@@ -588,14 +616,6 @@
     ],
     [
       "sha256",
-      "[native]"
-    ],
-    [
-      "singleDescriptors",
-      "[native]"
-    ],
-    [
-      "sk",
       "[native]"
     ],
     [
@@ -683,6 +703,14 @@
       "[native]"
     ],
     [
+      "tx::id",
+      "[native]"
+    ],
+    [
+      "txid",
+      "[native]"
+    ],
+    [
       "typeof",
       "[native]"
     ],
@@ -704,6 +732,14 @@
     ],
     [
       "wsh",
+      "[native]"
+    ],
+    [
+      "xpriv::from_seed",
+      "[native]"
+    ],
+    [
+      "xpriv::rand",
       "[native]"
     ]
   ]
