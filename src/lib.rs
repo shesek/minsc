@@ -18,10 +18,9 @@ pub mod playground;
 pub mod wasm;
 
 use std::convert::TryInto;
-use std::str::FromStr;
 
 pub use error::{Error, ParseError, RuntimeError};
-pub use parser::{ast, Expr, Ident, Library, Stmt, Stmts};
+pub use parser::{ast, Expr, Ident, Library, Stmt};
 pub use runtime::{Evaluate, Execute, Number, Scope, ScopeRef, Value};
 pub use util::PrettyDisplay;
 
@@ -41,14 +40,14 @@ where
     Ok(expr.try_into()?.eval(&Scope::root())?)
 }
 
-/// Parse program code into an Expr AST
+/// Parse expression/program code into an Expr AST
 pub fn parse(s: &str) -> Result<Expr, ParseError> {
-    Expr::from_str(s)
+    s.parse()
 }
 
-// Parse library code into an Stmts AST
-pub fn parse_lib(s: &str) -> Result<Stmts, ParseError> {
-    Stmts::from_str(s)
+/// Parse library code (collection of statements with no return value)
+pub fn parse_lib(s: &str) -> Result<Library, ParseError> {
+    s.parse()
 }
 
 #[deprecated = "use eval() instead"]

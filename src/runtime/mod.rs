@@ -80,9 +80,15 @@ impl Execute for ast::Stmt {
     }
 }
 
-impl Execute for ast::Stmts {
+impl Execute for ast::Library {
     fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
-        for stmt in &self.0 {
+        self.0.exec(scope)
+    }
+}
+
+impl Execute for Vec<ast::Stmt> {
+    fn exec(&self, scope: &ScopeRef<Mutable>) -> Result<()> {
+        for stmt in self {
             stmt.exec(scope)?;
         }
         Ok(())
@@ -339,9 +345,7 @@ impl Evaluate for ast::Block {
     // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let scope = scope.child().into_ref();
-        for stmt in &self.stmts {
-            stmt.exec(&scope)?;
-        }
+        self.stmts.exec(&scope)?;
         let scope = scope.into_readonly();
         if let Some(return_value) = &self.return_value {
             // The return value is the final expression within the block

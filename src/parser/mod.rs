@@ -4,15 +4,13 @@ use std::str::FromStr;
 pub use crate::error::ParseError;
 
 pub mod ast;
-pub use ast::{Expr, Ident, Stmt, Stmts};
+pub use ast::{Expr, Ident, Stmt, Library};
 
 lalrpop_mod!(
     #[allow(clippy::all)]
     pub grammar,
     "/parser/grammar.rs"
 );
-
-pub type Library = Stmts;
 
 impl FromStr for Expr {
     type Err = ParseError;
@@ -23,14 +21,14 @@ impl FromStr for Expr {
 }
 impl_tryfrom_fromstr!(Expr);
 
-impl FromStr for Stmts {
+impl FromStr for Library {
     type Err = ParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parser = grammar::StmtsParser::new();
+        let parser = grammar::LibraryParser::new();
         Ok(parser.parse(s)?)
     }
 }
-impl_tryfrom_fromstr!(Stmts);
+impl_tryfrom_fromstr!(Library);
 
 // Utility functions used by the grammar
 

@@ -40,8 +40,8 @@ pub Program: Expr = <stmts:Stmt*> <ret:Expr?> =>
   ast::Block { stmts, return_value: ret.map(Into::into) }.into();
 
 // A collection of statements with no return value
-// Used for library files and for the body of if statements
-pub Stmts: ast::Stmts = <stmts:Stmt*> => ast::Stmts(stmts);
+// Thin wrapper over a Vec<Stmt> used for library files
+pub Library: ast::Library = Stmt* => ast::Library(<>);
 
 // All possible statements
 Stmt = {
@@ -369,12 +369,12 @@ FnDef: Stmt = {
         ast::FnDef { ident, params, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
 }
 
-IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmts> "}" <else_body:IfStmtElse?> =>
+IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmt*> "}" <else_body:IfStmtElse?> =>
     ast::IfStmt { condition, then_body, else_body }.into();
-IfStmtElse: ast::Stmts = {
-  "else" "{" <Stmts> "}",
+IfStmtElse: Vec<Stmt> = {
+  "else" "{" <Stmt*> "}",
   // allow nested `else if` statements without `{}`
-  "else" <IfStmt> => ast::Stmts(vec![<>]),
+  "else" <IfStmt> => vec![<>],
 };
 
 // An expression used in a statement position. The evaluated return value is

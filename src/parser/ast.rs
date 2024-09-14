@@ -251,15 +251,15 @@ impl_from_variant!(ExprStmt, Stmt, ExprStmt);
 #[derive(Debug, Clone)]
 pub struct IfStmt {
     pub condition: Expr,
-    pub then_body: Stmts,
-    pub else_body: Option<Stmts>,
+    pub then_body: Vec<Stmt>,
+    pub else_body: Option<Vec<Stmt>>,
 }
 impl_from_variant!(IfStmt, Stmt, If);
 
 /// A collection of statements with no return value
-/// Used for library files and the body of if statements
+// Thin wrapper over a Vec<Stmt> used for library files
 #[derive(Debug, Clone)]
-pub struct Stmts(pub Vec<Stmt>);
+pub struct Library(pub Vec<Stmt>);
 
 impl Expr {
     pub fn bytes_from_hex(s: &str) -> Result<Expr, ParseError> {
