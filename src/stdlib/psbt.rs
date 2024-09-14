@@ -145,6 +145,7 @@ pub mod fns {
         if finalize.unwrap_or(false) {
             psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
         }
+        // XXX unlike bitcoin::Psbt::extract_tx(), the miniscript::PsbtExt::extract() does not check for absurd fee
         Ok(psbt.extract(&EC)?.into())
     }
 
@@ -253,15 +254,11 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
     let mut utxo_amount = None;
     tags.for_each_unique_tag(|tag, val| {
         match tag {
-            "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
-            "witness_utxo" | "utxo" => psbt_input.witness_utxo = Some(val.try_into()?),
             "partial_sigs" => psbt_input.partial_sigs = val.try_into()?,
             "sighash_type" => psbt_input.sighash_type = Some(val.try_into()?),
             "redeem_script" => psbt_input.redeem_script = Some(val.try_into()?),
             "witness_script" => psbt_input.witness_script = Some(val.try_into()?),
-            "bip32_derivation" | "key_source" => {
-                psbt_input.bip32_derivation = bip32_derivation(val)?
-            }
+            "bip32_derivation" => psbt_input.bip32_derivation = bip32_derivation(val)?,
             "final_script_sig" => psbt_input.final_script_sig = Some(val.try_into()?),
             "final_script_witness" => psbt_input.final_script_witness = Some(val.try_into()?),
             "ripemd160_preimages" => psbt_input.ripemd160_preimages = val.try_into()?,
@@ -276,17 +273,29 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "tap_merkle_root" => psbt_input.tap_merkle_root = Some(val.try_into()?),
             "proprietary" => psbt_input.proprietary = val.try_into()?,
             "unknown" => psbt_input.unknown = val.try_into()?,
-            "descriptor" => {
-                let descriptor_ = val.try_into()?;
-                psbt_input.update_with_descriptor_unchecked(&descriptor_)?;
-                descriptor = Some(descriptor_);
+            "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
+            "witness_utxo" | "utxo" => {
+                // If the UTXO was given as a `$descriptor:$amount` tuple, extract the descriptor
+                // and keep it around prior to converting it to a TxOut scriptPubKey
+                if let (Value::Array(arr), None) = (&val, &descriptor) {
+                    if arr.len() == 2 && arr[0].is_descriptor() {
+                        descriptor = Some(arr[0].clone().try_into()?);
+                    }
+                }
+                psbt_input.witness_utxo = Some(val.try_into()?);
             }
+            "descriptor" => descriptor = Some(val.try_into()?),
             // Keep the amount to later construct the utxo
             "amount" | "utxo_amount" => utxo_amount = Some(val.try_into()?),
             _ => bail!(Error::TagUnknown),
         }
         Ok(())
     })?;
+
+    // Populate input PSBT fields using the descriptor
+    if let Some(descriptor) = &descriptor {
+        psbt_input.update_with_descriptor_unchecked(descriptor)?;
+    }
 
     // Automatically fill in the `witness_utxo` if both the `descriptor` and `utxo_amount` are known
     if let (Some(descriptor), Some(utxo_amount), None) =

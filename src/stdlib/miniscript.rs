@@ -292,4 +292,8 @@ impl Value {
     pub fn is_policy_coercible(&self) -> bool {
         matches!(self, Value::Policy(_) | Value::PubKey(_) | Value::SecKey(_))
     }
+
+    pub fn is_descriptor(&self) -> bool {
+        matches!(self, Value::Descriptor(_))
+    }
 }
