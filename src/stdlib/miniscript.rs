@@ -40,6 +40,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
 
     // Other descriptor functions
+    scope.set_fn("descriptor", fns::descriptor).unwrap();
     scope.set_fn("explicitScript", fns::explicitScript).unwrap();
     scope
         .set_fn("descriptor::singles", fns::descriptor_singles)
@@ -187,6 +188,14 @@ pub mod fns {
     //
     // Descriptor utilities
     //
+
+    /// descriptor(String|Descriptor) -> Descriptor
+    pub fn descriptor(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::Descriptor(match args.arg_into()? {
+            Value::String(desc_str) => desc_str.parse()?,
+            other => other.try_into()?,
+        }))
+    }
 
     /// explicitScript(Descriptor) -> Script
     /// Get the Descriptor's underlying Script (before any hashing is done - AKA the witnessScript for Wsh,
