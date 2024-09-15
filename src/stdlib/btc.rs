@@ -187,7 +187,7 @@ pub mod fns {
     ///
     /// Descriptors are compiled into their scriptPubKey
     /// TapInfo are returned as their V1 witness program
-    /// PubKeys are converted into a wpkh() scripts
+    /// PubKeys are converted into a wpkh() script
     /// Scripts are returned as-is
     pub fn scriptPubKey(args: Array, _: &ScopeRef) -> Result<Value> {
         let spk = args.arg_into::<Value>()?.into_spk()?;
@@ -358,6 +358,9 @@ impl TryFrom<Value> for Txid {
                 Txid::from_slice(&bytes)?
             }
             Value::Transaction(tx) => tx.compute_txid(),
+            // The psbt unsigned_tx's txid is useless if there are any non-segwit inputs. Use with care. Should probably check :>
+            // (Note however that Minsc itself does not support pre-segwit descriptors construction)
+            Value::Psbt(psbt) => psbt.unsigned_tx.compute_txid(),
             other => bail!(Error::NotTxidLike(other.into())),
         })
     }
