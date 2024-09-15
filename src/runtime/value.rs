@@ -417,7 +417,7 @@ impl fmt::Display for Value {
             Value::Network(x) => write!(f, "{}", x),
             Value::Psbt(x) => write!(f, "{:?}", x), // not round-trip-able
             Value::Symbol(x) => write!(f, "{}", x),
-            Value::SecKey(x) => write!(f, "{}", x),
+            Value::SecKey(x) => write!(f, "{}", x.pretty(None)),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
@@ -435,20 +435,21 @@ impl fmt::Display for Number {
         }
     }
 }
-
 impl PrettyDisplay for Value {
     const AUTOFMT_ENABLED: bool = true;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         match self {
             Value::PubKey(x) => write!(f, "{}", x.pretty(indent)),
+            Value::SecKey(x) => write!(f, "{}", x.pretty(indent)),
             Value::Array(x) => write!(f, "{}", x.pretty(indent)),
             Value::Script(x) => write!(f, "{}", x.pretty(indent)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
-            // support multi-line Psbt via its Debug impl (the actual `indent` setting is ignored)
+
+            // Support multi-line Psbt via its Debug impl (the actual `indent` setting is ignored)
             Value::Psbt(x) if indent.is_some() => write!(f, "{:#?}", x),
-            // Use Display for types that don't implement PrettyDisplay
+            // Use Display for other types that don't implement PrettyDisplay
             other => write!(f, "{}", other),
         }
     }

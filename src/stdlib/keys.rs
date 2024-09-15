@@ -324,13 +324,27 @@ impl TryFrom<Value> for ChildNumber {
 
 // Display
 
-impl PrettyDisplay for miniscript::DescriptorPublicKey {
+impl PrettyDisplay for DescriptorPublicKey {
     const AUTOFMT_ENABLED: bool = false;
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
-        use miniscript::DescriptorPublicKey::{MultiXPub, Single, XPub};
+        use DescriptorPublicKey::{MultiXPub, Single, XPub};
         match self {
             XPub(_) | MultiXPub(_) => write!(f, "{}", self),
+            // Wrap hex-encoded single pubkeys with a pubkey() call, so that the resulting string
+            // may be used as an expression that produces a PubKey rather than Bytes.
             Single(_) => write!(f, "pubkey({})", self),
+        }
+    }
+}
+impl PrettyDisplay for DescriptorSecretKey {
+    const AUTOFMT_ENABLED: bool = false;
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        use DescriptorSecretKey::{MultiXPrv, Single, XPrv};
+        match self {
+            XPrv(_) | MultiXPrv(_) => write!(f, "{}", self),
+            // Wrap WIF-encoded single secret keys with a seckey() call, for improved readability.
+            // (the WIF string alone would also produce a SecKey, but is not easily recognizable.)
+            Single(_) => write!(f, "seckey({})", self),
         }
     }
 }
