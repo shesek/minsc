@@ -24,9 +24,10 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::try_sign", fns::try_sign).unwrap();
     scope.set_fn("psbt::extract", fns::extract).unwrap();
 
-    scope.set_fn("psbt::tx", fns::tx).unwrap();
+    scope.set_fn("psbt::unsigned_tx", fns::sighash).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
     scope.set_fn("psbt::sighash", fns::sighash).unwrap();
+    scope.set_fn("psbt::tx", fns::tx).unwrap();
 }
 
 impl TryFrom<Value> for Psbt {
@@ -139,6 +140,7 @@ pub mod fns {
 
     /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
     ///
+    /// Extract the PSBT's signed & finalized transaction
     /// Also possible via `tx(Psbt)` (without the `finalize` option, for pre-finalized PSBT only)
     pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
@@ -149,11 +151,11 @@ pub mod fns {
         Ok(psbt.extract(&EC)?.into())
     }
 
-    /// psbt::tx(Array<Tagged>) -> Psbt
+    /// psbt::unsigned_tx(Psbt) -> Transaction
     ///
-    /// Initialize a new transaction alongside its PSBT metadata
-    pub fn tx(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Value::Psbt(create_psbt_with_tx(args.arg_into()?)?))
+    /// Get the PSBT's unsigned transaction (PSBT_GLOBAL_UNSIGNED_TX)
+    pub fn unsigned_tx(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(args.arg_into::<Psbt>()?.unsigned_tx.into())
     }
 
     /// psbt::fee(Psbt) -> Int
@@ -169,6 +171,13 @@ pub mod fns {
 
         let sighash_msg = psbt.sighash_msg(input_index, &mut sighash_cache, tapleaf_hash)?;
         Ok(sighash_msg.to_secp_msg()[..].to_vec().into())
+    }
+
+    /// psbt::tx(Array<Tagged>) -> Psbt
+    ///
+    /// Initialize a new transaction alongside its PSBT metadata
+    pub fn tx(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::Psbt(create_psbt_with_tx(args.arg_into()?)?))
     }
 }
 
