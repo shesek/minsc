@@ -1,16 +1,17 @@
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::sync::Arc;
 
 use bitcoin::hashes::{sha256, Hash, HashEngine};
-use bitcoin::key::XOnlyPublicKey;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
-use miniscript::{bitcoin, descriptor::TapTree, DescriptorPublicKey};
+use bitcoin::{ScriptBuf, XOnlyPublicKey};
+use miniscript::descriptor::{DescriptorPublicKey, TapTree};
 
 use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Error, Result, Value};
-use crate::util::{fmt_list, PrettyDisplay, EC};
+use crate::util::{self, fmt_list, PrettyDisplay, EC};
 use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -37,7 +38,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 pub mod fns {
     use super::*;
     use crate::runtime::{Array, Int};
-    use bitcoin::ScriptBuf;
 
     /// Construct a tr() descriptor:
     /// tr(PubKey) -> Descriptor
@@ -397,6 +397,7 @@ fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
         pk.at_derivation_index(0)?.derive_public_key(&EC)?.inner,
     ))
 }
+
 impl TryFrom<Value> for bitcoin::XOnlyPublicKey {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
@@ -433,25 +434,27 @@ impl PrettyDisplay for TaprootSpendInfo {
     const MAX_ONELINER_LENGTH: usize = 300;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
-        write!(f, "tr(0x{}", self.internal_key())?;
+        write!(f, "tr({}", self.internal_key())?;
         let scripts = self.script_map();
         if !scripts.is_empty() {
             write!(f, ", ",)?;
-            if scripts.len() > 1 {
+            let max_depth = scripts.values().map(|bs| bs.len()).max().unwrap_or(0);
+
+            // If the tree's depth is below 2 (meaning only 1 or 2 leaves), its easy -  we can treat it as a flat list, with no tree
+            // structure information that needs to be preserved (siblings are ordered, making trees of 2 is deterministic).
+            if max_depth == 0 && scripts.len() == 1 {
+                let (script, _) = scripts.first_key_value().expect("checked non-empty").0;
+                write!(f, "{}", script.pretty(indent))?;
+            } else if max_depth == 1 && scripts.len() == 2 {
                 fmt_list(f, scripts.keys(), indent, |f, (script, _), indent_inner| {
-                    //write!(f, "{:?}:", leaf_ver)?;
                     write!(f, "{}", script.pretty(indent_inner))
                 })?;
-                if scripts.len() > 2 {
-                    // The Taproot script tree is displayed as a flat array, which loses the the Taproot tree structure information when there
-                    // are more than two scripts. "(not tree)" is added to inform users, and to make the serialized string invalid as a
-                    // Minsc expression to prevent it from being used to reconstruct a TaprootSpendInfo with the wrong tree structure.
-                    // FIXME deduce the original TapTree structure from the TaprootSpendInfo merkle paths (not available in rust-bitcoin)
-                    write!(f, "(not tree)")?;
-                }
-            } else {
-                let ((script, _), _) = scripts.first_key_value().expect("checked non-empty");
-                write!(f, "{}", script.pretty(indent))?;
+            }
+            // If there are >2 leaf nodes, the tree structure must be reconstructed in order to encode it as a nested binary array that can be
+            // round-tripped back into the same structure. The reconstruction involves hashing and may be computationally heavy for large trees.
+            else {
+                let tree = reconstruct_tree(self).expect("invalid TaprootSpendInfo"); // can only fail if the TaprootSpendInfo has invalid proofs
+                write!(f, "{}", tree.pretty(indent))?;
             }
         }
         write!(f, ")")
@@ -459,5 +462,77 @@ impl PrettyDisplay for TaprootSpendInfo {
 
     fn prefer_multiline_anyway(&self) -> bool {
         self.script_map().len() > 2
+    }
+}
+
+#[derive(Debug)]
+enum NodeTree<'a> {
+    Leaf(&'a (ScriptBuf, LeafVersion)),
+    Branch(Box<NodeTree<'a>>, Box<NodeTree<'a>>),
+    Hidden(TapNodeHash),
+}
+
+// Reconstruct the Taproot tree structure from a TaprootSpendInfo using the merkle proofs associated with its scripts.
+// Returns None if there are no script paths, or if any of the merkle proofs are invalid (don't connect to the root).
+fn reconstruct_tree<'a>(tapinfo: &'a TaprootSpendInfo) -> Option<NodeTree<'a>> {
+    let root_hash = tapinfo.merkle_root()?;
+
+    // First, build a map of all known nodes indexed by their hash using an intermediate Node structure
+    enum Node<'a> {
+        Leaf(&'a (ScriptBuf, LeafVersion)),
+        Branch(TapNodeHash, TapNodeHash), // children referenced by hash, not an actual tree (yet)
+    }
+    let mut node_map = HashMap::new();
+
+    for (script_leaf, merkle_branches) in tapinfo.script_map() {
+        let leaf_hash = TapNodeHash::from_script(&script_leaf.0, script_leaf.1);
+        node_map.insert(leaf_hash, Node::Leaf(script_leaf));
+
+        // Process each merkle branch leading to this leaf script (there may multiple for duplicated scripts)
+        for merkle_branch in merkle_branches {
+            let mut current_hash = leaf_hash;
+            for sibling_hash in merkle_branch.iter() {
+                let branch_hash = TapNodeHash::from_node_hashes(current_hash, *sibling_hash); // XXX could cache
+                node_map
+                    .entry(branch_hash)
+                    .or_insert_with(|| Node::Branch(current_hash, *sibling_hash));
+                current_hash = branch_hash;
+            }
+            // All branches should converge to the root hash
+            if current_hash != root_hash {
+                return None;
+            }
+        }
+    }
+
+    // Now, going from the root node, convert the Node structure into a nested tree structure of NodeTree
+    fn tree<'a>(hash: &TapNodeHash, map: &HashMap<TapNodeHash, Node<'a>>) -> NodeTree<'a> {
+        match map.get(hash) {
+            Some(Node::Branch(a, b)) => NodeTree::Branch(tree(a, map).into(), tree(b, map).into()),
+            Some(Node::Leaf(leaf)) => NodeTree::Leaf(leaf),
+            None => NodeTree::Hidden(*hash),
+        }
+    }
+    Some(tree(&root_hash, &node_map))
+}
+
+impl<'a> PrettyDisplay for NodeTree<'a> {
+    const AUTOFMT_ENABLED: bool = true;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
+            util::indentation_params(indent);
+        match self {
+            NodeTree::Leaf((script, _)) => {
+                write!(f, "{}", script.pretty(inner_indent))
+            }
+            NodeTree::Branch(first, second) => {
+                let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
+                write!(f, "[{sep}{}", first.pretty(inner_indent))?;
+                write!(f, ",{sep}{}", second.pretty(inner_indent))?;
+                write!(f, "{newline_or_space}{:indent_w$}]", "")
+            }
+            NodeTree::Hidden(hash) => write!(f, "HIDDEN_TAP_NODE(0x{})", hash),
+        }
     }
 }

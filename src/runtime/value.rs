@@ -422,7 +422,7 @@ impl fmt::Display for Value {
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
             Value::Script(x) => write!(f, "{}", x.pretty(None)),
-            Value::TapInfo(x) => write!(f, "{}", x.pretty(None)), // not round-trip-able for >2 scripts
+            Value::TapInfo(x) => write!(f, "{}", x.pretty(None)),
         }
     }
 }
