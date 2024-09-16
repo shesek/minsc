@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::sync::Arc;
 
-use bitcoin::hashes::{sha256, Hash, HashEngine};
+use bitcoin::hashes::Hash;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 use bitcoin::{ScriptBuf, XOnlyPublicKey};
 use miniscript::descriptor::{DescriptorPublicKey, TapTree};
@@ -135,8 +135,7 @@ pub mod fns {
     /// Combine two nodes to create a new TapBranch parent
     pub fn tapBranch(args: Array, _: &ScopeRef) -> Result<Value> {
         let (a_hash, b_hash) = args.args_into()?;
-        let branch = branch_hash(&a_hash, &b_hash);
-
+        let branch = TapNodeHash::from_node_hashes(a_hash, b_hash);
         Ok(Value::Bytes(branch.to_byte_array().to_vec()))
     }
 }
@@ -313,18 +312,6 @@ fn tapinfo_huffman(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<
         internal_key,
         script_weights,
     )?)
-}
-
-fn branch_hash(a: &sha256::Hash, b: &sha256::Hash) -> sha256::Hash {
-    let mut eng = TapNodeHash::engine();
-    if a < b {
-        eng.input(a.as_byte_array());
-        eng.input(b.as_byte_array());
-    } else {
-        eng.input(b.as_byte_array());
-        eng.input(a.as_byte_array());
-    };
-    sha256::Hash::from_engine(eng)
 }
 
 // Functions for Taproot tr() descriptor construction
