@@ -52,6 +52,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
         // Development utilities
         scope.set_fn("debug", fns::debug).unwrap();
+        scope.set_fn("repr", fns::repr).unwrap();
         scope.set_fn("env", fns::env).unwrap();
 
         // Constants
@@ -77,7 +78,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 pub mod fns {
     use super::*;
     use crate::runtime::{Call, Function};
-    use crate::util::PrettyDisplay;
+    use crate::{ExprRepr, PrettyDisplay};
 
     /// Get the argument type as a string
     /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array, symbol
@@ -219,6 +220,14 @@ pub mod fns {
         // This works because the Value's Display returns Symbol strings as-is, with no quoting or escaping.
         // This is a serious misuse of what Symbols are meant for, but I guess it works >.<
         Ok(Symbol::new(Some(debug_str)).into())
+    }
+
+    /// repr(Any) -> String
+    ///
+    /// Get the ExprRepr representation of the value, which can be round-tripped
+    /// as a Minsc expression to reproduce the value.
+    pub fn repr(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(args.arg_into::<Value>()?.repr_str().into())
     }
 
     /// Get env vars from the local and parent scopes

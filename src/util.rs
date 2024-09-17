@@ -470,7 +470,7 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
 }
 
 /// Display-like with custom formatting options, newlines/indentation handling and the ability to implement on foreign types
-pub trait PrettyDisplay: Sized + fmt::Debug {
+pub trait PrettyDisplay: Sized {
     const AUTOFMT_ENABLED: bool;
     const MAX_ONELINER_LENGTH: usize = 125;
 

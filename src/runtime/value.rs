@@ -404,6 +404,7 @@ impl FromStr for Value {
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Mostly round-trip-able, see ReprExpr for a string representation that always is
         match self {
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
@@ -411,11 +412,11 @@ impl fmt::Display for Value {
             Value::String(x) => fmt_quoted_str(f, x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Descriptor(x) => write!(f, "{:#}", x), // round-trip-able except for Sh/Wsh or Tr with script-paths (can be, if the compiled miniscript in it was)
+            Value::Descriptor(x) => write!(f, "{:#}", x), // not round-trip-able (ExprRepr is)
             Value::Address(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
-            Value::Psbt(x) => write!(f, "{:?}", x), // not round-trip-able
+            Value::Psbt(x) => write!(f, "{:?}", x), // uses Debug, not round-trip-able (ExprRepr is)
             Value::Symbol(x) => write!(f, "{}", x),
             Value::SecKey(x) => write!(f, "{}", x.pretty(None)),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
@@ -455,6 +456,61 @@ impl PrettyDisplay for Value {
     }
 }
 
+/// Round-trip-able string encoding as a Minsc expression that can be evaluated to reproduce the original Value.
+/// Used as the encoding format to pass around Values between the Minsc runtime and other runtimes (currently WASM/JS).
+pub trait ExprRepr {
+    fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result;
+
+    fn repr_str(&self) -> String {
+        let mut s = String::new();
+        self.repr_fmt(&mut s).unwrap();
+        s
+    }
+}
+
+impl ExprRepr for Value {
+    fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result {
+        use Value::*;
+        match self {
+            // For most types we can delegate to Display, which already is round-trip-able
+            // (Symbols are encoded as their name, which is expected to be made round-trip-able)
+            Number(_) | Bool(_) | Bytes(_) | String(_) | Network(_) | Address(_) | Symbol(_)
+            | SecKey(_) | PubKey(_) | Policy(_) => write!(f, "{}", self),
+
+            // These also have round-trip-able Display, but can be expressed more compactly/precisely for ExprRepr
+            Transaction(tx) => write!(f, "tx(0x{})", bitcoin::consensus::serialize(tx).as_hex()),
+            Script(script) => write!(f, "script(0x{})", script.as_bytes().as_hex()),
+            TapInfo(tapinfo) => tapinfo.repr_fmt(f),
+
+            // Psbt's Display uses the Debug representation which is not round-trip-able (but better to serialize as bytes anyway)
+            Psbt(psbt) => write!(f, "psbt(0x{})", psbt.serialize().as_hex()),
+
+            // Descriptors require special handling when they have script paths (i.e. not (W)Pkh or script-less Tr)
+            Descriptor(desc) => desc.repr_fmt(f),
+
+            // Functions cannot be round tripped, as they depend on their lexical scope.
+            // Write null instead of erroring so that arrays containing them may otherwise be ExprRepr-serialized.
+            Function(func) => write!(f, "/**{}*/null", func),
+
+            // Use ExprRepr to encode inner values
+            Array(arr) => {
+                write!(f, "[")?;
+                for (i, item) in arr.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ",")?;
+                    }
+                    item.repr_fmt(f)?;
+                }
+                write!(f, "]")
+            }
+            WithProb(p, x) => {
+                write!(f, "{}@", p)?;
+                x.repr_fmt(f)
+            }
+        }
+    }
+}
+
 // Symbol
 //
 // A Value type guaranteed to be unique. Symbols don't have any special meaning on the Rust side, but are used in
@@ -481,7 +537,7 @@ impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.name {
             Some(name) => write!(f, "{}", name),
-            None => write!(f, "Symbol"),
+            None => write!(f, "Symbol()"),
         }
     }
 }

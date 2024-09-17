@@ -1,10 +1,10 @@
 use std::convert::{TryFrom, TryInto};
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
-use miniscript::{ScriptContext, Threshold};
+use miniscript::{descriptor::ShInner, ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, Error, Evaluate, Result, Value};
+use crate::runtime::{Array, Error, Evaluate, ExprRepr, Result, Value};
 use crate::util::{DescriptorExt, MiniscriptExt, EC};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
@@ -304,5 +304,23 @@ impl Value {
 
     pub fn is_descriptor(&self) -> bool {
         matches!(self, Value::Descriptor(_))
+    }
+}
+
+impl ExprRepr for Descriptor {
+    fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result {
+        match self {
+            // Descriptors with key-based paths only (Pkh, Wpkh, Sh-Wpkh and script-less Tr) are already round-trip-able
+            // using their native rust-miniscript's Display as a Minsc expression (:# modifier to exclude checksum)
+            Descriptor::Pkh(_) | Descriptor::Wpkh(_) => write!(f, "{:#}", self),
+            Descriptor::Tr(tr) if tr.tap_tree().is_none() => write!(f, "{:#}", self),
+            Descriptor::Sh(sh) if matches!(sh.as_inner(), ShInner::Wpkh(_)) => {
+                write!(f, "{:#}", self)
+            }
+
+            // Descriptors with inner Miniscripts for script-based paths must be encoded as string.
+            // (while the Policy syntax can be used as a Minsc expression, Miniscript's cannot.)
+            _ => write!(f, "descriptor(\"{}\")", self),
+        }
     }
 }

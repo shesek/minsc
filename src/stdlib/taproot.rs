@@ -4,6 +4,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use bitcoin::hashes::Hash;
+use bitcoin::hex::DisplayHex;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 use bitcoin::{ScriptBuf, XOnlyPublicKey};
 use miniscript::descriptor::{DescriptorPublicKey, TapTree};
@@ -12,7 +13,7 @@ use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Error, Result, Value};
 use crate::util::{self, fmt_list, PrettyDisplay, EC};
-use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -455,6 +456,22 @@ impl PrettyDisplay for TaprootSpendInfo {
     }
 }
 
+impl ExprRepr for TaprootSpendInfo {
+    fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result {
+        write!(f, "tr({}", self.internal_key())?;
+        if !self.script_map().is_empty() {
+            write!(f, ",")?;
+            // Always reconstruct the tree, without the optimization for simple cases used in PrettyDisplay,
+            // to be 100% certain that it is fully round-trip-able.
+            let tree = reconstruct_tree(self).expect("invalid TaprootSpendInfo"); // can only fail if the TaprootSpendInfo has invalid proofs
+            tree.repr_fmt(f)?;
+        } else if let Some(root_hash) = self.merkle_root() {
+            write!(f, ",{}", root_hash)?;
+        }
+        write!(f, ")")
+    }
+}
+
 #[derive(Debug)]
 enum NodeTree<'a> {
     Leaf(&'a (ScriptBuf, LeafVersion)),
@@ -506,6 +523,24 @@ fn reconstruct_tree<'a>(tapinfo: &'a TaprootSpendInfo) -> Option<NodeTree<'a>> {
     Some(tree(&root_hash, &node_map))
 }
 
+impl<'a> ExprRepr for NodeTree<'a> {
+    fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result {
+        match self {
+            NodeTree::Leaf((script, _)) => {
+                write!(f, "script(0x{})", script.as_bytes().as_hex())
+            }
+            NodeTree::Branch(first, second) => {
+                write!(f, "[")?;
+                first.repr_fmt(f)?;
+                write!(f, ",")?;
+                second.repr_fmt(f)?;
+                write!(f, "]")
+            }
+            NodeTree::Hidden(hash) => write!(f, "rawleaf(0x{})", hash),
+            // TODO rawleaf() not yet implemented (https://github.com/bitcoin/bitcoin/pull/30243)
+        }
+    }
+}
 impl<'a> PrettyDisplay for NodeTree<'a> {
     const AUTOFMT_ENABLED: bool = true;
 
@@ -522,7 +557,7 @@ impl<'a> PrettyDisplay for NodeTree<'a> {
                 write!(f, ",{sep}{}", second.pretty(inner_indent))?;
                 write!(f, "{newline_or_space}{:indent_w$}]", "")
             }
-            NodeTree::Hidden(hash) => write!(f, "HIDDEN_TAP_NODE(0x{})", hash),
+            NodeTree::Hidden(hash) => write!(f, "rawleaf(0x{})", hash),
         }
     }
 }
