@@ -443,6 +443,9 @@ impl PrettyDisplay for TaprootSpendInfo {
                 let tree = reconstruct_tree(self).expect("invalid TaprootSpendInfo"); // can only fail if the TaprootSpendInfo has invalid proofs
                 write!(f, "{}", tree.pretty(indent))?;
             }
+        } else if let Some(root_hash) = self.merkle_root() {
+            // Merkle root hash of an unknown script tree
+            write!(f, ", {}", root_hash)?; // TODO should use rawleaf() (https://github.com/bitcoin/bitcoin/pull/30243)
         }
         write!(f, ")")
     }
