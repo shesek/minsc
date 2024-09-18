@@ -244,7 +244,7 @@ impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value, scope: &ScopeRef) -> Result<Value> {
         use ast::InfixOp::*;
         use Value::{
-            Array, Bytes, Number as Num, Policy, PubKey, Script, SecKey, String, WithProb,
+            Array, Bytes, Number as Num, Policy, Psbt, PubKey, Script, SecKey, String, WithProb,
         };
 
         Ok(match (self, lhs, rhs) {
@@ -280,8 +280,8 @@ impl ast::InfixOp {
             (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             (Add, String(a), String(b)) => [a, b].concat().into(),
-            // + for string and number
-            (Add, String(a), Num(b)) => [a, b.to_string()].concat().into(),
+            // + for LHS string and any RHS
+            (Add, String(a), b) => [a, b.to_string()].concat().into(),
 
             // + for taproot construction (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
