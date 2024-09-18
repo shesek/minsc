@@ -283,6 +283,9 @@ impl ast::InfixOp {
             // + for LHS string and any RHS
             (Add, String(a), b) => [a, b.to_string()].concat().into(),
 
+            // A:B array tuple construction
+            (Colon, a, b) => vec![a, b].into(),
+
             // + for taproot construction (internal_key+script_tree)
             (Add, k @ PubKey(_), s)
             | (Add, k @ SecKey(_), s)
@@ -291,6 +294,12 @@ impl ast::InfixOp {
                 k @ Bytes(_),
                 s @ Script(_) | s @ Policy(_) | s @ PubKey(_) | s @ SecKey(_) | s @ Array(_),
             ) => stdlib::taproot::tr(k, Some(s), &scope.borrow())?,
+
+            // + to combine PSBTs
+            (Add, Psbt(mut a), Psbt(b)) => {
+                a.combine(b)?;
+                a.into()
+            }
 
             // * to repeat script fragments
             (Multiply, Script(s), Num(Int(n))) | (Multiply, Num(Int(n)), Script(s)) => {
@@ -301,9 +310,6 @@ impl ast::InfixOp {
             (Prob, Num(prob), v @ Policy(_) | v @ Script(_) | v @ PubKey(_) | v @ SecKey(_)) => {
                 WithProb(prob.into_usize()?, v.into())
             }
-
-            // A:B array tuple construction
-            (Colon, a, b) => vec![a, b].into(),
 
             // Specialized error for mixed-up number types
             (_, lhs @ Num(Int(_)), rhs @ Num(Float(_)))
