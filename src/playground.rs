@@ -91,7 +91,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 }
 
 fn run(code: &str) -> Result<Value, Error> {
-    DEMO_SCOPE.with(|root| Ok(parse(code)?.eval(root)?))
+    PLAYGROUND_SCOPE.with(|scope| Ok(parse(code)?.eval(scope)?))
 }
 
 fn script_asm(script: &ScriptBuf) -> String {
@@ -103,6 +103,8 @@ fn script_asm(script: &ScriptBuf) -> String {
 
 lazy_static! {
     static ref PLAYGROUND_LIB: Library = r#"
+        __DEFAULT_SCOPE__ = true; // see Scope::is_default()
+
         // Add a default `main` function displaying all environment variables,
         // or a welcome message if there aren't any.
         dyn fn main() = Symbol({
@@ -140,13 +142,11 @@ lazy_static! {
 }
 
 thread_local! {
-    // Provide some built-in example pubkeys and hashes in the web demo env
-    static DEMO_SCOPE: ScopeRef = {
+    // Create a scope beneath the root with additional playground utilities, used to evaluate playground code
+    static PLAYGROUND_SCOPE: ScopeRef = {
         console_error_panic_hook::set_once();
 
-        // The root is cloned to make the playground library part of the root
-        // and to have it excluded from `env()`
-        let scope = Scope::root().make_copy();
+        let scope = Scope::root().child().into_ref();
         PLAYGROUND_LIB.exec(&scope).unwrap();
         scope.into_readonly()
     };

@@ -49,8 +49,8 @@ impl Scope {
 
     /// Get the entire env from the local and parent scopes
     ///
-    /// max_depth can be set to limit the number of scopes included. It may be set to 0
-    /// to return everything or to -1 to return everything but the top-level global scope.
+    /// max_depth can be set to the number of parent scopes to include, to 0 to include
+    /// all scopes, or to -1 to includes everything below the default (typically root) scope.
     pub fn env(&self, max_depth: isize) -> Vec<(Ident, Value)> {
         let mut depth = 0;
         let mut seen_keys = HashSet::new();
@@ -65,14 +65,24 @@ impl Scope {
                 break;
             }
             let parent = parent.borrow();
-            if max_depth == -1 && parent.parent.is_none() {
-                break; // skip the top-level root scope when max_depth==-1
+            if max_depth == -1 && parent.is_default() {
+                break; // skip the default scope when max_depth==-1
             }
 
             env.append(&mut parent.local_env(&mut seen_keys));
             next_parent = parent.parent.as_ref().map(ScopeRef::make_ref);
         }
         env
+    }
+
+    // The default scope is typically the top-most root scope. However in some environments (like the playground)
+    // there can be a scope beneath root used as the default, that provides additional environment-specific
+    // utilities. These are identified by the presence of a flag variable, to have them excluded from env().
+    fn is_default(&self) -> bool {
+        lazy_static! {
+            static ref FLAG_VAR: Ident = "__DEFAULT_SCOPE__".into();
+        };
+        self.parent.is_none() || self.local.contains_key(&FLAG_VAR)
     }
 
     fn local_env(&self, seen_keys: &mut HashSet<Ident>) -> Vec<(Ident, Value)> {
