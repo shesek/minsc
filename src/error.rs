@@ -93,8 +93,8 @@ pub enum RuntimeError {
     #[error("Expected a Policy (or a coercible PubKey/SecKey), not {0:?}")]
     NotPolicyLike(Box<Value>),
 
-    #[error("Expected a descriptor or pubkey, not {0:?}")]
-    NotDescriptorLike(Box<Value>),
+    #[error("Expected a descriptor, not {0:?}")]
+    NotDescriptor(Box<Value>),
 
     #[error("Expected Script, not {0:?}")]
     NotScript(Box<Value>),

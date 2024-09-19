@@ -240,6 +240,8 @@ fn into_prob_policies(values: Vec<Value>) -> Result<Vec<(usize, Arc<Policy>)>> {
 
 // Convert from Value to Miniscript types
 
+impl_simple_into_variant!(Descriptor, Descriptor, into_descriptor, NotDescriptor);
+
 impl TryFrom<Value> for Policy {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
@@ -257,17 +259,6 @@ impl TryFrom<Value> for Policy {
     }
 }
 
-impl TryFrom<Value> for Descriptor {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::Descriptor(x) => Ok(x),
-            // PubKeys are coerced into a wpkh() descriptor
-            Value::PubKey(x) => Ok(Descriptor::new_wpkh(x)?),
-            v => Err(Error::NotDescriptorLike(v.into())),
-        }
-    }
-}
 impl TryFrom<Value> for miniscript::Descriptor<miniscript::DefiniteDescriptorKey> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {

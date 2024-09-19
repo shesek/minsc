@@ -287,13 +287,9 @@ impl ast::InfixOp {
             (Colon, a, b) => vec![a, b].into(),
 
             // + for taproot construction (internal_key+script_tree)
-            (Add, k @ PubKey(_), s)
-            | (Add, k @ SecKey(_), s)
-            | (
-                Add,
-                k @ Bytes(_),
-                s @ Script(_) | s @ Policy(_) | s @ PubKey(_) | s @ SecKey(_) | s @ Array(_),
-            ) => stdlib::taproot::tr(k, Some(s), &scope.borrow())?,
+            (Add, key @ PubKey(_) | key @ SecKey(_), script_tree) => {
+                stdlib::taproot::tr(key, Some(script_tree), &scope.borrow())?
+            }
 
             // + to combine PSBTs
             (Add, Psbt(mut a), Psbt(b)) => {

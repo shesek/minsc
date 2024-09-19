@@ -53,10 +53,7 @@ $tx = tx([
     tb1qww749rc3svsjh2rlqn7jx345zl8r0agftt3ep2: 1 BTC,
     wpkh($alice/5): 100 bits,
     tr($bob, pk($alice) && older(10)): 150000 sats,
-    
-    // Works with pubkeys (coerced into a wpkh() descriptor by default)
-    $alice/100: 2 mBTC,
-    xpub661MyMwAqRbcGczjuMoRm6dXaLDEhW1u34gKenbeYqAix21mdUKJyuyu5F1rzYGVxyL6tmgBUAEPrEz92mBXjByMRiJdba9wpnN37RLLAXa/0/3: 20 uBTC,
+    wpkh(xpub661MyMwAqRbcGczjuMoRm6dXaLDEhW1u34gKenbeYqAix21mdUKJyuyu5F1rzYGVxyL6tmgBUAEPrEz92mBXjByMRiJdba9wpnN37RLLAXa/0/3): 20 uBTC,
     
     // Works with raw scriptPubKeys
     `OP_ADD 5 OP_EQUAL`: 0.9 BTC, // non-standard

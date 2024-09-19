@@ -8,7 +8,6 @@ use bitcoin::{
     absolute::LockTime, address, hex::DisplayHex, Address, Amount, Network, Opcode, Sequence,
     SignedAmount, Txid, WitnessProgram, WitnessVersion,
 };
-use miniscript::descriptor::Descriptor;
 use miniscript::psbt::PsbtExt;
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
@@ -146,7 +145,7 @@ pub mod fns {
     use super::*;
 
     /// Generate an address
-    /// address(Script|Descriptor|PubKey|TapInfo|String|Address, Network=testnet) -> Address
+    /// address(Script|Descriptor|PubKey|TapInfo|Address, Network=testnet) -> Address
     pub fn address(args: Array, _: &ScopeRef) -> Result<Value> {
         let (spk, network): (Value, Option<Network>) = args.args_into()?;
         let spk = spk.into_spk()?;
@@ -227,17 +226,14 @@ impl Value {
         Ok(match self {
             // Raw scripts are returned as-is
             Value::Script(script) => script,
-            // Descriptors (or values coercible into them) are converted into their scriptPubKey
+            // Descriptors/addresses are converted into their scriptPubKey
             Value::Descriptor(descriptor) => descriptor.to_script_pubkey()?,
-            Value::PubKey(_) => Descriptor::try_from(self)?.to_script_pubkey()?,
-            // TapInfo returns the output V1 witness program of the output key
+            Value::Address(address) => address.script_pubkey(),
+            // TapInfo returns the V1 witness program of the output key
             Value::TapInfo(tapinfo) => ScriptBuf::new_witness_program(&WitnessProgram::new(
                 WitnessVersion::V1,
                 &tapinfo.output_key().serialize(),
             )?),
-            // Addresses can be provided as an Address or String
-            Value::Address(address) => address.script_pubkey(),
-            Value::String(_) => Address::try_from(self)?.script_pubkey(),
             other => bail!(Error::NoSpkRepr(other.into())),
         })
     }
