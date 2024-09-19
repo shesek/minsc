@@ -116,6 +116,12 @@ lazy_static! {
         // Get the env with the argument displayed on top as `$`
         dyn fn with_env($) = env::pretty();
 
+        // Wrap some String-returning functions to return a Symbol instead, to have them displayed in
+        // multi-line with syntax highlighting. This works because the playground displays Symbols as
+        // their raw internal name, with no string quoting/escaping.
+        _symbolify = |$fn| |$arg| Symbol($fn($arg));
+        debug = _symbolify(debug), script::wiz=_symbolify(script::wiz), script::bitide=_symbolify(script::bitide);
+
         // Provide some built-in example pubkeys and hashes for the demo env
 
         A = pubkey(0x029ffbe722b147f3035c87cb1c60b9a5947dd49c774cc31e94773478711a929ac0);

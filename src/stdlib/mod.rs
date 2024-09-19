@@ -206,8 +206,8 @@ pub mod fns {
         Ok(num.to_le_bytes().to_vec().into())
     }
 
-    /// debug(Value, Bool single_line=false)
-    /// Get the Debug representation of the Value
+    /// debug(Value, Bool single_line=false) -> String
+    /// Get the Debug representation of the Value (rust's std::fmt::Debug)
     pub fn debug(args: Array, _: &ScopeRef) -> Result<Value> {
         let (val, single_line): (Value, Option<bool>) = args.args_into()?;
         let debug_str = if single_line.unwrap_or(false) {
@@ -216,10 +216,7 @@ pub mod fns {
             // Indent with 2 spaces instead of 4
             format!("{:#?}", val).replace("    ", "  ")
         };
-        // Uses Symbol as a hack to enable syntax highlighting for debug_str in the web playground.
-        // This works because the Value's Display returns Symbol strings as-is, with no quoting or escaping.
-        // This is a serious misuse of what Symbols are meant for, but I guess it works >.<
-        Ok(Symbol::new(Some(debug_str)).into())
+        Ok(debug_str.into())
     }
 
     /// repr(Any) -> String

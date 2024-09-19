@@ -13,8 +13,7 @@ use miniscript::psbt::PsbtExt;
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
 use crate::runtime::{
-    eval_exprs, Array, Error, Evaluate, Execute, Float, Int, Mutable, Result, ScopeRef, Symbol,
-    Value,
+    eval_exprs, Array, Error, Evaluate, Execute, Float, Int, Mutable, Result, ScopeRef, Value,
 };
 use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, EC};
 use crate::{ast, time, Library};
@@ -203,23 +202,22 @@ pub mod fns {
             .into())
     }
 
-    /// script::wiz(Script) -> Symbol
+    /// script::wiz(Script) -> String
     /// Encode the Script in a Scriptwiz-compatible format (newlines, stack labels & comments)
     pub fn script_wiz(args: Array, _: &ScopeRef) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut wiz_str = String::new();
         fmt_script(&mut wiz_str, &script, ScriptFmt::ScriptWiz, Some(0))?;
-        // Uses Symbol for the same reason described in `stdlib::fns::debug()`
-        Ok(Symbol::new(Some(wiz_str)).into())
+        Ok(wiz_str.into())
     }
 
-    /// script::bitide(Script) -> Symbol
+    /// script::bitide(Script) -> String
     /// Encode the Script in a BitIDE-compatible format (newlines, stack labels & comments)
     pub fn script_bitide(args: Array, _: &ScopeRef) -> Result<Value> {
         let script = args.arg_into::<ScriptBuf>()?;
         let mut bitide_str = String::new();
         fmt_script(&mut bitide_str, &script, ScriptFmt::BitIde, Some(0))?;
-        Ok(Symbol::new(Some(bitide_str)).into())
+        Ok(bitide_str.into())
     }
 }
 
