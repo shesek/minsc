@@ -39,7 +39,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("float", fns::float).unwrap();
         scope.set_fn("str", fns::r#str).unwrap();
         scope.set_fn("bytes", fns::bytes).unwrap();
-        scope.set_fn("Symbol", fns::Symbol).unwrap();
+        scope.set_fn("symbol", fns::symbol).unwrap();
 
         scope.set_fn("le64", fns::le64).unwrap();
 
@@ -188,8 +188,8 @@ pub mod fns {
     }
 
     /// Create a new unique Symbol
-    /// Symbol(String=None) -> Symbol
-    pub fn Symbol(args: Array, _: &ScopeRef) -> Result<Value> {
+    /// symbol(String=None) -> Symbol
+    pub fn symbol(args: Array, _: &ScopeRef) -> Result<Value> {
         let name = args.arg_into()?;
         Ok(Symbol::new(name).into())
     }

@@ -528,8 +528,8 @@ impl Symbol {
 impl fmt::Debug for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.name {
-            Some(name) => write!(f, "Symbol({}, \"{}\")", self.id, name),
-            None => write!(f, "Symbol({})", self.id),
+            Some(name) => write!(f, "symbol({}, \"{}\")", self.id, name),
+            None => write!(f, "symbol({})", self.id),
         }
     }
 }
@@ -537,7 +537,7 @@ impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.name {
             Some(name) => write!(f, "{}", name),
-            None => write!(f, "Symbol()"),
+            None => write!(f, "symbol()"),
         }
     }
 }

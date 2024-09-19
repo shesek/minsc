@@ -1,7 +1,7 @@
 // Built-in unique Symbols
 // These don't have any special meaning on the Rust side, but are used in Minsc code for various purposes
-null = Symbol("null");
-default = Symbol("default");
+null = symbol("null");
+default = symbol("default");
 
 // Common type checks
 fn isArray($x) = typeof($x) == "array";
@@ -60,8 +60,8 @@ fn assert::eq($a, $b) = ($a == $b) || throw("Not equal: "+$a+" != "+$b+"");
 fn assert::msg($bool, $msg) = $bool || throw($msg);
 
 // Scope inspection
-dyn fn env::pretty() = env() | map(|$kv| $kv.0+" = "+pretty($kv.1)+" // "+typeof($kv.1)) | join("\n\n")| Symbol();
-dyn fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | Symbol();
+dyn fn env::pretty() = env() | map(|$kv| $kv.0+" = "+pretty($kv.1)+" // "+typeof($kv.1)) | join("\n\n")| symbol();
+dyn fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | symbol();
 fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
 
 dyn fn log::env($label) = log("variables:\n----\n" + env::pretty() + "\n----");

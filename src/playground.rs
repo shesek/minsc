@@ -107,7 +107,7 @@ lazy_static! {
 
         // Add a default `main` function displaying all environment variables,
         // or a welcome message if there aren't any.
-        dyn fn main() = Symbol({
+        dyn fn main() = symbol({
             $env = str(env::pretty());
             if !isEmpty($env) then "// Environment variables:\n\n" + $env
             else "// Welcome! Put some variables in your environment and they will show up here."
@@ -119,7 +119,7 @@ lazy_static! {
         // Wrap some String-returning functions to return a Symbol instead, to have them displayed in
         // multi-line with syntax highlighting. This works because the playground displays Symbols as
         // their raw internal name, with no string quoting/escaping.
-        _symbolify = |$fn| |$arg| Symbol($fn($arg));
+        _symbolify = |$fn| |$arg| symbol($fn($arg));
         debug = _symbolify(debug), script::wiz=_symbolify(script::wiz), script::bitide=_symbolify(script::bitide);
 
         // Provide some built-in example pubkeys and hashes for the demo env
