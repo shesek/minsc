@@ -60,9 +60,9 @@ fn assert::eq($a, $b) = ($a == $b) || throw("Not equal: "+$a+" != "+$b+"");
 fn assert::msg($bool, $msg) = $bool || throw($msg);
 
 // Scope inspection
-dyn fn env::pretty() = env() | map(|$kv| $kv.0+" = "+str($kv.1, true, true)+" // "+typeof($kv.1)) | join("\n\n")| Symbol();
+dyn fn env::pretty() = env() | map(|$kv| $kv.0+" = "+pretty($kv.1)+" // "+typeof($kv.1)) | join("\n\n")| Symbol();
 dyn fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | Symbol();
-fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else str($v);
+fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
 
 dyn fn log::env($label) = log("variables:\n----\n" + env::pretty() + "\n----");
 dyn fn log::debug_env($label) = log("variables:\n----\n" + env::debug() + "\n----");

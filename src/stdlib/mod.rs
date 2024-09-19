@@ -52,6 +52,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
         // Development utilities
         scope.set_fn("debug", fns::debug).unwrap();
+        scope.set_fn("pretty", fns::pretty).unwrap();
         scope.set_fn("repr", fns::repr).unwrap();
         scope.set_fn("env", fns::env).unwrap();
 
@@ -174,12 +175,14 @@ pub mod fns {
         Ok(num.into())
     }
 
-    /// str(Value, Bool multiline=false, Bool quoted_str=false) -> String
+    /// str(Value) -> String
+    ///
+    /// Strings are returned as-is, other values are converted to a string representation that is mostly
+    /// pretty (but single-line; see pretty() for multi-line) and mostly round-trip-able (see repr())
     pub fn r#str(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(match args.args_into()? {
-            (Value::String(string), _, None | Some(false)) => string,
-            (value, None | Some(false), _) => value.to_string(), // Value::String will be quoted
-            (value, Some(true), _) => value.multiline_str(),
+        Ok(match args.arg_into()? {
+            Value::String(string) => string, // no quoting/escaping
+            other => other.to_string(),      // Display internally uses single-line PrettyDisplay
         }
         .into())
     }
@@ -219,12 +222,20 @@ pub mod fns {
         Ok(debug_str.into())
     }
 
-    /// repr(Any) -> String
+    /// repr(Value) -> String
     ///
-    /// Get the ExprRepr representation of the value, which can be round-tripped
-    /// as a Minsc expression to reproduce the value.
+    /// Get the ExprRepr representation of the Value, which can be round-tripped
+    /// as a Minsc expression to reproduce the original Value.
     pub fn repr(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(args.arg_into::<Value>()?.repr_str().into())
+    }
+
+    /// pretty(Value) -> String
+    ///
+    /// Get a pretty multi-line string representation of the Value.
+    /// Similar to str(), except for using multi-line and that strings are quoted/escaped.
+    pub fn pretty(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(args.arg_into::<Value>()?.multiline_str().into())
     }
 
     /// Get env vars from the local and parent scopes
