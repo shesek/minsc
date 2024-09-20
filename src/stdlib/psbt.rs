@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
 
 use bitcoin::bip32::{self, Xpriv};
 use bitcoin::psbt::{self, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
@@ -8,7 +9,7 @@ use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
-use crate::util::EC;
+use crate::util::{PrettyDisplay, EC};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -601,5 +602,24 @@ impl psbt::GetKey for XprivSet {
             .iter()
             .find_map(|xpriv| xpriv.get_key(key_request.clone(), secp).transpose())
             .transpose()
+    }
+}
+
+// Temporary 'pretty' display based on Debug
+// TODO actual PrettyDisplay with `psbt [ ... ]` construction
+impl PrettyDisplay for Psbt {
+    const AUTOFMT_ENABLED: bool = false;
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        // Indent for any `Some` (actual indent level ignored)
+        let debug_str = match indent {
+            None => format!("{:?}", self),
+            Some(_) => format!("{:#?}", self).replace("    ", "  "), // 2 spaces instead of 4
+        };
+
+        // Hide empty fields. (Hopefully? Regex likely broken for some inputs. >.< Temporary hack.)
+        let re = regex::Regex::new(r" +[a-z][a-z0-9_]{4,}: (None|\{\}),\n?").unwrap();
+        let debug_str = re.replace_all(&debug_str, "");
+
+        write!(f, "{}", debug_str)
     }
 }

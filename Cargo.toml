@@ -18,7 +18,7 @@ lalrpop = { version = "0.21", features = ["lexer"] }
 miniscript = { version = "12", features = ["compiler"] }
 
 lalrpop-util = "0.21"
-regex = "1.3.9"
+regex = "1"
 thiserror = "1.0.20"
 chrono = "0.4.13"
 lazy_static = "1.4.0"

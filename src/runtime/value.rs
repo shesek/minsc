@@ -416,8 +416,8 @@ impl fmt::Display for Value {
             Value::Address(x) => write!(f, "{}", x),
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
-            Value::Psbt(x) => write!(f, "{:?}", x), // uses Debug, not round-trip-able (ExprRepr is)
             Value::Symbol(x) => write!(f, "{}", x),
+            Value::Psbt(x) => write!(f, "{}", x.pretty(None)), // uses Debug, not round-trip-able (ExprRepr is)
             Value::SecKey(x) => write!(f, "{}", x.pretty(None)),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
@@ -447,9 +447,8 @@ impl PrettyDisplay for Value {
             Value::Script(x) => write!(f, "{}", x.pretty(indent)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
+            Value::Psbt(x) => write!(f, "{}", x.pretty(indent)),
 
-            // Support multi-line Psbt via its Debug impl (the actual `indent` setting is ignored)
-            Value::Psbt(x) if indent.is_some() => write!(f, "{:#?}", x),
             // Use Display for other types that don't implement PrettyDisplay
             other => write!(f, "{}", other),
         }
