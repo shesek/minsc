@@ -4,7 +4,7 @@ use std::str::FromStr;
 pub use crate::error::ParseError;
 
 pub mod ast;
-pub use ast::{Expr, Ident, Stmt, Library};
+pub use ast::{Expr, Ident, Library, Stmt};
 
 lalrpop_mod!(
     #[allow(clippy::all)]
@@ -50,4 +50,33 @@ pub fn call(func: &str, args: Vec<Expr>) -> Expr {
         args,
     }
     .into()
+}
+
+pub fn bytes_from_hex(s: &str) -> Result<Expr, ParseError> {
+    use bitcoin::hashes::hex::FromHex;
+    Ok(Expr::Bytes(Vec::from_hex(s)?))
+}
+
+/// Expand escape characters in string literals (\", \\, \n, \r and \t)
+pub fn string_from_escaped_str(s: &str) -> Expr {
+    Expr::String(if !s.contains('\\') {
+        s.to_owned()
+    } else {
+        let mut iter = s.chars();
+        let mut s_new = String::new();
+        while let Some(mut ch) = iter.next() {
+            if ch == '\\' {
+                let next_ch = iter.next().expect("well formed string guaranteed by regex");
+                ch = match next_ch {
+                    '\\' | '\"' => next_ch,
+                    'n' => '\n',
+                    'r' => '\r',
+                    't' => '\t',
+                    _ => unreachable!("only valid escape sequences accepted by the regex"),
+                };
+            }
+            s_new.push(ch);
+        }
+        s_new
+    })
 }

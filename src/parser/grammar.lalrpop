@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use crate::time;
-use crate::parser::{ast, Expr, Stmt, ParseError, concat, prepend, call};
+use crate::parser::{ast, Expr, Stmt, ParseError, concat, prepend, call, self};
 
 grammar;
 
@@ -190,14 +190,14 @@ SecKey: Expr = SecKey_ =>? Ok(Expr::SecKey(<>.parse().map_err(ParseError::from)?
 SecKey_ = { XPRV, WIF };
 
 Bytes: Expr = {
-  BYTES =>? Ok(Expr::bytes_from_hex(&<>[2..])?),
+  BYTES =>? Ok(parser::bytes_from_hex(&<>[2..])?),
 
   // Bytes are typically constructed with the `0x` prefix, but can be constructed without it if
   // the length is exactly 33, 32 or 20 bytes. This is done for compatibility with the Miniscript
   // Policy syntax for literal pubkeys, x-only-pubkeys and hashes. The Bytes value will later get
   // get coerced into a PubKey/Hash as needed. Note that SINGLE_PK_ORIG already matches 0x-less
   // pubkeys that include bip32 origin info, and constructs them directly as PubKeys.
-  BYTES_NO0x =>? Ok(Expr::bytes_from_hex(&<>)?),
+  BYTES_NO0x =>? Ok(parser::bytes_from_hex(&<>)?),
 };
 
 // Addresses in Bech32 or Base58check encoding
@@ -208,7 +208,7 @@ Bytes: Expr = {
 // Supporting them requires resolving the ambiguity with "0x"-less 64-characters long hexadecimal strings.
 Address: Expr = ADDRESS =>? Ok(Expr::Address(<>.parse().map_err(ParseError::from)?));
 
-String: Expr = STRING => Expr::string_from_escaped_str(&<>[1..<>.len()-1]);
+String: Expr = STRING => parser::string_from_escaped_str(&<>[1..<>.len()-1]);
 
 // Script fragment enclosed in backticks
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
