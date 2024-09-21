@@ -19,6 +19,7 @@ miniscript = { version = "12", features = ["compiler"] }
 
 lalrpop-util = "0.21"
 regex = "1"
+base64 = "0.22"
 thiserror = "1.0.20"
 chrono = "0.4.13"
 lazy_static = "1.4.0"

@@ -427,6 +427,9 @@ pub enum ParseError {
     #[error("Invalid hex: {0}")]
     HexError(#[from] hex::HexToBytesError),
 
+    #[error("Invalid base64: {0}")]
+    Base64Error(#[from] base64::DecodeError),
+
     #[error("Invalid address: {0}")]
     AddressError(#[from] bitcoin::address::ParseError),
 

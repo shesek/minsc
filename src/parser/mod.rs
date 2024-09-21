@@ -57,13 +57,24 @@ pub fn bytes_from_hex(s: &str) -> Result<Expr, ParseError> {
     Ok(Expr::Bytes(Vec::from_hex(s)?))
 }
 
+pub fn bytes_from_base64(s: &str) -> Result<Expr, ParseError> {
+    use base64::alphabet;
+    use base64::engine::{DecodePaddingMode, Engine, GeneralPurpose, GeneralPurposeConfig};
+    // Support base64 strings with or without padding characters
+    const ENGINE: GeneralPurpose = GeneralPurpose::new(
+        &alphabet::STANDARD,
+        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+    );
+    Ok(Expr::Bytes(ENGINE.decode(s)?))
+}
+
 /// Expand escape characters in string literals (\", \\, \n, \r and \t)
 pub fn string_from_escaped_str(s: &str) -> Expr {
     Expr::String(if !s.contains('\\') {
         s.to_owned()
     } else {
         let mut iter = s.chars();
-        let mut s_new = String::new();
+        let mut s_new = String::with_capacity(s.len());
         while let Some(mut ch) = iter.next() {
             if ch == '\\' {
                 let next_ch = iter.next().expect("well formed string guaranteed by regex");

@@ -37,6 +37,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     // Bytes sequences, including keys and hashes in hex
     {regex: /0x[a-fA-F0-9]*\b/, token: "number"}, // with 0x prefix, any length
     {regex: /([a-fA-F0-9]{40}|[a-fA-F0-9]{64}|[a-fA-F0-9]{66})\b/, token: "number"}, // no 0x prefix, supported lengths only (for Miniscript compatibility)
+    {regex: /0z[A-Za-z0-9+/]+={0,2}/, token: "number"}, // 0z prefix for base64 encoded bytes
 
     // WIF private key
     {regex: /\b[KLc][1-9A-HJ-NP-Za-km-z]{51}|[59][1-9A-HJ-NP-Za-km-z]{50}\b/, token: "number"},
