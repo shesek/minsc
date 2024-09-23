@@ -30,7 +30,7 @@ module.exports = {
       crateDirectory: path.resolve(__dirname, '..'),
       outDir: path.resolve(__dirname, 'pkg'),
       outName: 'index',
-      extraArgs: '--no-typescript',
+      extraArgs: '--no-typescript -- --features playground',
     }),
   ],
   module: {

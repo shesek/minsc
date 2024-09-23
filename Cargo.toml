@@ -35,8 +35,6 @@ bitcoin = { version = "0.32", features = ["std", "secp-recovery", "rand", "rand-
 getrandom = { version = "0.2" }
 
 [features]
-# default = ["wee_alloc"]
-default = [ "wasm", "playground" ]
 wasm = [ "wasm-bindgen", "getrandom/js" ]
 playground = [ "wasm", "serde", "wasm-bindgen/serde-serialize", "console_error_panic_hook" ]
 

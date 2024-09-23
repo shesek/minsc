@@ -1,6 +1,6 @@
 #!/bin/bash
 
-wasm-pack build --target nodejs --out-dir $PWD/../node-pkg
+wasm-pack build --target nodejs --out-dir "$PWD/../node-pkg" "$PWD/.." --features wasm
 
 node -p '
   const [ vars, funcs ] = JSON.parse(require("../node-pkg/minsc.js").run(`
