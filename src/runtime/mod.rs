@@ -232,6 +232,15 @@ impl Evaluate for ast::Not {
     }
 }
 
+impl Evaluate for ast::Negate {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
+        Ok(match self.0.eval(scope)?.try_into()? {
+            Number::Int(n) => (-n).into(),
+            Number::Float(n) => (-n).into(),
+        })
+    }
+}
+
 impl Evaluate for ast::Infix {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         self.op
@@ -378,6 +387,7 @@ impl Evaluate for Expr {
             Expr::Infix(x) => x.eval(scope)?,  // dedicated error type
             Expr::SlashOp(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
+            Expr::Negate(x) => x.eval(scope)?,
             Expr::BtcAmount(x) => x.eval(scope).ctx("BTC amount")?, // eval'd into a Number
             Expr::Duration(x) => x.eval(scope).ctx("time duration")?, // eval'd into a Number
 

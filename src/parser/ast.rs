@@ -20,6 +20,7 @@ pub enum Expr {
     FnExpr(FnExpr),
     Infix(Infix),
     Not(Not),
+    Negate(Negate),
 
     BtcAmount(BtcAmount),
     Address(Address<address::NetworkUnchecked>),
@@ -174,6 +175,10 @@ pub enum InfixOp {
 #[derive(Debug, Clone)]
 pub struct Not(pub Box<Expr>);
 impl_from_variant!(Not, Expr);
+
+#[derive(Debug, Clone)]
+pub struct Negate(pub Box<Expr>);
+impl_from_variant!(Negate, Expr);
 
 /// Slash operator. Used for number division and BIP32 derivation.
 #[derive(Debug, Clone)]

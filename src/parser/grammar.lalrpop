@@ -19,8 +19,8 @@ match {
   // Takes priority over IDENT
   r"BTC|[mu]BTC|bits?|satoshis?|sats?|msats?" => BTC_DENOMINATION,
 } else{
-  r"-?\d{1,25}" => INT, // i64::MAX_NUMBER is 19 digits long
-  r"-?\d{1,25}\.\d{1,25}" => FLOAT, // f64 provides precision for up to approx 17 decimal digits
+  r"\d{1,25}" => INT, // i64::MAX_NUMBER is 19 digits long
+  r"\d{1,25}\.\d{1,25}" => FLOAT, // f64 provides precision for up to approx 17 decimal digits
   r"[a-zA-Z_$][a-zA-Z0-9_$]{0,38}(?:::[a-zA-Z0-9_$]+)*" => IDENT,
   r#""([^\\"]|\\[\\ntr"])*""# => STRING,
   r"0x[a-fA-F0-9]*" => BYTES_HEX,
@@ -70,6 +70,7 @@ Expr = {
 SimpleExpr = {
   SExpr,
   Not,
+  Negate,
   Thresh,
   InfixProb,
   ArrayAccess,
@@ -320,6 +321,9 @@ HardenedModifier = { "'", "h" };
 
 Not: Expr = "!" <SimpleExpr> =>
   ast::Not(<>.into()).into();
+
+Negate: Expr = "-" <SimpleExpr> =>
+  ast::Negate(<>.into()).into();
 
 // Duration and times
 
