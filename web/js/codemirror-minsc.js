@@ -56,8 +56,8 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /\b((?:dyn )?fn)(\s+)([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\b/, token: ["keyword", null, "def"]},
 
     // Keywords
-    {regex: /\b(of|return|let|if|then|else|dyn(?: fn)?|_)\b/, token: "keyword"},
-    {regex: /\b(true|false|null|default|int|float|str|bytes|likely)\b/, token: "builtin"},
+    {regex: /(of|return|let|if|then|else|dyn(?: fn)?|_)\b/, token: "keyword"},
+    {regex: /(true|false|null|default|likely)\b/, token: "builtin"},
 
     // Assignment
     //{regex: /\b([$a-zA-Z_][$a-zA-Z_0-9]*)\s*(=)/, token: ["variable-3", null]},

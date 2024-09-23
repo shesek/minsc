@@ -31,11 +31,11 @@ console_error_panic_hook = { version = "0.1", optional = true }
 
 # needed to enable 'rand-std' (rust-miniscript does not provide a way to propagate the feature)
 bitcoin = { version = "0.32", features = ["std", "secp-recovery", "rand", "rand-std"] }
-# needed to enable 'js' (enabled for the 'wasm' feature below)
+# needed to enable 'getrandom/js' (enabled for the 'wasm' feature below)
 getrandom = { version = "0.2" }
 
 [features]
-wasm = [ "wasm-bindgen", "getrandom/js" ]
+wasm = [ "wasm-bindgen", "getrandom/js" ] # wee_alloc? seems to result in larger files
 playground = [ "wasm", "serde", "wasm-bindgen/serde-serialize", "console_error_panic_hook" ]
 
 [lib]
