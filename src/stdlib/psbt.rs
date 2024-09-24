@@ -4,7 +4,7 @@ use std::fmt;
 
 use bitcoin::bip32::{self, Xpriv};
 use bitcoin::psbt::{self, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
-use bitcoin::{secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
+use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
 use crate::error::ResultExt;
@@ -271,10 +271,10 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "bip32_derivation" => psbt_input.bip32_derivation = bip32_derivation(val)?,
             "final_script_sig" => psbt_input.final_script_sig = Some(val.try_into()?),
             "final_script_witness" => psbt_input.final_script_witness = Some(val.try_into()?),
-            "ripemd160_preimages" => psbt_input.ripemd160_preimages = val.try_into()?,
-            "sha256_preimages" => psbt_input.sha256_preimages = val.try_into()?,
-            "hash160_preimages" => psbt_input.hash160_preimages = val.try_into()?,
-            "hash256_preimages" => psbt_input.hash256_preimages = val.try_into()?,
+            "ripemd160_preimages" => psbt_input.ripemd160_preimages = hash_preimages(val)?,
+            "sha256_preimages" => psbt_input.sha256_preimages = hash_preimages(val)?,
+            "hash160_preimages" => psbt_input.hash160_preimages = hash_preimages(val)?,
+            "hash256_preimages" => psbt_input.hash256_preimages = hash_preimages(val)?,
             "tap_key_sig" => psbt_input.tap_key_sig = Some(val.try_into()?),
             "tap_script_sigs" => psbt_input.tap_script_sigs = val.try_into()?,
             "tap_scripts" => psbt_input.tap_scripts = val.try_into()?,
@@ -508,6 +508,20 @@ impl TryFrom<Value> for PsbtTxOut {
         let tx_output = tx_output.ok_or(Error::PsbtTxOutMissingFields)?;
         Ok(PsbtTxOut(tx_output, psbt_output))
     }
+}
+
+// Support specifying just the preimage, automatically converted into the hash->preimage map
+fn hash_preimages<H: hashes::Hash + FromValue>(val: Value) -> Result<BTreeMap<H, Vec<u8>>> {
+    val.into_array()?
+        .into_iter()
+        .map(|el| match el {
+            Value::Bytes(preimage) => {
+                ensure!(preimage.len() == 32, Error::InvalidPreimageLen); // requirement by miniscript
+                Ok((<H as hashes::Hash>::hash(&preimage), preimage))
+            }
+            other => other.try_into(),
+        })
+        .collect()
 }
 
 // BIP32 key sources. May be provided as a single Xpub/Xpriv, as an array of Xpubs/Xprivs,

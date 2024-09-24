@@ -34,9 +34,6 @@ pub enum RuntimeError {
     #[error("Missing expected return value, set a final expression or a main() function")]
     NoReturnValue,
 
-    #[error("Undefined function: {0}")]
-    FnNotFound(Ident),
-
     #[error("Undefined variable: {0}")]
     VarNotFound(Ident),
 
@@ -240,6 +237,9 @@ pub enum RuntimeError {
 
     #[error("Invalid taproot script, expecting Policy/Script or an array of them")]
     TaprootInvalidScript,
+
+    #[error["Miniscript hash pre-images must be exactly 32 bytes long"]]
+    InvalidPreimageLen,
 
     #[error("Expected a tuple array of 2 elements, not {0:?}")]
     InvalidTuple(Box<Value>),
