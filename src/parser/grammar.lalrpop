@@ -218,7 +218,7 @@ String: Expr = STRING => parser::string_from_escaped_str(&<>[1..<>.len()-1]);
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
 ScriptFragPart = {
   Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, ArrayAccess,
-  BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">",
+  BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">", "<" <SlashOp> ">",
   ScriptFragPart_Infix, ScriptFragPart_Mark,
 };
 // Cannot allow all Infix operators because < > conflicts
