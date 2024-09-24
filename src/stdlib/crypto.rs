@@ -14,7 +14,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     // Hashes
     scope.set_fn("hash::sha256", fns::hash_sha256).unwrap();
     scope.set_fn("hash::sha256d", fns::hash_sha256d).unwrap();
-    scope.set_fn("hash::ripemd160", fns::hash_sha256d).unwrap();
+    scope
+        .set_fn("hash::ripemd160", fns::hash_ripemd160)
+        .unwrap();
     scope.set_fn("hash::hash160", fns::hash_hash160).unwrap();
     // Note: There are none-hash::-prefixed functions (e.g. sha256()) that also exists
     // but are different, returning a Miniscript Policy requiring the hash preimage
@@ -32,8 +34,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("rand::i64", fns::rand_i64).unwrap();
     scope.set_fn("rand::f64", fns::rand_f64).unwrap();
 }
-
-
 
 pub mod fns {
     use super::*;
