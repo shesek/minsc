@@ -54,13 +54,15 @@ pub mod fns {
         super::tr(a, b, &scope.borrow())
     }
 
-    /// tr::internalKey(TapInfo) -> PubKey
+    /// tr::internalKey(TapInfo|Descriptor) -> PubKey
     ///
-    /// Get the internal x-only key of the given TapInfo
+    /// Get the internal x-only key of the given TapInfo/Descriptor
     pub fn internalKey(args: Array, _: &ScopeRef) -> Result<Value> {
-        let tapinfo: TaprootSpendInfo = args.arg_into()?;
-
-        Ok(tapinfo.internal_key().into())
+        Ok(match args.arg_into()? {
+            Value::TapInfo(tapinfo) => tapinfo.internal_key().into(),
+            Value::Descriptor(Descriptor::Tr(tr)) => tr.internal_key().clone().into(),
+            _ => bail!(Error::InvalidArguments),
+        })
     }
 
     /// tr::outputKey(TapInfo) -> PubKey | (PubKey, Number)
