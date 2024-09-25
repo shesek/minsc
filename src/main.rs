@@ -1,7 +1,7 @@
-use minsc::{eval, parse, Error, PrettyDisplay};
+use minsc::{eval, parse, Error, PrettyDisplay, Value};
 use std::{env, fs, io, process::ExitCode};
 
-fn main_() -> Result<(), Error> {
+fn main_() -> Result<ExitCode, Error> {
     let mut args = env::args();
     let input = args.nth(1).unwrap_or_else(|| "-".into());
 
@@ -17,25 +17,30 @@ fn main_() -> Result<(), Error> {
     let mut code = String::new();
     reader.read_to_string(&mut code)?;
 
-    if print_ast {
+    Ok(if print_ast {
         println!("{:#?}", parse(&code)?);
+        ExitCode::SUCCESS
     } else {
         let res = eval(parse(&code)?)?;
-        println!("{}", res.pretty_multiline());
+        // Unnecessary to print return values of `true`, the SUCCESS exit code is sufficient
+        if res != Value::Bool(true) {
+            println!("{}", res.pretty_multiline());
+        }
         if debug {
             println!("\n\n{:#?}", res);
         }
-    }
-
-    Ok(())
+        if res == Value::Bool(false) {
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        }
+    })
 }
 
-// Wrap main() to print errors using Display rather than Debug
+// Wrap main() to customize error handling (print using Display rather than Debug)
 fn main() -> ExitCode {
-    if let Err(e) = main_() {
-        eprintln!("{}", e);
+    main_().unwrap_or_else(|err| {
+        eprintln!("{}", err);
         ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
-    }
+    })
 }
