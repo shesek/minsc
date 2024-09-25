@@ -352,20 +352,26 @@ impl Evaluate for ast::SlashOp {
     }
 }
 
+lazy_static! {
+    static ref MAIN: ast::Ident = "main".into();
+}
+
 impl Evaluate for ast::Block {
-    // Execute the block in a new child scope, with no visible side-effects.
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
+        // Execute the Block's stmts under a new child scope, with no visible side-effects
         let scope = scope.child().into_ref();
         self.stmts.exec(&scope)?;
         let scope = scope.into_readonly();
+
         if let Some(return_value) = &self.return_value {
-            // The return value is the final expression within the block
+            // Use the Block's final expression as its return value. Required for BlockExpr.
             return_value.eval(&scope)
-        } else if let Some(main_fn) = scope.borrow().get(&"main".into()) {
-            // The return value is the evaluation of main()
+        } else if let Some(main_fn) = self.use_main.then(|| scope.borrow().get(&MAIN)).flatten() {
+            // Use main() as the return value. Only enabled for top-level programs.
             main_fn.call(vec![], &scope)
         } else {
-            Err(Error::NoReturnValue)
+            // Return an implicit true by default. Only allowed by the grammar for Blocks representing function bodies or programs.
+            Ok(true.into())
         }
     }
 }

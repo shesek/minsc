@@ -38,7 +38,7 @@ match {
 // Top-level program
 // Can have a final return value or use the main() function instead
 pub Program: Expr = <stmts:Stmt*> <ret:Expr?> =>
-  ast::Block { stmts, return_value: ret.map(Into::into) }.into();
+  ast::Block { stmts, return_value: ret.map(Into::into), use_main: true }.into();
 
 // A collection of statements with no return value
 // Thin wrapper over a Vec<Stmt> used for library files
@@ -151,7 +151,7 @@ Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
 // A { .. } block expression with a final return value
 
 BlockExpr: Expr = "{" <stmts:Stmt*> <ret:Expr> "}" =>
-  ast::Block { stmts, return_value: Some(ret.into()) }.into();
+  ast::Block { stmts, return_value: Some(ret.into()), use_main: false }.into();
 
 Array = { ArraySquare, ArrayCurly }
 
@@ -253,7 +253,7 @@ ScriptMarkCtx: Expr = "@@" <Paren<(<Expr> "," <Expr>)>> =>
 
 
 // Anonymous function expression
-FnExpr: Expr = <dyn_scoping:"dyn"?> <params:FnExprParams> <body:Expr> =>
+FnExpr: Expr = <dyn_scoping:"dyn"?> <params:FnExprParams> <body:FnExprBody> =>
     ast::FnExpr { params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
 FnExprParams = {
   "|" <List0<IdentTerm, ",">> "|",
@@ -261,6 +261,12 @@ FnExprParams = {
   // Possibly because `||` is also a terminal for policy OR?
   "||" => vec![],
 };
+FnExprBody = { Expr, FnBlockNoReturn };
+
+// Allow function bodies without an explicit final return value (true is returned by default).
+// Also used for FnDef below.
+FnBlockNoReturn: Expr = "{" <Stmt*> "}" =>
+  ast::Block { stmts: <>, return_value: None, use_main: false }.into();
 
 // Binary infix operators with left associativity
 Infix: Expr = <lhs:InfixLHS> <op:InfixOp> <rhs:InfixRHS> =>
@@ -369,12 +375,10 @@ Assign: Stmt = "let"? <assigns:List1<Assignment, ",">> ";" =>
 Assignment: ast::Assignment = <lhs:IdentTerm> "=" <rhs:Expr> =>
     ast::Assignment { lhs, rhs };
 
-FnDef: Stmt = {
-    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <params:Paren<List0<IdentTerm, ",">>> "=" <body:Expr> ";" =>
-        ast::FnDef { ident, params, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
-    <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <params:Paren<List0<IdentTerm, ",">>> <body:BlockExpr> ";"? =>
-        ast::FnDef { ident, params, body, dynamic_scoping: dyn_scoping.is_some() }.into(),
-}
+FnDef: Stmt = <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <params:Paren<List0<IdentTerm, ",">>> <body:FnDefBody> =>
+  ast::FnDef { ident, params, body, dynamic_scoping: dyn_scoping.is_some() }.into();
+
+FnDefBody = { "=" <Expr> ";", <BlockExpr> ";"?, <FnBlockNoReturn> ";"? };
 
 IfStmt: Stmt = "if" <condition:Expr> "{" <then_body:Stmt*> "}" <else_body:IfStmtElse?> =>
     ast::IfStmt { condition, then_body, else_body }.into();

@@ -57,8 +57,10 @@ pub enum Stmt {
 #[derive(Debug, Clone)]
 pub struct Block {
     pub stmts: Vec<Stmt>,
-    /// may be None for top-level Programs where the evaluation of `main()` is returned instead
+    /// may be None to use the default return value (only for Blocks representing function bodies or programs, not for other BlockExpr)
     pub return_value: Option<Box<Expr>>,
+    /// Whether main() can be used as the return value (enabled for top-level programs)
+    pub use_main: bool,
 }
 impl_from_variant!(Block, Expr);
 
