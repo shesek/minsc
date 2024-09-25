@@ -24,6 +24,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::sign", fns::sign).unwrap();
     scope.set_fn("psbt::try_sign", fns::try_sign).unwrap();
     scope.set_fn("psbt::extract", fns::extract).unwrap();
+    scope
+        .set_fn("psbt::extract_non_ms", fns::extract_non_ms)
+        .unwrap();
 
     scope.set_fn("psbt::unsigned_tx", fns::sighash).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
@@ -141,15 +144,26 @@ pub mod fns {
 
     /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
     ///
-    /// Extract the PSBT's signed & finalized transaction
-    /// Also possible via `tx(Psbt)` (without the `finalize` option, for pre-finalized PSBT only)
+    /// Extract the PSBT finalized transaction. Will run the Miniscript interpreter sanity checks.  
+    /// Also possible using `tx(Psbt)` (without the `finalize` option, for pre-finalized PSBT only)
     pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
         if finalize.unwrap_or(false) {
             psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
         }
-        // XXX unlike bitcoin::Psbt::extract_tx(), the miniscript::PsbtExt::extract() does not check for absurd fee
+        // Uses rust-miniscript's PsbtExt::extract(), which only works with Miniscript-compatible Scripts
         Ok(psbt.extract(&EC)?.into())
+    }
+
+    /// psbt::extract_non_ms(Psbt) -> Transaction
+    ///
+    /// Extract the PSBT finalized transaction, without running the Miniscript interpreter checks.
+    pub fn extract_non_ms(args: Array, _: &ScopeRef) -> Result<Value> {
+        let psbt: Psbt = args.arg_into()?;
+        // Uses rust-bitcoin's Psbt::extract_tx(). Unlike rust-miniscript's PsbtExt::extract(), this does not run the
+        // interpreter checks and can be used with manual finalization of arbitrary (non-Miniscript-compatible) Script.
+        // Also unlike it, this includes a check for absurdly high fees (over 25k sat/vb) -- TODO make fee check configurable, support in both variants
+        Ok(psbt.extract_tx()?.into())
     }
 
     /// psbt::unsigned_tx(Psbt) -> Transaction
