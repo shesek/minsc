@@ -7,7 +7,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::hex::DisplayHex;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 use bitcoin::{ScriptBuf, XOnlyPublicKey};
-use miniscript::descriptor::{DescriptorPublicKey, TapTree};
+use miniscript::descriptor::{self, DescriptorPublicKey};
 
 use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
@@ -187,14 +187,14 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         // tr(PubKey, Script) -> TaprootSpendInfo
         // Single Script used as the tree root, with an explicit internal key
         (Value::PubKey(pk), Some(Value::Script(script))) => {
-            tapinfo_from_tree(definite_xonly(pk)?, Value::Script(script))?.into()
+            tapinfo_from_tree_node(definite_xonly(pk)?, Value::Script(script))?.into()
         }
 
         // tr(Script) -> TaprootSpendInfo
         // Single Script used as the tree root, with an unspendable internal key
         (Value::Script(script), None) => {
             let unspendable = tr_unspendable(scope)?.ok_or(Error::TaprootNoViableKey)?;
-            tapinfo_from_tree(definite_xonly(unspendable)?, Value::Script(script))?.into()
+            tapinfo_from_tree_node(definite_xonly(unspendable)?, Value::Script(script))?.into()
         }
 
         // tr(PubKey, Hash) -> TaprootSpendInfo
@@ -271,7 +271,7 @@ fn tapinfo_from_array(
 
     if scripts.len() == 2 && (scripts[0].is_array() || scripts[1].is_array()) {
         // Nested arrays of length 2 are treated as a binary tree of scripts (e.g. [ A, [ [ B, C ], D ] ])
-        tapinfo_from_tree(dpk, Value::array(scripts))
+        tapinfo_from_tree_node(dpk, Value::array(scripts))
     } else {
         // Other arrays are expected to be flat and are built into a huffman tree
         // Scripts may include weights (e.g. [ 10@`$pk OP_CHECSIG`, 1@`OP_ADD 2 OP_EQUAL` ] )
@@ -279,24 +279,31 @@ fn tapinfo_from_array(
     }
 }
 
-fn tapinfo_from_tree(dpk: XOnlyPublicKey, node: Value) -> Result<TaprootSpendInfo> {
-    fn process_node(node: Value) -> Result<NodeInfo> {
-        Ok(match node {
+fn tapinfo_from_tree_node(internal_key: XOnlyPublicKey, node: Value) -> Result<TaprootSpendInfo> {
+    let tree = NodeInfo::try_from(node)?;
+    Ok(TaprootSpendInfo::from_node_info(&EC, internal_key, tree))
+}
+
+impl TryFrom<Value> for NodeInfo {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
             Value::Script(script) => NodeInfo::new_leaf_with_ver(script, LeafVersion::TapScript),
             Value::Array(mut nodes) if nodes.len() == 2 => {
-                let a = process_node(nodes.remove(0))?;
-                let b = process_node(nodes.remove(0))?;
+                let a = nodes.remove(0).try_into()?;
+                let b = nodes.remove(0).try_into()?;
                 NodeInfo::combine(a, b)?
             }
             Value::WithProb(_, _) => bail!(Error::InvalidScriptProb),
             _ => bail!(Error::TaprootInvalidScriptBinaryTree),
         })
     }
-    Ok(TaprootSpendInfo::from_node_info(
-        &EC,
-        dpk,
-        process_node(node)?,
-    ))
+}
+impl TryFrom<Value> for bitcoin::taproot::TapTree {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(NodeInfo::try_from(value)?.try_into()?)
+    }
 }
 
 fn tapinfo_huffman(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {
@@ -345,7 +352,8 @@ fn descriptor_from_array(
     if policies.len() == 2 && (policies[0].is_array() || policies[1].is_array()) {
         // Nested arrays of length 2 are treated as a binary tree of policies (e.g. [ A, [ [ B, C ], D ] ])
         let internal_key = pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?;
-        descriptor_from_tree(internal_key, Value::array(policies))
+        let tree = descriptor::TapTree::try_from(Value::array(policies))?;
+        Ok(Descriptor::new_tr(internal_key, Some(tree))?)
     } else {
         // Other arrays are expected to be flat and are compiled into an OR or thresh(1, POLICIES) policy
         let policy = multi_andor(AndOr::Or, policies)?;
@@ -353,22 +361,21 @@ fn descriptor_from_array(
     }
 }
 
-fn descriptor_from_tree(pk: DescriptorPublicKey, node: Value) -> Result<Descriptor> {
-    fn process_node(node: Value) -> Result<TapTree<DescriptorPublicKey>> {
-        Ok(match node {
+impl TryFrom<Value> for descriptor::TapTree<DescriptorPublicKey> {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
             Value::Policy(_) | Value::PubKey(_) | Value::SecKey(_) => {
-                TapTree::Leaf(Arc::new(node.into_policy()?.compile()?))
+                Self::Leaf(Arc::new(value.into_policy()?.compile()?))
             }
             Value::Array(mut nodes) if nodes.len() == 2 => {
-                let a = process_node(nodes.remove(0))?;
-                let b = process_node(nodes.remove(0))?;
-                TapTree::combine(a, b)
+                let a = nodes.remove(0).try_into()?;
+                let b = nodes.remove(0).try_into()?;
+                Self::combine(a, b)
             }
             _ => bail!(Error::TaprootInvalidScriptBinaryTree),
         })
     }
-    let tree = process_node(node)?;
-    Ok(Descriptor::new_tr(pk, Some(tree))?)
 }
 
 // Get the TR_UNSPENDABLE key from scope. It may be set to false to disable it.

@@ -327,6 +327,9 @@ pub enum RuntimeError {
     #[error("Taproot builder error: {0}")]
     TaprootBuilderError(#[from] taproot::TaprootBuilderError),
 
+    #[error("TapTree construction failed: {0}")]
+    TaprootHiddenNodes(#[from] taproot::HiddenNodesError),
+
     #[error("Secp256k1 error: {0}")]
     Secp256k1Error(#[from] bitcoin::secp256k1::Error),
 

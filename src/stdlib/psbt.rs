@@ -341,7 +341,7 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
             "witness_script" => psbt_output.witness_script = Some(val.try_into()?),
             "bip32_derivation" => psbt_output.bip32_derivation = val.try_into()?,
             "tap_internal_key" => psbt_output.tap_internal_key = Some(val.try_into()?),
-            // TODO "tap_tree" => psbt_output.tap_tree = Some(val.try_into()?),
+            "tap_tree" => psbt_output.tap_tree = Some(val.try_into()?),
             "tap_key_origins" => psbt_output.tap_key_origins = val.try_into()?,
             "proprietary" => psbt_output.proprietary = val.try_into()?,
             "unknown" => psbt_output.unknown = val.try_into()?,
