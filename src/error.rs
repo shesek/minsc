@@ -1,3 +1,4 @@
+use std::fmt;
 use std::result::Result as StdResult;
 
 use bitcoin::{self, amount, bip32, hashes, hex, key, network, script, taproot, witness_program};
@@ -5,8 +6,7 @@ use miniscript::policy::compiler::CompilerError;
 use miniscript::{descriptor, TranslateErr};
 
 use crate::parser::ast::{Ident, InfixOp};
-use crate::runtime::Value;
-use crate::stdlib;
+use crate::{stdlib, PrettyDisplay, Value};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -34,45 +34,45 @@ pub enum RuntimeError {
     #[error("Undefined variable: {0}")]
     VarNotFound(Ident),
 
-    #[error("Expected a function, not {0:?}")]
+    #[error("Expected a function, not {}", ValErrFmt(.0))]
     NotFn(Box<Value>),
 
-    #[error("Expected an array, not {0:?}")]
+    #[error("Expected an array, not {}", ValErrFmt(.0))]
     NotArray(Box<Value>),
 
     #[error(
-        "Accessing by index is possible on Array, Bytes and multi-path Descriptors, not {0:?}"
+        "Accessing by index is possible on Array, Bytes and multi-path Descriptors, not {}", ValErrFmt(.0)
     )]
     NoArrayAccess(Box<Value>),
 
-    #[error("Expected a number, not {0:?}")]
+    #[error("Expected a number, not {}", ValErrFmt(.0))]
     NotNumber(Box<Value>),
 
     #[error("Expected an integer, not {0:?}")]
     NotInt(f64),
 
-    #[error("Expected a boolean, not {0:?}")]
+    #[error("Expected a boolean, not {}", ValErrFmt(.0))]
     NotBool(Box<Value>),
 
-    #[error("Expected a pubkey, not {0:?}")]
+    #[error("Expected a pubkey, not {}", ValErrFmt(.0))]
     NotPubKey(Box<Value>),
 
-    #[error("Expected an address, not {0:?}")]
+    #[error("Expected an address, not {}", ValErrFmt(.0))]
     NotAddress(Box<Value>),
 
-    #[error("Expected hash bytes, not {0:?}")]
+    #[error("Expected hash bytes, not {}", ValErrFmt(.0))]
     NotHashLike(Box<Value>),
 
-    #[error("Expected a network type, not {0:?}")]
+    #[error("Expected a network type, not {}", ValErrFmt(.0))]
     NotNetwork(Box<Value>),
 
-    #[error("Expected a secret key, not {0:?}")]
+    #[error("Expected a secret key, not {}", ValErrFmt(.0))]
     NotSecKey(Box<Value>),
 
-    #[error("Cannot be converted to Bytes: {0:?}")]
+    #[error("Cannot be converted to Bytes: {}", ValErrFmt(.0))]
     NotBytesLike(Box<Value>),
 
-    #[error("Expected a string, not {0:?}")]
+    #[error("Expected a string, not {}", ValErrFmt(.0))]
     NotString(Box<Value>),
 
     #[error("Expected a single Xpub, not {0}")]
@@ -81,36 +81,36 @@ pub enum RuntimeError {
     #[error("Expected a single Xpriv, not {0}")]
     NotSingleXpriv(Box<miniscript::descriptor::DescriptorSecretKey>),
 
-    #[error("Expected TapInfo or tr() Descriptor, not {0:?}")]
+    #[error("Expected TapInfo or tr() Descriptor, not {}", ValErrFmt(.0))]
     NotTapInfoLike(Box<Value>),
 
-    #[error("Expected a Policy (or a coercible PubKey/SecKey), not {0:?}")]
+    #[error("Expected a Policy (or a coercible PubKey/SecKey), not {}", ValErrFmt(.0))]
     NotPolicyLike(Box<Value>),
 
-    #[error("Expected a descriptor, not {0:?}")]
+    #[error("Expected a descriptor, not {}", ValErrFmt(.0))]
     NotDescriptor(Box<Value>),
 
-    #[error("Expected Script, not {0:?}")]
+    #[error("Expected Script, not {}", ValErrFmt(.0))]
     NotScript(Box<Value>),
 
-    #[error("Expected a transaction as object, raw bytes or tagged list, not {0:?}")]
+    #[error("Expected a transaction, raw bytes or tagged list, not {}", ValErrFmt(.0))]
     NotTxLike(Box<Value>),
 
-    #[error("Expected txid bytes or tx, not {0:?}")]
+    #[error("Expected txid bytes or tx, not {}", ValErrFmt(.0))]
     NotTxidLike(Box<Value>),
 
     #[error(
-        "Expected a 4 bytes BIP32 fingerprint or a key to compute the fingerprint for, not {0:?}"
+        "Expected a 4 bytes BIP32 fingerprint or a key to compute the fingerprint for, not {}", ValErrFmt(.0)
     )]
     NotFingerprintLike(Box<Value>),
 
-    #[error("Expected raw Script or Bytes, not {0:?}. Perhaps you meant to use explicitScript()/scriptPubKey()?")]
+    #[error("Expected raw Script or Bytes, not {}. Perhaps you meant to use explicitScript()/scriptPubKey()?", ValErrFmt(.0))]
     InvalidScriptConstructor(Box<Value>),
 
-    #[error("Cannot represent as a scriptPubKey: {0:?}")]
+    #[error("Cannot represent as a scriptPubKey: {}", ValErrFmt(.0))]
     NoSpkRepr(Box<Value>),
 
-    #[error("Invalid script fragment: {0:?}")]
+    #[error("Invalid script fragment: {}", ValErrFmt(.0))]
     InvalidScriptFrag(Box<Value>),
 
     #[error("Only integers can be interpolated as script fragments, received a float: {0:?}")]
@@ -122,7 +122,7 @@ pub enum RuntimeError {
     #[error("Required value missing")]
     MissingValue,
 
-    #[error("Invalid value: {0:?}")]
+    #[error("Invalid value: {}", ValErrFmt(.0))]
     InvalidValue(Box<Value>),
 
     #[error("Expected length {1}, not {0}")]
@@ -133,9 +133,6 @@ pub enum RuntimeError {
 
     #[error("Invalid arguments: {0}")]
     InvalidArgumentsError(#[source] Box<RuntimeError>),
-
-    #[error("Expected {1} arguments, not {0}")]
-    ArgumentMismatch(usize, usize),
 
     #[error("Heightwise duration must be divisible by the block interval (typically 10 minutes)")]
     InvalidDurationHeightwise,
@@ -178,8 +175,8 @@ pub enum RuntimeError {
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 
-    #[error("Script cannot be represented as an address: {0}")]
-    NotAddressable(bitcoin::ScriptBuf),
+    #[error("Script cannot be represented as an address: {}", .0.pretty(None))]
+    NotAddressable(Box<bitcoin::ScriptBuf>),
 
     #[error("Number operation overflowed")]
     Overflow,
@@ -197,7 +194,7 @@ pub enum RuntimeError {
     #[error("{0:?} operator error: {1}")]
     InfixOpError(InfixOp, #[source] Box<RuntimeError>),
 
-    #[error("Invalid operands: ({0}, {1})")]
+    #[error("Invalid operands: {}, {}", ValErrFmt(.0), ValErrFmt(.1))]
     InfixOpArgs(Box<Value>, Box<Value>),
 
     #[error("cannot mix number types ({0} and {1}). convert with explicit int()/float()")]
@@ -223,7 +220,7 @@ pub enum RuntimeError {
     #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash)")]
     TaprootInvalidTrUse,
 
-    #[error("Invalid Taproot unspendable key: {0}")]
+    #[error("Invalid Taproot unspendable key: {}", ValErrFmt(.0))]
     InvalidTrUnspendable(Box<Value>),
 
     #[error("No viable taproot internal key found, provide one explicitly")]
@@ -238,9 +235,6 @@ pub enum RuntimeError {
     #[error["Miniscript hash pre-images must be exactly 32 bytes long"]]
     InvalidPreimageLen,
 
-    #[error("Expected a tuple array of 2 elements, not {0:?}")]
-    InvalidTuple(Box<Value>),
-
     #[error("Invalid tagged array structure: {0}")]
     InvalidTaggedList(#[source] Box<RuntimeError>),
 
@@ -254,10 +248,10 @@ pub enum RuntimeError {
     TagUnknown,
 
     // PSBT
-    #[error("Cannot construct PSBT from {0:?}")]
+    #[error("Cannot construct PSBT from {}", ValErrFmt(.0))]
     NotPsbtLike(Box<Value>),
 
-    #[error("Expected PSBT sighash as number/string, not {0:?}")]
+    #[error("Expected PSBT sighash as number/string, not {}", ValErrFmt(.0))]
     PsbtInvalidSighashType(Box<Value>),
 
     #[error("PSBT tagged array construction must begin with the \"tx\"/\"unsigned_tx\" field")]
@@ -333,7 +327,7 @@ pub enum RuntimeError {
     #[error("Hash error: {0}")]
     HashError(#[from] hashes::FromSliceError),
 
-    #[error("IO error: {0:?}")]
+    #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
     #[error("Bitcoin key error: {0}")]
@@ -358,7 +352,7 @@ pub enum RuntimeError {
     ParseFloat(#[from] std::num::ParseFloatError),
 
     #[error("fmt Error: {0}")]
-    Fmt(#[from] std::fmt::Error),
+    Fmt(#[from] fmt::Error),
 
     // needed so that Infallible conversions can be used with `?`
     #[error("Infallible (can never be constructed)")]
@@ -413,6 +407,13 @@ pub enum RuntimeError {
 impl From<TranslateErr<RuntimeError>> for RuntimeError {
     fn from(e: TranslateErr<RuntimeError>) -> Self {
         RuntimeError::TranslateError(Box::new(e))
+    }
+}
+
+struct ValErrFmt<'a>(&'a Value);
+impl<'a> fmt::Display for ValErrFmt<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[{}] {}", self.0.type_of(), self.0)
     }
 }
 
