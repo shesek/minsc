@@ -1,7 +1,8 @@
 use std::convert::{TryFrom, TryInto};
 use std::{fmt, sync::Arc};
 
-use miniscript::{descriptor::ShInner, ScriptContext, Threshold};
+use miniscript::descriptor::{ShInner, WshInner};
+use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, ExprRepr, Result, Value};
@@ -33,6 +34,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("wpkh", fns::wpkh).unwrap();
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
+    scope.set_fn("sortedmulti", fns::sortedmulti).unwrap();
     // tr() is also available, defined in taproot.rs
 
     // Expose TRIVIAL and UNSATISFIABLE policies
@@ -141,13 +143,18 @@ pub mod fns {
         Ok(Descriptor::new_wpkh(args.arg_into()?)?.into())
     }
 
-    /// wsh(Policy|Miniscript) -> Descriptor::Wsh
-    /// wsh(Script witnessScript) -> Script scriptPubKey
+    /// `wsh(Policy) -> Descriptor`
+    /// `wsh(Array<tagged:sortedmulti>) -> Descriptor` (see `sortedmulti()`)
+    /// `wsh(Script witnessScript) -> Script scriptPubKey``
     pub fn wsh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Policy(policy) => {
                 let miniscript = policy.compile()?;
                 Descriptor::new_wsh(miniscript)?.into()
+            }
+            Value::Array(arr) if arr.is_tagged_with("sortedmulti") => {
+                let (_tag, thresh_k, pks): (String, _, _) = arr.try_into()?;
+                Descriptor::new_wsh_sortedmulti(thresh_k, pks)?.into()
             }
             Value::Script(script) => script.to_p2wsh().into(),
             _ => bail!(Error::InvalidArguments),
@@ -155,6 +162,7 @@ pub mod fns {
     }
 
     /// sh(Descriptor::W{sh,pkh}) -> Descriptor::ShW{sh,pkh}
+    /// Can only be used to wrap over wsh()/wpkh(). Minsc does not support pre-segwit descriptors.
     pub fn sh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Descriptor(desc) => match desc {
@@ -165,6 +173,24 @@ pub mod fns {
             _ => bail!(Error::InvalidShUse),
         }
         .into())
+    }
+
+    /// sortedmulti(Int thresh_k, ...PubKey) -> Array<tagged:sortedmulti>
+    /// sortedmulti(Int thresh_k, Array<PubKey>) -> Array<tagged:sortedmulti>
+    ///
+    /// Can be used within wsh() only - sortedmulti() within tr() is currently unsupported by rust-miniscript
+    /// and intentionally unsupported in sh() by minsc.
+    pub fn sortedmulti(args: Array, _: &ScopeRef) -> Result<Value> {
+        let mut args = args.check_varlen(2, usize::MAX)?;
+        let thresh_k: usize = args.remove(0).try_into()?;
+        let pks = if args.len() == 1 && args[0].is_array() {
+            args.remove(0) // called as sortedmulti($n, $keys)
+        } else {
+            Value::Array(args) // called as sortedmulti($n, $key1, $key2, ...)
+        };
+        // Return a tagged array, later detected by wsh() to construct a SortedMultiVec. Uses an unusual representation because
+        // sortedmulti() is not a quite descriptor nor a policy, and so cannot be represented directly as a first-class Minsc Value.
+        Ok(Value::array_of(("sortedmulti", thresh_k, pks)))
     }
 
     //
@@ -301,11 +327,15 @@ impl Value {
 impl ExprRepr for Descriptor {
     fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result {
         match self {
-            // Descriptors with key-based paths only (Pkh, Wpkh, Sh-Wpkh and script-less Tr) are already round-trip-able
-            // using their native rust-miniscript's Display as a Minsc expression (:# modifier to exclude checksum)
+            // Descriptors with key-based paths only (Pkh, Wpkh, Sh-Wpkh, Wsh-SortedMulti and script-less Tr) are already
+            // round-trip-able using their rust-miniscript's Display as a Minsc expression (:# modifier to exclude checksum)
+            // (technically Sh-Wsh-SortedMulti and Sh-SortedMulti too, but they're uncommon so just stringify them.)
             Descriptor::Pkh(_) | Descriptor::Wpkh(_) => write!(f, "{:#}", self),
             Descriptor::Tr(tr) if tr.tap_tree().is_none() => write!(f, "{:#}", self),
             Descriptor::Sh(sh) if matches!(sh.as_inner(), ShInner::Wpkh(_)) => {
+                write!(f, "{:#}", self)
+            }
+            Descriptor::Wsh(wsh) if matches!(wsh.as_inner(), WshInner::SortedMulti(_)) => {
                 write!(f, "{:#}", self)
             }
 

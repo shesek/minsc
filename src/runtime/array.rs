@@ -50,6 +50,13 @@ impl Array {
         }
     }
 
+    pub fn is_tagged_with(&self, tag: &str) -> bool {
+        self.get(0).is_some_and(|el| match el {
+            Value::String(el_s) => el_s == tag,
+            _ => false,
+        })
+    }
+
     /// Unpack function arguments into a tuple or vec. Like try_into(), but with a
     /// wrapper error type to indicate the error was related to the arguments.
     /// Supports optional arguments by specifying an Option<T> as the return type.
