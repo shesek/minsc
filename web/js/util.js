@@ -31,7 +31,21 @@ export function findErrorLines (code, errMessage) {
   return { from, to }
 }
 
-export async function loadGist(identifier) {
+export function loadFile(hash) {
+  if (hash.startsWith('#github=')) return loadRepoFile(hash.slice(8))
+  if (hash.startsWith('#gist=')) return loadGist(hash.slice(6))
+}
+
+async function loadRepoFile(path) {
+  if (path.startsWith('examples/')) path=`shesek/minsc/master/${path}`
+  const parts = path.split('/')
+  if (parts[2] == 'blob') parts.splice(2,1) // drop '/blob/' to support github.com web ui urls
+  const resp = await fetch(`https://raw.githubusercontent.com/${parts.join('/')}`)
+  if (!resp.ok) throw new Error(resp)
+  return resp.text()
+}
+
+async function loadGist(identifier) {
   const [ gist_id, file_index ] = identifier.split(':')
   const resp = await fetch(`https://api.github.com/gists/${encodeURIComponent(gist_id)}`)
       , body = await resp.json()

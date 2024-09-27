@@ -22,7 +22,7 @@ import './codemirror-addon-hinting'
 
 import stdlib_wordlist from './stdlib-wordlist.json'
 
-import { debounce, encode, findErrorLines, loadGist } from './util'
+import { debounce, encode, findErrorLines, loadFile } from './util'
 import default_code from '../default-code.minsc'
 
 const worker = new Worker(new URL("./worker.js", import.meta.url));
@@ -40,17 +40,16 @@ const error_el = document.querySelector('#error')
     , output_el_key = document.querySelector('#output-key')
     , output_el_other = document.querySelector('#output-other')
 
-const gist_id = location.hash.startsWith('#gist=') && location.hash.slice(6)
-const initial_code = gist_id ? '' // leave the editor empty while the gist is loading
+const code_file = loadFile(location.hash) // null if there are no gist/github hash params
+const initial_code = code_file ? '' // leave the editor empty while the code is loading
                      : location.hash.startsWith('#c=') && location.hash.length > 3
                      ? decodeURIComponent(location.hash.slice(3))
                      : default_code
 
-// Load code from gist
-if (gist_id) {
-  loadGist(gist_id).then(code => {
+if (code_file) {
+  code_file.then(code => {
     editor.setValue(code)
-    update('gist')
+    update('code_file')
   }).catch(console.error)
 }
 
@@ -110,7 +109,7 @@ function update(source) {
   const share_uri = `#c=${encode(code)}`
   share_el.href = share_uri
   share_box.value = share_el.href
-  if (source != 'init' && source != 'gist') location.hash = share_uri
+  if (source != 'init' && source != 'code_file') location.hash = share_uri
 
   if (code) worker.postMessage({ code, network })
   else error_el.style.display = 'none'
