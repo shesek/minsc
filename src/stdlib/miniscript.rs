@@ -165,11 +165,8 @@ pub mod fns {
     /// Can only be used to wrap over wsh()/wpkh(). Minsc does not support pre-segwit descriptors.
     pub fn sh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
-            Value::Descriptor(desc) => match desc {
-                Descriptor::Wsh(wsh) => Descriptor::new_sh_with_wsh(wsh),
-                Descriptor::Wpkh(wpkh) => Descriptor::new_sh_with_wpkh(wpkh),
-                _ => bail!(Error::InvalidShUse),
-            },
+            Descriptor::Wsh(wsh) => Descriptor::new_sh_with_wsh(wsh),
+            Descriptor::Wpkh(wpkh) => Descriptor::new_sh_with_wpkh(wpkh),
             _ => bail!(Error::InvalidShUse),
         }
         .into())
