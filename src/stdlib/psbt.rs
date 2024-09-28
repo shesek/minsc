@@ -588,6 +588,7 @@ impl TryFrom<Value> for psbt::PsbtSighashType {
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
             Value::Number(Int(num)) => Self::from_u32(num.try_into()?),
+            Value::Bytes(bytes) if bytes.len() == 1 => Self::from_u32(bytes[0] as u32),
             Value::String(str) => str.parse()?,
             other => bail!(Error::PsbtInvalidSighashType(Box::new(other))),
         })

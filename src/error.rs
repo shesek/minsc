@@ -251,7 +251,7 @@ pub enum RuntimeError {
     #[error("Cannot construct PSBT from {}", ValErrFmt(.0))]
     NotPsbtLike(Box<Value>),
 
-    #[error("Expected PSBT sighash as number/string, not {}", ValErrFmt(.0))]
+    #[error("Expected sighash type as byte, number or string, not {}", ValErrFmt(.0))]
     PsbtInvalidSighashType(Box<Value>),
 
     #[error("PSBT tagged array construction must begin with the \"tx\"/\"unsigned_tx\" field")]
