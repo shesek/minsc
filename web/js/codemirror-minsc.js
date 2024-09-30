@@ -29,7 +29,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /\d{4}-\d{1,2}-\d{1,2}T(\d{1,2}:\d{1,2}(:\d{1,2})?Z?)?\b/, token: "number"},
 
     // Xpubs/Xprvs
-    {regex: /[xt](?:pub|prv)[0-9a-zA-Z]{100,120}\b/, token: "number"},
+    {regex: /[xt](?:pub|prv)[0-9a-zA-Z]{100,120}\b(?![_$]|::)/, token: "number"},
 
     // BIP32 key origin fingerprint
     {regex: /(\[)([a-fA-F0-9]{8})\b/, token: [null,"number"]},
@@ -40,10 +40,10 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /0z[A-Za-z0-9+/]+={0,2}/, token: "number"}, // 0z prefix for base64 encoded bytes
 
     // WIF private key
-    {regex: /\b[KLc][1-9A-HJ-NP-Za-km-z]{51}|[59][1-9A-HJ-NP-Za-km-z]{50}\b/, token: "number"},
+    {regex: /[KLc][1-9A-HJ-NP-Za-km-z]{51}|[59][1-9A-HJ-NP-Za-km-z]{50}\b(?![_$]|::)/, token: "number"},
 
     // Addresses (Bech32 & Base58check)
-    {regex: /\b[123mn][1-9A-HJ-NP-Za-km-z]{25,34}|((bc|tb|bcrt)1[0-9a-z]{38,59}|(BC|TB|BCRT)1[0-9A-Z]{38,59})\b/, token: "number"},
+    {regex: /(?:[123mn][1-9A-HJ-NP-Za-km-z]{25,34}|(bc|tb|bcrt)1[0-9a-z]{38,59}|(BC|TB|BCRT)1[0-9A-Z]{38,59})\b(?![_$]|::)/, token: "number"},
 
     // Numbers
     {regex: /\b-?\d+(?:\.\d+)?\b/, token: "number"},
@@ -76,7 +76,8 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
 
     // Variables
     {regex: /[A-Z$][A-Z0-9_]+\b/, token: "variable-2"}, // different look for all-caps identifiers, typically OP_CODES
-    {regex: /[$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*\b/, token: "variable-3"},
+    // IDENT regex explained in grammar.lalrpop
+    {regex: /(?:[a-zA-Z][a-zA-Z0-9]{0,24}|(?:[a-zA-Z][a-zA-Z0-9]*)?[_$][a-zA-Z0-9_$]*|[a-zA-Z_$][a-zA-Z0-9_$]*(?:::[a-zA-Z0-9_$]+)+)(?![a-zA-Z0-9$_]|::)/, token: "variable-3" },
 
     // Numeric array index
     {regex: /\.\d+\b/, token: "property"},
