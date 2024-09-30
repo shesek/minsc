@@ -4,9 +4,10 @@ use std::fmt;
 use bitcoin::hashes::Hash;
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
+use bitcoin::{absolute::LockTime as AbsLockTime, relative::LockTime as RelLockTime};
 use bitcoin::{
-    absolute::LockTime, address, hex::DisplayHex, Address, Amount, Network, Opcode, Sequence,
-    SignedAmount, Txid, WitnessProgram, WitnessVersion,
+    address, hex::DisplayHex, Address, Amount, Network, Opcode, Sequence, SignedAmount, Txid,
+    WitnessProgram, WitnessVersion,
 };
 use miniscript::psbt::PsbtExt;
 
@@ -274,7 +275,7 @@ impl TryFrom<Value> for Transaction {
             Value::Array(_) => {
                 let mut tx = Transaction {
                     version: Version(2),
-                    lock_time: LockTime::ZERO,
+                    lock_time: AbsLockTime::ZERO,
                     input: vec![],
                     output: vec![],
                 };
@@ -365,10 +366,10 @@ impl TryFrom<Value> for Amount {
         Ok(Amount::from_sat(val.into_u64()?))
     }
 }
-impl TryFrom<Value> for LockTime {
+impl TryFrom<Value> for AbsLockTime {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        Ok(LockTime::from_consensus(val.into_u32()?))
+        Ok(AbsLockTime::from_consensus(val.into_u32()?))
     }
 }
 impl TryFrom<Value> for Version {
@@ -381,7 +382,7 @@ impl TryFrom<Value> for Sequence {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(Sequence(match val {
-            Value::Bytes(bytes) => u32::from_le_bytes(bytes.as_slice().try_into()?),
+            Value::Bytes(bytes) => u32::from_be_bytes(bytes.as_slice().try_into()?),
             Value::Number(num) => num.into_u32()?,
             other => bail!(Error::InvalidValue(other.into())),
         }))
@@ -555,8 +556,12 @@ impl PrettyDisplay for Transaction {
             util::indentation_params(indent);
         let field_sep = format!("{newline_or_space}{:inner_indent_w$}", "");
         write!(f, r#"tx [{field_sep}"version": {}"#, self.version.0)?;
-        if self.lock_time != LockTime::ZERO {
-            write!(f, r#",{field_sep}"locktime": {}"#, self.lock_time)?;
+        if self.lock_time != AbsLockTime::ZERO {
+            write!(
+                f,
+                ",{field_sep}\"locktime\": {}",
+                self.lock_time.pretty(None)
+            )?;
         }
         if !self.input.is_empty() {
             write!(f, r#",{field_sep}"inputs": "#)?;
@@ -570,7 +575,7 @@ impl PrettyDisplay for Transaction {
                 } else {
                     write!(f, r#"[ "prevout": {}"#, input.previous_output)?;
                     if input.sequence != Sequence::default() {
-                        write!(f, r#", "sequence": {}"#, input.sequence)?;
+                        write!(f, r#", "sequence": {}"#, input.sequence.pretty(None))?;
                     }
                     if input.script_sig != ScriptBuf::default() {
                         write!(f, r#", "script_sig": {}"#, input.script_sig.pretty(None))?;
@@ -618,6 +623,37 @@ impl PrettyDisplay for bitcoin::Witness {
         fmt_list(f, &mut self.iter(), indent, |f, wit_item: &[u8], _| {
             write!(f, "0x{}", wit_item.as_hex())
         })
+    }
+}
+
+impl PrettyDisplay for bitcoin::Sequence {
+    const AUTOFMT_ENABLED: bool = false;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        if *self == Self::ENABLE_RBF_NO_LOCKTIME {
+            write!(f, "ENABLE_RBF")
+        } else {
+            match self.to_relative_lock_time() {
+                None => write!(f, "{:#010x}", self.to_consensus_u32()),
+                Some(RelLockTime::Blocks(blocks)) => write!(f, "{blocks} blocks"),
+                Some(RelLockTime::Time(time)) => {
+                    write!(f, "{} seconds", (time.value() as usize) * 512)
+                }
+            }
+        }
+    }
+}
+
+impl PrettyDisplay for AbsLockTime {
+    const AUTOFMT_ENABLED: bool = false;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        match self {
+            AbsLockTime::Blocks(height) => write!(f, "{height}"),
+            AbsLockTime::Seconds(timestamp) => {
+                write!(f, "{}", time::fmt_timestamp(timestamp.to_consensus_u32()))
+            }
+        }
     }
 }
 

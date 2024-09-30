@@ -1,4 +1,6 @@
-use chrono::{NaiveDate, NaiveDateTime};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+
+use bitcoin::relative::LockTime;
 
 use crate::error::{ParseError, RuntimeError};
 use crate::parser::ast::DurationUnit;
@@ -7,13 +9,11 @@ use crate::parser::ast::DurationUnit;
 
 const SEQUENCE_LOCKTIME_MASK: u32 = 0x0000ffff;
 const SEQUENCE_LOCKTIME_GRANULARITY: u32 = 9;
-const SEQUENCE_LOCKTIME_TYPE_FLAG: u32 = 1 << 22;
 
 const LOCKTIME_THRESHOLD: u32 = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 
 const BLOCKS_MAX: u32 = SEQUENCE_LOCKTIME_MASK; // 65535
 const SECONDS_MAX: u32 = SEQUENCE_LOCKTIME_MASK << SEQUENCE_LOCKTIME_GRANULARITY; // 33553920
-const SECONDS_MOD: u32 = 1 << SEQUENCE_LOCKTIME_GRANULARITY; // 512
 
 // The default block interval. Can be overridden in Minsc by setting the `BLOCK_INTERVAL` variable
 pub const BLOCK_INTERVAL: usize = 600;
@@ -56,9 +56,7 @@ pub fn relative_time_to_seq(
             seconds > 0.0 && seconds <= SECONDS_MAX as f64,
             RuntimeError::InvalidDurationTimeOutOfRange
         );
-
-        let units = (seconds / SECONDS_MOD as f64).ceil() as u32;
-        Ok(SEQUENCE_LOCKTIME_TYPE_FLAG | units)
+        Ok(LockTime::from_seconds_ceil(seconds as u32)?.to_consensus_u32())
     }
 }
 
@@ -76,4 +74,17 @@ pub fn parse_datetime(s: &str) -> Result<NaiveDateTime, ParseError> {
         ParseError::InvalidDateTimeOutOfRange // TODO add date string to error
     );
     Ok(dt)
+}
+
+pub fn fmt_timestamp(ts: u32) -> impl std::fmt::Display {
+    lazy_static! {
+        static ref MIN_TIME: NaiveTime = NaiveTime::from_hms(0, 0, 0);
+    }
+
+    let ts = NaiveDateTime::from_timestamp(ts as i64, 0);
+    if ts.time() == *MIN_TIME {
+        ts.format("%Y-%m-%dT")
+    } else {
+        ts.format("%Y-%m-%dT%H:%M:%S")
+    }
 }

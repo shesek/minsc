@@ -379,6 +379,9 @@ pub enum RuntimeError {
     #[error("Invalid Script: {0}")]
     InvalidScript(#[from] bitcoin::script::Error),
 
+    #[error("Invalid locktime: {0}")]
+    TimeOverflow(#[from] bitcoin::locktime::relative::TimeOverflowError),
+
     #[error("ECDSA error: {0}")]
     Ecdsa(#[from] bitcoin::ecdsa::Error),
 
