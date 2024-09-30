@@ -8,9 +8,9 @@ fn sumInputs($max_inputs) = `
   unrollFor($max_inputs, |$n| ` // errors if there are more inputs
     #{"loop:"+$n}
     OP_DUP OP_1SUB // get input index (counter-1)
-    INPUT_VALUE // get input value
+    OP::INPUT_VALUE // get input value
     OP_ROT // bring sum accumulator to top
-    ADD64_VERIFY // add current input value to sum
+    OP::ADD64_VERIFY // add current input value to sum
     OP_SWAP // bring current index back to top
   `) // (should check asset id too -- skipped here for brevity)
 `;
