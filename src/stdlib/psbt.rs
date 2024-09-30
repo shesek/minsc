@@ -4,8 +4,9 @@ use std::fmt;
 
 use bitcoin::bip32::{self, Xpriv};
 use bitcoin::psbt::{self, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
-use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
+use bitcoin::{hashes, secp256k1, taproot, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
+use miniscript::DescriptorPublicKey;
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
@@ -245,7 +246,7 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
     tags.for_each_tag(|tag, val| {
         match tag {
             "version" => psbt.version = val.try_into()?,
-            "xpub" => psbt.xpub = val.try_into()?,
+            "xpub" => psbt.xpub = xpub_map(val)?,
             "proprietary" => psbt.proprietary = val.try_into()?,
             "unknown" => psbt.unknown = val.try_into()?,
             "inputs" => {
@@ -282,7 +283,7 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "sighash_type" => psbt_input.sighash_type = Some(val.try_into()?),
             "redeem_script" => psbt_input.redeem_script = Some(val.try_into()?),
             "witness_script" => psbt_input.witness_script = Some(val.try_into()?),
-            "bip32_derivation" => psbt_input.bip32_derivation = bip32_derivation(val)?,
+            "bip32_derivation" => psbt_input.bip32_derivation = bip32_derivation_map(val)?,
             "final_script_sig" => psbt_input.final_script_sig = Some(val.try_into()?),
             "final_script_witness" => psbt_input.final_script_witness = Some(val.try_into()?),
             "ripemd160_preimages" => psbt_input.ripemd160_preimages = hash_preimages(val)?,
@@ -291,8 +292,8 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "hash256_preimages" => psbt_input.hash256_preimages = hash_preimages(val)?,
             "tap_key_sig" => psbt_input.tap_key_sig = Some(val.try_into()?),
             "tap_script_sigs" => psbt_input.tap_script_sigs = val.try_into()?,
-            "tap_scripts" => psbt_input.tap_scripts = val.try_into()?,
-            "tap_key_origins" => psbt_input.tap_key_origins = val.try_into()?,
+            "tap_scripts" => psbt_input.tap_scripts = tap_scripts_map(val)?,
+            "tap_key_origins" => psbt_input.tap_key_origins = tap_key_origins_map(val)?,
             "tap_internal_key" => psbt_input.tap_internal_key = Some(val.try_into()?),
             "tap_merkle_root" => psbt_input.tap_merkle_root = Some(val.try_into()?),
             "proprietary" => psbt_input.proprietary = val.try_into()?,
@@ -339,10 +340,10 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
         match tag {
             "redeem_script" => psbt_output.redeem_script = Some(val.try_into()?),
             "witness_script" => psbt_output.witness_script = Some(val.try_into()?),
-            "bip32_derivation" => psbt_output.bip32_derivation = val.try_into()?,
+            "bip32_derivation" => psbt_output.bip32_derivation = bip32_derivation_map(val)?,
             "tap_internal_key" => psbt_output.tap_internal_key = Some(val.try_into()?),
             "tap_tree" => psbt_output.tap_tree = Some(val.try_into()?),
-            "tap_key_origins" => psbt_output.tap_key_origins = val.try_into()?,
+            "tap_key_origins" => psbt_output.tap_key_origins = tap_key_origins_map(val)?,
             "proprietary" => psbt_output.proprietary = val.try_into()?,
             "unknown" => psbt_output.unknown = val.try_into()?,
             "descriptor" => psbt_output
@@ -538,49 +539,115 @@ fn hash_preimages<H: hashes::Hash + FromValue>(val: Value) -> Result<BTreeMap<H,
         .collect()
 }
 
-// BIP32 key sources. May be provided as a single Xpub/Xpriv, as an array of Xpubs/Xprivs,
-// or as map of single PubKey to KeySource. (examples in KeyWithSource below)
-fn bip32_derivation(val: Value) -> Result<BTreeMap<secp256k1::PublicKey, bip32::KeySource>> {
+// BIP32 key sources. May be provided as as an array of Xpubs/Xprivs or as a map of single pubkeys to key sources
+fn bip32_derivation_map(val: Value) -> Result<BTreeMap<secp256k1::PublicKey, bip32::KeySource>> {
     // TODO support MultiXpub/Prv as multiple KeyWithSource
-    let key_sources: Vec<KeyWithSource> = match val {
-        Value::Array(array) => array.into_iter().collect_into()?,
-        single => vec![single.try_into()?],
-    };
-    Ok(key_sources
+    val.into_array()?
         .into_iter()
-        .map(|KeyWithSource(key, source)| (key, source))
-        .collect())
-}
-pub struct KeyWithSource(pub secp256k1::PublicKey, pub bip32::KeySource);
-
-impl TryFrom<Value> for KeyWithSource {
-    type Error = Error;
-
-    fn try_from(val: Value) -> Result<Self> {
-        Ok(match val {
-            // May be provided as an array mapping from `pk` to the `source`,
-            // where `source` is a tuple/tagged array of $fingerprint:$derivation_path.
-            // For example: `$single_pk1: 0x1223344:[2,5]`
-            // Or in long-form: `$single_pk1: [ "fingerprint": 0x11223344, "derivation_path": [2,5] ]`
-            // Or even longer: `[ "pubkey": $single_pk1, "source": [ "fingerprint": 0x11223344, "derivation_path": [2,5] ] ]`
-            // The fingerprint may also be provided as a key to compute the fingerprint for, for example: `$single_pk1: xpub123:[2,5]`
-            Value::Array(_) => {
-                let (pk, source): (_, Value) = val.tagged_or_tuple("pubkey", "source")?;
-                let (fingerprint, derivation_path) =
-                    source.tagged_or_tuple("fingerprint", "derivation_path")?;
-                Self(pk, (fingerprint, derivation_path))
-            }
-            // Or any value coercible into a PubKey/SecKey, using the origin/derivation associated with it.
-            // For example, `xpub123/1/10` would set the final key's origin to `[fingerprint(xpub123), [1, 10]]`
-            _ => {
-                let dpk = miniscript::DescriptorPublicKey::try_from(val)?;
-                let fingerprint = dpk.master_fingerprint();
-                let derivation_path = dpk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
-                let final_pk = dpk.at_derivation_index(0)?.derive_public_key(&EC)?.inner;
-                Self(final_pk, (fingerprint, derivation_path))
-            }
+        .map(|el| {
+            Ok(match el {
+                // Provided as an explicit map from `pk` to the bip32 `source` (fingerprint+path)
+                // For example: `$single_pk1: 0x1223344:[2,5]`, or in long-form: `$single_pk1: [ "fingerprint": 0x11223344, "derivation_path": [2,5] ]`
+                // Or even longer: `[ "pubkey": $single_pk1, "source": [ "fingerprint": 0x11223344, "derivation_path": [2,5] ] ]`
+                // The fingerprint may also be provided as a key to compute the fingerprint for, for example: `$single_pk1: xpub123:[2,5]`
+                // Matches the underlying structure used by rust-bitcoin.
+                explicit_map @ Value::Array(_) => {
+                    let (pk, source): (_, Value) =
+                        explicit_map.tagged_or_tuple("pubkey", "source")?;
+                    let (fingerprint, derivation_path) =
+                        source.tagged_or_tuple("fingerprint", "derivation_path")?;
+                    (pk, (fingerprint, derivation_path))
+                }
+                // Alternatively, can be provided as a DescriptorPubKey with an internally associated key source.
+                // For example, `xpub123/1/10` would set the final key's origin to `[fingerprint(xpub123), [1, 10]]`
+                pk_with_source => {
+                    let dpk = DescriptorPublicKey::try_from(pk_with_source)?;
+                    let fingerprint = dpk.master_fingerprint();
+                    let derivation_path =
+                        dpk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                    let final_pk = dpk.at_derivation_index(0)?.derive_public_key(&EC)?.inner;
+                    (final_pk, (fingerprint, derivation_path))
+                }
+            })
         })
-    }
+        .collect()
+}
+
+// Similar to bip32_derivation_map(), but for Xpubs. Used for the global PSBT `xpub` field.
+fn xpub_map(val: Value) -> Result<BTreeMap<bip32::Xpub, bip32::KeySource>> {
+    val.into_array()?
+        .into_iter()
+        .map(|el| {
+            Ok(match el {
+                // Provided as an explicit map from xpubs to the key source (fingerprint+path)
+                // Matches the underlying structure used by rust-bitcoin.
+                explicit_map @ Value::Array(_) => {
+                    let (xpub, source): (_, Value) =
+                        explicit_map.tagged_or_tuple("xpub", "source")?;
+                    let (fingerprint, derivation_path) =
+                        source.tagged_or_tuple("fingerprint", "derivation_path")?;
+                    (xpub, (fingerprint, derivation_path))
+                }
+                // Alternatively, provided as a DescriptorPubKey xpub with an internally associated key source
+                xpub_with_source => match xpub_with_source.try_into()? {
+                    ref dpk @ DescriptorPublicKey::XPub(ref dxpub) => {
+                        let fingerprint = dpk.master_fingerprint();
+                        let derivation_path =
+                            dpk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                        let final_xpub = dxpub.xkey.derive_pub(&EC, &dxpub.derivation_path)?;
+                        (final_xpub, (fingerprint, derivation_path))
+                    }
+                    other => bail!(Error::NotSingleXpub(other.into())),
+                },
+            })
+        })
+        .collect()
+}
+
+// Similar to bip32_derivation_map(), for the PSBT input/output `tap_key_origins` field
+fn tap_key_origins_map(
+    val: Value,
+) -> Result<BTreeMap<bitcoin::XOnlyPublicKey, (Vec<bitcoin::TapLeafHash>, bip32::KeySource)>> {
+    val.into_array()?
+        .into_iter()
+        .map(|el| {
+            let (pk, pk_val): (DescriptorPublicKey, Array) = el.try_into()?;
+            Ok(if !pk_val.is_empty() && !pk_val[0].is_bytes() {
+                // Provided as a map from pubkeys to a tuple of (leaf_hashes,key_source)
+                // Matches the underlying structure used by rust-bitcoin.
+                let (leaf_hashes, key_source) = pk_val.try_into()?;
+                let final_pk = pk.at_derivation_index(0)?.derive_public_key(&EC)?;
+                (final_pk.into(), (leaf_hashes, key_source))
+            } else {
+                // Provided as a map from pubkeys with associated sources to leaf_hashes
+                let leaf_hashes = pk_val.try_into()?;
+                let fingerprint = pk.master_fingerprint();
+                let derivation_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                let key_source = (fingerprint, derivation_path);
+                let final_pk = pk.at_derivation_index(0)?.derive_public_key(&EC)?;
+                (final_pk.into(), (leaf_hashes, key_source))
+            })
+        })
+        .collect()
+}
+
+// Accept the `tap_scripts` PSBT input field without an explicit leaf version (defaults to TapScript)
+fn tap_scripts_map(
+    val: Value,
+) -> Result<BTreeMap<taproot::ControlBlock, (bitcoin::ScriptBuf, taproot::LeafVersion)>> {
+    static DEFAULT_VERSION: taproot::LeafVersion = taproot::LeafVersion::TapScript;
+
+    val.into_array()?
+        .into_iter()
+        .map(|el| {
+            let (ctrl, script_val): (_, Value) = el.try_into()?;
+            Ok(if script_val.is_array() {
+                (ctrl, script_val.try_into()?)
+            } else {
+                (ctrl, (script_val.try_into()?, DEFAULT_VERSION))
+            })
+        })
+        .collect()
 }
 
 impl TryFrom<Value> for psbt::PsbtSighashType {
