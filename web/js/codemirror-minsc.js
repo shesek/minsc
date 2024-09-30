@@ -43,7 +43,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /\b[KLc][1-9A-HJ-NP-Za-km-z]{51}|[59][1-9A-HJ-NP-Za-km-z]{50}\b/, token: "number"},
 
     // Addresses (Bech32 & Base58check)
-    {regex: /\b[123][1-9A-HJ-NP-Za-km-z]{25,34}|((bc|tb|bcrt)1[0-9a-z]{38,59}|(BC|TB|BCRT)1[0-9A-Z]{38,59})\b/, token: "number"},
+    {regex: /\b[123mn][1-9A-HJ-NP-Za-km-z]{25,34}|((bc|tb|bcrt)1[0-9a-z]{38,59}|(BC|TB|BCRT)1[0-9A-Z]{38,59})\b/, token: "number"},
 
     // Numbers
     {regex: /\b-?\d+(?:\.\d+)?\b/, token: "number"},
