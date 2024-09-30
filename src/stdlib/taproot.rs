@@ -594,3 +594,5 @@ impl PrettyDisplay for bitcoin::taproot::TapTree {
         write!(f, "{}", tree.pretty(indent))
     }
 }
+
+impl_simple_pretty!(TapLeafHash, h, "{}", h);

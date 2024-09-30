@@ -3,14 +3,15 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use bitcoin::bip32::{self, Xpriv};
-use bitcoin::psbt::{self, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
+use bitcoin::hex::DisplayHex;
+use bitcoin::psbt::{self, raw, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
 use bitcoin::{hashes, secp256k1, taproot, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 use miniscript::DescriptorPublicKey;
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
-use crate::util::{PrettyDisplay, EC};
+use crate::util::{self, PrettyDisplay, EC};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -661,7 +662,7 @@ impl TryFrom<Value> for psbt::PsbtSighashType {
         })
     }
 }
-impl TryFrom<Value> for psbt::raw::Key {
+impl TryFrom<Value> for raw::Key {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         let (type_value, key): (u32, Vec<u8>) = val.try_into()?;
@@ -671,7 +672,7 @@ impl TryFrom<Value> for psbt::raw::Key {
         })
     }
 }
-impl TryFrom<Value> for psbt::raw::ProprietaryKey {
+impl TryFrom<Value> for raw::ProprietaryKey {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         let (prefix, subtype, key): (Vec<u8>, u32, Vec<u8>) = val.try_into()?;
@@ -701,21 +702,118 @@ impl psbt::GetKey for XprivSet {
     }
 }
 
-// Temporary 'pretty' display based on Debug
-// TODO actual PrettyDisplay with `psbt [ ... ]` construction
 impl PrettyDisplay for Psbt {
     const AUTOFMT_ENABLED: bool = false;
+
+    #[rustfmt::skip]
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
-        // Indent for any `Some` (actual indent level ignored)
-        let debug_str = match indent {
-            None => format!("{:?}", self),
-            Some(_) => format!("{:#?}", self).replace("    ", "  "), // 2 spaces instead of 4
-        };
+        let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
+            util::indentation_params(indent);
+        let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
+        let mut is_first = true;
 
-        // Hide empty fields. (Hopefully? Regex likely broken for some inputs. >.< Temporary hack.)
-        let re = regex::Regex::new(r" +[a-z][a-z0-9_]{4,}: (None|\{\}),\n?").unwrap();
-        let debug_str = re.replace_all(&debug_str, "");
+        write!(f, "psbt [")?;
+        fmt_field!(self, unsigned_tx, f, sep, is_first, "{}", self.unsigned_tx.pretty(inner_indent));
+        fmt_field!(self, version, f, sep, is_first);
+        fmt_map_field!(self, xpub, f, sep, is_first, inner_indent,
+            |f, (pk, src), _| write!(f, "[{}/{}]{}", src.0, src.1, pk));
+        fmt_map_field!(self, proprietary, f, sep, is_first, inner_indent);
+        fmt_map_field!(self, unknown, f, sep, is_first, inner_indent);
 
-        write!(f, "{}", debug_str)
+        write!(f, ",{sep}\"inputs\": ")?;
+        util::fmt_list(f, &mut self.inputs.iter(), inner_indent,
+            |f, input, in_indent| write!(f, "{}", input.pretty(in_indent)))?;
+
+        write!(f, ",{sep}\"outputs\": ")?;
+        util::fmt_list(f, &mut self.outputs.iter(), inner_indent,
+            |f, output, out_indent| write!(f, "{}", output.pretty(out_indent)))?;
+
+        write!(f, "{newline_or_space}{:indent_w$}]", "")
     }
 }
+
+impl PrettyDisplay for psbt::Input {
+    const AUTOFMT_ENABLED: bool = true;
+
+    #[rustfmt::skip]
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
+            util::indentation_params(indent);
+        let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
+        let mut is_first = true;
+
+        write!(f, "[")?;
+        fmt_opt_field!(self, non_witness_utxo, f, sep, is_first, "{}", non_witness_utxo.pretty(None));
+        fmt_opt_field!(self, witness_utxo, f, sep, is_first, "{}", witness_utxo.pretty(None));
+
+        fmt_map_field!(self, partial_sigs, f, sep, is_first, inner_indent,
+            |f, (pk, sig), _| write!(f, "{}: 0x{}", pk, sig));
+        fmt_opt_field!(self, sighash_type, f, sep, is_first);
+        fmt_opt_field!(self, redeem_script, f, sep, is_first, "{}", redeem_script.pretty(inner_indent));
+        fmt_opt_field!(self, witness_script, f, sep, is_first, "{}", witness_script.pretty(inner_indent));
+        fmt_map_field!(self, bip32_derivation, f, sep, is_first, inner_indent,
+            |f, (pk, src), _| write!(f, "[{}/{}]{}", src.0, src.1, pk));
+
+        fmt_opt_field!(self, final_script_sig, f, sep, is_first, "{}", final_script_sig.pretty(None));
+        fmt_opt_field!(self, final_script_witness, f, sep, is_first, "{}", final_script_witness.pretty(None));
+
+        fmt_map_field!(self, ripemd160_preimages, f, sep, is_first, inner_indent,
+            |f, (h, p), _| write!(f, "0x{}: 0x{}", h, p.as_hex()));
+        fmt_map_field!(self, sha256_preimages, f, sep, is_first, inner_indent,
+            |f, (h, p), _| write!(f, "0x{}: 0x{}", h, p.as_hex()));
+        fmt_map_field!(self, hash160_preimages, f, sep, is_first, inner_indent,
+            |f, (h, p), _| write!(f, "0x{}: 0x{}", h, p.as_hex()));
+        fmt_map_field!(self, hash256_preimages, f, sep, is_first, inner_indent,
+            |f, (h, p), _| write!(f, "0x{}: 0x{}", h, p.as_hex()));
+
+        fmt_opt_field!(self, tap_key_sig, f, sep, is_first, "0x{}", tap_key_sig.to_vec().as_hex());
+        fmt_map_field!(self, tap_script_sigs, f, sep, is_first, inner_indent,
+            |f, ((pk, leaf_hash), sig), _| write!(f, "[{}, {}]: 0x{}", pk, leaf_hash, sig.to_vec().as_hex()));
+        fmt_map_field!(self, tap_scripts, f, sep, is_first, inner_indent, // TODO leaf version not encoded
+            |f, (ctrl, (script, _ver)), _| write!(f, "0x{}: {}", ctrl.serialize().as_hex(), script.pretty(None)));
+        fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent,
+            |f, (pk, (hashes, src)), _| write!(f, "[{}/{}]{}: {}", src.0, src.1, pk, hashes.pretty(None)));
+        fmt_opt_field!(self, tap_internal_key, f, sep, is_first);
+        fmt_opt_field!(self, tap_merkle_root, f, sep, is_first);
+
+        fmt_map_field!(self, proprietary, f, sep, is_first, inner_indent);
+        fmt_map_field!(self, unknown, f, sep, is_first, inner_indent);
+
+        write!(f, "{newline_or_space}{:indent_w$}]", "")
+    }
+}
+
+impl PrettyDisplay for psbt::Output {
+    const AUTOFMT_ENABLED: bool = true;
+
+    #[rustfmt::skip]
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
+            util::indentation_params(indent);
+        let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
+        let mut is_first = true;
+
+        write!(f, "[")?;
+        fmt_opt_field!(self, redeem_script, f, sep, is_first, "{}", redeem_script.pretty(inner_indent));
+        fmt_opt_field!(self, witness_script, f, sep, is_first, "{}", witness_script.pretty(inner_indent));
+        fmt_map_field!(self, bip32_derivation, f, sep, is_first, inner_indent,
+            |f, (pk, src), _| write!(f, "[{}/{}]{}", src.0, src.1, pk));
+        fmt_opt_field!(self, tap_internal_key, f, sep, is_first);
+        fmt_opt_field!(self, tap_tree, f, sep, is_first, "{}", tap_tree.pretty(inner_indent));
+        fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent,
+            |f, (pk, (hashes, src)), _| write!(f, "[{}/{}]{}: {}", src.0, src.1, pk, hashes.pretty(None)));
+        fmt_map_field!(self, proprietary, f, sep, is_first, inner_indent);
+        fmt_map_field!(self, unknown, f, sep, is_first, inner_indent);
+        write!(f, "{newline_or_space}{:indent_w$}]", "")
+    }
+}
+
+impl_simple_pretty!(raw::Key, k, "[{}, 0x{}]", k.type_value, k.key.as_hex());
+impl_simple_pretty!(
+    raw::ProprietaryKey,
+    k,
+    "[0x{}, {}, 0x{}]",
+    k.prefix.as_hex(),
+    k.subtype,
+    k.key.as_hex()
+);

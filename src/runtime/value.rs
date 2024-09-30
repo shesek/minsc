@@ -417,7 +417,7 @@ impl fmt::Display for Value {
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
-            Value::Psbt(x) => write!(f, "{}", x.pretty(None)), // uses Debug, not round-trip-able (ExprRepr is)
+            Value::Psbt(x) => write!(f, "{}", x.pretty(None)),
             Value::SecKey(x) => write!(f, "{}", x.pretty(None)),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
@@ -479,10 +479,8 @@ impl ExprRepr for Value {
             // These also have round-trip-able Display, but can be expressed more compactly/precisely for ExprRepr
             Transaction(tx) => write!(f, "tx(0x{})", bitcoin::consensus::serialize(tx).as_hex()),
             Script(script) => write!(f, "script(0x{})", script.as_bytes().as_hex()),
-            TapInfo(tapinfo) => tapinfo.repr_fmt(f),
-
-            // Psbt's Display uses the Debug representation which is not round-trip-able (but better to serialize as bytes anyway)
             Psbt(psbt) => write!(f, "psbt(0x{})", psbt.serialize().as_hex()),
+            TapInfo(tapinfo) => tapinfo.repr_fmt(f),
 
             // Descriptors require special handling when they have script paths (i.e. not (W)Pkh or script-less Tr)
             Descriptor(desc) => desc.repr_fmt(f),
