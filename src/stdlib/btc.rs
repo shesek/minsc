@@ -663,7 +663,9 @@ impl PrettyDisplay for Opcode {
             (ops::OP_RETURN_216, _) => write!(f, "OP_SUB64"),
             (ops::OP_RETURN_228, _) => write!(f, "OP_TWEAKVERIFY"),
             (ops::OP_RETURN_214, _) => write!(f, "OP_TXWEIGHT"),
-            (opcode, _) => write!(f, "{:}", opcode),
+            // use full 'OP_CHECKSEQUENCEVERIFY' rather than 'OP_CSV' so that its recognized by scriptwiz
+            (ops::OP_CSV, _) => write!(f, "OP_CHECKSEQUENCEVERIFY"),
+            (opcode, _) => write!(f, "{}", opcode),
         }
     }
 }
