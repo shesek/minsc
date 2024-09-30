@@ -416,7 +416,11 @@ impl TryFrom<Value> for bitcoin::taproot::Signature {
 impl TryFrom<Value> for bitcoin::taproot::LeafVersion {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        Ok(Self::from_consensus(val.into_u8()?)?)
+        Ok(match val {
+            Value::Number(num) => Self::from_consensus(num.into_i64()?.try_into()?)?,
+            Value::Bytes(bytes) if bytes.len() == 1 => Self::from_consensus(bytes[0])?,
+            other => bail!(Error::InvalidValue(other.into())),
+        })
     }
 }
 impl TryFrom<Value> for bitcoin::taproot::ControlBlock {
@@ -536,6 +540,7 @@ impl<'a> ExprRepr for NodeTree<'a> {
     fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result {
         match self {
             NodeTree::Leaf((script, _)) => {
+                // TODO leaf version not encoded
                 write!(f, "script(0x{})", script.as_bytes().as_hex())
             }
             NodeTree::Branch(first, second) => {
@@ -558,6 +563,7 @@ impl<'a> PrettyDisplay for NodeTree<'a> {
             util::indentation_params(indent);
         match self {
             NodeTree::Leaf((script, _)) => {
+                // TODO leaf version not encoded
                 write!(f, "{}", script.pretty(inner_indent))
             }
             NodeTree::Branch(first, second) => {
