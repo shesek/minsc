@@ -573,7 +573,7 @@ impl PrettyDisplay for Transaction {
                         write!(f, r#", "sequence": {}"#, input.sequence)?;
                     }
                     if input.script_sig != ScriptBuf::default() {
-                        write!(f, r#", "script_sig": {}"#, &input.script_sig.pretty(None))?;
+                        write!(f, r#", "script_sig": {}"#, input.script_sig.pretty(None))?;
                     }
                     if !input.witness.is_empty() {
                         write!(f, r#", "witness": {}"#, input.witness.pretty(None))?;
@@ -584,29 +584,30 @@ impl PrettyDisplay for Transaction {
         }
         if !self.output.is_empty() {
             write!(f, r#",{field_sep}"outputs": "#)?;
-            fmt_list(
-                f,
-                self.output.iter(),
-                inner_indent,
-                |f, output, _inner_indent| {
-                    // Individual outputs are always displayed as one-liners
-                    if let Ok(address) =
-                        Address::from_script(&output.script_pubkey, Network::Testnet)
-                    {
-                        // XXX always uses the Testnet version bytes
-                        write!(f, "{}", address)?;
-                    } else {
-                        write!(f, "{}", output.script_pubkey.pretty(None))?;
-                    }
-                    write!(f, r#": {} BTC"#, output.value.to_btc())
-                },
-            )?;
+            fmt_list(f, self.output.iter(), inner_indent, |f, output, _| {
+                // Individual outputs are always displayed as one-liners
+                write!(f, "{}", output.pretty(None))
+            })?;
         }
         write!(f, "{newline_or_space}{:indent_w$}]", "")
     }
 
     fn prefer_multiline_anyway(&self) -> bool {
         (self.input.len() + self.output.len()) > 2
+    }
+}
+
+impl PrettyDisplay for bitcoin::TxOut {
+    const AUTOFMT_ENABLED: bool = false;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        if let Ok(address) = Address::from_script(&self.script_pubkey, Network::Testnet) {
+            // XXX always uses the Testnet version bytes
+            write!(f, "{}", address)?;
+        } else {
+            write!(f, "{}", self.script_pubkey.pretty(None))?;
+        }
+        write!(f, ":{} BTC", self.value.to_btc())
     }
 }
 

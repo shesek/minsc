@@ -576,3 +576,21 @@ impl<'a> PrettyDisplay for NodeTree<'a> {
         }
     }
 }
+
+impl PrettyDisplay for bitcoin::taproot::TapTree {
+    const AUTOFMT_ENABLED: bool = false; // Enabled for the rendered NodeTree
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        // Construct a TaprootSpendInfo with a dummy key so that it may be used for reconstruct_tree()
+        // TODO reconstructing the tree without going through TaprootSpendInfo is possible and more efficient.
+        lazy_static! {
+            static ref DUMMY_KEY: XOnlyPublicKey =
+                "50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+                    .parse()
+                    .unwrap();
+        }
+        let tapinfo = TaprootSpendInfo::from_node_info(&EC, *DUMMY_KEY, self.node_info().clone());
+        let tree = reconstruct_tree(&tapinfo).expect("invalid TapTree");
+        write!(f, "{}", tree.pretty(indent))
+    }
+}

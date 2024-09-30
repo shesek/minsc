@@ -69,3 +69,75 @@ macro_rules! iif {
         }
     };
 }
+
+// Helper macros for PrettyDisplay field formatting
+
+macro_rules! fmt_field {
+    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident, $($arg:tt)*) => {
+        if $is_first {
+            $is_first = false;
+        } else {
+            write!($f, ",")?;
+        }
+        write!($f, "{}\"{}\": ", $sep, stringify!($field))?;
+        write!($f, $($arg)*)?;
+    };
+    // Format using the field's Display by default
+    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident) => {
+        fmt_field!($self, $field, $f, $sep, $is_first, "{}", $self.$field)
+    };
+}
+
+macro_rules! fmt_opt_field {
+    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident, $($arg:tt)*) => {
+        if let Some($field) = &$self.$field {
+            if $is_first {
+                $is_first = false;
+            } else {
+                write!($f, ",")?;
+            }
+            write!($f, "{}\"{}\": ", $sep, stringify!($field))?;
+            write!($f, $($arg)*)?;
+        }
+    };
+    // Format using the field's Display by default
+    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident) => {
+        fmt_opt_field!($self, $field, $f, $sep, $is_first, "{}", $field)
+    };
+}
+
+#[rustfmt::skip]
+macro_rules! fmt_map_field {
+    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident, $inner_indent:expr, $el_fn:expr) => {
+        if !$self.$field.is_empty() {
+            #[allow(unused_assignments)]
+            if $is_first {
+                $is_first = false;
+            } else {
+                write!($f, ",")?;
+            }
+            write!($f, "{}\"{}\": ", $sep, stringify!($field))?;
+            util::fmt_list($f, &mut $self.$field.iter(), $inner_indent, $el_fn)?;
+        }
+    };
+    // Format using the key/value's PrettyDisplay by default
+    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident, $inner_indent:expr) => {
+        fmt_map_field!(
+            $self, $field, $f, $sep, $is_first, $inner_indent,
+            |f, (k, v), el_indent| write!(f, "{}: {}", k.pretty(el_indent), v.pretty(el_indent))
+        );
+    };
+}
+
+macro_rules! impl_simple_pretty {
+    ($target:ty, $var:tt, $($arg:tt)*) => {
+        impl PrettyDisplay for $target {
+            const AUTOFMT_ENABLED: bool = false;
+
+            fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+                let $var = self; // to make it available in the calling context
+                write!(f, $($arg)*)
+            }
+        }
+    };
+}

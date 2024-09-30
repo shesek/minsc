@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 
 use bitcoin::bip32::{ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
+use bitcoin::hex::DisplayHex;
 use bitcoin::{secp256k1, PublicKey};
 use miniscript::descriptor::{
     DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
@@ -553,6 +554,17 @@ where
     }
     write!(w, "{newline_or_space}{:indent_w$}]", "")
 }
+
+impl<T: PrettyDisplay> PrettyDisplay for Vec<T> {
+    const AUTOFMT_ENABLED: bool = true;
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        fmt_list(f, self.iter(), indent, |f, el, inner_indent| {
+            write!(f, "{}", el.pretty(inner_indent))
+        })
+    }
+}
+
+impl_simple_pretty!(Vec<u8>, bytes, "0x{}", bytes.as_hex());
 
 pub fn indentation_params(indent: Option<usize>) -> (&'static str, Option<usize>, usize, usize) {
     let newline_or_space = iif!(indent.is_some(), "\n", " ");
