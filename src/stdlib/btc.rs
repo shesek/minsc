@@ -565,26 +565,8 @@ impl PrettyDisplay for Transaction {
         }
         if !self.input.is_empty() {
             write!(f, r#",{field_sep}"inputs": "#)?;
-            fmt_list(f, &mut self.input.iter(), inner_indent, |f, input, _| {
-                // Individual inputs are always displayed as one-liners
-                if input.sequence == Sequence::default()
-                    && input.script_sig == ScriptBuf::default()
-                    && input.witness.is_empty()
-                {
-                    write!(f, "{}", input.previous_output)
-                } else {
-                    write!(f, r#"[ "prevout": {}"#, input.previous_output)?;
-                    if input.sequence != Sequence::default() {
-                        write!(f, r#", "sequence": {}"#, input.sequence.pretty(None))?;
-                    }
-                    if input.script_sig != ScriptBuf::default() {
-                        write!(f, r#", "script_sig": {}"#, input.script_sig.pretty(None))?;
-                    }
-                    if !input.witness.is_empty() {
-                        write!(f, r#", "witness": {}"#, input.witness.pretty(None))?;
-                    }
-                    write!(f, r#" ]"#)
-                }
+            fmt_list(f, &mut self.input.iter(), inner_indent, |f, input, ind| {
+                write!(f, "{}", input.pretty(ind))
             })?;
         }
         if !self.output.is_empty() {
@@ -599,6 +581,39 @@ impl PrettyDisplay for Transaction {
 
     fn prefer_multiline_anyway(&self) -> bool {
         (self.input.len() + self.output.len()) > 2
+    }
+}
+
+impl PrettyDisplay for bitcoin::TxIn {
+    const AUTOFMT_ENABLED: bool = true;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        if self.sequence == Sequence::default()
+            && self.script_sig == ScriptBuf::default()
+            && self.witness.is_empty()
+        {
+            write!(f, "{}", self.previous_output)
+        } else {
+            let (newline_or_space, _inner_indent, indent_w, inner_indent_w) =
+                util::indentation_params(indent);
+            let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
+
+            write!(f, "[{sep}\"prevout\": {}", self.previous_output)?;
+            if self.sequence != Sequence::default() {
+                write!(f, ",{sep}\"sequence\": {}", self.sequence.pretty(None))?;
+            }
+            if !self.script_sig.is_empty() {
+                write!(f, ",{sep}\"script_sig\": {}", self.script_sig.pretty(None))?;
+            }
+            if !self.witness.is_empty() {
+                write!(f, ",{sep}\"witness\": {}", self.witness.pretty(None))?;
+            }
+            write!(f, "{newline_or_space}{:indent_w$}]", "")
+        }
+    }
+
+    fn prefer_multiline_anyway(&self) -> bool {
+        !self.witness.is_empty() || !self.script_sig.is_empty()
     }
 }
 
