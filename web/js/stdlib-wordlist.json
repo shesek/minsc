@@ -1,32 +1,45 @@
 {
   "vars": [
-    "ADD64_VERIFY",
     "BLOCK_INTERVAL",
-    "DIV64FLOOR_VERIFY",
-    "DIV64_VERIFY",
     "DUST_AMOUNT",
-    "DUST_NON_SW",
-    "ENCODE_COMPACT_SIZE",
-    "ENCODE_PUSH_OP",
-    "GTE64_VERIFY",
-    "GT_VERIFY",
-    "HASH_TAPLEAF",
-    "HASH_TAPTWEAK",
-    "INPUT_ASSET",
-    "INPUT_ASSET_EQ_VERIFY",
-    "INPUT_SPK_EQ_VERIFY",
-    "INPUT_VALUE",
-    "INPUT_VALUE_EQ_VERIFY",
+    "DUST_PRE_SW",
+    "DUST_TR",
+    "DUST_WPKH",
+    "DUST_WSH",
+    "ENABLE_RBF",
     "LBTC",
-    "LT64_VERIFY",
-    "LTE64_VERIFY",
     "MARK_CTX",
     "MARK_SCRIPT",
-    "MAX_NUMBER",
-    "MIN_NUMBER",
-    "MUL_64_VERIFY",
-    "NEG64_VERIFY",
+    "MAX_INTEGER",
+    "MIN_INTEGER",
     "NUMS",
+    "OP::ADD64_VERIFY",
+    "OP::DIV64FLOOR_VERIFY",
+    "OP::DIV64_VERIFY",
+    "OP::ENCODE_COMPACT_SIZE",
+    "OP::ENCODE_PUSH_OP",
+    "OP::GT64_VERIFY",
+    "OP::GTE64_VERIFY",
+    "OP::HASH_TAPLEAF",
+    "OP::HASH_TAPTWEAK",
+    "OP::INPUT_ASSET",
+    "OP::INPUT_ASSET_EQ_VERIFY",
+    "OP::INPUT_SPK_EQ_VERIFY",
+    "OP::INPUT_VALUE",
+    "OP::INPUT_VALUE_EQ_VERIFY",
+    "OP::LT64_VERIFY",
+    "OP::LTE64_VERIFY",
+    "OP::MAX64",
+    "OP::MIN64",
+    "OP::MUL64_VERIFY",
+    "OP::NEG64_VERIFY",
+    "OP::OUTPUT_ASSET",
+    "OP::OUTPUT_ASSET_EQ_VERIFY",
+    "OP::OUTPUT_SPK_EQ_VERIFY",
+    "OP::OUTPUT_VALUE",
+    "OP::OUTPUT_VALUE_EQ_VERIFY",
+    "OP::REQUIRE_RBF",
+    "OP::SUB64_VERIFY",
     "OP_0NOTEQUAL",
     "OP_1ADD",
     "OP_1SUB",
@@ -153,14 +166,14 @@
     "OP_VERNOTIF",
     "OP_WITHIN",
     "OP_XOR",
-    "OUTPUT_ASSET",
-    "OUTPUT_ASSET_EQ_VERIFY",
-    "OUTPUT_SPK_EQ_VERIFY",
-    "OUTPUT_VALUE",
-    "OUTPUT_VALUE_EQ_VERIFY",
-    "REQUIRE_RBF",
     "SCRIPT_MARKER_MAGIC",
-    "SUB64_VERIFY",
+    "SIGHASH_ALL",
+    "SIGHASH_ALL_ANYONECANPAY",
+    "SIGHASH_DEFAULT",
+    "SIGHASH_NONE",
+    "SIGHASH_NONE_ANYONECANPAY",
+    "SIGHASH_SINGLE",
+    "SIGHASH_SINGLE_ANYONECANPAY",
     "TAPLEAF_TAG",
     "TAPSCRIPT_VERSION",
     "TAPTWEAK_TAG",
@@ -178,22 +191,6 @@
     "true"
   ],
   "funcs": [
-    [
-      "PubKey",
-      "[native]"
-    ],
-    [
-      "SecKey",
-      "[native]"
-    ],
-    [
-      "Symbol",
-      "[native]"
-    ],
-    [
-      "Transaction",
-      "[native]"
-    ],
     [
       "address",
       "[native]"
@@ -264,6 +261,10 @@
     ],
     [
       "debug",
+      "[native]"
+    ],
+    [
+      "descriptor",
       "[native]"
     ],
     [
@@ -483,6 +484,14 @@
       "[native]"
     ],
     [
+      "pretty",
+      "[native]"
+    ],
+    [
+      "print",
+      "[native]"
+    ],
+    [
       "prob",
       "$n, $val"
     ],
@@ -500,6 +509,10 @@
     ],
     [
       "psbt::extract",
+      "[native]"
+    ],
+    [
+      "psbt::extract_non_ms",
       "[native]"
     ],
     [
@@ -531,6 +544,10 @@
       "[native]"
     ],
     [
+      "psbt::unsigned_tx",
+      "[native]"
+    ],
+    [
       "psbt::update",
       "[native]"
     ],
@@ -557,6 +574,14 @@
     [
       "reduce",
       "$arr, $fn"
+    ],
+    [
+      "repeat",
+      "[native]"
+    ],
+    [
+      "repr",
+      "[native]"
     ],
     [
       "ripemd160",
@@ -627,6 +652,10 @@
       "$arr, $fn"
     ],
     [
+      "sortedmulti",
+      "[native]"
+    ],
+    [
       "str",
       "[native]"
     ],
@@ -637,6 +666,10 @@
     [
       "switch",
       "$clauses"
+    ],
+    [
+      "symbol",
+      "[native]"
     ],
     [
       "t",
@@ -688,10 +721,6 @@
     ],
     [
       "tr::tapLeaf",
-      "[native]"
-    ],
-    [
-      "transaction",
       "[native]"
     ],
     [
