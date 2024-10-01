@@ -1,6 +1,6 @@
 import CodeMirror from "codemirror"
 
-const WORD = /[\w$:]+/, RANGE = 500
+const WORD = /[a-zA-Z0-9_$:]+/, RANGE = 500
 
 // Combines results from a pre-defined wordlist and using words in the document (anyhint)
 CodeMirror.registerHelper("hint", "multihint", (cm, options) => {

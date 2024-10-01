@@ -197,7 +197,7 @@ const editor = CodeMirror(document.querySelector('#editor'), {
   hintOptions: {
     hint: CodeMirror.hint.multihint,
     wordlist: stdlib_wordlist,
-    word: /[\w$:]+/,
+    word: /[a-zA-Z0-9_$:]+/,
     closeCharacters: /[\s()\[\]{};>,]/,
     minAnyhintLen: 3,
   },
