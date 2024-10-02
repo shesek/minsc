@@ -42,6 +42,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("symbol", fns::symbol).unwrap();
 
         scope.set_fn("le64", fns::le64).unwrap();
+        scope.set_fn("hex", fns::hex).unwrap();
+        scope.set_fn("base64", fns::base64).unwrap();
 
         // Logging & Exceptions
         // These are the only functions in Minsc that produce side-effects.
@@ -195,8 +197,7 @@ pub mod fns {
     }
 
     /// Convert the argument into Bytes
-    /// Scripts are serialized, Strings are converted to Bytes, Bytes are returned as-is
-    /// bytes(Script|Bytes|String) -> Bytes
+    /// bytes(Transaction|Psbt|Script|PubKey|SecKey|String|Bytes) -> Bytes
     pub fn bytes(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::Bytes(args.arg_into()?))
     }
@@ -236,6 +237,20 @@ pub mod fns {
     /// Similar to str(), except for using multi-line and that strings are quoted/escaped.
     pub fn pretty(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(args.arg_into::<Value>()?.multiline_str().into())
+    }
+
+    /// hex(Bytes|Transaction|Psbt|Script|PubKey|SecKey|String) -> String
+    pub fn hex(args: Array, _: &ScopeRef) -> Result<Value> {
+        use bitcoin::hex::DisplayHex;
+        let bytes = args.arg_into::<Vec<u8>>()?;
+        Ok(format!("{}", bytes.as_hex()).into())
+    }
+
+    /// base64(Bytes|Transaction|Psbt|Script|PubKey|SecKey|String) -> String
+    pub fn base64(args: Array, _: &ScopeRef) -> Result<Value> {
+        use base64::prelude::{BASE64_STANDARD, Engine};
+        let bytes = args.arg_into::<Vec<u8>>()?;
+        Ok(BASE64_STANDARD.encode(bytes).into())
     }
 
     /// Get env vars from the local and parent scopes
