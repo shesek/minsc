@@ -212,15 +212,13 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         // Can be provided as an explicit binary tree array structure ([ A, [ [ B, C ], [ D, E ] ] ]), or as a flat array
         // of Scripts/Policies to automatically construct a tree. Policies are merged together with OR and compiled into a
         // tree using rust-miniscript. Scripts can have probability weights associated with them to construct a huffman tree.
-        (Value::PubKey(pk), Some(Value::Array(nodes))) => {
-            tr_from_array(Some(pk), None, nodes.0)?.into()
-        }
+        (Value::PubKey(pk), Some(Value::Array(nodes))) => tr_from_array(Some(pk), None, nodes.0)?,
 
         // tr(Array<Policy>) -> Descriptor
         // Create a Taproot descriptor for the given Policies, extracting the internal key or using TR_UNSPENDABLE
         // tr(Array<Script>) -> TaprootSpendInfo
         // Create a TaprootSpendInfo for the given Scripts, using TR_UNSPEDABLE as the internal key
-        (Value::Array(nodes), None) => tr_from_array(None, tr_unspendable(scope)?, nodes.0)?.into(),
+        (Value::Array(nodes), None) => tr_from_array(None, tr_unspendable(scope)?, nodes.0)?,
 
         _ => bail!(Error::TaprootInvalidTrUse),
     })
@@ -249,7 +247,7 @@ fn tr_from_array(
         Policy,
     }
 
-    Ok(if nodes.len() == 0 {
+    Ok(if nodes.is_empty() {
         // Key-path only
         Descriptor::new_tr(internal_key.ok_or(Error::TaprootNoViableKey)?, None)?.into()
     } else {
@@ -382,7 +380,7 @@ impl TryFrom<Value> for descriptor::TapTree<DescriptorPublicKey> {
 fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
     // Must exists in scope because its set in the stdlib
     Ok(match scope.builtin("TR_UNSPENDABLE") {
-        Value::Bool(val) if val == false => None,
+        Value::Bool(false) => None,
         Value::PubKey(val) => Some(val),
         other => bail!(Error::InvalidTrUnspendable(other.into())),
     })
@@ -494,7 +492,7 @@ enum NodeTree<'a> {
 
 // Reconstruct the Taproot tree structure from a TaprootSpendInfo using the merkle proofs associated with its scripts.
 // Returns None if there are no script paths, or if any of the merkle proofs are invalid (don't connect to the root).
-fn reconstruct_tree<'a>(tapinfo: &'a TaprootSpendInfo) -> Option<NodeTree<'a>> {
+fn reconstruct_tree(tapinfo: &TaprootSpendInfo) -> Option<NodeTree<'_>> {
     let root_hash = tapinfo.merkle_root()?;
 
     // First, build a map of all known nodes indexed by their hash using an intermediate Node structure

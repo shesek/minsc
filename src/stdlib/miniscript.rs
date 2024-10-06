@@ -72,8 +72,8 @@ lazy_static! {
 
 impl Evaluate for ast::Thresh {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        let thresh_n = self.thresh.eval(&scope)?.into_usize()?;
-        let policies = into_policies(self.policies.eval(&scope)?.into_vec()?)?;
+        let thresh_n = self.thresh.eval(scope)?.into_usize()?;
+        let policies = into_policies(self.policies.eval(scope)?.into_vec()?)?;
         Ok(Policy::Thresh(Threshold::new(thresh_n, policies)?).into())
     }
 }

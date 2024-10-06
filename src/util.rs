@@ -121,7 +121,7 @@ impl DeriveExt for DescriptorPublicKey {
 
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
         let paths = paths
-            .into_iter()
+            .iter()
             .map(|p| Ok(p.clone().into_derivation_path()?))
             .collect::<Result<Vec<_>>>()?;
 
@@ -129,7 +129,7 @@ impl DeriveExt for DescriptorPublicKey {
 
         let derived_paths = parent_paths
             .into_iter()
-            .flat_map(|parent_path| paths.iter().map(move |path| parent_path.extend(&path)))
+            .flat_map(|parent_path| paths.iter().map(move |path| parent_path.extend(path)))
             .collect::<Vec<_>>();
 
         let (origin, xkey) = match self {
@@ -138,8 +138,8 @@ impl DeriveExt for DescriptorPublicKey {
             DescriptorPublicKey::Single(_) => bail!(Error::NonDeriveableSingle),
         };
         Ok(DescriptorPublicKey::MultiXPub(DescriptorMultiXKey {
-            origin: origin,
-            xkey: xkey,
+            origin,
+            xkey,
             derivation_paths: DerivPaths::new(derived_paths).expect("cannot be empty"),
             wildcard,
         }))
@@ -178,7 +178,7 @@ impl DeriveExt for DescriptorSecretKey {
 
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
         let paths = paths
-            .into_iter()
+            .iter()
             .map(|p| Ok(p.clone().into_derivation_path()?))
             .collect::<Result<Vec<DerivationPath>>>()?;
 
@@ -186,7 +186,7 @@ impl DeriveExt for DescriptorSecretKey {
 
         let derived_paths = parent_paths
             .into_iter()
-            .flat_map(|parent_path| paths.iter().map(move |path| parent_path.extend(&path)))
+            .flat_map(|parent_path| paths.iter().map(move |path| parent_path.extend(path)))
             .collect::<Vec<_>>();
 
         let (origin, xkey) = match self {
@@ -195,8 +195,8 @@ impl DeriveExt for DescriptorSecretKey {
             DescriptorSecretKey::Single(_) => bail!(Error::NonDeriveableSingle),
         };
         Ok(DescriptorSecretKey::MultiXPrv(DescriptorMultiXKey {
-            origin: origin,
-            xkey: xkey,
+            origin,
+            xkey,
             derivation_paths: DerivPaths::new(derived_paths).expect("cannot be empty"),
             wildcard,
         }))
@@ -215,13 +215,13 @@ impl DeriveExt for crate::PolicyDpk {
         ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         let path = path.into_derivation_path()?;
         self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-            Ok(pk.clone().maybe_derive_path(path.clone(), wildcard)?)
+            pk.clone().maybe_derive_path(path.clone(), wildcard)
         }))
     }
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
         ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
         self.translate_pk(&mut FnTranslator::new(|pk: &DescriptorPublicKey| {
-            Ok(pk.clone().maybe_derive_multi(paths, wildcard)?)
+            pk.clone().maybe_derive_multi(paths, wildcard)
         }))
     }
     fn has_wildcards(&self) -> bool {
@@ -505,7 +505,7 @@ pub trait PrettyDisplay: Sized {
     /// Get back a Display-able struct with pretty-formatting
     fn pretty(&self, indent: Option<usize>) -> PrettyDisplayer<Self> {
         PrettyDisplayer {
-            inner: &self,
+            inner: self,
             indent,
         }
     }

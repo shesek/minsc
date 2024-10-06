@@ -2,7 +2,6 @@ use std::fmt;
 
 use crate::parser::{ast, Expr, Ident};
 use crate::runtime::{Array, Error, Evaluate, Result, ScopeRef, Value};
-use crate::stdlib::fns::throw as stdlib_throw;
 
 #[derive(Debug, Clone)]
 pub enum Function {
@@ -69,7 +68,7 @@ impl Call for UserFunction {
 impl Call for NativeFunction {
     fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
         (self.pt)(Array(args), caller_scope).map_err(|e| {
-            if self.pt == stdlib_throw {
+            if self.ident.as_ref().is_some_and(|ident| ident.0 == "throw") {
                 e // Don't include the `throw()` function in the CallError stack context.
             } else {
                 Error::CallError(self.ident.clone(), e.into())

@@ -41,7 +41,7 @@ pub mod fns {
         if tx.input.is_empty() {
             tx.input.push(TxIn::default());
         }
-        ensure!(tx.output.len() > 0, Error::InvalidArguments);
+        ensure!(!tx.output.is_empty(), Error::InvalidArguments);
 
         let hash = get_ctv_hash(&tx, input_index.unwrap_or(0));
         Ok(hash.into())

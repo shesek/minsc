@@ -51,7 +51,7 @@ impl Array {
     }
 
     pub fn is_tagged_with(&self, tag: &str) -> bool {
-        self.get(0).is_some_and(|el| match el {
+        self.first().is_some_and(|el| match el {
             Value::String(el_s) => el_s == tag,
             _ => false,
         })
@@ -233,7 +233,7 @@ impl PrettyDisplay for Array {
 }
 
 // Heuristic to decide whether to format 2-tuple arrays using the : colon syntax
-fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
+fn should_use_colon_syntax(elements: &[Value]) -> bool {
     use Value::*;
     if elements.len() == 2 {
         match (&elements[0], &elements[1]) {
@@ -258,7 +258,7 @@ fn should_use_colon_syntax(elements: &Vec<Value>) -> bool {
 }
 // Heuristic to pick whether space should be used for the colon separator
 // (no space for tuple values like $txid:$vout, with it for key-value-like structures)
-fn colon_separator(elements: &Vec<Value>) -> &str {
+fn colon_separator(elements: &[Value]) -> &str {
     use Value::*;
     // Assumes `elements` was already checked to be a 2-tuple
     match (&elements[0], &elements[1]) {

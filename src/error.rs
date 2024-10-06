@@ -266,10 +266,10 @@ pub enum RuntimeError {
     #[error("PSBT output #{0} does not exists")]
     PsbtOutputNotFound(usize),
 
-    #[error("PSBT finalization error(s): {}", .0.into_iter().map(ToString::to_string).collect::<Vec<_>>().join(" · "))]
+    #[error("PSBT finalization error(s): {}", .0.iter().map(ToString::to_string).collect::<Vec<_>>().join(" · "))]
     PsbtFinalize(Vec<miniscript::psbt::Error>),
 
-    #[error("PSBT signing error(s): {}", .0.into_iter().map(|(i, e)| format!("input #{}: {}", i, e)).collect::<Vec<_>>().join(" · "))]
+    #[error("PSBT signing error(s): {}", .0.iter().map(|(i, e)| format!("input #{}: {}", i, e)).collect::<Vec<_>>().join(" · "))]
     PsbtSigning(bitcoin::psbt::SigningErrors),
 
     #[error("Missing fields to construct PSBT transaction input (prevout is required)")]

@@ -248,7 +248,7 @@ pub mod fns {
 
     /// base64(Bytes|Transaction|Psbt|Script|PubKey|SecKey|String) -> String
     pub fn base64(args: Array, _: &ScopeRef) -> Result<Value> {
-        use base64::prelude::{BASE64_STANDARD, Engine};
+        use base64::prelude::{Engine, BASE64_STANDARD};
         let bytes = args.arg_into::<Vec<u8>>()?;
         Ok(BASE64_STANDARD.encode(bytes).into())
     }

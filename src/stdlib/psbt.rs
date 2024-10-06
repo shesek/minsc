@@ -177,7 +177,7 @@ pub mod fns {
 
     /// psbt::fee(Psbt) -> Int
     pub fn fee(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()?)
+        args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()
     }
 
     /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes
@@ -221,7 +221,7 @@ fn sign_psbt(psbt: &mut Psbt, keys_val: Value) -> Result<(SigningKeysMap, Signin
     let signing_result = match keys_val {
         Value::Array(keys) if !keys.is_empty() => {
             // Peek at the first array element to determine its format
-            match keys.get(0).expect("not empty") {
+            match keys.first().expect("not empty") {
                 // Keys provided as tagged array of [ $single_pk1:$single_sk1, $single_pk2:$single_sk2, ... ]
                 Value::Array(_) => {
                     psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(keys)?, &EC)
@@ -363,8 +363,8 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
 // Returned as a list of index:value tuples in both cases.
 fn mapped_or_all<T: FromValue>(arr: Value, expected_all_length: usize) -> Result<Vec<(usize, T)>> {
     let arr = arr.into_array()?;
-    if let Some(Value::Array(first_el)) = arr.get(0) {
-        if let Some(Value::Number(_)) = first_el.get(0) {
+    if let Some(Value::Array(first_el)) = arr.first() {
+        if let Some(Value::Number(_)) = first_el.first() {
             // Provided as [ 0: $val0, 1: $val1, ... ]
             return arr.try_into();
         }

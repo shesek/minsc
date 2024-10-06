@@ -115,7 +115,7 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
 
 pub fn repeat_script(script: ScriptBuf, times: usize) -> ScriptBuf {
     let bytes = script.into_bytes();
-    let bytes_n: Vec<u8> = (0..times).map(|_| bytes.clone()).flatten().collect();
+    let bytes_n: Vec<u8> = (0..times).flat_map(|_| bytes.clone()).collect();
     ScriptBuf::from(bytes_n)
 }
 
@@ -130,7 +130,7 @@ impl Evaluate for ast::Duration {
                 let block_interval = scope.borrow().builtin("BLOCK_INTERVAL").into_u32()?;
 
                 let time_parts = parts
-                    .into_iter()
+                    .iter()
                     .map(|(num, unit)| Ok((num.eval(scope)?.into_f64()?, *unit)))
                     .collect::<Result<Vec<_>>>()?;
 
@@ -428,16 +428,16 @@ pub fn fmt_script<W: fmt::Write>(
         ScriptFmt::Minsc(true) => {
             write!(f, "`")?;
             if indent.is_some() {
-                write!(f, "\n")?;
+                writeln!(f)?;
                 indent_w += INDENT;
             }
         }
         ScriptFmt::Minsc(false) => (),
         ScriptFmt::ScriptWiz => {
-            write!(f, "// ScriptWiz formatted\n")?;
+            writeln!(f, "// ScriptWiz formatted")?;
         }
         ScriptFmt::BitIde => {
-            write!(f, "// BitIDE formatted\n")?;
+            writeln!(f, "// BitIDE formatted")?;
         }
     }
 
@@ -449,7 +449,7 @@ pub fn fmt_script<W: fmt::Write>(
         if let (Ok(MarkerItem::Instruction(Instruction::Op(OP_ELSE | OP_ENDIF))), Some(_)) =
             (&item, indent)
         {
-            if_indent_w = if_indent_w.checked_sub(INDENT).unwrap_or(0);
+            if_indent_w = if_indent_w.saturating_sub(INDENT);
         }
         write!(f, "{:i$}", "", i = indent_w + if_indent_w)?;
 
@@ -461,7 +461,7 @@ pub fn fmt_script<W: fmt::Write>(
                     write!(f, "{}", opcode.pretty(None))?;
 
                     if let (OP_IF | OP_NOTIF | OP_ELSE, Some(_)) = (opcode, indent) {
-                        if_indent_w = if_indent_w + INDENT;
+                        if_indent_w += INDENT;
                     }
                 }
             },
@@ -504,7 +504,7 @@ pub fn fmt_script<W: fmt::Write>(
                     // Standard // comment format, ScriptWiz & BitIDE
                     (ScriptFmt::ScriptWiz | ScriptFmt::BitIde, "comment") => {
                         let newline_indent = format!("\n{:i$}// ", "", i = indent_w + if_indent_w);
-                        write!(f, "// {}", body.replace("\n", &newline_indent))?
+                        write!(f, "// {}", body.replace('\n', &newline_indent))?
                     }
                     (ScriptFmt::ScriptWiz | ScriptFmt::BitIde, kind) => {
                         write!(f, "// Mark {}: {}", quote(kind), quote(body))?
@@ -519,12 +519,12 @@ pub fn fmt_script<W: fmt::Write>(
                 if indent.is_none() && has_more {
                     write!(f, " ")?; // add space before the next item
                 } else if indent.is_some() && (has_more || backticks) {
-                    write!(f, "\n")?; // add newline before the next item or the closing backtick
+                    writeln!(f)?; // add newline before the next item or the closing backtick
                 }
             }
 
             // Always add newlines, these are never rendered as a single line
-            ScriptFmt::ScriptWiz | ScriptFmt::BitIde => write!(f, "\n")?,
+            ScriptFmt::ScriptWiz | ScriptFmt::BitIde => writeln!(f)?,
         }
     }
     if format == ScriptFmt::Minsc(true) {

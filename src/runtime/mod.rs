@@ -109,7 +109,7 @@ impl Evaluate for ast::Call {
                 // If the function originating the error is unnamed but the caller called it using an identifier,
                 // use the caller name for the CallError message. A name may not be available on the caller side
                 // either if the function was not accessed through a simple identifier, for example `([a].0)()`
-                Err(Error::CallError(Some(caller_ident.clone()), e.into()))
+                Err(Error::CallError(Some(caller_ident.clone()), e))
             }
             (other, _) => other,
         }
@@ -184,7 +184,7 @@ impl Evaluate for ast::Ident {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         scope
             .borrow()
-            .get(&self)
+            .get(self)
             .ok_or_else(|| Error::VarNotFound(self.clone()))
     }
 }
