@@ -10,6 +10,9 @@ use crate::{stdlib, Ident};
 pub struct Scope {
     parent: Option<ScopeRef<ReadOnly>>,
     local: HashMap<Ident, Value>,
+
+    // same keys as in `local`, in insertion order. used for env().
+    ordered_keys: Vec<Ident>,
 }
 
 impl Scope {
@@ -30,6 +33,7 @@ impl Scope {
             // cannot be set if already exists in this scope, but could shadow over a definition from a parent scope
             Err(Error::AssignedVariableExists(key))
         } else {
+            self.ordered_keys.push(key.clone());
             self.local.insert(key, value.into());
             Ok(())
         }
@@ -86,14 +90,11 @@ impl Scope {
     }
 
     fn local_env(&self, seen_keys: &mut HashSet<Ident>) -> Vec<(Ident, Value)> {
-        let mut new_vars = self
-            .local
+        self.ordered_keys
             .iter()
-            .filter(|(key, _)| seen_keys.insert((*key).clone()))
-            .map(|(key, val)| (key.clone(), val.clone()))
-            .collect::<Vec<_>>();
-        new_vars.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        new_vars
+            .filter(|key| !seen_keys.contains(key) && seen_keys.insert((*key).clone()))
+            .map(|key| (key.clone(), self.local.get(key).unwrap().clone()))
+            .collect()
     }
 }
 
@@ -162,7 +163,7 @@ impl<A: ScopeAccess> ScopeRef<A> {
     pub fn child(&self) -> Scope {
         Scope {
             parent: Some(self.make_ref()),
-            local: HashMap::new(),
+            ..Default::default()
         }
     }
 }
