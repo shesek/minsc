@@ -5,7 +5,7 @@ use miniscript::descriptor::{ShInner, WshInner};
 use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, Error, Evaluate, ExprRepr, Result, Value};
+use crate::runtime::{Array, Error, Evaluate, Execute, ExprRepr, Result, Value};
 use crate::util::{DescriptorExt, MiniscriptExt, EC};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
@@ -16,6 +16,8 @@ pub use crate::runtime::AndOr;
 // even when not used for Miniscript-related stuff.
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
+    MINISCRIPT_LIB.exec(scope).unwrap();
+
     let mut scope = scope.borrow_mut();
 
     // Miniscript Policy functions exposed in the Minsc runtime
@@ -54,6 +56,18 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
     // multi() and thresh() are basically the same; a thresh() policy between keys compiles into Miniscript as multi()
     scope.set_fn("multi", fns::thresh).unwrap();
+}
+
+lazy_static! {
+    static ref MINISCRIPT_LIB: crate::Library = r#"
+        fn any($policies) = 1 of $policies;
+        fn all($policies) = len($policies) of $policies;
+
+        // likely probability alias, for e.g. `likely@pk(A) || pk(B)`
+        likely = 10;
+    "#
+    .parse()
+    .unwrap();
 }
 
 impl Evaluate for ast::Thresh {

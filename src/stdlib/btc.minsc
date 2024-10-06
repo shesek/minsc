@@ -174,11 +174,3 @@ dyn fn mark::ctx($$context, $$fn) {
   MARK_CTX = MARK_CTX + $$context;
   $$fn()
 }
-
-//
-// Miniscript utilities
-//
-
-fn any($policies) = 1 of $policies;
-fn all($policies) = len($policies) of $policies;
-likely = 10; // likely probability alias, for e.g. `likely@pk(A) || pk(B)`
