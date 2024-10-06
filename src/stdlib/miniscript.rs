@@ -51,6 +51,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     // Policy to Script compilation
     scope.set_fn("tapscript", fns::tapscript).unwrap();
     scope.set_fn("segwitv0", fns::segwitv0).unwrap();
+
+    // multi() and thresh() are basically the same; a thresh() policy between keys compiles into Miniscript as multi()
+    scope.set_fn("multi", fns::thresh).unwrap();
 }
 
 impl Evaluate for ast::Thresh {
