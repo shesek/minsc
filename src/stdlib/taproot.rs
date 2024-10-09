@@ -12,7 +12,7 @@ use miniscript::descriptor::{self, DescriptorPublicKey};
 use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Error, Result, Value};
-use crate::util::{self, fmt_list, PrettyDisplay, EC};
+use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, EC};
 use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -148,7 +148,7 @@ impl TryFrom<Value> for TaprootSpendInfo {
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value {
             Value::TapInfo(tapinfo) => tapinfo,
-            Value::Descriptor(desc) => match desc.at_derivation_index(0)? {
+            Value::Descriptor(desc) => match desc.definite() {
                 miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
                 _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc).into())),
             },

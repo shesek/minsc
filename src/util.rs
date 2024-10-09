@@ -52,11 +52,12 @@ pub trait DescriptorExt {
     fn to_script_pubkey(&self) -> Result<bitcoin::ScriptBuf>;
     fn to_explicit_script(&self) -> Result<bitcoin::ScriptBuf>;
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address>;
+    fn definite(&self) -> miniscript::Descriptor<miniscript::DefiniteDescriptorKey>;
 }
 
 impl DescriptorExt for crate::DescriptorDpk {
     fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>> {
-        // XXX verify no wildcard?
+        // XXX check no wildcard?
         Ok(self.derived_descriptor(&EC, 0)?)
     }
     fn to_script_pubkey(&self) -> Result<bitcoin::ScriptBuf> {
@@ -68,7 +69,13 @@ impl DescriptorExt for crate::DescriptorDpk {
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address> {
         Ok(self.derive_keys()?.address(network)?)
     }
+    fn definite(&self) -> miniscript::Descriptor<miniscript::DefiniteDescriptorKey> {
+        // XXX check no wildcard?
+        self.at_derivation_index(0).expect("index is valid")
+    }
 }
+
+// BIP32 derivation utilities
 
 pub trait DeriveExt: Sized {
     /// Always derives when called directly on Xpubs/Xprivs, even if their wildcard modifier
