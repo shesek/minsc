@@ -7,7 +7,6 @@ use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{absolute::LockTime as AbsLockTime, relative::LockTime as RelLockTime};
 use bitcoin::{
     address, hex::DisplayHex, Address, Amount, Network, Opcode, Sequence, SignedAmount, Txid,
-    WitnessProgram, WitnessVersion,
 };
 use miniscript::psbt::PsbtExt;
 
@@ -15,7 +14,7 @@ use super::script_marker::{Marker, MarkerItem, ScriptMarker};
 use crate::runtime::{
     eval_exprs, Array, Error, Evaluate, Execute, Float, Int, Mutable, Result, ScopeRef, Value,
 };
-use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, EC};
+use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, TapInfoExt, EC};
 use crate::{ast, time, Library};
 
 lazy_static! {
@@ -231,10 +230,7 @@ impl Value {
             Value::Descriptor(descriptor) => descriptor.to_script_pubkey()?,
             Value::Address(address) => address.script_pubkey(),
             // TapInfo returns the V1 witness program of the output key
-            Value::TapInfo(tapinfo) => ScriptBuf::new_witness_program(&WitnessProgram::new(
-                WitnessVersion::V1,
-                &tapinfo.output_key().serialize(),
-            )?),
+            Value::TapInfo(tapinfo) => tapinfo.script_pubkey(),
             other => bail!(Error::NoSpkRepr(other.into())),
         })
     }

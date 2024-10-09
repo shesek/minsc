@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use bitcoin::bip32::{ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::hex::DisplayHex;
-use bitcoin::{secp256k1, PublicKey};
+use bitcoin::{secp256k1, taproot, PublicKey};
 use miniscript::descriptor::{
     DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
 };
@@ -15,6 +15,22 @@ use crate::runtime::{Array, Error, Result, Value};
 lazy_static! {
     pub static ref EC: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
 }
+
+// Taproot utilities
+
+pub trait TapInfoExt {
+    fn witness_program(&self) -> bitcoin::WitnessProgram;
+    fn script_pubkey(&self) -> bitcoin::ScriptBuf {
+        bitcoin::ScriptBuf::new_witness_program(&self.witness_program())
+    }
+}
+impl TapInfoExt for taproot::TaprootSpendInfo {
+    fn witness_program(&self) -> bitcoin::WitnessProgram {
+        bitcoin::WitnessProgram::p2tr_tweaked(self.output_key())
+    }
+}
+
+// Miniscript utilities
 
 pub trait MiniscriptExt<T: miniscript::ScriptContext> {
     fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, T>>;

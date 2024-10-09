@@ -11,7 +11,7 @@ use miniscript::DescriptorPublicKey;
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
-use crate::util::{self, PrettyDisplay, EC};
+use crate::util::{self, DescriptorExt, PrettyDisplay, TapInfoExt, EC};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
