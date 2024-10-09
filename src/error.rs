@@ -254,11 +254,8 @@ pub enum RuntimeError {
     #[error("Expected sighash type as byte, number or string, not {}", ValErrFmt(.0))]
     PsbtInvalidSighashType(Box<Value>),
 
-    #[error("PSBT tagged array construction must begin with the \"tx\"/\"unsigned_tx\" field")]
-    PsbtFirstTagNotTx,
-
-    #[error("Invalid PSBT source tx: {0}")]
-    PsbtInvalidTx(#[source] Box<RuntimeError>),
+    #[error("When provided, the \"unsigned_tx\" must be the first field")]
+    PsbtTxTagInvalidPosition,
 
     #[error("PSBT input #{0} does not exists")]
     PsbtInputNotFound(usize),

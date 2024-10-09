@@ -384,6 +384,10 @@ impl Value {
         self.try_into()
     }
 
+    pub fn is_tagged_with(&self, tag: &str) -> bool {
+        matches!(self, Value::Array(arr) if arr.is_tagged_with(tag))
+    }
+
     pub fn array(elements: Vec<Value>) -> Self {
         Value::Array(Array(elements))
     }

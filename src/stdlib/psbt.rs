@@ -10,7 +10,6 @@ use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 use miniscript::DescriptorPublicKey;
 
-use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
 use crate::util::{self, DescriptorExt, PrettyDisplay, PsbtTaprootExt, TapInfoExt, EC};
 
@@ -31,10 +30,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         .set_fn("psbt::extract_non_ms", fns::extract_non_ms)
         .unwrap();
 
-    scope.set_fn("psbt::unsigned_tx", fns::sighash).unwrap();
+    scope.set_fn("psbt::unsigned_tx", fns::unsigned_tx).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
     scope.set_fn("psbt::sighash", fns::sighash).unwrap();
-    scope.set_fn("psbt::tx", fns::tx).unwrap();
 }
 
 impl TryFrom<Value> for Psbt {
@@ -55,6 +53,7 @@ pub mod fns {
     use super::*;
 
     /// psbt::create(Transaction|Bytes|Array<Tagged>) -> Psbt
+    /// Aliased as psbt()
     pub fn create(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::Psbt(args.arg_into()?))
     }
@@ -190,32 +189,24 @@ pub mod fns {
         let sighash_msg = psbt.sighash_msg(input_index, &mut sighash_cache, tapleaf_hash)?;
         Ok(sighash_msg.to_secp_msg()[..].to_vec().into())
     }
-
-    /// psbt::tx(Array<Tagged>) -> Psbt
-    ///
-    /// Initialize a new transaction alongside its PSBT metadata
-    pub fn tx(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Value::Psbt(create_psbt_with_tx(args.arg_into()?)?))
-    }
 }
 
 fn psbt_from_tags(tags: Array) -> Result<Psbt> {
     let mut tags = tags.check_varlen(1, usize::MAX)?;
 
-    // The first tag must be the tx to initialize the PSBT with
-    let (first_tag, tx_val): (String, Value) = tags.0.remove(0).try_into()?; // safe to remove() because the length was checked
-    ensure!(
-        first_tag == "tx" || first_tag == "unsigned_tx",
-        Error::PsbtFirstTagNotTx
-    );
+    // If the first tag is the 'unsigned_tx', initialize the PSBT with it then update it
+    if tags[0].is_tagged_with("unsigned_tx") {
+        let (_tag, unsigned_tx): (String, _) = tags.remove(0).try_into()?;
+        let mut psbt = Psbt::from_unsigned_tx(unsigned_tx)?;
 
-    let unsigned_tx = tx_val.try_into().box_err(Error::PsbtInvalidTx)?;
-    let mut psbt = Psbt::from_unsigned_tx(unsigned_tx)?;
-
-    // The rest are tagged instructions for update_psbt()
-    update_psbt(&mut psbt, tags)?;
-
-    Ok(psbt)
+        // Pass the rest of the tags to update_psbt()
+        update_psbt(&mut psbt, tags)?;
+        Ok(psbt)
+    }
+    // Otherwise, initialize a new transaction alongside its PSBT
+    else {
+        create_psbt_with_tx(tags)
+    }
 }
 
 fn sign_psbt(psbt: &mut Psbt, keys_val: Value) -> Result<(SigningKeysMap, SigningErrors)> {
@@ -270,6 +261,10 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
                 }
             }
             "combine" => psbt.combine(val.try_into()?)?,
+
+            // Expected to be provided as the first tag, which is handled and stripped by psbt_from_tags()
+            "unsigned_tx" => bail!(Error::PsbtTxTagInvalidPosition),
+
             _ => bail!(Error::TagUnknown),
         }
         Ok(())
