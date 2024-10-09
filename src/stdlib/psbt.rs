@@ -11,7 +11,7 @@ use miniscript::DescriptorPublicKey;
 
 use crate::error::ResultExt;
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
-use crate::util::{self, DescriptorExt, PrettyDisplay, TapInfoExt, EC};
+use crate::util::{self, DescriptorExt, PrettyDisplay, PsbtTaprootExt, TapInfoExt, EC};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -277,6 +277,7 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
 
 fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
     let mut descriptor = None;
+    let mut tapinfo = None;
     let mut utxo_amount = None;
     tags.for_each_unique_tag(|tag, val| {
         match tag {
@@ -301,34 +302,48 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "unknown" => psbt_input.unknown = val.try_into()?,
             "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
             "witness_utxo" | "utxo" => {
-                // If the UTXO was given as a `$descriptor:$amount` tuple, extract the descriptor
-                // and keep it around prior to converting it to a TxOut scriptPubKey
-                if let (Value::Array(arr), None) = (&val, &descriptor) {
-                    if arr.len() == 2 && arr[0].is_descriptor() {
-                        descriptor = Some(arr[0].clone().try_into()?);
+                // If the UTXO was specified using a Descriptor or a TaprootSpendInfo, keep
+                // a copy of them around prior to converting them to a TxOut scriptPubKey
+                if let Value::Array(arr) = &val {
+                    match arr.get(0) {
+                        Some(Value::Descriptor(descriptor_)) => {
+                            descriptor.get_or_insert_with(|| descriptor_.definite());
+                        }
+                        Some(Value::TapInfo(tapinfo_)) => {
+                            tapinfo.get_or_insert_with(|| tapinfo_.clone());
+                        }
+                        _ => {}
                     }
                 }
                 psbt_input.witness_utxo = Some(val.try_into()?);
             }
+
+            // Keep the descriptor, tapinfo and amount to later construct the utxo and populate the PSBT fields
             "descriptor" => descriptor = Some(val.try_into()?),
-            // Keep the amount to later construct the utxo
+            "tap_info" => tapinfo = Some(val.try_into()?),
             "amount" | "utxo_amount" => utxo_amount = Some(val.try_into()?),
+
             _ => bail!(Error::TagUnknown),
         }
         Ok(())
     })?;
 
-    // Populate input PSBT fields using the descriptor
+    // Populate PSBT fields using the Descriptor/TaprootSpendInfo, if available
+    let mut utxo_spk = None;
     if let Some(descriptor) = &descriptor {
         psbt_input.update_with_descriptor_unchecked(descriptor)?;
+        utxo_spk = Some(descriptor.script_pubkey());
+    } else if let Some(tapinfo) = &tapinfo {
+        psbt_input.update_with_taproot(tapinfo)?;
+        utxo_spk = Some(tapinfo.script_pubkey());
     }
 
-    // Automatically fill in the `witness_utxo` if both the `descriptor` and `utxo_amount` are known
-    if let (Some(descriptor), Some(utxo_amount), None) =
-        (descriptor, utxo_amount, &psbt_input.witness_utxo)
+    // Automatically fill in the witness_utxo if utxo amount and scriptPubKey are known
+    if let (None, Some(utxo_amount), Some(utxo_spk)) =
+        (&psbt_input.witness_utxo, utxo_amount, utxo_spk)
     {
         psbt_input.witness_utxo = Some(TxOut {
-            script_pubkey: descriptor.script_pubkey(),
+            script_pubkey: utxo_spk,
             value: utxo_amount,
         });
     }
@@ -350,8 +365,11 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
             "descriptor" => psbt_output
                 .update_with_descriptor_unchecked(&val.try_into()?)
                 .map(|_| ())?,
-            // note: PsbtTxOut calls update_with_descriptor() itself to handle the "descriptor" tag and
-            // does not forward it here. This will need to be refactored if anything more complex is done here.
+            "tap_info" => psbt_output
+                .update_with_taproot(&val.try_into()?)
+                .map(|_| ())?,
+            // note: PsbtTxOut calls update_with{descriptor,taproot}() itself and does not forward the "descriptor"
+            // and "tap_info" tags here. This will need to be refactored if anything more complex is done here.
             _ => bail!(Error::TagUnknown),
         }
         Ok(())
@@ -477,16 +495,24 @@ impl TryFrom<Value> for PsbtTxOut {
 
         let arr = value.into_array()?;
         if arr.len() == 2 && arr.get(1).is_some_and(Value::is_number) {
-            // Tx output provided as a simple $scriptPubKeyLike:$amount tuple
+            // Tx output provided as a $scriptPubKeyLike:$amount tuple
             let (spk_like, amount): (Value, _) = arr.try_into()?;
+
+            // If the scriptPubKey was specified using a Descriptor or a TaprootSpendInfo, also use them to populate the PSBT fields
+            match &spk_like {
+                Value::Descriptor(descriptor) => {
+                    psbt_output.update_with_descriptor_unchecked(&descriptor.definite())?;
+                }
+                Value::TapInfo(tapinfo) => {
+                    psbt_output.update_with_taproot(&tapinfo)?;
+                }
+                _ => {}
+            }
+
             tx_output = Some(TxOut {
-                script_pubkey: spk_like.clone().into_spk()?,
+                script_pubkey: spk_like.into_spk()?,
                 value: amount,
             });
-            // If the given scriptPubKeyLike is a descriptor, also use it to populate the PSBT fields
-            if let Ok(descriptor) = spk_like.try_into() {
-                psbt_output.update_with_descriptor_unchecked(&descriptor)?;
-            }
         } else {
             // Tx output and PSBT metadata provided as a tagged list
             let mut spk = None;
@@ -498,11 +524,18 @@ impl TryFrom<Value> for PsbtTxOut {
                     "amount" => amount = Some(val.try_into()?),
                     "script_pubkey" => spk = Some(val.try_into()?),
 
-                    // Use the descriptor to populate the PSBT fields and the tx output scriptPubKey
+                    // Use the Descriptor to populate the PSBT fields and to construct the scriptPubKey
                     "descriptor" => {
                         let descriptor = val.try_into()?;
                         psbt_output.update_with_descriptor_unchecked(&descriptor)?;
                         spk.get_or_insert_with(|| descriptor.script_pubkey());
+                    }
+
+                    // Use the TaprootSpendInfo to populate the PSBT fields and to construct the scriptPubKey
+                    "tap_info" => {
+                        let tapinfo = val.try_into()?;
+                        psbt_output.update_with_taproot(&tapinfo)?;
+                        spk.get_or_insert_with(|| tapinfo.script_pubkey());
                     }
 
                     // Collect other PSBT tags to forward to update_output()
@@ -512,7 +545,7 @@ impl TryFrom<Value> for PsbtTxOut {
             })?;
             update_output(&mut psbt_output, psbt_output_tags)?;
 
-            // If not explicitly given, construct the tx output using the `amount` and `script_pubkey` (which may derived from the `descriptor`)
+            // If not explicitly given, construct the tx output using the `amount` and `script_pubkey` (which may derived from the `descriptor`/`tap_info`)
             tx_output = tx_output.or_else(|| {
                 spk.zip(amount).map(|(spk, amount)| TxOut {
                     script_pubkey: spk,

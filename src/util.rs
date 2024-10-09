@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use bitcoin::bip32::{ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::hex::DisplayHex;
-use bitcoin::{secp256k1, taproot, PublicKey};
+use bitcoin::{psbt, secp256k1, taproot, PublicKey};
 use miniscript::descriptor::{
     DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
 };
@@ -27,6 +27,35 @@ pub trait TapInfoExt {
 impl TapInfoExt for taproot::TaprootSpendInfo {
     fn witness_program(&self) -> bitcoin::WitnessProgram {
         bitcoin::WitnessProgram::p2tr_tweaked(self.output_key())
+    }
+}
+
+pub trait PsbtTaprootExt {
+    /// Update PSBT fields using the TaprootSpendInfo
+    fn update_with_taproot(&mut self, tapinfo: &taproot::TaprootSpendInfo) -> Result<()>;
+}
+impl PsbtTaprootExt for psbt::Input {
+    fn update_with_taproot(&mut self, tapinfo: &taproot::TaprootSpendInfo) -> Result<()> {
+        self.tap_merkle_root = tapinfo.merkle_root();
+        self.tap_internal_key = Some(tapinfo.internal_key());
+        self.tap_scripts = tapinfo
+            .script_map()
+            .iter()
+            .map(|(script_ver, _)| {
+                let ctrl = tapinfo.control_block(script_ver).expect("must exists");
+                (ctrl, script_ver.clone())
+            })
+            .collect();
+        // `tap_key_origins` needs to be filled in manually
+        Ok(())
+    }
+}
+impl PsbtTaprootExt for psbt::Output {
+    fn update_with_taproot(&mut self, tapinfo: &taproot::TaprootSpendInfo) -> Result<()> {
+        self.tap_internal_key = Some(tapinfo.internal_key());
+        // `tap_key_origins` needs to be filled in manually
+        // TODO autofill `tap_tree`
+        Ok(())
     }
 }
 
