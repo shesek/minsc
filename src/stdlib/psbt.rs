@@ -5,7 +5,8 @@ use std::fmt;
 use bitcoin::bip32::{self, Xpriv};
 use bitcoin::hex::DisplayHex;
 use bitcoin::psbt::{self, raw, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
-use bitcoin::{hashes, secp256k1, taproot, PrivateKey, PublicKey, TxIn, TxOut};
+use bitcoin::taproot::{self, LeafVersion, TapLeafHash};
+use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 use miniscript::DescriptorPublicKey;
 
@@ -638,29 +639,42 @@ fn xpub_map(val: Value) -> Result<BTreeMap<bip32::Xpub, bip32::KeySource>> {
         .collect()
 }
 
-// Similar to bip32_derivation_map(), for the PSBT input/output `tap_key_origins` field
+// Taproot key source map, with support for some additional ways to specify the BIP32 sources and leaf hashes
 fn tap_key_origins_map(
     val: Value,
-) -> Result<BTreeMap<bitcoin::XOnlyPublicKey, (Vec<bitcoin::TapLeafHash>, bip32::KeySource)>> {
+) -> Result<BTreeMap<bitcoin::XOnlyPublicKey, (Vec<TapLeafHash>, bip32::KeySource)>> {
     val.into_array()?
         .into_iter()
         .map(|el| {
-            let (pk, pk_val): (DescriptorPublicKey, Array) = el.try_into()?;
-            Ok(if !pk_val.is_empty() && !pk_val[0].is_bytes() {
-                // Provided as a map from pubkeys to a tuple of (leaf_hashes,key_source)
+            let (pk, pk_val): (DescriptorPublicKey, _) = el.try_into()?;
+            let (leaf_hashes, key_source) = match pk_val {
+                // Provided as an explicit map from pubkeys to a tuple of (leaf_hashes,(bip32_fingerprint, path))
                 // Matches the underlying structure used by rust-bitcoin.
-                let (leaf_hashes, key_source) = pk_val.try_into()?;
-                let final_pk = pk.at_derivation_index(0)?.derive_public_key(&EC)?;
-                (final_pk.into(), (leaf_hashes, key_source))
-            } else {
-                // Provided as a map from pubkeys with associated sources to leaf_hashes
-                let leaf_hashes = pk_val.try_into()?;
-                let fingerprint = pk.master_fingerprint();
-                let derivation_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
-                let key_source = (fingerprint, derivation_path);
-                let final_pk = pk.at_derivation_index(0)?.derive_public_key(&EC)?;
-                (final_pk.into(), (leaf_hashes, key_source))
-            })
+                // For example: "tap_key_origins": [ SINGLE_PUBKEY: [ [ LEAF_HASH1, LEAF_HASH2 ], 0xFINGERPRINT:[0,100]] ] ]
+                Value::Array(arr) if !arr.is_empty() && arr[0].is_array() => arr.try_into()?,
+
+                // Provided as a map from xpubs (with associated key source) to the leaf_hashes
+                // For example: "tap_key_origins": [ xpubAAA/0/100: [ LEAF_HASH1, LEAF_HASH2 ] ]
+                Value::Array(arr) => {
+                    let leaf_hashes = arr.try_into()?;
+                    let fingerprint = pk.master_fingerprint();
+                    let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                    (leaf_hashes, (fingerprint, path))
+                }
+
+                // Provided as a map from xpubs (with associated key source) to a single script to compute the leaf hash for
+                // For example: "tap_key_origins": [ xpubAAA/0/100: `xpubAAA/0/100 OP_CHECKSIG` ]
+                Value::Script(script) => {
+                    let leaf_hash = TapLeafHash::from_script(&script, LeafVersion::TapScript);
+                    let fingerprint = pk.master_fingerprint();
+                    let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                    (vec![leaf_hash], (fingerprint, path))
+                }
+
+                other => bail!(Error::InvalidValue(other.into())),
+            };
+            let final_pk = pk.at_derivation_index(0)?.derive_public_key(&EC)?;
+            Ok((final_pk.into(), (leaf_hashes, key_source)))
         })
         .collect()
 }
@@ -668,8 +682,8 @@ fn tap_key_origins_map(
 // Accept the `tap_scripts` PSBT input field without an explicit leaf version (defaults to TapScript)
 fn tap_scripts_map(
     val: Value,
-) -> Result<BTreeMap<taproot::ControlBlock, (bitcoin::ScriptBuf, taproot::LeafVersion)>> {
-    static DEFAULT_VERSION: taproot::LeafVersion = taproot::LeafVersion::TapScript;
+) -> Result<BTreeMap<taproot::ControlBlock, (bitcoin::ScriptBuf, LeafVersion)>> {
+    static DEFAULT_VERSION: LeafVersion = LeafVersion::TapScript;
 
     val.into_array()?
         .into_iter()
