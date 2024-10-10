@@ -13,7 +13,7 @@ use miniscript::descriptor::{
 
 use crate::ast::SlashRhs;
 use crate::runtime::{Array, Error, Evaluate, Mutable, Result, ScopeRef, Value};
-use crate::util::{hash_to_child_vec, DeriveExt, PrettyDisplay, EC};
+use crate::util::{hash_to_child_vec, DeriveExt, DescriptorPubKeyExt, PrettyDisplay, EC};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -24,6 +24,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope
         .set_fn("xpriv::from_seed", fns::xpriv_from_seed)
         .unwrap();
+
+    scope.set_fn("xonly", fns::xonly).unwrap();
 }
 
 /// BIP32 key derivation using the Slash operator
@@ -107,6 +109,33 @@ pub mod fns {
         let (seed, network): (Vec<u8>, Option<_>) = args.args_into()?;
         let network = network.unwrap_or(Network::Testnet);
         Ok(Xpriv::new_master(network, &seed)?.into())
+    }
+
+    /// Convert the pubkey into an x-only pubkey.
+    /// Always returned as a single (non-xpub) pubkey (x-only xpubs cannot be represented as an Xpub/DescriptorPublicKey).
+    ///
+    /// xonly(PubKey) -> PubKey
+    pub fn xonly(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(match args.arg_into()? {
+            // Already an x-only
+            single_xonly @ DescriptorPublicKey::Single(SinglePub {
+                key: SinglePubKey::XOnly(_),
+                ..
+            }) => single_xonly,
+
+            // Convert into an x-only single pubkey with BIP32 origin information
+            non_xonly => {
+                let pk = non_xonly.ensure_definite()?;
+                let derived_single_pk = pk.derive_public_key(&EC)?;
+                let derived_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+
+                DescriptorPublicKey::Single(SinglePub {
+                    key: SinglePubKey::XOnly(derived_single_pk.into()),
+                    origin: Some((pk.master_fingerprint(), derived_path)),
+                })
+            }
+        }
+        .into())
     }
 }
 

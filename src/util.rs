@@ -406,6 +406,22 @@ where
     // XXX could use miniscript::translate_hash_clone!() if is used std::result:Result or if we avoided replacing Result with a type alias
 }
 
+// Keys utilities
+
+pub trait DescriptorPubKeyExt: Sized {
+    /// Convert into a DefiniteDescriptorKey. Errors if the descriptor contains underived wildcards.
+    fn ensure_definite(self) -> Result<miniscript::DefiniteDescriptorKey>;
+}
+impl DescriptorPubKeyExt for DescriptorPublicKey {
+    fn ensure_definite(self) -> Result<miniscript::DefiniteDescriptorKey> {
+        ensure!(
+            !self.has_wildcard(),
+            Error::UnexpectedWildcard(self.clone().into())
+        );
+        Ok(self.at_derivation_index(0).expect("valid index"))
+    }
+}
+
 pub trait DescriptorSecretKeyExt {
     /// Like `DescriptorPublicKey::full_derivation_paths()`, which isn't available for secret keys
     fn full_derivation_paths(&self) -> Vec<DerivationPath>;

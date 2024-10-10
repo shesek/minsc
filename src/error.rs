@@ -149,6 +149,9 @@ pub enum RuntimeError {
     #[error("No inner wildcard xpubs to derive")]
     NonDeriveableNoWildcard,
 
+    #[error("Expected a definite pubkey with no underived wildcards, not {0}")]
+    UnexpectedWildcard(Box<miniscript::DescriptorPublicKey>),
+
     #[error("Data type cannot be derived")]
     NonDeriveableType,
 
