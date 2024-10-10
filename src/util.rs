@@ -411,6 +411,10 @@ where
 pub trait DescriptorPubKeyExt: Sized {
     /// Convert into a DefiniteDescriptorKey. Errors if the descriptor contains underived wildcards.
     fn ensure_definite(self) -> Result<miniscript::DefiniteDescriptorKey>;
+
+    fn derive_definite(self) -> Result<bitcoin::PublicKey> {
+        Ok(self.ensure_definite()?.derive_public_key(&EC)?)
+    }
 }
 impl DescriptorPubKeyExt for DescriptorPublicKey {
     fn ensure_definite(self) -> Result<miniscript::DefiniteDescriptorKey> {

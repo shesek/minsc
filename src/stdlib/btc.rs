@@ -4,9 +4,9 @@ use std::fmt;
 use bitcoin::hashes::Hash;
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
-use bitcoin::{absolute::LockTime as AbsLockTime, relative::LockTime as RelLockTime};
 use bitcoin::{
-    address, hex::DisplayHex, Address, Amount, Network, Opcode, Sequence, SignedAmount, Txid,
+    absolute::LockTime as AbsLockTime, address, hex::DisplayHex, relative::LockTime as RelLockTime,
+    Address, Amount, Network, Opcode, Sequence, SignedAmount, Txid,
 };
 use miniscript::psbt::PsbtExt;
 
@@ -74,6 +74,9 @@ impl Evaluate for ast::ScriptFrag {
 }
 
 fn script_frag(value: Value) -> Result<ScriptBuf> {
+    use crate::util::DescriptorPubKeyExt;
+    use miniscript::descriptor::{DescriptorPublicKey, SinglePub, SinglePubKey};
+
     let push_int = |num| ScriptBuilder::new().push_int(num).into_script();
     let push_slice = |slice| -> Result<_> {
         Ok(ScriptBuilder::new()
@@ -89,10 +92,18 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
         Value::Bool(val) => push_int(val as i64),
         Value::Bytes(bytes) => push_slice(bytes)?,
         Value::String(string) => push_slice(string.into_bytes())?,
-        Value::PubKey(desc_pubkey) => {
-            let pubkey = desc_pubkey.at_derivation_index(0)?.derive_public_key(&EC)?;
-            ScriptBuilder::new().push_key(&pubkey).into_script()
+        Value::PubKey(pubkey) => match pubkey {
+            // Handle single x-only pubkeys
+            DescriptorPublicKey::Single(SinglePub {
+                origin: _,
+                key: SinglePubKey::XOnly(xonly_pk),
+            }) => ScriptBuilder::new().push_x_only_key(&xonly_pk),
+
+            // Xpubs are always encoded as full keys (x-only xpubs cannot be represented as an Xpub/DescriptorPublicKey)
+            // To encode them as x-only, use xonly() convert into a single x-only first
+            non_xonly => ScriptBuilder::new().push_key(&non_xonly.derive_definite()?),
         }
+        .into_script(),
 
         // Flatten arrays
         Value::Array(elements) => {
