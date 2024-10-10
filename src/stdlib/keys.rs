@@ -125,7 +125,7 @@ pub mod fns {
 
             // Convert into an x-only single pubkey with BIP32 origin information
             non_xonly => {
-                let pk = non_xonly.ensure_definite()?;
+                let pk = non_xonly.definite()?;
                 let derived_single_pk = pk.derive_public_key(&EC)?;
                 let derived_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
 
@@ -202,7 +202,7 @@ impl TryFrom<Value> for secp256k1::SecretKey {
         Ok(match value.try_into()? {
             DescriptorSecretKey::Single(single_priv) => single_priv.key.inner,
             DescriptorSecretKey::XPrv(xprv) => {
-                // TODO derive wildcards (similarly to pubkeys via at_derivation_index)
+                // TODO ensure no wildcards, similarly to DescriptorPubKeyExt::definite()
                 xprv.xkey
                     .derive_priv(&EC, &xprv.derivation_path)?
                     .private_key
@@ -229,9 +229,7 @@ impl TryFrom<Value> for secp256k1::Keypair {
 impl TryFrom<Value> for bitcoin::PublicKey {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        Ok(DescriptorPublicKey::try_from(val)?
-            .at_derivation_index(0)?
-            .derive_public_key(&EC)?)
+        DescriptorPublicKey::try_from(val)?.derive_definite()
     }
 }
 

@@ -12,7 +12,7 @@ use miniscript::descriptor::{self, DescriptorPublicKey};
 use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Error, Result, Value};
-use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, EC};
+use crate::util::{self, fmt_list, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, EC};
 use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -148,7 +148,7 @@ impl TryFrom<Value> for TaprootSpendInfo {
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value {
             Value::TapInfo(tapinfo) => tapinfo,
-            Value::Descriptor(desc) => match desc.definite() {
+            Value::Descriptor(desc) => match desc.definite()? {
                 miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
                 _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc).into())),
             },
@@ -187,14 +187,14 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         // tr(PubKey, Script) -> TaprootSpendInfo
         // Single Script used as the tree root, with an explicit internal key
         (Value::PubKey(pk), Some(Value::Script(script))) => {
-            tapinfo_from_tree_node(definite_xonly(pk)?, Value::Script(script))?.into()
+            tapinfo_from_tree_node(pk.derive_xonly()?, Value::Script(script))?.into()
         }
 
         // tr(Script) -> TaprootSpendInfo
         // Single Script used as the tree root, with an unspendable internal key
         (Value::Script(script), None) => {
             let unspendable = tr_unspendable(scope)?.ok_or(Error::TaprootNoViableKey)?;
-            tapinfo_from_tree_node(definite_xonly(unspendable)?, Value::Script(script))?.into()
+            tapinfo_from_tree_node(unspendable.derive_xonly()?, Value::Script(script))?.into()
         }
 
         // tr(PubKey, Hash) -> TaprootSpendInfo
@@ -202,7 +202,7 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         (Value::PubKey(pk), Some(Value::Bytes(bytes))) => {
             let merkle_root = TapNodeHash::from_slice(&bytes).map_err(Error::InvalidMerkleRoot)?;
             // TODO should ideally return a Descriptor, but rawtr() is not yet supported in rust-miniscript
-            TaprootSpendInfo::new_key_spend(&EC, definite_xonly(pk)?, Some(merkle_root)).into()
+            TaprootSpendInfo::new_key_spend(&EC, pk.derive_xonly()?, Some(merkle_root)).into()
         }
 
         // tr(PubKey, Array<Policy>) -> Descriptor
@@ -265,7 +265,10 @@ fn tapinfo_from_array(
     unspendable: Option<DescriptorPublicKey>,
     scripts: Vec<Value>,
 ) -> Result<TaprootSpendInfo> {
-    let dpk = definite_xonly(pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?)?;
+    let dpk = pk
+        .or(unspendable)
+        .ok_or(Error::TaprootNoViableKey)?
+        .derive_xonly()?;
 
     if scripts.len() == 2 && (scripts[0].is_array() || scripts[1].is_array()) {
         // Nested arrays of length 2 are treated as a binary tree of scripts (e.g. [ A, [ [ B, C ], D ] ])
@@ -386,17 +389,10 @@ fn tr_unspendable(scope: &Scope) -> Result<Option<DescriptorPublicKey>> {
     })
 }
 
-// Derive the DescriptorPublicKey into a definite key and transform to an x-only
-fn definite_xonly(pk: DescriptorPublicKey) -> Result<XOnlyPublicKey> {
-    Ok(XOnlyPublicKey::from(
-        pk.at_derivation_index(0)?.derive_public_key(&EC)?.inner,
-    ))
-}
-
-impl TryFrom<Value> for bitcoin::XOnlyPublicKey {
+impl TryFrom<Value> for XOnlyPublicKey {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        definite_xonly(val.try_into()?)
+        Ok(bitcoin::PublicKey::try_from(val)?.into())
     }
 }
 impl TryFrom<Value> for bitcoin::secp256k1::schnorr::Signature {

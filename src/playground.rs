@@ -64,8 +64,8 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
 
         // Display the explicitScript/scriptPubKey and address of descriptors
         if let (Some(desc), None, None) = (&desc, &script, &addr) {
-            // Multi-path descriptors cannot be used to derive scripts/addresses
-            if !desc.is_multipath() {
+            // Multi-path and wildcards descriptors cannot be used to derive scripts/addresses
+            if !desc.is_multipath() && !desc.has_wildcard() {
                 // may fail if the descriptor pubkey has unresolved hardened derivation steps
                 addr = desc.to_address(network).ok();
                 script = match desc {

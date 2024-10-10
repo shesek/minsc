@@ -11,7 +11,9 @@ use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 use miniscript::DescriptorPublicKey;
 
 use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
-use crate::util::{self, DescriptorExt, PrettyDisplay, PsbtTaprootExt, TapInfoExt, EC};
+use crate::util::{
+    self, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, PsbtTaprootExt, TapInfoExt, EC,
+};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -302,12 +304,12 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
                 // If the UTXO was specified using a Descriptor or a TaprootSpendInfo, keep
                 // a copy of them around prior to converting them to a TxOut scriptPubKey
                 if let Value::Array(arr) = &val {
-                    match arr.get(0) {
-                        Some(Value::Descriptor(descriptor_)) => {
-                            descriptor.get_or_insert_with(|| descriptor_.definite());
+                    match arr.first() {
+                        Some(Value::Descriptor(desc)) if descriptor.is_none() => {
+                            descriptor = Some(desc.definite()?)
                         }
-                        Some(Value::TapInfo(tapinfo_)) => {
-                            tapinfo.get_or_insert_with(|| tapinfo_.clone());
+                        Some(Value::TapInfo(tap)) if tapinfo.is_none() => {
+                            tapinfo = Some(tap.clone())
                         }
                         _ => {}
                     }
@@ -498,7 +500,7 @@ impl TryFrom<Value> for PsbtTxOut {
             // If the scriptPubKey was specified using a Descriptor or a TaprootSpendInfo, also use them to populate the PSBT fields
             match &spk_like {
                 Value::Descriptor(descriptor) => {
-                    psbt_output.update_with_descriptor_unchecked(&descriptor.definite())?;
+                    psbt_output.update_with_descriptor_unchecked(&descriptor.definite()?)?;
                 }
                 Value::TapInfo(tapinfo) => {
                     psbt_output.update_with_taproot(&tapinfo)?;
@@ -596,7 +598,7 @@ fn bip32_derivation_map(val: Value) -> Result<BTreeMap<secp256k1::PublicKey, bip
                     let fingerprint = dpk.master_fingerprint();
                     let derivation_path =
                         dpk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
-                    let final_pk = dpk.at_derivation_index(0)?.derive_public_key(&EC)?.inner;
+                    let final_pk = dpk.derive_definite()?.inner;
                     (final_pk, (fingerprint, derivation_path))
                 }
             })
@@ -669,7 +671,7 @@ fn tap_key_origins_map(
 
                 other => bail!(Error::InvalidValue(other.into())),
             };
-            let final_pk = pk.at_derivation_index(0)?.derive_public_key(&EC)?;
+            let final_pk = pk.derive_definite()?;
             Ok((final_pk.into(), (leaf_hashes, key_source)))
         })
         .collect()

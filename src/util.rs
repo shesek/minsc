@@ -8,7 +8,9 @@ use bitcoin::{psbt, secp256k1, taproot, PublicKey};
 use miniscript::descriptor::{
     DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
 };
-use miniscript::{bitcoin, ForEachKey, MiniscriptKey, TranslatePk, Translator};
+use miniscript::{
+    bitcoin, DefiniteDescriptorKey, Descriptor, ForEachKey, MiniscriptKey, TranslatePk, Translator,
+};
 
 use crate::runtime::{Array, Error, Result, Value};
 
@@ -71,36 +73,47 @@ impl<Ctx: miniscript::ScriptContext> MiniscriptExt<Ctx>
     fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
         Ok(
             self.translate_pk(&mut FnTranslator::new(|xpk: &DescriptorPublicKey| {
-                Ok(xpk.clone().at_derivation_index(0)?.derive_public_key(&EC)?)
+                Ok(xpk.clone().derive_definite()?)
             }))?,
         )
     }
 }
 pub trait DescriptorExt {
-    fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>>;
-    fn to_script_pubkey(&self) -> Result<bitcoin::ScriptBuf>;
-    fn to_explicit_script(&self) -> Result<bitcoin::ScriptBuf>;
-    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address>;
-    fn definite(&self) -> miniscript::Descriptor<miniscript::DefiniteDescriptorKey>;
+    /// Convert into a Descriptor over definite pubkeys. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn definite(&self) -> Result<Descriptor<DefiniteDescriptorKey>>;
+
+    /// Convert into a Descriptor over derived pubkeys. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn derive_definite(&self) -> Result<Descriptor<PublicKey>> {
+        Ok(self.definite()?.derived_descriptor(&EC)?)
+    }
+
+    /// Get the scriptPubKey. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn to_script_pubkey(&self) -> Result<bitcoin::ScriptBuf> {
+        Ok(self.derive_definite()?.script_pubkey())
+    }
+
+    /// Get the explicit script. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn to_explicit_script(&self) -> Result<bitcoin::ScriptBuf> {
+        Ok(self.derive_definite()?.explicit_script()?)
+    }
+
+    /// Get the address. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address> {
+        Ok(self.derive_definite()?.address(network)?)
+    }
 }
 
-impl DescriptorExt for crate::DescriptorDpk {
-    fn derive_keys(&self) -> Result<miniscript::Descriptor<PublicKey>> {
-        // XXX check no wildcard?
-        Ok(self.derived_descriptor(&EC, 0)?)
-    }
-    fn to_script_pubkey(&self) -> Result<bitcoin::ScriptBuf> {
-        Ok(self.derive_keys()?.script_pubkey())
-    }
-    fn to_explicit_script(&self) -> Result<bitcoin::ScriptBuf> {
-        Ok(self.derive_keys()?.explicit_script()?)
-    }
-    fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address> {
-        Ok(self.derive_keys()?.address(network)?)
-    }
-    fn definite(&self) -> miniscript::Descriptor<miniscript::DefiniteDescriptorKey> {
-        // XXX check no wildcard?
-        self.at_derivation_index(0).expect("index is valid")
+impl DescriptorExt for Descriptor<DescriptorPublicKey> {
+    fn definite(&self) -> Result<Descriptor<DefiniteDescriptorKey>> {
+        ensure!(
+            !self.has_wildcard(),
+            Error::UnexpectedWildcardDescriptor(self.clone().into())
+        );
+        ensure!(
+            !self.is_multipath(),
+            Error::UnexpectedMultiPathDescriptor(self.clone().into())
+        );
+        Ok(self.at_derivation_index(0).expect("index is valid"))
     }
 }
 
@@ -409,20 +422,30 @@ where
 // Keys utilities
 
 pub trait DescriptorPubKeyExt: Sized {
-    /// Convert into a DefiniteDescriptorKey. Errors if the descriptor contains underived wildcards.
-    fn ensure_definite(self) -> Result<miniscript::DefiniteDescriptorKey>;
+    /// Convert into a definite pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn definite(self) -> Result<DefiniteDescriptorKey>;
 
+    /// Convert into a derived pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
     fn derive_definite(self) -> Result<bitcoin::PublicKey> {
-        Ok(self.ensure_definite()?.derive_public_key(&EC)?)
+        Ok(self.definite()?.derive_public_key(&EC)?)
+    }
+
+    /// Convert into a derived x-only pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn derive_xonly(self) -> Result<bitcoin::XOnlyPublicKey> {
+        Ok(self.derive_definite()?.inner.into())
     }
 }
 impl DescriptorPubKeyExt for DescriptorPublicKey {
-    fn ensure_definite(self) -> Result<miniscript::DefiniteDescriptorKey> {
+    fn definite(self) -> Result<DefiniteDescriptorKey> {
         ensure!(
             !self.has_wildcard(),
-            Error::UnexpectedWildcard(self.clone().into())
+            Error::UnexpectedWildcardPubKey(self.clone().into())
         );
-        Ok(self.at_derivation_index(0).expect("valid index"))
+        ensure!(
+            !self.is_multipath(),
+            Error::UnexpectedMultiPathPubKey(self.clone().into())
+        );
+        Ok(self.at_derivation_index(0).expect("index is valid"))
     }
 }
 

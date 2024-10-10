@@ -28,7 +28,7 @@ impl_from_variant!(ParseError, Error, Parse);
 
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeError {
-    #[error("Assigned variable name already exists: {0}")]
+    #[error("Variables are immutable, cannot assign over {0}")]
     AssignedVariableExists(Ident),
 
     #[error("Undefined variable: {0}")]
@@ -149,8 +149,17 @@ pub enum RuntimeError {
     #[error("No inner wildcard xpubs to derive")]
     NonDeriveableNoWildcard,
 
-    #[error("Expected a definite pubkey with no underived wildcards, not {0}")]
-    UnexpectedWildcard(Box<miniscript::DescriptorPublicKey>),
+    #[error("Expected a definite pubkey with no underived wildcards, not {0:#}")]
+    UnexpectedWildcardPubKey(Box<miniscript::DescriptorPublicKey>),
+
+    #[error("Expected a definite descriptor with no underived wildcards, not {0:#}")]
+    UnexpectedWildcardDescriptor(Box<crate::DescriptorDpk>),
+
+    #[error("Expected a definite pubkey with no multi-path derivations, not {0:#}")]
+    UnexpectedMultiPathPubKey(Box<miniscript::DescriptorPublicKey>),
+
+    #[error("Expected a definite descriptor with no multi-path derivations, not {0:#}")]
+    UnexpectedMultiPathDescriptor(Box<crate::DescriptorDpk>),
 
     #[error("Data type cannot be derived")]
     NonDeriveableType,

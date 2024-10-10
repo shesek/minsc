@@ -302,7 +302,7 @@ impl TryFrom<Value> for Policy {
 impl TryFrom<Value> for miniscript::Descriptor<miniscript::DefiniteDescriptorKey> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        Ok(Descriptor::try_from(value)?.definite())
+        Descriptor::try_from(value)?.definite()
     }
 }
 impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
