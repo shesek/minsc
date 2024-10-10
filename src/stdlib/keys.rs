@@ -80,6 +80,7 @@ pub fn eval_slash_bip32_derive(lhs: Value, rhs: &SlashRhs, scope: &ScopeRef) -> 
 
 pub mod fns {
     use super::*;
+    use miniscript::MiniscriptKey;
 
     /// Cast SecKey/Bytes into a PubKey
     /// pubkey(SecKey|Bytes|PubKey) -> PubKey
@@ -116,24 +117,20 @@ pub mod fns {
     ///
     /// xonly(PubKey) -> PubKey
     pub fn xonly(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(match args.arg_into()? {
-            // Already an x-only
-            single_xonly @ DescriptorPublicKey::Single(SinglePub {
-                key: SinglePubKey::XOnly(_),
-                ..
-            }) => single_xonly,
+        let pk: DescriptorPublicKey = args.arg_into()?;
 
+        Ok(if pk.is_x_only_key() {
+            pk
+        } else {
             // Convert into an x-only single pubkey with BIP32 origin information
-            non_xonly => {
-                let pk = non_xonly.definite()?;
-                let derived_single_pk = pk.derive_public_key(&EC)?;
-                let derived_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+            let pk = pk.definite()?;
+            let derived_single_pk = pk.derive_public_key(&EC)?;
+            let derived_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
 
-                DescriptorPublicKey::Single(SinglePub {
-                    key: SinglePubKey::XOnly(derived_single_pk.into()),
-                    origin: Some((pk.master_fingerprint(), derived_path)),
-                })
-            }
+            DescriptorPublicKey::Single(SinglePub {
+                key: SinglePubKey::XOnly(derived_single_pk.into()),
+                origin: Some((pk.master_fingerprint(), derived_path)),
+            })
         }
         .into())
     }
