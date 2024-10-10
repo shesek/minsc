@@ -397,6 +397,9 @@ pub enum RuntimeError {
     #[error("PSBT error: {0}")]
     Psbt(#[from] bitcoin::psbt::Error),
 
+    #[error("Failed parsing PSBT: {0}")]
+    PsbtParse(#[from] bitcoin::psbt::PsbtParseError),
+
     #[error("Miniscript PSBT error: {0}")]
     MiniscriptPsbt(#[from] miniscript::psbt::Error),
 

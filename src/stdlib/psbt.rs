@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 use bitcoin::bip32::{self, Xpriv};
 use bitcoin::hex::DisplayHex;
@@ -41,6 +41,7 @@ impl TryFrom<Value> for Psbt {
         Ok(match value {
             Value::Psbt(psbt) => psbt,
             Value::Bytes(bytes) => Psbt::deserialize(&bytes)?,
+            Value::String(base64) => Psbt::from_str(&base64)?,
             Value::Transaction(tx) => Psbt::from_unsigned_tx(tx)?,
             Value::Array(array) => psbt_from_tags(array)?,
             other => bail!(Error::NotPsbtLike(other.into())),

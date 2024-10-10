@@ -16,6 +16,7 @@ lalrpop = { version = "0.21", features = ["lexer"] }
 
 [dependencies]
 miniscript = { version = "12", features = ["compiler"] }
+bitcoin = { version = "0.32", features = ["rand-std", "base64"] }
 
 lalrpop-util = "0.21"
 regex = "1"
@@ -29,13 +30,11 @@ wasm-bindgen = { version = "0.2.65", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
 
-# needed to enable 'rand-std' (rust-miniscript does not provide a way to propagate the feature)
-bitcoin = { version = "0.32", features = ["std", "secp-recovery", "rand", "rand-std"] }
-# needed to enable 'getrandom/js' (enabled for the 'wasm' feature below)
-getrandom = { version = "0.2" }
+# not used directly, needed to enable 'getrandom/js' (for the 'wasm' feature below)
+getrandom = { version = "0.2", optional = true }
 
 [features]
-wasm = [ "wasm-bindgen", "getrandom/js" ] # wee_alloc? seems to result in larger files
+wasm = [ "wasm-bindgen", "getrandom", "getrandom/js" ] # wee_alloc? seems to result in larger files
 playground = [ "wasm", "serde", "wasm-bindgen/serde-serialize", "console_error_panic_hook" ]
 
 [lib]
@@ -43,5 +42,4 @@ crate-type = ["cdylib", "lib"]
 
 [profile.release]
 lto = true
-# webpack fail wasm compilation without this
 opt-level = "s"
