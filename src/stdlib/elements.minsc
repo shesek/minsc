@@ -42,10 +42,17 @@ OP::INPUT_VALUE_EQ_VERIFY = `OP::INPUT_VALUE OP_EQUALVERIFY`;
 OP::OUTPUT_SPK_EQ_VERIFY = `OP_INSPECTOUTPUTSCRIPTPUBKEY OP_ROT OP_EQUALVERIFY*2`;
 OP::INPUT_SPK_EQ_VERIFY = `OP_INSPECTINPUTSCRIPTPUBKEY OP_ROT OP_EQUALVERIFY*2`;
 
-fn checkOutput($vout, $asset_id, $amount, $spk_version, $spk_prog) = `
+fn checkOutput($vout, $asset_id, $amount, $spk_tup) = `
   $asset_id $vout OP::OUTPUT_ASSET_EQ_VERIFY
   $amount   $vout OP::OUTPUT_VALUE_EQ_VERIFY
-  $spk_prog $spk_version $vout OP::OUTPUT_SPK_EQ_VERIFY
+  checkOutputSpk($vout, $spk_tup)
+`;
+
+fn checkOutputSpk($vout, $spk_tup) = `
+  // $spk_tup is a tuple of the witness version and program
+  $vot OP_INSPECTOUTPUTSCRIPTPUBKEY
+  $spk_tup.0 OP_EQUALVERIFY
+  $spk_tup.1 OP_EQUALVERIFY
 `;
 
 fn checkSameAsset($vin, $vout) = `
@@ -145,19 +152,19 @@ OP::ENCODE_PUSH_OP = `
 // Taproot Utilities
 //
 
-TAPSCRIPT_VERSION = 0xc4;
-TAPLEAF_TAG = "TapLeaf/elements";
-TAPTWEAK_TAG = "TapTweak/elements";
+ELEMENTS_TAPSCRIPT_VERSION = 0xc4;
+ELEMENTS_TAPLEAF_TAG = "TapLeaf/elements";
+ELEMENTS_TAPTWEAK_TAG = "TapTweak/elements";
 
 // Compute the TapLeaf hash for the script bytes at the top of the stack
 // in: <script bytes>
 // out: <leaf hash>
 OP::HASH_TAPLEAF = `
   // Compute the tagged hash prefix (XXX could be precomputed)
-    TAPLEAF_TAG
+    ELEMENTS_TAPLEAF_TAG
     OP_SHA256 OP_DUP OP_CAT
   // Add version
-    TAPSCRIPT_VERSION OP_CAT
+    ELEMENTS_TAPSCRIPT_VERSION OP_CAT
     // Stack: <script bytes> <leaf: H('TapLeaf') || H('TapLeaf') || leaf_version>
   // Bring <script bytes> and prefix it with its size in compactSize encoding
     OP_SWAP
@@ -175,7 +182,7 @@ OP::HASH_TAPLEAF = `
 // out: <tweak hash>
 OP::HASH_TAPTWEAK = `
   // Compute the tagged hash prefix (XXX could be precomputed)
-    TAPTWEAK_TAG
+    ELEMENTS_TAPTWEAK_TAG
     OP_SHA256 OP_DUP OP_CAT
   // Add internal pubkey to tweak data
     OP_SWAP OP_CAT
