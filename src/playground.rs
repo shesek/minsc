@@ -113,9 +113,6 @@ lazy_static! {
             else "// Welcome! Put some variables in your environment and they will show up here."
         });
 
-        // Get the env with the argument displayed on top as `$`
-        dyn fn with_env($) = env::pretty();
-
         // Wrap some String-returning functions to return a Symbol instead, to have them displayed in
         // multi-line with syntax highlighting. This works because the playground displays Symbols as
         // their raw internal name, with no string quoting/escaping.
@@ -123,23 +120,12 @@ lazy_static! {
         debug = _symbolify(debug), script::wiz=_symbolify(script::wiz), script::bitide=_symbolify(script::bitide);
 
         // Provide some built-in example pubkeys and hashes for the demo env
-
-        A = pubkey(0x029ffbe722b147f3035c87cb1c60b9a5947dd49c774cc31e94773478711a929ac0);
-        B = pubkey(0x025f05815e3a1a8a83bfbb03ce016c9a2ee31066b98f567f6227df1d76ec4bd143),
-        C = pubkey(0x025625f41e4a065efc06d5019cbbd56fe8c07595af1231e7cbc03fafb87ebb71ec),
-        D = pubkey(0x02a27c8b850a00f67da3499b60562673dcf5fdfb82b7e17652a7ac54416812aefd);
-        E = pubkey(0x03e618ec5f384d6e19ca9ebdb8e2119e5bef978285076828ce054e55c4daf473e2);
-        F = pubkey(0x03deae92101c790b12653231439f27b8897264125ecb2f46f48278603102573165);
-        G = pubkey(0x033841045a531e1adf9910a6ec279589a90b3b8a904ee64ffd692bd08a8996c1aa);
-        I = pubkey(0x02aebf2d10b040eb936a6f02f44ee82f8b34f5c1ccb20ff3949c2b28206b7c1068);
-        J = pubkey(0x03d2810d442a784e93133760af5ac05e4eb72364a3257e5a5eafc618ccb15e580a);
-        K = pubkey(0x03a81dca4cde2edf3d193e2b2446b40aa04f33dd11a4599c7fa55415fc274f0f70);
-        L = pubkey(0x029e5de3f2391700fdb5f45aa5db40b953de8bd4a147663b1cd89aa0703a0c2fcf);
-
-        $alice = xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw/0;
-        $bob = xpub69tT6QWuMwV9bppMzxDX39hz6vcwsgK6YE4gR5cA4auaHsX6dR7uCu566h2WXEGjQe8B89PUJEwsaTJZiDTmLbGVPDDz9JjohA46jUEPvtb;
-        $charlie = xpub6BCmnsYVHYpxh4gPrwWXbYZwGsDHoGP69rQR7EQkWDNKJDuCqhSJXBRsTxiap6fsCmG2YNUVjn3WhpqvtRcwuMX5HyFdvuEwghKjmWMaGrA/3/*;
-
+        $alice = tpubD6NzVbkrYhZ4Y1jchg1nEfquYkdrh9oY5WXwxweo1zYevL9PHMVY9DzJWU5dxhr4v9E2Vp4XKSnztCRkv87LJJZekwYPofCBVh25bnuMsza;
+        $bob = tpubD6NzVbkrYhZ4XJ4wfKpkuKAe6t5151uF1Hq4cvivWNbuRai6XsSCHfUo8FWPMnpj9etDWJmGrGqFhExmyVUfogq87vfi6R1PjP5eF8TTPef;
+        $charlie = tpubD6NzVbkrYhZ4WgopbX4W8gekmVedWGcN6LbbPyHTUh2SsUYosMKxyh5jag4ipYpKhYyrxKENeBDsC3WtzSoayt8xjBps5sAvCTtnq74WWAh;
+        $alice_sk = tprv8ZgxMBicQKsPeYhpp2MBqGBnyj7vXpcdWCwAgRcVbikG5qtcexfwxjNSLKjWGJMCyxBdznejsBgcxMsvKkX7HKJHN25vUPN2szNSc9v7dEp;
+        $bob_sk = tprv8ZgxMBicQKsPdq39mgAAVuWXXrZ4ugiLRzEHLQgd66oWb6TKuUcc7ArvxA8R29Cp65WwChKFq1ELbjCTucZvoe3qn1VjBmGWkiHFq3Fmfiu;
+        $charlie_sk = tprv8ZgxMBicQKsPdDn2hsPujGzeCU8hLwRTX2zp7TFA4RE42zJ3ExWNoCTsQXC2BHVGgEfCdZP9YoV3XHDuDhzCPuw29i74osGgYRxLZ6jfUuh;
         $H256 = 0x01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b;
         $H160 = 0x4355a46b19d348dc2f57c046f8ef63d4538ebb93;
     "#
