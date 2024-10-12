@@ -481,7 +481,18 @@ pub fn fmt_script<W: fmt::Write>(
                     }
                     (ScriptFmt::Minsc(_), "label") => write!(f, "@{{{}}}", quote(body))?,
                     (ScriptFmt::Minsc(_), "comment") => {
-                        write!(f, "#{}{}", iif!(indent.is_some(), " ", ""), quote(body))?
+                        if indent.is_none() {
+                            write!(f, "#{}", quote(body))?;
+                        } else if !body.contains("\n") {
+                            write!(f, "# {}", quote(body))?;
+                        } else {
+                            let mut lines = body.split_inclusive("\n");
+                            write!(f, "#({}", quote(lines.next().unwrap()))?;
+                            for line in lines {
+                                write!(f, " +\n{:i$}{}", "", quote(line), i = indent_w + 2)?;
+                            }
+                            write!(f, ")")?;
+                        }
                     }
                     (ScriptFmt::Minsc(_), kind) if is_valid_ident(kind) => {
                         if body.is_empty() {
@@ -510,8 +521,8 @@ pub fn fmt_script<W: fmt::Write>(
 
                     // Standard // comment format, ScriptWiz & BitIDE
                     (ScriptFmt::ScriptWiz | ScriptFmt::BitIde, "comment") => {
-                        let newline_indent = format!("\n{:i$}// ", "", i = indent_w + if_indent_w);
-                        write!(f, "// {}", body.replace('\n', &newline_indent))?
+                        let newline_sep = format!("\n{:i$}// ", "", i = indent_w + if_indent_w);
+                        write!(f, "// {}", body.replace('\n', &newline_sep))?
                     }
                     (ScriptFmt::ScriptWiz | ScriptFmt::BitIde, kind) => {
                         write!(f, "// Mark {}: {}", quote(kind), quote(body))?
