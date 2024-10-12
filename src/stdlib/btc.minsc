@@ -9,7 +9,7 @@ SIGHASH_DEFAULT=0x00, SIGHASH_ALL=0x01, SIGHASH_NONE=0x02, SIGHASH_SINGLE=0x03,
 SIGHASH_ALL_ANYONECANPAY=0x81, SIGHASH_NONE_ANYONECANPAY=0x82, SIGHASH_SINGLE_ANYONECANPAY=0x83;
 
 // Dust amounts
-DUST_WPKH=294, DUST_WSH=330, DUST_TR=330, DUST_PRE_SW=546,
+DUST_WPKH=294, DUST_WSH=330, DUST_TR=330, DUST_P2A=240, DUST_PRE_SW=546,
 DUST_AMOUNT=DUST_WSH; // also == DUST_TR
 
 // A point with unknown discrete logarithm (to eliminate key-path spend)
@@ -21,6 +21,8 @@ TR_UNSPENDABLE = NUMS; // the default for tr(), can be overridden in user-land c
 // Enables RBF and absolute lock time, disables relative lock time
 ENABLE_RBF = 0xFFFFFFFD;
 
+PREVOUT_NONE = 0000000000000000000000000000000000000000000000000000000000000000:0;
+
 //
 // Altstack manipulation
 //
@@ -28,12 +30,12 @@ ENABLE_RBF = 0xFFFFFFFD;
 // ROLL/PICK from the altstack, for static $n
 fn rollAlt($n) = `
   OP_FROMALTSTACK*$n
-  {`OP_SWAP OP_TOALTSTACK`}*($n - 1)
+  {`OP_SWAP OP_TOALTSTACK`*($n - 1)}
 `;
 fn pickAlt($n) = `
   OP_FROMALTSTACK*$n
   OP_DUP OP_TOALTSTACK
-  {`OP_SWAP OP_TOALTSTACK`}*($n - 1)
+  {`OP_SWAP OP_TOALTSTACK`*($n - 1)}
 `;
 
 // ROLL/PICK from the altstack, using the number at the top of the stack as the depth
@@ -67,7 +69,7 @@ fn nFromAlt($max_n) = `
   OP_FROMALTSTACK
   OP_DUP // keep a copy of the total number of elements
   // stack: <N total> <N counter>, alt stack: <el1> <el2> .. <elN>
-  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT OP_ROT`)
+  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT*2`)
 `;
 
 //
@@ -106,11 +108,11 @@ fn unrollFor($max_iterations, $for_body) {
 // match or the optional `default` branch. If there's no match and no `default`, execution fails.
 //
 // For example, to match a number on the stack and run some code accordingly:
-// ifelseif([
+// ifelseif [
 //   `OP_DUP 0 OP_EQUAL`: `OP_DROP $alice_pk OP_CHECKSIG`,
 //   `OP_DUP 1 OP_EQUAL`: `OP_DROP <6 months> OP_CSV OP_DROP`,
 //   default:             `OP_DROP $bob_pk OP_CHECKSIG`
-// ])
+// ]
 fn ifelseif($clauses) = if isEmpty($clauses) then `` else `
   // Check all clauses but the last, running the first one that matches
   map(initial($clauses), |$clause| `$clause.0 OP_IF $clause.1 OP_ELSE`)
@@ -124,10 +126,10 @@ fn ifelseif($clauses) = if isEmpty($clauses) then `` else `
 
 // Match the item at the top of the stack against the clauses and run the matching script,
 // keeping the item being matched around as necessary. For example:
-// match([
+// match [
 //   `0 OP_EQUAL`: `$alice_pk OP_CHECKSIG`,
 //   `1 OP_EQUAL`: `<6 months> OP_CSV OP_DROP`,
-// ])
+// ]
 fn match($clauses) = if isEmpty($clauses) then `` else
   ifelseif(
     // DUP the value being matched to keep it available for the next clause, while allowing condition
@@ -140,7 +142,7 @@ fn match($clauses) = if isEmpty($clauses) then `` else
   );
 
 // Match the item at the top of the stack for equality.
-// For example: switch([ 0: `$alice_pk OP_CHECKSIG`, 1: `<6 months> OP_CSV OP_DROP` ])
+// For example: switch[ 0: `$alice_pk OP_CHECKSIG`, 1: `<6 months> OP_CSV OP_DROP` ]
 fn switch($clauses) = match(map($clauses, |$clause| {
   $condition = if $clause.0 != default then `$clause.0 OP_EQUAL` else default;
   $condition: $clause.1
@@ -150,7 +152,7 @@ fn switch($clauses) = match(map($clauses, |$clause| {
 // This can typically be better accomplished with separate Taproot leaves for the script
 // branches, but branching within a single Script may be preferable for some simple cases.
 // Does not support a `default` branch.
-// For example: select([ `$alice_pk OP_CHECKSIG`, `<6 months> OP_CSV OP_DROP` ])
+// For example: select[ `$alice_pk OP_CHECKSIG`, `<6 months> OP_CSV OP_DROP` ]
 fn select($scripts) =
   if len($scripts) == 2 then
     // special-case optimization for 2 branches (MINIMALIF enforces 0/1 only)
