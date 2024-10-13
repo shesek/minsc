@@ -6,7 +6,7 @@ use bitcoin::bip32::{self, Xpriv};
 use bitcoin::hex::DisplayHex;
 use bitcoin::psbt::{self, raw, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
 use bitcoin::taproot::{self, LeafVersion, TapLeafHash};
-use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut};
+use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut, XOnlyPublicKey};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 use miniscript::DescriptorPublicKey;
 
@@ -640,39 +640,48 @@ fn xpub_map(val: Value) -> Result<BTreeMap<bip32::Xpub, bip32::KeySource>> {
 // Taproot key source map, with support for some additional ways to specify the BIP32 sources and leaf hashes
 fn tap_key_origins_map(
     val: Value,
-) -> Result<BTreeMap<bitcoin::XOnlyPublicKey, (Vec<TapLeafHash>, bip32::KeySource)>> {
+) -> Result<BTreeMap<XOnlyPublicKey, (Vec<TapLeafHash>, bip32::KeySource)>> {
     val.into_array()?
         .into_iter()
         .map(|el| {
-            let (pk, pk_val): (DescriptorPublicKey, _) = el.try_into()?;
-            let (leaf_hashes, key_source) = match pk_val {
-                // Provided as an explicit map from pubkeys to a tuple of (leaf_hashes,(bip32_fingerprint, path))
-                // Matches the underlying structure used by rust-bitcoin.
-                // For example: "tap_key_origins": [ SINGLE_PUBKEY: [ [ LEAF_HASH1, LEAF_HASH2 ], 0xFINGERPRINT:[0,100]] ] ]
-                Value::Array(arr) if !arr.is_empty() && arr[0].is_array() => arr.try_into()?,
+            Ok(if el.is_array() {
+                let (pk, pk_val): (DescriptorPublicKey, _) = el.try_into()?;
+                match pk_val {
+                    // Provided as an explicit map from pubkeys to a tuple of (leaf_hashes,(bip32_fingerprint, path))
+                    // Matches the underlying structure used by rust-bitcoin.
+                    // For example: "tap_key_origins": [ SINGLE_PUBKEY: [ [ LEAF_HASH1, LEAF_HASH2 ], 0xFINGERPRINT:[0,100]] ] ]
+                    Value::Array(arr) if !arr.is_empty() && arr[0].is_array() => {
+                        (pk.derive_definite()?.into(), arr.try_into()?)
+                    }
 
-                // Provided as a map from xpubs (with associated key source) to the leaf_hashes
-                // For example: "tap_key_origins": [ xpubAAA/0/100: [ LEAF_HASH1, LEAF_HASH2 ] ]
-                Value::Array(arr) => {
-                    let leaf_hashes = arr.try_into()?;
-                    let fingerprint = pk.master_fingerprint();
-                    let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
-                    (leaf_hashes, (fingerprint, path))
+                    // Provided as a map from xpubs (with associated key source) to the leaf_hashes
+                    // For example: "tap_key_origins": [ xpubAAA/0/100: [ LEAF_HASH1, LEAF_HASH2 ] ]
+                    Value::Array(arr) => {
+                        let leaf_hashes = arr.try_into()?;
+                        let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                        let source = (pk.master_fingerprint(), path);
+                        (pk.derive_definite()?.into(), (leaf_hashes, source))
+                    }
+
+                    // Provided as a map from xpubs (with associated key source) to a single script to compute the leaf hash for
+                    // For example: "tap_key_origins": [ xpubAAA/0/100: `xpubAAA/0/100 OP_CHECKSIG` ]
+                    Value::Script(script) => {
+                        let leaf_hash = TapLeafHash::from_script(&script, LeafVersion::TapScript);
+                        let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                        let source = (pk.master_fingerprint(), path);
+                        (pk.derive_definite()?.into(), (vec![leaf_hash], source))
+                    }
+
+                    other => bail!(Error::InvalidValue(other.into())),
                 }
-
-                // Provided as a map from xpubs (with associated key source) to a single script to compute the leaf hash for
-                // For example: "tap_key_origins": [ xpubAAA/0/100: `xpubAAA/0/100 OP_CHECKSIG` ]
-                Value::Script(script) => {
-                    let leaf_hash = TapLeafHash::from_script(&script, LeafVersion::TapScript);
-                    let fingerprint = pk.master_fingerprint();
-                    let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
-                    (vec![leaf_hash], (fingerprint, path))
-                }
-
-                other => bail!(Error::InvalidValue(other.into())),
-            };
-            let final_pk = pk.derive_definite()?;
-            Ok((final_pk.into(), (leaf_hashes, key_source)))
+            } else {
+                // Provided as just the internal key (with associated source), with no leaf hashes
+                // For example: "tap_key_origins": [ xpubAAA/0/100 ], which is equivalent to [ xpubAAA/0/100: [] ]
+                let pk: DescriptorPublicKey = el.try_into()?;
+                let fingerprint = pk.master_fingerprint();
+                let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+                (pk.derive_definite()?.into(), (vec![], (fingerprint, path)))
+            })
         })
         .collect()
 }
@@ -816,8 +825,7 @@ impl PrettyDisplay for psbt::Input {
             |f, ((pk, leaf_hash), sig), _| write!(f, "[{}, {}]: 0x{}", pk, leaf_hash, sig.to_vec().as_hex()));
         fmt_map_field!(self, tap_scripts, f, sep, is_first, inner_indent, // TODO leaf version not encoded
             |f, (ctrl, (script, _ver)), _| write!(f, "0x{}: {}", ctrl.serialize().as_hex(), script.pretty(None)));
-        fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent,
-            |f, (pk, (hashes, src)), _| write!(f, "[{}/{}]{}: {}", src.0, src.1, pk, hashes.pretty(None)));
+        fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent, fmt_tap_key_origin);
         fmt_opt_field!(self, tap_internal_key, f, sep, is_first);
         fmt_opt_field!(self, tap_merkle_root, f, sep, is_first);
 
@@ -845,11 +853,23 @@ impl PrettyDisplay for psbt::Output {
             |f, (pk, src), _| write!(f, "[{}/{}]{}", src.0, src.1, pk));
         fmt_opt_field!(self, tap_internal_key, f, sep, is_first);
         fmt_opt_field!(self, tap_tree, f, sep, is_first, "{}", tap_tree.pretty(inner_indent));
-        fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent,
-            |f, (pk, (hashes, src)), _| write!(f, "[{}/{}]{}: {}", src.0, src.1, pk, hashes.pretty(None)));
+        fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent, fmt_tap_key_origin);
         fmt_map_field!(self, proprietary, f, sep, is_first, inner_indent);
         fmt_map_field!(self, unknown, f, sep, is_first, inner_indent);
         write!(f, "{newline_or_space}{:indent_w$}]", "")
+    }
+}
+
+#[rustfmt::skip]
+fn fmt_tap_key_origin<W: fmt::Write>(
+    f: &mut W,
+    (pk, (leaf_hashes, src)): (&XOnlyPublicKey, &(Vec<TapLeafHash>, bip32::KeySource)),
+    _indent: Option<usize>,
+) -> fmt::Result {
+    if !leaf_hashes.is_empty() {
+        write!(f, "[{}/{}]{}: {}", src.0, src.1, pk, leaf_hashes.pretty(None))
+    } else {
+        write!(f, "[{}/{}]{}", src.0, src.1, pk)
     }
 }
 
