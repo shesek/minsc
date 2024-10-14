@@ -32,6 +32,8 @@ fn find($arr, $fn)  = foldUntil($arr, null,  |$acc, $el| if $fn($el)  then true:
 fn some($arr, $fn)  = foldUntil($arr, false, |$acc, $el| if $fn($el)  then true:true  else false:false);
 fn every($arr, $fn) = foldUntil($arr, true,  |$acc, $el| if !$fn($el) then true:false else false:true);
 
+fn contains($arr, $needle) = some($arr, |$el| $el == $needle);
+
 fn concat($xs) = reduce($xs, |$acc, $x| $acc + $x);
 sum = concat; // works for arrays, bytes, strings and numbers
 
