@@ -17,7 +17,7 @@ use crate::util::{
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
-    scope.set_fn("psbt", fns::create).unwrap(); // alias
+    scope.set_fn("psbt", fns::psbt).unwrap(); // create or update
     scope.set_fn("psbt::create", fns::create).unwrap();
     scope.set_fn("psbt::update", fns::update).unwrap();
     scope.set_fn("psbt::combine", fns::combine).unwrap();
@@ -55,8 +55,18 @@ impl TryFrom<Value> for Psbt {
 pub mod fns {
     use super::*;
 
+    /// psbt(Transaction|Bytes|Array<Tagged>) -> Psbt
+    /// psbt(Transaction|Bytes|Array<Tagged>, Array<Tagged>) -> Psbt
+    pub fn psbt(args: Array, scope: &ScopeRef) -> Result<Value> {
+        let args = args.check_varlen(1, 2)?;
+        if args.len() == 1 {
+            create(args, scope)
+        } else {
+            update(args, scope)
+        }
+    }
+
     /// psbt::create(Transaction|Bytes|Array<Tagged>) -> Psbt
-    /// Aliased as psbt()
     pub fn create(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::Psbt(args.arg_into()?))
     }
