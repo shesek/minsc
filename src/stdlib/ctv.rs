@@ -11,7 +11,8 @@ lazy_static! {
         OP_CHECKTEMPLATEVERIFY = script(0xb3);
         OP_CTV = OP_CHECKTEMPLATEVERIFY;
 
-        fn ctv::verify($tx) = `ctv::hash($tx) OP_CHECKTEMPLATEVERIFY OP_DROP`;
+        fn ctv($tx) = `ctv::hash($tx) OP_CHECKTEMPLATEVERIFY OP_DROP`;
+        fn ctv::verify($tx) = `ctv::hash($tx) OP_CHECKTEMPLATEVERIFY`;
     "#
     .parse()
     .unwrap();

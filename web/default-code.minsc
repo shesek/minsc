@@ -78,7 +78,7 @@ fn SimpleVault($cold_pk, $hot_policy, $hot_delay, $txo_amount, $fee) =
   tr($cold_pk, SimpleVaultHotPath($cold_pk, $hot_policy, $hot_delay, $txo_amount, $fee));
 
 fn SimpleVaultHotPath($cold_pk, $hot_policy, $hot_delay, $txo_amount, $fee) =
-  `tapscript($hot_policy) ctv::verify[
+  `tapscript($hot_policy) ctv [
     "output": tr($cold_pk, $hot_policy && older($hot_delay)): $txo_amount - $fee - DUST_AMOUNT,
     "output": tr($cold_pk, $hot_policy): DUST_AMOUNT, // anchor output for fee bumping
   ]`;
@@ -132,14 +132,14 @@ fn HodlChicken($alice_pk, $bob_pk, $hodl_time, $amount, $penalty) {
   // Create a taproot tree for all the outcome branches (using a point with unknown discrete logarithm to eliminate key-path spends)
   NUMS + [
     // Alice chickens out
-    `$alice_pk OP_CHECKSIG ctv::verify(earlyRedeem($alice_pk, $bob_pk))`,
+    `$alice_pk OP_CHECKSIG ctv(earlyRedeem($alice_pk, $bob_pk))`,
 
     // Bob chickens out
-    `$bob_pk OP_CHECKSIG ctv::verify(earlyRedeem($bob_pk, $alice_pk))`,
+    `$bob_pk OP_CHECKSIG ctv(earlyRedeem($bob_pk, $alice_pk))`,
 
     // Both HODL all the way through & get their bitcoins back (either can sign)
-    `$alice_pk OP_CHECKSIG ctv::verify($hodlRedeem)`,
-    `$bob_pk OP_CHECKSIG ctv::verify($hodlRedeem)`,
+    `$alice_pk OP_CHECKSIG ctv($hodlRedeem)`,
+    `$bob_pk OP_CHECKSIG ctv($hodlRedeem)`,
 
     // Allow other outcomes by mutual agreement (could be an aggregated musig internal key)
     `$alice_pk OP_CHECKSIGVERIFY $bob_pk OP_CHECKSIG`,
