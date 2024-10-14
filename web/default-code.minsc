@@ -1,48 +1,45 @@
-// Script
+// Public Keys, Descriptors & Miniscript
 
-// Sum inputs using the Elements introspection opcodes
-fn sumInputs($max_inputs) = `
-  le64(0) // 64-bit accumulator for the total input sum
-  OP_INSPECTNUMINPUTS // num inputs counter, 1-indexed (e.g starts at 1 for a single input at index 0)
-  #"starting loop"
-  unrollFor($max_inputs, |$n| ` // errors if there are more inputs
-    #{"loop:"+$n}
-    OP_DUP OP_1SUB // get input index (counter-1)
-    OP::INPUT_VALUE // get input value
-    OP_ROT // bring sum accumulator to top
-    OP::ADD64_VERIFY // add current input value to sum
-    OP_SWAP // bring current index back to top
-  `) // (should check asset id too -- skipped here for brevity)
-`;
+$alice = xpub661MyMwAqRbcFjVEmr9dDxeGKJznf41v5bEd83wMwu7CJ6PFeqJk3cSECPTh6wzsh32xceVsPvBgJ1q3Cqqie2dvH9nMFdL5865WrtRNhiB;
+$bob = xpub661MyMwAqRbcFG1mzmcbw7oZss2Fn9y3d27D1KVjyKQdYGqNsZ8nSvLSexZAtkCNwvhFrAkTWAixvN9wjmnLNR22EsQczTiKccAJoLYW8CK;
+$charlie = xpub661MyMwAqRbcEZC9Va3dMVh3uf9Lrob4K47xhfiAyUrDZSpNWi17UiP9TSPYeCVBHTHqaGhqUpSoTtaWqp1LYB4fKyKCHieonMDxngohm8q;
 
-// Ensure the total inputs sum is at least 2 BTC (for up to 3 inputs)
-$minimum_2btc = `sumInputs(3) le64(2 BTC) OP_GREATERTHANOREQUAL64`;
-
-
-// Miniscript
-
-$alice = xpub68Gmy5EdvgibQVfPdqkBBCHxA5htiqg55crXYuXoQRKfDBFA1WEjWgP6LHhwBZeNK1VTsfTFUHCdrfp1bgwQ9xv5ski8PX9rL2dZXvgGDnw/0;
-$bob = xpub69tT6QWuMwV9bppMzxDX39hz6vcwsgK6YE4gR5cA4auaHsX6dR7uCu566h2WXEGjQe8B89PUJEwsaTJZiDTmLbGVPDDz9JjohA46jUEPvtb;
-$charlie = xpub6BCmnsYVHYpxh4gPrwWXbYZwGsDHoGP69rQR7EQkWDNKJDuCqhSJXBRsTxiap6fsCmG2YNUVjn3WhpqvtRcwuMX5HyFdvuEwghKjmWMaGrA;
-
-$alice_wpkh = wpkh($alice/5/0/*);
-$wsh = wsh(pk($bob) && older(1 year));
+$wpkh = wpkh($alice/5/0/*);
+$wsh = wsh(pk($bob) && pk($alice));
 $tr = tr($alice, [ pk($bob), pk($charlie) && older(30 days) ]);
 
 $htlc_redeem = pk($alice) && sha256(907bde3816465e678dd2d661bf3d84f933e71c5e2ea25543247df7a5858dfa55);
 $htlc_refund = pk($bob) && older(2 days);
 $htlc_tr = tr(likely@$htlc_redeem || $htlc_refund); // NUMS as the internal key
 
+$3of3_into_2of3 = tr(3 of [ $alice, $bob, $charlie, older(6 months) ]);
+
+
+// Address generation
+
+$alice_addr = address(wpkh($alice/10));
+$htlc_addr = address($htlc_tr, signet);
+
+
+// Secret keys & Signing
+
+$alice_sk = xprv9s21ZrQH143K3FQmfpccrphXmHAJFbJ4iNK2KfXkPZaDRJ477HzVVp7kM7RV3ihdLh4Wy163wJahwXcdcrpu4R6xSu6CUvKYwftQYCbowYM;
+$bob_sk = xprv9s21ZrQH143K2mwJtk5bZyrqKqBmNhFCFoBcCw68QysefUWEL1pXu81xoeva2ZWpCjsJzzmYqph6vw6FjCMjg3q8obNzxYY9bCVgt9bKoHQ;
+$wif_sk = 5HueCGU8rMjxEXxiPuD5BDku4MkFqeZyd4dZ1jvhTVqvbTLvyTJ;
+
+$signature = schnorr::sign($alice_sk/10, hash::sha256("Hello"));
+assert(schnorr::verify($alice/10, hash::sha256("Hello"), $signature));
+
 
 // Transactions
 
-$tx = tx([
+$tx = tx [
   "version": 2,
   "locktime": 2025-06-02T,
   // all fields are optional
 
   "inputs": [
-    [ "prevout": 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b:3, "sequence": 0xffffffff, "witness": [ 0x010203, 0x040506 ] ],
+    [ "prevout": 01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b:3, "sequence": 2 months, "witness": [ 0x010203, 0x040506 ] ],
     [ "prevout": d9cd8155764c3543f10fad8a480d743137466f8d55213c8eaefcd12f06d43a80:2, "script_sig": `0x070809 0x009988` ],
     // or just the prevout's txid:vout
     b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c:0,
@@ -65,13 +62,71 @@ $tx = tx([
     // Long form
     [ "script_pubkey": tr($bob), "amount": 10 uBTC ],
   ]
-]);
+];
+
+$tx2 = tx [
+  "input": b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c:0,
+  "output": tr($bob/5):4500 sat
+];
+
+$tx2_sighash = tx::sighash($tx2, 0, [ wpkh($alice/9):5000 sat ], SIGHASH_ALL);
+$tx2_sig = ecdsa::sign($alice_sk/9, $tx2_sighash) + SIGHASH_ALL;
+
+
+// PSBT & Transaction signing
+
+$multisig = 2 of [ $alice/5/*, $bob/5/*, $charlie/5/* ];
+$psbt = psbt [
+  "input": [
+    "prevout": b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c:0,
+    "utxo": wsh($multisig/0):0.5 BTC,
+  ],
+  "outputs": [
+    wpkh($alice/5): 0.1 BTC,
+    wsh($multisig/1): 0.399 BTC, // change back to multisig
+  ]
+];
+$psbt_signed = psbt::sign($psbt, [ $alice_sk, $bob_sk ]);
+$psbt_tx = psbt::extract(psbt::finalize($psbt_signed));
+
+
+// Script
+
+fn taggedHash($tag) = `$tag OP_SHA256 OP_DUP OP_CAT OP_SWAP OP_SHA256`;
+$script = `0x1122334455 taggedHash("TapLeaf") OP_TOALTSTACK`;
+
+// OP_PICK from altstack (for static $n)
+fn pickAlt($n) = `
+  OP_FROMALTSTACK*$n
+  OP_DUP OP_TOALTSTACK
+  {`OP_SWAP OP_TOALTSTACK`*($n - 1)}
+`;
+$s_pick = `OP_SWAP pickAlt(3) OP_CAT`;
+
+// Sum inputs using the Elements introspection opcodes and loop unrolling
+fn sumInputs($max_inputs) = `
+  le64(0) // 64-bit accumulator for the total input sum
+  OP_INSPECTNUMINPUTS // num inputs counter, 1-indexed (e.g starts at 1 for a single input at index 0)
+  unrollFor($max_inputs, ` // errors if there are more inputs
+    # "loop iter"
+    OP_DUP OP_1SUB // get input index (counter-1)
+    OP::INPUT_VALUE // get input value
+    OP_ROT // bring sum accumulator to top
+    OP::ADD64_VERIFY // add current input value to sum
+    OP_SWAP // bring current index back to top
+  `) // (should check asset id too -- skipped here for brevity)
+`;
+
+// Ensure the total inputs sum is at least 2 BTC (for up to 3 inputs)
+$minimum_2btc = `sumInputs(3) le64(2 BTC) OP_GREATERTHANOREQUAL64`;
+
+// More Script builtins at https://github.com/shesek/minsc/blob/master/src/stdlib/btc.minsc
 
 
 // Simple CTV vault
 //
 // $cold_pk can sign unconditionally using the internal key path.
-// $hot_policy can initiate a 2-stage withdrawl process with a mandatory delay
+// $hot_policy can initiate a 2-stage withdrawal process with a mandatory delay
 // period of $hot_delay, during which the $cold_pk can claim the funds back.
 
 fn SimpleVault($cold_pk, $hot_policy, $hot_delay, $txo_amount, $fee) =
@@ -84,11 +139,13 @@ fn SimpleVaultHotPath($cold_pk, $hot_policy, $hot_delay, $txo_amount, $fee) =
   ]`;
   // (has to embed Miniscript into a raw `` Script because rust-miniscript doesn't support CTV)
 
-// Cold key $alice/0 can withdraw immediatly, hot key $alice/1 has to wait 2 weeks
-$vault_simple = SimpleVault($alice/0, pk($alice/1), 2 weeks, 300 bits, 500 sats);
+$alice_cold = xpub661MyMwAqRbcGEt6aoj3Uf25rMPiRt5Dn7HWgbMD4Fi4moiDMr37K2A7SDoLrmZnoWGPQFyNLDLFxfPh4Yv8Z7ms639K4he2za1FLwam2ia;
+
+// Cold key can withdraw immediately, hot key $alice has to wait 2 weeks
+$vault = SimpleVault($alice_cold, $alice, 2 weeks, 300 bits, 500 sats);
 
 // A vault where the hot key is a 2-of-2 between alice and a cosigner
-$vault_hot2f2 = SimpleVault($alice/0, pk($alice/1) && pk($charlie), 2 weeks, 300 bits, 500 sats);
+$vault_hot2f2 = SimpleVault($alice_cold, $alice && $charlie, 2 weeks, 300 bits, 500 sats);
 
 // Vault with multiple secondary keys, each with its own delay configuration
 fn MultiKeyVault($primary_pk, $txo_amount, $fee, $secondary_pks) =
@@ -96,30 +153,30 @@ fn MultiKeyVault($primary_pk, $txo_amount, $fee, $secondary_pks) =
     SimpleVaultHotPath($primary_pk, $pk_tuple.0, $pk_tuple.1, $txo_amount, $fee)
   ));
 
-$vault_multi = MultiKeyVault($alice/0, 300 bits, 500 sats, [
-  pk($alice/1): 1 week, // alice's own hot key can withdraw with a 1 week delay
-  pk($charlie): 1 year, // alice's friend charlie can help recover with a 1 year delay 
-  pk($bob): 6 months, // alice's best friend can recover sooner
-  (pk($charlie) && pk($bob)): 4 weeks, // together they can expedite to 4 weeks
+$vault_multi = MultiKeyVault($alice_cold, 300 bits, 500 sats, [
+  $alice: 1 week, // alice's own hot key can withdraw with a 1 week delay
+  $charlie: 1 year, // alice's friend charlie can help recover with a 1 year delay
+  $bob: 6 months, // alice's best friend can recover sooner
+  ($charlie && $bob): 4 weeks, // together they can expedite to 4 weeks
 ]);
 
 
-// Chicken HODL game
+// CTV Chicken HODL game
 //
-// Bob and Alice both deposit $amount BTC (+some for fees) into the covenant. If Alice and Bob both HODL
+// Bob and Alice each deposit $amount BTC (+some for fees) into the covenant. If Alice and Bob both HODL
 // for $hodl_time, they get their bitcoins back. If they chicken out before that they can still redeem,
 // but have to forfeit $penalty BTC to the other party. (based on https://judica.org/blog/hodl-chicken/)
 
 fn HodlChicken($alice_pk, $bob_pk, $hodl_time, $amount, $penalty) {
-  // early redeem $tx signed by $loser_pk, $winner_pk wins $penatly
-  fn earlyRedeem($loser_pk, $winner_pk) = [
+  // early redeem $tx signed by $loser_pk, $winner_pk wins $penalty
+  fn earlyRedeem($loser_pk, $winner_pk) = tx [
     "outputs": [
       tr($loser_pk): $amount - $penalty,
       tr($winner_pk): $amount + $penalty,
     ]
   ];
   // $hodl_time passed, bob & alice get their bitcoins back
-  $hodlRedeem = [
+  $hodlRedeem = tx [
     "input": [ "sequence": $hodl_time ],
     "outputs": [
       tr($alice_pk): $amount,
@@ -127,10 +184,8 @@ fn HodlChicken($alice_pk, $bob_pk, $hodl_time, $amount, $penalty) {
     ]
   ];
 
-  log("HODL:", tx($hodlRedeem), "\nBob chickens:", tx(earlyRedeem($bob_pk, $alice_pk)), "\nAlice chickens:", tx(earlyRedeem($alice_pk, $bob_pk)));
-
-  // Create a taproot tree for all the outcome branches (using a point with unknown discrete logarithm to eliminate key-path spends)
-  NUMS + [
+  // Create a taproot tree for all the outcome branches (uses NUMS as the internal key to eliminate key-path spends)
+  tr [
     // Alice chickens out
     `$alice_pk OP_CHECKSIG ctv(earlyRedeem($alice_pk, $bob_pk))`,
 
@@ -144,7 +199,6 @@ fn HodlChicken($alice_pk, $bob_pk, $hodl_time, $amount, $penalty) {
     // Allow other outcomes by mutual agreement (could be an aggregated musig internal key)
     `$alice_pk OP_CHECKSIGVERIFY $bob_pk OP_CHECKSIG`,
   ]
-  // $pk + $script is an alternative syntax for tr($pk, $script)
 }
 
 $hodl_chicken = HodlChicken($alice/5, $charlie/5, 1 year, 1 BTC, 0.5 BTC);
