@@ -179,3 +179,18 @@ dyn fn mark::ctx($$context, $$fn) {
   MARK_CTX = MARK_CTX + $$context;
   $$fn()
 }
+
+//
+// Transaction utilities
+//
+
+fn tx::sighash($tx, $vin, $utxos, $sighash_ty) = psbt::sighash([
+  "unsigned_tx": $tx,
+  "inputs": map($utxos, |$utxo| [
+    "utxo": $utxo,
+    "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
+  ])
+], $vin);
+
+// TODO support specifying the tapleaf heah (available when using psbt::sighash() directly)
+// TOOD tx::sighash_sw0() with just the signed utxo & tx::sighash_presw() with just the utxo scriptPubKey
