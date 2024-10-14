@@ -11,7 +11,7 @@ use miniscript::descriptor::{self, DescriptorPublicKey};
 
 use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
-use crate::runtime::{Error, Result, Value};
+use crate::runtime::{Array, Error, Result, Value};
 use crate::util::{self, fmt_list, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, EC};
 use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
 
@@ -39,7 +39,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 #[allow(non_snake_case)]
 pub mod fns {
     use super::*;
-    use crate::runtime::{Array, Int};
     use crate::util::MiniscriptExt;
 
     /// Construct a tr() descriptor:
@@ -130,20 +129,14 @@ pub mod fns {
         Ok(Value::TapInfo(args.arg_into()?))
     }
 
-    /// tr::tapLeaf(Script, version=0xc0) -> Hash
+    /// tr::tapLeaf(Script, Byte version=TapScript) -> Hash
     ///
     /// Compute the leaf hash of the given script
     pub fn tapLeaf(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (script, leaf_var): (ScriptBuf, Option<Value>) = args.args_into()?;
-        let leaf_ver = leaf_var.map_or(Ok(LeafVersion::TapScript), |ver| -> Result<_> {
-            Ok(LeafVersion::from_consensus(match ver {
-                Value::Number(Int(num)) => num.try_into()?,
-                Value::Bytes(bytes) if bytes.len() == 1 => bytes[0],
-                _ => bail!(Error::InvalidArguments),
-            })?)
-        })?;
+        let (script, leaf_var): (ScriptBuf, Option<_>) = args.args_into()?;
+        let leaf_ver = leaf_var.unwrap_or(LeafVersion::TapScript);
         let leaf_hash = TapLeafHash::from_script(&script, leaf_ver);
-        Ok(Value::Bytes(leaf_hash.to_byte_array().to_vec()))
+        Ok(leaf_hash.to_byte_array().to_vec().into())
     }
 
     /// tr::tapBranch(Hash node_a, Hash node_b) -> Hash
@@ -151,8 +144,8 @@ pub mod fns {
     /// Combine two nodes to create a new TapBranch parent
     pub fn tapBranch(args: Array, _: &ScopeRef) -> Result<Value> {
         let (a_hash, b_hash) = args.args_into()?;
-        let branch = TapNodeHash::from_node_hashes(a_hash, b_hash);
-        Ok(Value::Bytes(branch.to_byte_array().to_vec()))
+        let branch_hash = TapNodeHash::from_node_hashes(a_hash, b_hash);
+        Ok(branch_hash.to_byte_array().to_vec().into())
     }
 }
 
