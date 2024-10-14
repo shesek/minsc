@@ -1,0 +1,40 @@
+// Spend from a simple Taproot internal-key-only wallet using PSBT
+// Similarly to https://github.com/rust-bitcoin/rust-bitcoin/blob/master/bitcoin/examples/taproot-psbt-simple.rs
+
+// Wallet setup & Address generation
+
+$sk = xprv9tuogRdb5YTgcL3P8Waj7REqDuQx4sXcodQaWTtEVFEp6yRKh1CjrWfXChnhgHeLDuXxo2auDZegMiVMGGxwxcrb2PmiGyCngLxvLeGsZRq;
+
+// Multi-path descriptor with the BIP86 external/internal chains
+$descs = tr($sk/86'/0'/0'/<0;1>/*);
+$external = $descs.0, $internal = $descs.1;
+
+$receive_addr = address($external/0); // tr($sk/86'/0'/0'/0/0)
+$change_addr = address($internal/5); // tr($sk/86'/0'/0'/1/5)
+
+// Spend from wallet
+
+$psbt = psbt [
+  "inputs": [
+    [
+      "prevout": b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c:0,
+      "utxo": ($external/0):0.2 BTC,
+    ],
+    [
+      "prevout": 45bdbfc61243606521bb174473121b922cbebb983b628c191253d1e0e88b2d49:1,
+      "utxo": ($internal/0):0.1 BTC,
+    ],
+  ],
+  "outputs": [
+    tb1qs2xpw2sc6vrl8u0x5mw2l9ff2tj4tsca82nq9w:0.0499 BTC,
+    ($internal/1):0.25 BTC, // change
+  ]
+];
+
+assert::eq(psbt::fee($psbt), 0.0001 BTC);
+
+$signed = psbt::sign($psbt, $sk);
+$tx = psbt::extract(psbt::finalize($signed));
+$tx_hex = hex($tx);
+
+env::pretty()

@@ -1,0 +1,50 @@
+//
+// Wallet setup
+//
+
+$user = tprv8ZgxMBicQKsPfJtqwiW9WhjJHPZtDo8aUbCkkcG8sjHbpZqjghF6ZJ1Tze9fUHrhYyXSNfw5VPbCKEkoFKaDRUzctbSxmxSWNfAGDonxcTG;
+$cosigner = tpubD6NzVbkrYhZ4WU51DSz3tDgUfzssAKfjba5JkCLKYmbpeimzvrc7NfTPMStAugvBbyrii2jQKxDofyWVt2Kfxhjd2wz7BGAjNn35HnN7u2L;
+
+// Normally the user and co-signer sign-off together, but after 6 months the user alone is enough
+$co_wallet = pk($user/*) && (likely@pk($cosigner/*) || older(6 months));
+
+// The user is expected to occasionally 'roll over' UTXOs so the expiry isn't reached (unless he wishes it to)
+
+// Generate wallet address #0 (code below assumes a0499e..:0 funded it with 0.5 BTC)
+$address = address(tr($co_wallet/0));
+
+
+//
+// Spend from wallet
+//
+
+// Spend with co-signer cooperation
+$co_spend = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:0,
+    "utxo": tr($co_wallet/0):0.5 BTC,
+  ],
+  "outputs": [
+    bcrt1ql8nqx3q3v7napchr6ewy4tpyq5y08ywat84pen: 0.4 BTC,
+    tr($co_wallet/1): 0.099 BTC, // change
+  ]
+];
+$co_spend_user_signed = psbt::sign($co_spend, $user);
+// The co-signer will typically run some checks against the $psbt before agreeing to sign it, apply rate limits, require a 2FA token, etc.
+$co_spend_co_signed = psbt::sign($co_spend_user_signed, tprv8ZgxMBicQKsPd13DKoKTUp2N6yMvzzUq2GUXTgJ28VoRpEXEJTnXCAqXBHm6sCAMgPNR9fwjcpzCWRpV9uqu85YEtSwb4dCoBGrPP84mLrR);
+$co_spend_tx = psbt::extract(psbt::finalize($co_spend_co_signed));
+
+
+// Spend without the co-signer, after waiting for 6 months
+$unilateral_spend = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:0,
+    "utxo": tr($co_wallet/0):0.5 BTC,
+    "sequence": 6 months,
+  ],
+  "output": wpkh($user/1'/0): 0.499 BTC, // send to the $user's full control
+];
+$unilateral_user_signed = psbt::sign($unilateral_spend, $user);
+$unilateral_tx = psbt::extract(psbt::finalize($unilateral_user_signed));
+
+env::pretty()

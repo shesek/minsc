@@ -1,2 +1,44 @@
+//
+// Wallet setup
+//
+
+// Keys can also be provided as xpubs (psbt::sign() won't work, everything else will)
+$alice = tprv8ZgxMBicQKsPetSgeFrfiPJK1FSJsK9PiQ4eiJofrWY8UFgG4BWSBmq8s9Y7qaQmgekZqbcZdv3bykUVBB6mXuPhkMGF8i3fKQhVx9vv3D6/*;
+$bob = tprv8ZgxMBicQKsPczR3NYu9cBy9BmsCZAPyZvySKon1nPDpZZAdQ4aUgXpSgZpaGzsXPs6QEzsHiW3TpYAGfHvATofLL5ztpLdF8BgiUVs5JJy/*;
+$charlie = tprv8ZgxMBicQKsPf3wr5EcYfF74cDWJpyxeahyTS2yQoF6gZdL2aG2TdvXJEBdSfvUKv2f224B1PntM1bUntdbnLPqzENFwHFbYRCYe8Bx15hU/*;
+
 // A 3-of-3 that turns into 2-of-3 after a timeout
-3 of [ pk(A), pk(B), pk(C), older(1 month 2 weeks) ]
+$desc = tr(3 of [ $alice, $bob, $charlie, older(6 months) ]);
+
+// Generate wallet address #0 (code below assumes a0499e..:0 funded it with 0.5 BTC)
+$address = address($desc/0, regtest);
+
+//
+// Spend from wallet
+//
+
+// Spend with 3 signatures
+$3of3_psbt = psbt [
+  "input": [
+    "prevout": 72877bd944be3433d5030ef102922e52f7c40de8b5ca26fa8b7c724d341e936e:1,
+    "utxo": ($desc/0):0.5 BTC,
+  ],
+  "output": bcrt1ql8nqx3q3v7napchr6ewy4tpyq5y08ywat84pen: 0.499 BTC,
+];
+$3of3_signed = psbt::sign($3of3_psbt, [ $alice, $bob, $charlie ]);
+$3of3_tx = psbt::extract(psbt::finalize($3of3_signed));
+
+
+// Spend with 2 signatures after 6 months
+$2of3_psbt = psbt [
+  "input": [
+    "prevout": 72877bd944be3433d5030ef102922e52f7c40de8b5ca26fa8b7c724d341e936e:1,
+    "utxo": ($desc/0):0.5 BTC,
+    "sequence": 6 months,
+  ],
+  "output": bcrt1ql8nqx3q3v7napchr6ewy4tpyq5y08ywat84pen: 0.499 BTC,
+];
+$2of3_signed = psbt::sign($2of3_psbt, [ $bob, $charlie ]);
+$2of3_tx = psbt::extract(psbt::finalize($2of3_signed));
+
+env::pretty()
