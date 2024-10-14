@@ -23,6 +23,9 @@ ENABLE_RBF = 0xFFFFFFFD;
 
 PREVOUT_NONE = 0000000000000000000000000000000000000000000000000000000000000000:0;
 
+// Taproot utilities
+fn tr::script_witness($tr, $script, $stack) = $stack + [ $script, tr::ctrl($tr, $script) ];
+
 //
 // Altstack manipulation
 //

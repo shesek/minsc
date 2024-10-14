@@ -26,6 +26,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("tr::outputKey", fns::outputKey).unwrap();
     scope.set_fn("tr::merkleRoot", fns::merkleRoot).unwrap();
     scope.set_fn("tr::scripts", fns::scripts).unwrap();
+    scope.set_fn("tr::ctrl", fns::ctrl).unwrap();
 
     // Convert a tr() descriptor into a TaprootSpendInfo
     scope.set_fn("tr::tapInfo", fns::tapInfo).unwrap();
@@ -39,6 +40,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 pub mod fns {
     use super::*;
     use crate::runtime::{Array, Int};
+    use crate::util::MiniscriptExt;
 
     /// Construct a tr() descriptor:
     /// tr(PubKey) -> Descriptor
@@ -92,22 +94,33 @@ pub mod fns {
         }))
     }
 
-    /// tr::scripts(TapInfo) -> Array<(Script, Int version, Bytes control_block)>
+    /// tr::scripts(TapInfo|Descriptor) -> Array<Script>
     ///
-    /// Get the scripts in this TapInfo with their control blocks
+    /// Get an array of all scripts in the tree
     pub fn scripts(args: Array, _: &ScopeRef) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
+        let scripts = tapinfo.script_map().keys();
+        Ok(Value::array(
+            scripts.map(|(script, _)| script.clone().into()).collect(),
+        ))
+    }
 
-        let scripts_ctrls = tapinfo
-            .script_map()
-            .keys()
-            .map(|script_ver| {
-                let ctrl = tapinfo.control_block(script_ver).unwrap().serialize();
-                Value::array_of((script_ver.0.clone(), script_ver.1.to_consensus(), ctrl))
-            })
-            .collect();
-
-        Ok(Value::array(scripts_ctrls))
+    /// tr::ctrl(TapInfo|Descriptor, Script|Policy, Byte version=TapScript) -> Array<Script>
+    ///
+    /// Get the control block for the given script/policy
+    pub fn ctrl(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (tapinfo, script_or_policy, leaf_ver): (TaprootSpendInfo, Value, Option<LeafVersion>) =
+            args.args_into()?;
+        let script = match script_or_policy {
+            Value::Script(script) => script,
+            Value::Policy(policy) => policy.compile::<miniscript::Tap>()?.derive_keys()?.encode(),
+            other => bail!(Error::InvalidValue(other.into())),
+        };
+        let leaf_ver = leaf_ver.unwrap_or(LeafVersion::TapScript);
+        let ctrl = tapinfo
+            .control_block(&(script, leaf_ver))
+            .ok_or(Error::TaprootScriptNotFound)?;
+        Ok(ctrl.serialize().into())
     }
 
     /// tr::tapInfo(Descriptor|TapInfo) -> TapInfo

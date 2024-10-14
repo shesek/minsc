@@ -241,8 +241,11 @@ pub enum RuntimeError {
     #[error("Invalid taproot binary script tree structure. Expecting a nested array where elements are leaf nodes (with no weights) or a tuple of nodes.")]
     TaprootInvalidScriptBinaryTree,
 
-    #[error("Invalid taproot script, expecting Policy/Script or an array of them")]
+    #[error("Invalid taproot tree node, expecting Policy/Script or an array of them")]
     TaprootInvalidScript,
+
+    #[error("Script does not exists in Taproot tree")]
+    TaprootScriptNotFound,
 
     #[error["Miniscript hash pre-images must be exactly 32 bytes long"]]
     InvalidPreimageLen,
