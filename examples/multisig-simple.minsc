@@ -1,0 +1,41 @@
+// Keys can also be provided as xpubs (psbt::sign() won't work, everything else will)
+$alice = tprv8ZgxMBicQKsPetSgeFrfiPJK1FSJsK9PiQ4eiJofrWY8UFgG4BWSBmq8s9Y7qaQmgekZqbcZdv3bykUVBB6mXuPhkMGF8i3fKQhVx9vv3D6;
+$bob = tprv8ZgxMBicQKsPczR3NYu9cBy9BmsCZAPyZvySKon1nPDpZZAdQ4aUgXpSgZpaGzsXPs6QEzsHiW3TpYAGfHvATofLL5ztpLdF8BgiUVs5JJy;
+
+// A 2-of-2 between Alice and Bob as a P2WSH
+$multisig = wsh(pk($alice/*) && pk($bob/*));
+
+$multisig2 = wsh(2 of [ pk($alice/*), pk($bob/*) ]);
+assert::eq($multisig,  $multisig2);
+
+// Generate wallet address #0 (code below assumes a0499e..:0 funded it with 0.5 BTC)
+$address = address($multisig/0);
+
+// Create PSBT spending from the wallet
+$psbt = psbt [
+  "input": [
+    "prevout": 72877bd944be3433d5030ef102922e52f7c40de8b5ca26fa8b7c724d341e936e:1,
+    "utxo": ($multisig/0):0.5 BTC,
+  ],
+  "outputs": [
+    bcrt1ql8nqx3q3v7napchr6ewy4tpyq5y08ywat84pen: 0.4 BTC,
+    ($multisig/1): 0.099 BTC, // change back to multisig
+  ],
+];
+
+assert::eq(psbt::fee($psbt), 0.001 BTC);
+
+// The PSBT can be exported in base64 for external signing
+$psbt_base64 = base64($psbt);
+
+// Each party can sign independently
+$signed_alice = psbt::sign($psbt, $alice);
+$signed_bob   = psbt::sign($psbt, $bob);
+
+// Then later combine the PSBTs
+$psbt_combined = $signed_alice + $signed_bob;
+$tx = psbt::extract(psbt::finalize($psbt_combined));
+
+$tx_bytes = bytes($tx);
+
+env::pretty()

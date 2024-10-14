@@ -1,0 +1,81 @@
+$owner = tprv8ZgxMBicQKsPfJtqwiW9WhjJHPZtDo8aUbCkkcG8sjHbpZqjghF6ZJ1Tze9fUHrhYyXSNfw5VPbCKEkoFKaDRUzctbSxmxSWNfAGDonxcTG;
+$heir = tb1qmyrr32c0pw3d32eu2tc0tmll6ml4dja7zfq32f;
+
+// Allow the $heir to inherit the funds using a chain of 2 pre-signed transactions, with an
+// enforced contest period delay between them during which the $owner may claim the funds back.
+// If it isn't contested and both transactions confirm, the funds are sent to the $heir address.
+
+// Stage 1 - Trigger Transaction
+// Moves funds to an intermediate address (still controlled by the owner), initiating the contest period
+$stage1 = psbt [
+  // wpkh($owner/0/*) are the main wallet keys where funds are held
+  "inputs": [
+    [
+      "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:0,
+      "utxo": wpkh($owner/0/0):0.5 BTC,
+    ],
+    [
+      "prevout": 219a491699670893bad0624d230a535f24c1f57daaea9e2a002d1997b44c116f:2,
+      "utxo": wpkh($owner/0/3):0.1 BTC,
+    ]
+    // Note that spending any of these UTXOs will invalidate the pre-signed txs, requiring the owner
+    // to give the heir new ones. To minimize the risk of accidental invalidation, you may create
+    // a separate 1-on-1-out transaction for each UTXO - but at the cost of increased fees.
+  ],
+
+  // wpkh($owner/1/*) holds funds during the contest period
+  "output": wpkh($owner/1/0):0.599 BTC,
+];
+$stage1_signed = psbt::sign($stage1, $owner);
+$stage1_tx = psbt::extract(psbt::finalize($stage1_signed));
+
+// Stage 2 - Release Transaction
+// Moves funds to the $heir, after the 4-month contest period ends
+$stage2 = psbt [
+  "input": [
+    "prevout": $stage1:0,
+    "utxo": wpkh($owner/1/0):0.599 BTC,
+    "sequence": 4 months,
+  ],
+  "output": $heir:0.598 BTC,
+];
+$stage2_signed = psbt::sign($stage2, $owner);
+$stage2_tx = psbt::extract(psbt::finalize($stage2_signed));
+
+// This is what's given to the heir for safe keeping:
+$txs_hex = [ hex($stage1_tx), hex($stage2_tx) ];
+
+
+// Unauthorized withdrawal attempts can be aborted by spending the trigger tx output before the contest period ends.
+// The owner is expected to monitor the blockchain for the trigger transactions, and can store the pre-signed abort
+// transactions in a readily available location so they can be broadcast quickly when necessary.
+$abort_tx = psbt [
+  "input": [
+    "prevout": $stage1:0,
+    "utxo": wpkh($owner/1/0):0.599 BTC,
+  ],
+  // wpkh($owner/2/*) as the destination for aborted withdrawals
+  "output": wpkh($owner/2/0):0.598 BTC,
+] | psbt::sign($owner) | psbt::extract(true);
+
+
+//
+// Design notes
+//
+// An alternative design could have the trigger tx pay to `pk($owner_pk) || (pk($heir_pk) && older($contest_period))`,
+// allowing the heir to spend directly from it without requiring a 2nd pre-signed transaction.
+//
+// However, this would require the heir to use a specialized Miniscript-enabled wallet that can spend complex policies,
+// which are (currently) not common. With the design used here, the funds end up in the heir's standard Bitcoin address
+// that can be managed using any standard Bitcoin wallet. And since storing pre-signed txs is a requirement either way,
+// it doesn't really matter if it's one or two. In addition, using complex Scripts reveals more information on-chain.
+//
+// The example uses fixed fees to keep things simple, but it would be better to provide an anchor output for CPFP
+// and/or provide multiple sets of pre-signed txs at different fee-rates.
+//
+// This can also be thought of as a recovery scheme, where instead of an heir you have emergency recovery material held by a close friend.
+// Or as a vault, where instead of an owner/heir you have the owner's cold/hot keys, and with a shorter contest period (few days/weeks?).
+//
+// h/t to @oren_z0 for inspiring this (https://x.com/BitcoinemBassy/status/1823599770222432724)
+
+env::pretty()

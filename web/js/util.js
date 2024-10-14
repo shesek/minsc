@@ -37,12 +37,18 @@ export function loadFile(hash) {
 }
 
 async function loadRepoFile(path) {
-  if (path.startsWith('examples/')) path=`shesek/minsc/master/${path}`
+  if (/^(examples|tests|src)\//.test(path)) path=`shesek/minsc/master/${path.replace(/\.minsc$/, '')}.minsc`
+  else if (path.startsWith('https://github.com/')) path=path.slice(18)
+
   const parts = path.split('/')
   if (parts[2] == 'blob') parts.splice(2,1) // drop '/blob/' to support github.com web ui urls
+
   const resp = await fetch(`https://raw.githubusercontent.com/${parts.join('/')}`)
   if (!resp.ok) throw new Error(resp)
-  return resp.text()
+  const code = await resp.text()
+
+  // Strip final `env::pretty()` calls. This is used in example files meant to be run using CLI, but not needed in the playground.
+  return code.replace(/\s*\nenv::pretty\(\)\s*$/, '\n')
 }
 
 async function loadGist(identifier) {

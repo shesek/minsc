@@ -1,0 +1,47 @@
+// An auction where the price goes down with each passing block
+fn DutchAuction($seller_spk, $pay_asset_id, $start_price, $min_price, $decrement_every, $decrement_by) = `
+  // Witness elements stack: <num block since auction start>
+
+  #"Verify <num blocks> is a relative time lock by height, not by timestamp"
+    OP_DUP
+    65535 OP_LESSTHANOREQUAL OP_VERIFY
+  #"Verify the <num blocks> timelock was reached"
+    OP_CSV
+  // stack: <num blocks>
+
+  #"Calculate the current price"
+    #"Number of decrements so far"
+      OP_SCRIPTNUMTOLE64
+      le64($decrement_every)
+      OP::DIV64FLOOR_VERIFY
+    #"Sum of decrements"
+      le64($decrement_by)
+      OP::MUL64_VERIFY
+    #"Current price"
+      le64($start_price)
+      OP_SWAP
+      OP::SUB64_VERIFY
+    #("Enforce min price of "+$min_price)
+      le64($min_price) OP::MAX64
+    @PRICE
+  // stack: <current price>
+
+  #"Check payment output at index #0"
+    #"Pays the <current price>"
+      0 OP::OUTPUT_VALUE_EQ_VERIFY
+    #"Pays the expected asset id" // typically (t)LBTC
+      $pay_asset_id 0 OP::OUTPUT_ASSET_EQ_VERIFY
+    #"Pays to seller_spk" // (tuple of witness_version:witness_program)
+      0 OP_INSPECTOUTPUTSCRIPTPUBKEY
+      $seller_spk.0 OP_EQUALVERIFY
+      $seller_spk.1 OP_EQUAL // no VERIFY -- last test
+
+  #"All good!"
+`;
+
+$seller_spk = 1:0x8e92f630e638202b7502f9d0f314f0bb57f1fd952950c71f6acede79cfa72477;
+
+// Start at 1 BTC, decreased by 2500 sats every block (1 minute on liquid) down to 50k sats
+$script = DutchAuction($seller_spk, TLBTC, 1 BTC, 50000 sat, 1, 2500 sat);
+
+script::wiz($script)

@@ -1,0 +1,243 @@
+// Stateful contract for token sales with enforced royalty payments
+
+// The covenant holds a token and has 2 state variables: the current owner pubkey and the token's price.
+// It supports 3 calls:
+// - 0x00 BUY - Anyone can buy the token for the listed price (non-interactively), with a requirement to pay some % of the price as royalty to the covenant's original creator.
+// - 0x01 SET PRICE - The current owner is able to update the price.
+// - 0x02 BURN - The original creator is able to freeze/burn the token.
+
+// The token can never escape the covenant, and there's no way to transfer it except through the sales mechanism (as to prevent transferring it in exchange for a side payment that doesn't pay the royalty).
+
+
+// NOTE: This is a WIP demonstration that is not yet fully working.
+// Also, I just picked NFT as an example. I'm not into that shit. >.<
+
+
+// Construct the final covenant script, including the state and quine self-reference
+fn RoyaltyCovenant($BTC, $creator_pk, $royalty, $owner_pk, $price) {
+  $script = RoyaltyCovenantBase($BTC, $creator_pk, $royalty);
+  $state = `le64($price) @CURR_PRICE $owner_pk @CURR_OWNER`;
+
+  // Final script: <push state> <push own tapscript> <own tapscript>
+  `$state bytes(script::strip($script)) @QUINE $script`
+
+  // TODO split <push own tapscript> into multiple PUSHs of 80 bytes
+}
+
+// Main covenant script
+fn RoyaltyCovenantBase($BTC, $creator_pk, $royalty) = `
+  // Witness stack in: <output key prefix> [call type params] <call type byte>
+
+  // State (injected by RoyaltyCovenant())
+    // <current price>
+    // <current owner pk>
+
+  // Send <own tapscript> to altstack (injected by RoyaltyCovenant())
+    OP_TOALTSTACK
+
+  // Stack: <output key prefix> [call type params] <call type byte> -- <current price> <current owner pk>
+
+  # "Some sanity checks"
+    OP::REQUIRE_RBF
+    1 OP_CSV OP_DROP // prevent unconfirmed tx chain
+    // TODO check fee, tx version
+
+  # "Dispatch call type to the call handler script"
+    OP_ROT @CALL_TYPE // bring call type byte to the top
+    select [
+      // Type 0x00
+      // Witness stack: <output key prefix> <new owner pk> <0x00>
+      ` #"BUY" call::buy($BTC, $creator_pk, $royalty) #"/BUY" `,
+
+      // Type 0x01
+      // Witness stack: <output key prefix> <new price> <owner sig> <0x01>
+      ` #"SET PRICE" call::setPrice #"/SET PRICE" `,
+
+      // Type 0x02
+      // Witness stack: <output key prefix> <creator sig> <0x02>
+      ` #"BURN" call::burn($creator_pk) #"/BURN" `
+    ]
+  # "/DISPATCH"
+  // Stack: <output key prefix> -- <new owner pk> <new price>
+
+  # "Validate new state"
+    OP_SIZE 8 OP_EQUALVERIFY @STATE_PRICE
+    OP_SWAP
+    OP_SIZE 32 OP_EQUALVERIFY @STATE_OWNER
+    // Stack: <output key prefix> -- <price> <owner pk>
+
+  # "Build new state blob" // PUSHBYTES_8 || <price> || PUSHBYTES_32 || <owner pk>
+    buildStateBlob @STATE_BLOB
+    // Stack: <output key prefix> -- <state blob>
+
+  # "Build the expected destination tapscript" // <new state> || <push(own tapscript)> || <own tapscript>
+    OP_FROMALTSTACK // bring <own tapscript> quine
+    buildScriptBlob @DEST_SCRIPT_BLOB
+    // Stack: <output key prefix> -- <script blob>
+
+  # "Compute the taproot merkle root hash (a single leaf script) and the tweak hash"
+    OP::HASH_TAPLEAF @LEAF_HASH
+    NUMS OP_TUCK
+    // Stack: <output key prefix> -- <NUMS> <leaf hash> <NUMS as the internal key>
+    OP::HASH_TAPTWEAK @TWEAK_HASH
+    // Stack: <output key prefix> -- <NUMS> <tweak hash>
+
+  # "Enforce recursive covenant at output #0 with the new state/script"
+    # "Check that the input asset/amount was transferred to output #0 in full (typically 1 token)"
+      checkSameValue(OP_PUSHCURRENTINPUTINDEX, 0)
+
+    # "Get the destination pubkey of output #0, concatenated with the <output key prefix>"
+      OP_ROT // bring <output key prefix>
+      0 inspectOutSpkVer(1)
+      OP_CAT @OUTPUT_PK_WITH_PARITY
+      // Stack: <NUMS> <tweak hash> <prefixed output pubkey>
+
+    # "Verify the destination pubkey matches the expected tapscript tweaked from NUMS"
+      OP_SWAP OP_ROT
+      // Stack: <prefixed output pubkey> <tweak hash> <NUMS>
+      OP_TWEAKVERIFY
+
+  OP_TRUE
+`;
+
+// Initialize the contract with its initial state (the creator as the initial owner and
+// with sales disabled until a price is set)
+fn RoyaltyCovenantInit($BTC, $creator_pk, $royalty) =
+  RoyaltyCovenant($BTC, $creator_pk, $royalty, $creator_pk, MAX_INTEGER);
+
+
+//
+// Call methods
+//
+// State transition scripts. Expected to consume the top 2 stack elements as the current state,
+// consume the witness stack elements for the call type, and push the new state onto the stack.
+//
+// stack in: [call type params] -- <current price> <current owner pk>
+// stack out: <new owner pk> <new price>
+
+
+// Buy call (0x00)
+// stack in: <new owner pk> -- <current price> <current owner pk>
+// stack out: <new owner pk> <new price (MAX)>
+fn call::buy($BTC, $creator_pk, $royalty) = `
+
+  # "Verify payment output to current owner at index #1"
+    // Pays to current owner pk (pop the owner pk off)
+      1 OP::OUTPUT_SPK_V1_EQ_VERIFY
+
+    // Pays the correct amount
+      OP_DUP // keep a copy of the price to verify the royalty payment
+      1 OP::OUTPUT_VALUE_EQ_VERIFY
+
+    // Is L-BTC
+      $BTC OP_DUP // keep a copy of $BTC to verify the royalty payment
+      1 OP::OUTPUT_ASSET_EQ_VERIFY
+
+    // stack: <output key prefix> <new owner pk> -- <price> <BTC asset id>
+
+  # "Verify royalty payment output to creator at index #2"
+    // Is L-BTC
+      2 OP::OUTPUT_ASSET_EQ_VERIFY
+
+    // Pays to creator key
+      $creator_pk 2 OP::OUTPUT_SPK_V1_EQ_VERIFY
+
+    // Amount paid matches the $royalty setting
+      // Calculate royalty payment amount (price/$royalty, e.g. 20 for 5%)
+          le64($royalty)
+          OP::DIV64FLOOR_VERIFY
+          // TODO minimum dust amount
+      2 OP::OUTPUT_VALUE_EQ_VERIFY
+
+  // Stack: <output key prefix> <new owner pk> --
+
+  # "Prepare new state"
+    // The new owner pk is already here (from the witness stack)
+      @NEW_OWNER
+    // Set price to MAX (disallow sales until a new price is set by the new owner)
+      le64(MAX_INTEGER) @NO_PRICE
+`;
+
+// Set price call (0x01)
+// stack in: <new price> <owner sig> -- <current price> <current owner pk>
+// stack out: <owner pk (unchanged)> <new price>
+call::setPrice = `
+  # "Drop old price"
+  OP_NIP
+
+  # "Verify signature by the current owner"
+    OP_DUP // keep current owner pk to construct the state
+    OP_ROT OP_SWAP // bring sig before key
+    OP_CHECKSIGVERIFY
+
+  // Stack: <new price> -- <owner pk>
+
+  # "Prepare new state"
+    // The owner pk is already here
+      @UNCHANGED_OWNER
+    // Bring new price to top (from the witness stack)
+      OP_SWAP @NEW_PRICE
+`;
+
+// Burn call (0x02)
+// stack in: <creator sig> -- <current price> <current owner pk>
+// stack out: <owner pk (NUMS)> <new price (MAX)>
+fn call::burn($creator_pk) = `
+  # "Drop current state, we don't need it"
+  OP_2DROP
+
+  # "Verify signature by creator"
+    $creator_pk
+    OP_CHECKSIGVERIFY
+
+  # "Prepare new state"
+    // Use point with unknown discrete logarithm as the new owner pubkey (no owner)
+      NUMS @NO_OWNER
+    // Set price to MAX (disallow sales forever)
+      le64(MAX_INTEGER) @NO_PRICE
+`;
+
+//
+// Utilities for constructing the recursive covenant
+//
+
+// Build the state blob as script bytes
+// stack in: <price> <owner pubkey>
+// stack out: <state blob: 0x08 || price || 0x20 || owner>
+buildStateBlob = `
+  // Prefix <owner pubkey> with push op
+    bytes(OP_PUSHBYTES_32) OP_SWAP OP_CAT
+  // Concat with <price>, prefix with push op
+    OP_CAT
+    bytes(OP_PUSHBYTES_8) OP_SWAP OP_CAT
+  // Final blob: OP_PUSHBYTES_8 <price> OP_PUSHBYTES_32 <owner>
+`;
+
+// Build the final script blob, including the state and quine
+// stack in: <state blob> <own tapscript>
+// stack out: <final script: state || push(own_tapscript) || own_tapscript>
+buildScriptBlob = `
+  OP_DUP
+
+  // PUSH for <own tapscript>
+    // Get the push opcode bytes for <own tapscript>'s length
+      #"ENCODE_PUSH_OP" OP::ENCODE_PUSH_OP #"/ENCODE_PUSH_OP"
+    // Merge PUSH opcode and <own tapscript> blob
+      OP_SWAP OP_CAT
+
+  // Append <own tapscript> code (actual opcodes, not data push)
+    OP_SWAP OP_CAT
+
+  // Prepend <state blob>
+    OP_CAT
+
+  // Final blob: push(<price>) push(<owner>) push(<own tapscript as data>) <own tapscript as code>
+`;
+
+$base_size = len(script::strip(RoyaltyCovenantBase(TLBTC, 0xcbc28b82ddfa91c5c0bce5dcaf2d1ded79cbf9738be278e97465d389cc7423a3, 20)));
+
+RoyaltyCovenantInit(TLBTC, 0xcbc28b82ddfa91c5c0bce5dcaf2d1ded79cbf9738be278e97465d389cc7423a3, 20)
+
+// Uncomments one of the following lines to get debug markers in ScriptWiz formatting or to strip them
+// | script::wiz()
+// | script::strip()
