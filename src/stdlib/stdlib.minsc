@@ -20,7 +20,6 @@ fn slice($arr, $start, $len) = fillArray($len, |$n| $arr.($start+$n));
 fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 fn isEmpty($arr) = len($arr) == 0;
-repeat = fillArray; // alias name for a common fillArray use-case, to repeat Script fragments
 
 fn map($arr, $fn)     = fold($arr, [], |$acc, $el| $acc + [ $fn($el) ]);
 fn filter($arr, $fn)  = fold($arr, [], |$acc, $el| $acc + (if $fn($el) then [ $el ] else [ ]));
@@ -28,9 +27,9 @@ fn flatMap($arr, $fn) = fold($arr, [], |$acc, $el| $acc + $fn($el));
 
 fn reduce($arr, $fn) = if !isEmpty($arr) then fold(tail($arr), $arr.0, $fn) else null;
 
-fn find($arr, $fn)  = foldUntil($arr, null,  |$acc, $el| if $fn($el)  then true:$el   else false:null);
-fn some($arr, $fn)  = foldUntil($arr, false, |$acc, $el| if $fn($el)  then true:true  else false:false);
-fn every($arr, $fn) = foldUntil($arr, true,  |$acc, $el| if !$fn($el) then true:false else false:true);
+fn find($arr, $fn)  = foldUntil($arr, null,  |$acc, $el| if $fn($el)  then true:$el  else false:null);
+fn some($arr, $fn)  = foldUntil($arr, false, |$acc, $el| if $fn($el)  then true:true else false:false);
+fn every($arr, $fn) = !some($arr, |$el| !$fn($el));
 
 fn contains($arr, $needle) = some($arr, |$el| $el == $needle);
 
@@ -68,19 +67,3 @@ fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
 
 dyn fn log::env($label) = log("variables:\n----\n" + env::pretty() + "\n----");
 dyn fn log::debug_env($label) = log("variables:\n----\n" + env::debug() + "\n----");
-
-
-//
-// Alternative forms
-//
-
-// Function form for assigning execution probabilities
-fn prob($n, $val) = $n@$val;
-
-// For compatibility with code that uses the old `iif()` function, which was replaced
-// with if..then..else expressions. Will probably be eventually removed.
-fn iif($condition, $then, $else) {
-  $result = if $condition then $then else $else;
-  if isFunction($result) then $result()
-  else $result
-}
