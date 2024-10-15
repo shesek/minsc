@@ -11,16 +11,21 @@ macro_rules! impl_from_variant {
     };
 }
 
-// Implement TryFrom<&str> for a type that implements FromStr
+// Implement TryFrom<&str> / TryFrom<&String> for a type that implements FromStr
 macro_rules! impl_tryfrom_fromstr {
-    ($type:ident) => {
-        impl TryFrom<&str> for $type {
+    ($type:ident, $str_type:ty) => {
+        impl TryFrom<$str_type> for $type {
             type Error = <$type as FromStr>::Err;
-            fn try_from(s: &str) -> Result<Self, Self::Error> {
+            fn try_from(s: $str_type) -> Result<Self, Self::Error> {
                 s.parse()
             }
         }
     };
+    ($type:ident) => {
+        // Could not make this work with AsRef<str> (conflicts with the blanket TryFrom for any Into)
+        impl_tryfrom_fromstr!($type, &str);
+        impl_tryfrom_fromstr!($type, &String);
+    }
 }
 
 // Simple extraction of a Value enum variant, with no specialized type coercion logic

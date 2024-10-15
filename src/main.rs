@@ -1,33 +1,29 @@
 use minsc::{eval, parse, Error, PrettyDisplay, Value};
-use std::{env, fs, io, process::ExitCode};
+use std::io::{self, Read};
+use std::{env, fs, process::ExitCode};
 
 fn main_() -> Result<ExitCode, Error> {
     let mut args = env::args();
     let input = args.nth(1).unwrap_or_else(|| "-".into());
-
-    let arg = args.next();
-    let print_ast = arg == Some("--ast".into());
-    let debug = arg == Some("--debug".into());
-
-    let mut reader: Box<dyn io::Read> = match &*input {
-        "-" => Box::new(io::stdin()),
-        _ => Box::new(fs::File::open(input)?),
-    };
+    let print_ast = args.next().is_some_and(|arg| arg == "--ast");
 
     let mut code = String::new();
-    reader.read_to_string(&mut code)?;
+    match &*input {
+        "-" => io::stdin().read_to_string(&mut code)?,
+        file => fs::File::open(file)?.read_to_string(&mut code)?,
+    };
 
     Ok(if print_ast {
         println!("{:#?}", parse(&code)?);
         ExitCode::SUCCESS
     } else {
-        let res = eval(parse(&code)?)?;
-        // Unnecessary to print return values of `true`, the SUCCESS exit code is sufficient
-        if res != Value::Bool(true) {
-            println!("{}", res.pretty_multiline());
-        }
-        if debug {
-            println!("\n\n{:#?}", res);
+        let res = eval(&code)?;
+        match &res {
+            // Unnecessary to print return values of `true`, the SUCCESS exit code is enough
+            Value::Bool(true) => {}
+            // Print raw strings with no quoting
+            Value::String(string) => print!("{}", string),
+            _ => println!("{}", res.pretty_multiline()),
         }
         if res == Value::Bool(false) {
             ExitCode::FAILURE
