@@ -190,7 +190,7 @@ impl DeriveExt for DescriptorPublicKey {
             .map(|p| Ok(p.clone().into_derivation_path()?))
             .collect::<Result<Vec<_>>>()?;
 
-        let parent_paths = self.full_derivation_paths();
+        let parent_paths = self.derivation_paths();
 
         let derived_paths = parent_paths
             .into_iter()
@@ -434,7 +434,11 @@ pub trait DescriptorPubKeyExt: Sized {
     fn derive_xonly(self) -> Result<bitcoin::XOnlyPublicKey> {
         Ok(self.derive_definite()?.inner.into())
     }
+
+    /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
+    fn derivation_paths(&self) -> Vec<DerivationPath>;
 }
+
 impl DescriptorPubKeyExt for DescriptorPublicKey {
     fn definite(self) -> Result<DefiniteDescriptorKey> {
         ensure!(
@@ -446,6 +450,19 @@ impl DescriptorPubKeyExt for DescriptorPublicKey {
             Error::UnexpectedMultiPathPubKey(self.clone().into())
         );
         Ok(self.at_derivation_index(0).expect("index is valid"))
+    }
+
+    fn derivation_paths(&self) -> Vec<DerivationPath> {
+        match self {
+            DescriptorPublicKey::MultiXPub(mxpub) => mxpub.derivation_paths.paths().clone(),
+            DescriptorPublicKey::XPub(xpub) => vec![xpub.derivation_path.clone()],
+            DescriptorPublicKey::Single(single) => {
+                vec![single
+                    .origin
+                    .as_ref()
+                    .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
+            }
+        }
     }
 }
 
