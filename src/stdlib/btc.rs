@@ -172,13 +172,23 @@ pub mod fns {
         Ok(Value::Transaction(args.arg_into()?))
     }
 
-    /// txid(Transaction) -> Bytes
+    /// Get the TXID of the Transaction or PSBT
+    ///
+    /// For PSBTs the TXID of the unsigned_tx is returned, which is *only safe to
+    /// use when all inputs are segwit inputs*.
+    ///
+    /// `txid(Transaction|Bytes|Array<Tagged>) -> Bytes`
+    /// `txid(Psbt) -> Bytes`
     pub fn txid(args: Array, _: &ScopeRef) -> Result<Value> {
-        let mut txid = Transaction::compute_txid(&args.arg_into()?)
-            .to_byte_array()
-            .to_vec();
+        let mut txid = match args.arg_into()? {
+            Value::Psbt(psbt) => psbt.unsigned_tx.compute_txid(),
+            Value::Transaction(tx) => tx.compute_txid(),
+            tx_like => Transaction::try_from(tx_like)?.compute_txid(),
+        }
+        .to_byte_array()
+        .to_vec();
         // Reverse when converted to Bytes to match the standard display order,
-        // reversed back in `TryFrom<Value> for Txid` (below).
+        // reversed back in `TryFrom<Value> for Txid` (below). FIXME find a better way
         txid.reverse();
         Ok(Value::Bytes(txid))
     }
