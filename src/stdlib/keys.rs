@@ -13,7 +13,9 @@ use miniscript::descriptor::{
 
 use crate::ast::SlashRhs;
 use crate::runtime::{Array, Error, Evaluate, Mutable, Result, ScopeRef, Value};
-use crate::util::{hash_to_child_vec, DeriveExt, DescriptorPubKeyExt, PrettyDisplay, EC};
+use crate::util::{
+    hash_to_child_vec, DeriveExt, DescriptorPubKeyExt, DescriptorSecretKeyExt, PrettyDisplay, EC,
+};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -261,7 +263,7 @@ impl TryFrom<Value> for DescriptorPublicKey {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::PubKey(pubkey) => Ok(pubkey),
-            Value::SecKey(seckey) => Ok(seckey.to_public(&EC)?),
+            Value::SecKey(seckey) => Ok(seckey.to_public_()?),
             // Bytes are coerced into a single PubKey if they are 33 or 32 bytes long,
             // or to an Xpub if they're 78 bytes long
             Value::Bytes(bytes) => Ok(match bytes.len() {
