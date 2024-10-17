@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Execute, Number, Result, Symbol, Value};
+use crate::util::DescriptorSecretKeyExt;
 use crate::Library;
 
 pub mod btc;
@@ -99,6 +100,8 @@ pub mod fns {
             Value::String(string) => string.len(),
             Value::Script(script) => script.into_bytes().len(),
             Value::Descriptor(desc) if desc.is_multipath() => desc.into_single_descriptors()?.len(),
+            Value::PubKey(pk) if pk.is_multipath() => pk.full_derivation_paths().len(),
+            Value::SecKey(sk) if sk.is_multipath() => sk.full_derivation_paths().len(),
             _ => bail!(Error::InvalidArguments),
         }
         .into())

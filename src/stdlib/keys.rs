@@ -26,6 +26,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         .unwrap();
 
     scope.set_fn("xonly", fns::xonly).unwrap();
+
+    scope.set_fn("singles", fns::singles).unwrap();
 }
 
 /// BIP32 key derivation using the Slash operator
@@ -133,6 +135,22 @@ pub mod fns {
             })
         }
         .into())
+    }
+
+    /// Convert a multi-PubKey/SecKey/Descriptor into an array of singles
+    ///
+    /// singles(PubKey<Multi>|SecKey<Multi>|Descriptor<Multi>) -> Array<PubKey|SecKey|Descriptor>
+    pub fn singles(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::array(match args.arg_into()? {
+            Value::PubKey(pk) => pk.into_single_keys().into_iter().map(Into::into).collect(),
+            Value::SecKey(sk) => sk.into_single_keys().into_iter().map(Into::into).collect(),
+            Value::Descriptor(desc) => desc
+                .into_single_descriptors()?
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+            other => bail!(Error::InvalidValue(other.into())),
+        }))
     }
 }
 

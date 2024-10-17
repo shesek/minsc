@@ -46,9 +46,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     // Other descriptor functions
     scope.set_fn("descriptor", fns::descriptor).unwrap();
     scope.set_fn("explicitScript", fns::explicitScript).unwrap();
-    scope
-        .set_fn("descriptor::singles", fns::descriptor_singles)
-        .unwrap();
 
     // Policy to Script compilation
     scope.set_fn("tapscript", fns::tapscript).unwrap();
@@ -244,15 +241,6 @@ pub mod fns {
     pub fn explicitScript(args: Array, _: &ScopeRef) -> Result<Value> {
         let descriptor: Descriptor = args.arg_into()?;
         Ok(descriptor.to_explicit_script()?.into())
-    }
-
-    /// descriptor::singles(Descriptor<Multi>) -> Array<Descriptor<Single>>
-    pub fn descriptor_singles(args: Array, _: &ScopeRef) -> Result<Value> {
-        let desc: Descriptor = args.arg_into()?;
-        let descs = desc.into_single_descriptors()?;
-        Ok(Value::array(
-            descs.into_iter().map(Value::Descriptor).collect(),
-        ))
     }
 }
 
