@@ -513,7 +513,7 @@ impl TryFrom<Value> for PsbtTxOut {
                     psbt_output.update_with_descriptor_unchecked(&descriptor.definite()?)?;
                 }
                 Value::TapInfo(tapinfo) => {
-                    psbt_output.update_with_taproot(&tapinfo)?;
+                    psbt_output.update_with_taproot(tapinfo)?;
                 }
                 _ => {}
             }

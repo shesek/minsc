@@ -16,7 +16,7 @@ DUST_AMOUNT=DUST_WSH; // also == DUST_TR
 
 // A point with unknown discrete logarithm (to eliminate key-path spend)
 // Uses the sha256 of G in DER encoding, as suggested by BIP 341: https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs
-// NUMS = pubkey(hash::sha256(0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8));
+// assert::eq(NUMS, pubkey(hash::sha256(0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)));
 NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
 TR_UNSPENDABLE = NUMS; // the default for tr(), can be overridden in user-land code
 

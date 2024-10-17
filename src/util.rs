@@ -73,7 +73,7 @@ impl<Ctx: miniscript::ScriptContext> MiniscriptExt<Ctx>
     fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
         Ok(
             self.translate_pk(&mut FnTranslator::new(|xpk: &DescriptorPublicKey| {
-                Ok(xpk.clone().derive_definite()?)
+                xpk.clone().derive_definite()
             }))?,
         )
     }

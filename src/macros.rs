@@ -25,7 +25,7 @@ macro_rules! impl_tryfrom_fromstr {
         // Could not make this work with AsRef<str> (conflicts with the blanket TryFrom for any Into)
         impl_tryfrom_fromstr!($type, &str);
         impl_tryfrom_fromstr!($type, &String);
-    }
+    };
 }
 
 // Simple extraction of a Value enum variant, with no specialized type coercion logic

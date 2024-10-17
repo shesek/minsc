@@ -67,7 +67,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\[)/, token: ["atom", null], indent: true},
 
     // PUSH in Script's Debug format
-    {regex: /(OP_PUSHBYTES\w*)\s*([a-f0-9]+)\b/, token: ["variable-2", "number"]},
+    {regex: /(OP_PUSHBYTES\w*)\s+([a-f0-9]+)\b/, token: ["variable-2", "number"]},
 
     // BIP32 derivation
     {regex: /(\d+)(h)\b/, token: ["number", "operator"]}, // hardened derivation step with number literal
@@ -75,7 +75,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /m\//, token: "operator"},
 
     // Variables
-    {regex: /[A-Z$][A-Z0-9_]+\b/, token: "variable-2"}, // different look for all-caps identifiers, typically OP_CODES
+    {regex: /[A-Z$][A-Z0-9_]+(?:::[A-Z0-9_]+)*(?![a-zA-Z0-9$_]|::)/, token: "variable-2"}, // different look for all-caps identifiers, typically OP_CODES
     // IDENT regex explained in grammar.lalrpop
     {regex: /(?:[a-zA-Z][a-zA-Z0-9]{0,24}|(?:[a-zA-Z][a-zA-Z0-9]*)?[_$][a-zA-Z0-9_$]*|[a-zA-Z_$][a-zA-Z0-9_$]*(?:::[a-zA-Z0-9_$]+)+)(?![a-zA-Z0-9$_]|::)/, token: "variable-3" },
 

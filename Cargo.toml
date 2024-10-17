@@ -19,18 +19,17 @@ miniscript = { version = "12", features = ["compiler"] }
 bitcoin = { version = "0.32", features = ["rand-std", "base64"] }
 
 lalrpop-util = "0.21"
-regex = "1"
 base64 = "0.22"
 thiserror = "1.0.20"
 chrono = "0.4.13"
 lazy_static = "1.4.0"
 
+# Optional
 serde = { version = "1", features=["derive"], optional = true }
 wasm-bindgen = { version = "0.2.65", optional = true }
 wee_alloc = { version = "0.4.5", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
-
-# not used directly, needed to enable 'getrandom/js' (for the 'wasm' feature below)
+# not used directly, needed to enable 'getrandom/js' for the 'wasm' feature
 getrandom = { version = "0.2", optional = true }
 
 [features]

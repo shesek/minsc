@@ -6,7 +6,7 @@ use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, Execute, ExprRepr, Result, Value};
-use crate::util::{DescriptorExt, MiniscriptExt, DescriptorSecretKeyExt};
+use crate::util::{DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 pub use crate::runtime::AndOr;

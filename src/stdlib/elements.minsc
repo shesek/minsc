@@ -50,7 +50,7 @@ fn checkOutput($vout, $asset_id, $amount, $spk_tup) = `
 
 fn checkOutputSpk($vout, $spk_tup) = `
   // $spk_tup is a tuple of the witness version and program
-  $vot OP_INSPECTOUTPUTSCRIPTPUBKEY
+  $vout OP_INSPECTOUTPUTSCRIPTPUBKEY
   $spk_tup.0 OP_EQUALVERIFY
   $spk_tup.1 OP_EQUALVERIFY
 `;

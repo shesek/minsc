@@ -489,14 +489,14 @@ pub fn fmt_script<W: fmt::Write>(
                     (ScriptFmt::Minsc(_), "label") if is_valid_ident(body) => {
                         write!(f, "@{}", body)?
                     }
-                    (ScriptFmt::Minsc(_), "label") => write!(f, "@{{{}}}", quote(body))?,
+                    (ScriptFmt::Minsc(_), "label") => write!(f, "@({})", quote(body))?,
                     (ScriptFmt::Minsc(_), "comment") => {
                         if indent.is_none() {
                             write!(f, "#{}", quote(body))?;
-                        } else if !body.contains("\n") {
+                        } else if !body.contains('\n') {
                             write!(f, "# {}", quote(body))?;
                         } else {
-                            let mut lines = body.split_inclusive("\n");
+                            let mut lines = body.split_inclusive('\n');
                             write!(f, "#({}", quote(lines.next().unwrap()))?;
                             for line in lines {
                                 write!(f, " +\n{:i$}{}", "", quote(line), i = indent_w + 2)?;
@@ -524,9 +524,7 @@ pub fn fmt_script<W: fmt::Write>(
                     (ScriptFmt::BitIde, "label") => write!(f, "#{}", encode_label(body))?,
                     // BitIDE-only features: {NAME} to move the stack element identified by NAME
                     // to the top, or [NAME] to copy it.
-                    (ScriptFmt::BitIde, "bitide::copy") => {
-                        write!(f, " {{{}}}", encode_label(body))?
-                    }
+                    (ScriptFmt::BitIde, "bitide::copy") => write!(f, "{{{}}}", encode_label(body))?,
                     (ScriptFmt::BitIde, "bitide::move") => write!(f, "[{}]", encode_label(body))?,
 
                     // Standard // comment format, ScriptWiz & BitIDE
@@ -573,7 +571,15 @@ fn encode_label(input: &str) -> String {
         .collect()
 }
 fn is_valid_ident(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_')
+    // TODO allow idents with ::
+    !s.is_empty()
+        && s.chars().enumerate().all(|(idx, c)| {
+            (if idx == 0 {
+                c.is_ascii_alphabetic()
+            } else {
+                c.is_ascii_alphanumeric()
+            }) || matches!(c, '_' | '$')
+        })
 }
 impl PrettyDisplay for Transaction {
     const AUTOFMT_ENABLED: bool = true;
