@@ -1,7 +1,7 @@
 use std::fmt;
 use std::marker::PhantomData;
 
-use bitcoin::bip32::{ChildNumber, DerivationPath, IntoDerivationPath};
+use bitcoin::bip32::{self, ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::hex::DisplayHex;
 use bitcoin::{psbt, secp256k1, taproot, PublicKey};
@@ -190,7 +190,7 @@ impl DeriveExt for DescriptorPublicKey {
             .map(|p| Ok(p.clone().into_derivation_path()?))
             .collect::<Result<Vec<_>>>()?;
 
-        let parent_paths = self.full_derivation_paths();
+        let parent_paths = self.derivation_paths();
 
         let derived_paths = parent_paths
             .into_iter()
@@ -434,7 +434,11 @@ pub trait DescriptorPubKeyExt: Sized {
     fn derive_xonly(self) -> Result<bitcoin::XOnlyPublicKey> {
         Ok(self.derive_definite()?.inner.into())
     }
+
+    /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
+    fn derivation_paths(&self) -> Vec<DerivationPath>;
 }
+
 impl DescriptorPubKeyExt for DescriptorPublicKey {
     fn definite(self) -> Result<DefiniteDescriptorKey> {
         ensure!(
@@ -447,11 +451,26 @@ impl DescriptorPubKeyExt for DescriptorPublicKey {
         );
         Ok(self.at_derivation_index(0).expect("index is valid"))
     }
+
+    fn derivation_paths(&self) -> Vec<DerivationPath> {
+        match self {
+            DescriptorPublicKey::MultiXPub(mxpub) => mxpub.derivation_paths.paths().clone(),
+            DescriptorPublicKey::XPub(xpub) => vec![xpub.derivation_path.clone()],
+            DescriptorPublicKey::Single(single) => {
+                vec![single
+                    .origin
+                    .as_ref()
+                    .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
+            }
+        }
+    }
 }
 
 pub trait DescriptorSecretKeyExt {
     /// Like `DescriptorPublicKey::full_derivation_paths()`, which isn't available for secret keys
     fn full_derivation_paths(&self) -> Vec<DerivationPath>;
+
+    fn to_public_(&self) -> Result<DescriptorPublicKey>;
 }
 impl DescriptorSecretKeyExt for DescriptorSecretKey {
     fn full_derivation_paths(&self) -> Vec<DerivationPath> {
@@ -485,6 +504,93 @@ impl DescriptorSecretKeyExt for DescriptorSecretKey {
             }
         }
     }
+
+    fn to_public_(&self) -> Result<DescriptorPublicKey> {
+        Ok(match self {
+            DescriptorSecretKey::Single(_) | DescriptorSecretKey::XPrv(_) => self.to_public(&EC)?,
+            DescriptorSecretKey::MultiXPrv(mxprv) => {
+                DescriptorPublicKey::MultiXPub(multi_xpriv_to_public(mxprv)?)
+            }
+        })
+    }
+}
+
+// Pending https://github.com/rust-bitcoin/rust-miniscript/pull/757
+fn multi_xpriv_to_public(
+    mxprv: &DescriptorMultiXKey<bip32::Xpriv>,
+) -> Result<DescriptorMultiXKey<bip32::Xpub>> {
+    assert!(
+        !mxprv.derivation_paths.paths().is_empty(),
+        "MultiXkey is never empty"
+    );
+
+    let deriv_paths = mxprv.derivation_paths.paths();
+
+    let shared_prefix: Vec<_> = deriv_paths[0]
+        .into_iter()
+        .enumerate()
+        .take_while(|(index, child_num)| {
+            deriv_paths[1..]
+                .iter()
+                .all(|other_path| other_path.len() > *index && other_path[*index] == **child_num)
+        })
+        .map(|(_, child_num)| *child_num)
+        .collect();
+
+    let suffixes: Vec<Vec<_>> = deriv_paths
+        .iter()
+        .map(|path| {
+            path.into_iter()
+                .skip(shared_prefix.len())
+                .map(|child_num| {
+                    // Hardended derivation steps are only allowed within the shared prefix
+                    ensure!(child_num.is_normal(), Error::InvalidHardenedMultiXprvToXpub);
+                    Ok(*child_num)
+                })
+                .collect()
+        })
+        .collect::<Result<_>>()?;
+
+    let unhardened = shared_prefix
+        .iter()
+        .rev()
+        .take_while(|c| c.is_normal())
+        .count();
+    let last_hardened_idx = shared_prefix.len() - unhardened;
+
+    let hardened_path = &shared_prefix[..last_hardened_idx];
+    let unhardened_path = &shared_prefix[last_hardened_idx..];
+
+    let xprv = mxprv.xkey.derive_priv(&EC, &hardened_path)?;
+    let xpub = bip32::Xpub::from_priv(&EC, &xprv);
+
+    let origin = match &mxprv.origin {
+        Some((fingerprint, path)) => Some((
+            *fingerprint,
+            path.into_iter()
+                .chain(hardened_path.iter())
+                .copied()
+                .collect(),
+        )),
+        None if !hardened_path.is_empty() => {
+            Some((mxprv.xkey.fingerprint(&EC), hardened_path.into()))
+        }
+        None => None,
+    };
+    let new_deriv_paths = suffixes
+        .into_iter()
+        .map(|suffix| {
+            let path = unhardened_path.iter().copied().chain(suffix);
+            path.collect::<Vec<_>>().into()
+        })
+        .collect();
+
+    Ok(DescriptorMultiXKey {
+        origin,
+        xkey: xpub,
+        derivation_paths: DerivPaths::new(new_deriv_paths).expect("not empty"),
+        wildcard: mxprv.wildcard,
+    })
 }
 
 /// Compute a derivation path from a sha256 hash.

@@ -172,6 +172,9 @@ pub enum RuntimeError {
     )]
     InvalidDerivationCode,
 
+    #[error("Can't make a multi-Xpub from a multi-Xpriv with hardened derivation steps that are not shared among all paths")]
+    InvalidHardenedMultiXprvToXpub,
+
     #[error("Unexpected multi-path Xpriv, only single-path Xprivs or single keys are accepted")]
     InvalidMultiXprv,
 
@@ -222,7 +225,7 @@ pub enum RuntimeError {
     InvalidMerkleRoot(#[source] hashes::FromSliceError),
 
     #[error(
-        "Invalid public key length {0} (expected 33 for single key, 32 for x-only or 78 for xpub"
+        "Invalid public key length {0} (expected 33 for single key, 32 for x-only or 78 for xpub)"
     )]
     InvalidPubKeyLen(usize),
 

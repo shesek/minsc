@@ -13,7 +13,9 @@ use miniscript::descriptor::{
 
 use crate::ast::SlashRhs;
 use crate::runtime::{Array, Error, Evaluate, Mutable, Result, ScopeRef, Value};
-use crate::util::{hash_to_child_vec, DeriveExt, DescriptorPubKeyExt, PrettyDisplay, EC};
+use crate::util::{
+    hash_to_child_vec, DeriveExt, DescriptorPubKeyExt, DescriptorSecretKeyExt, PrettyDisplay, EC,
+};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -26,6 +28,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         .unwrap();
 
     scope.set_fn("xonly", fns::xonly).unwrap();
+
+    scope.set_fn("singles", fns::singles).unwrap();
 }
 
 /// BIP32 key derivation using the Slash operator
@@ -133,6 +137,22 @@ pub mod fns {
             })
         }
         .into())
+    }
+
+    /// Convert a multi-PubKey/SecKey/Descriptor into an array of singles
+    ///
+    /// singles(PubKey<Multi>|SecKey<Multi>|Descriptor<Multi>) -> Array<PubKey|SecKey|Descriptor>
+    pub fn singles(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Value::array(match args.arg_into()? {
+            Value::PubKey(pk) => pk.into_single_keys().into_iter().map(Into::into).collect(),
+            Value::SecKey(sk) => sk.into_single_keys().into_iter().map(Into::into).collect(),
+            Value::Descriptor(desc) => desc
+                .into_single_descriptors()?
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+            other => bail!(Error::InvalidValue(other.into())),
+        }))
     }
 }
 
@@ -243,7 +263,7 @@ impl TryFrom<Value> for DescriptorPublicKey {
     fn try_from(value: Value) -> Result<Self> {
         match value {
             Value::PubKey(pubkey) => Ok(pubkey),
-            Value::SecKey(seckey) => Ok(seckey.to_public(&EC)?),
+            Value::SecKey(seckey) => Ok(seckey.to_public_()?),
             // Bytes are coerced into a single PubKey if they are 33 or 32 bytes long,
             // or to an Xpub if they're 78 bytes long
             Value::Bytes(bytes) => Ok(match bytes.len() {

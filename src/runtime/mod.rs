@@ -214,6 +214,16 @@ impl Evaluate for ast::ArrayAccess {
                 ensure!(index < single_descs.len(), Error::ArrayIndexOutOfRange);
                 single_descs.remove(index).into()
             }
+            Value::PubKey(pk) if pk.is_multipath() => {
+                let mut single_pks = pk.into_single_keys();
+                ensure!(index < single_pks.len(), Error::ArrayIndexOutOfRange);
+                single_pks.remove(index).into()
+            }
+            Value::SecKey(sk) if sk.is_multipath() => {
+                let mut single_sks = sk.into_single_keys();
+                ensure!(index < single_sks.len(), Error::ArrayIndexOutOfRange);
+                single_sks.remove(index).into()
+            }
             other => bail!(Error::NoArrayAccess(other.into())),
         })
     }
