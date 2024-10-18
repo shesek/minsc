@@ -48,6 +48,12 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("script::wiz", fns::script_wiz).unwrap();
         scope.set_fn("script::bitide", fns::script_bitide).unwrap();
 
+        // Script Opcodes
+        for op in 0x00..=0xff {
+            let script = ScriptBuf::from_bytes(vec![op]);
+            scope.set(Opcode::from(op).to_string(), script).unwrap();
+        }
+
         // Constants
         scope.set("BLOCK_INTERVAL", time::BLOCK_INTERVAL).unwrap();
         scope

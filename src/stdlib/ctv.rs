@@ -8,7 +8,7 @@ use crate::runtime::{Error, Execute, Result, Value};
 
 lazy_static! {
     static ref MINSC_CTV_LIB: Library = r#"
-        OP_CHECKTEMPLATEVERIFY = script(0xb3);
+        OP_CHECKTEMPLATEVERIFY = OP_NOP4;
         OP_CTV = OP_CHECKTEMPLATEVERIFY;
 
         fn ctv($tx) = `ctv::hash($tx) OP_CHECKTEMPLATEVERIFY OP_DROP`;
