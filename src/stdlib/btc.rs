@@ -6,7 +6,7 @@ use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Scrip
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
     absolute::LockTime as AbsLockTime, address, hex::DisplayHex, relative::LockTime as RelLockTime,
-    Address, Amount, Network, Opcode, Sequence, SignedAmount, Txid,
+    Address, Amount, Network, Opcode, Sequence, SignedAmount, Txid, Witness,
 };
 use miniscript::psbt::PsbtExt;
 
@@ -41,6 +41,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("tx", fns::tx).unwrap();
         scope.set_fn("txid", fns::txid).unwrap();
         scope.set_fn("tx::id", fns::txid).unwrap(); // alias
+        scope
+            .set_fn("tx::with_witness", fns::tx_with_witness)
+            .unwrap(); // alias
         scope.set_fn("script", fns::script).unwrap();
         scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
         scope.set_fn("explicitScript", fns::explicitScript).unwrap();
@@ -208,6 +211,24 @@ pub mod fns {
         // reversed back in `TryFrom<Value> for Txid` (below). FIXME find a better way
         txid.reverse();
         Ok(Value::Bytes(txid))
+    }
+
+    /// Attach input witnesses, returning a new modified Transaction with them
+    ///
+    /// Can provide an array of all input witnesses, or an array mapping from
+    /// specific input indexes to their witness.
+    ///
+    /// `tx::with_witness(Transaction, Array<Witness>) -> Transaction`
+    /// `tx::with_witness(Transaction, Array<Int:Witness>) -> Transaction`
+    pub fn tx_with_witness(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (mut tx, witnesses): (Transaction, Array) = args.args_into()?;
+        for (vin, witness) in witnesses.mapped_or_all(tx.input.len())? {
+            tx.input
+                .get_mut(vin)
+                .ok_or(Error::TxInputNotFound(vin))?
+                .witness = witness;
+        }
+        Ok(Value::Transaction(tx))
     }
 
     /// script(Bytes|Script) -> Script
@@ -436,7 +457,7 @@ impl TryFrom<Value> for Sequence {
         }))
     }
 }
-impl TryFrom<Value> for bitcoin::Witness {
+impl TryFrom<Value> for Witness {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(val.map_array(Value::into_bytes)?.into())
@@ -695,7 +716,7 @@ impl PrettyDisplay for bitcoin::TxOut {
     }
 }
 
-impl PrettyDisplay for bitcoin::Witness {
+impl PrettyDisplay for Witness {
     const AUTOFMT_ENABLED: bool = true;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
