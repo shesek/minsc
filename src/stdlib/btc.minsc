@@ -2,7 +2,7 @@
 OP_TRUE = `1`, OP_FALSE = `0`, OP_0 = OP_FALSE;
 OP_CHECKSEQUENCEVERIFY = OP_CSV;
 
-// Sighash type, including combinations with ANYONECANPAY
+// Sighash types, including combinations with ANYONECANPAY
 SIGHASH_DEFAULT=0x00, SIGHASH_ALL=0x01, SIGHASH_NONE=0x02, SIGHASH_SINGLE=0x03,
 SIGHASH_ALL_ANYONECANPAY=0x81, SIGHASH_NONE_ANYONECANPAY=0x82, SIGHASH_SINGLE_ANYONECANPAY=0x83;
 
@@ -16,16 +16,44 @@ DUST_AMOUNT=DUST_WSH; // also == DUST_TR
 NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
 TR_UNSPENDABLE = NUMS; // the default for tr(), can be overridden in user-land code
 
+// Useful as a default with CTV
+PREVOUT_NONE = 0000000000000000000000000000000000000000000000000000000000000000:0;
+
 // Enables RBF and absolute lock time, disables relative lock time
 ENABLE_RBF = 0xFFFFFFFD;
 
-PREVOUT_NONE = 0000000000000000000000000000000000000000000000000000000000000000:0;
+//
+// Taproot
+//
 
-// Taproot utilities
 fn tr::script_witness($tr, $script, $stack) = $stack + [ $script, tr::ctrl($tr, $script) ];
 
 //
-// Altstack manipulation
+// Transaction utilities
+//
+
+// Simplified SigHash API given a Transaction and its UTXOs
+fn tx::sighash($tx, $vin, $utxos, $sighash_ty) = psbt::sighash([
+  "unsigned_tx": $tx,
+  "inputs": map($utxos, |$utxo| [
+    "utxo": $utxo,
+    "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
+  ])
+], $vin);
+
+// SigHash for Taproot spending through a script-path leaf
+fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::sighash([
+  "unsigned_tx": $tx,
+  "inputs": map($utxos, |$utxo| [
+    "utxo": $utxo,
+    "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
+  ])
+], $vin, $script_leaf);
+
+// TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
+
+//
+// Script Altstack manipulation
 //
 
 // ROLL/PICK from the altstack, for static $n
@@ -74,7 +102,7 @@ fn nFromAlt($max_n) = `
 `;
 
 //
-// Looping utilities
+// Script Looping utilities
 //
 
 // Loop unrolling: run $loop_body as long as $condition is met, up to $max_iterations times
@@ -102,7 +130,7 @@ fn unrollFor($max_iterations, $for_body) {
 }
 
 //
-// Conditional control structures
+// Script Conditional control structures
 //
 
 // Check a series of nested OP_IF..OP_ELSE conditions, running the script associated with the first
@@ -177,18 +205,3 @@ dyn fn mark::ctx($$context, $$fn) {
   MARK_CTX = MARK_CTX + $$context;
   $$fn()
 }
-
-//
-// Transaction utilities
-//
-
-fn tx::sighash($tx, $vin, $utxos, $sighash_ty) = psbt::sighash([
-  "unsigned_tx": $tx,
-  "inputs": map($utxos, |$utxo| [
-    "utxo": $utxo,
-    "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
-  ])
-], $vin);
-
-// TODO support specifying the tapleaf heah (available when using psbt::sighash() directly)
-// TOOD tx::sighash_sw0() with just the signed utxo & tx::sighash_presw() with just the utxo scriptPubKey
