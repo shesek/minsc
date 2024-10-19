@@ -12,7 +12,7 @@ use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
 use crate::parser::Expr;
 use crate::util::{fmt_quoted_str, PrettyDisplay, EC};
-use crate::{error, DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 
 use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
 
@@ -204,7 +204,10 @@ impl TryFrom<Value> for Vec<u8> {
             Value::Bytes(bytes) => bytes,
             Value::String(string) => string.into_bytes(),
             Value::Script(script) => script.into_bytes(),
+            Value::Psbt(psbt) => psbt.serialize(),
             Value::Transaction(tx) => bitcoin::consensus::serialize(&tx),
+            // Encode integers as CScriptNum
+            Value::Number(Number::Int(num)) => stdlib::btc::scriptnum_enc(num),
             // XXX PubKey/SecKey not fully round-trip-able - only the key is encoded, without the bip32 `origin` field associated with it
             Value::PubKey(dpk) => match dpk {
                 Dpk::XPub(xpub) => xpub
@@ -226,7 +229,6 @@ impl TryFrom<Value> for Vec<u8> {
                 Dsk::Single(sk) => sk.key.to_bytes(),
                 Dsk::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
             },
-            Value::Psbt(psbt) => psbt.serialize(),
             v => bail!(Error::NotBytesLike(v.into())),
         })
     }

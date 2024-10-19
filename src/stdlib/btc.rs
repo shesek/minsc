@@ -129,6 +129,12 @@ pub fn repeat_script(script: ScriptBuf, times: usize) -> ScriptBuf {
     ScriptBuf::from(bytes_n)
 }
 
+pub fn scriptnum_enc(num: i64) -> Vec<u8> {
+    let mut buf = [0u8; 8];
+    let len = bitcoin::script::write_scriptint(&mut buf, num);
+    buf[..len].to_vec()
+}
+
 impl Evaluate for ast::Duration {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let seq_num = match self {
@@ -408,8 +414,7 @@ impl TryFrom<Value> for Sequence {
 impl TryFrom<Value> for bitcoin::Witness {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        let items = val.map_array(Value::into_bytes)?;
-        Ok(Self::from_slice(&items))
+        Ok(val.map_array(Value::into_bytes)?.into())
     }
 }
 
