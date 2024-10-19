@@ -311,8 +311,8 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
             "unknown" => psbt_input.unknown = val.try_into()?,
             "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
             "witness_utxo" | "utxo" => {
-                // If the UTXO was specified using a Descriptor or a TaprootSpendInfo, keep
-                // a copy of them around prior to converting them to a TxOut scriptPubKey
+                // If the UTXO was specified using a DescriptorTaprootSpendInfo/WshScript,
+                // also use them to populate the PSBT fields.
                 if let Value::Array(arr) = &val {
                     match arr.first() {
                         Some(Value::Descriptor(desc)) if descriptor.is_none() => {
@@ -320,6 +320,9 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
                         }
                         Some(Value::TapInfo(tap)) if tapinfo.is_none() => {
                             tapinfo = Some(tap.clone())
+                        }
+                        Some(Value::WshScript(wsh)) => {
+                            psbt_input.witness_script = Some(wsh.0.clone())
                         }
                         _ => {}
                     }
