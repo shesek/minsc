@@ -43,6 +43,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("tx::id", fns::txid).unwrap(); // alias
         scope.set_fn("script", fns::script).unwrap();
         scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
+        scope.set_fn("explicitScript", fns::explicitScript).unwrap();
         scope.set_fn("script::spk", fns::scriptPubKey).unwrap(); // alias
         scope.set_fn("script::strip", fns::script_strip).unwrap();
         scope.set_fn("script::wiz", fns::script_wiz).unwrap();
@@ -63,6 +64,10 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
     BTC_STDLIB.exec(scope).unwrap();
 }
+
+/// A 'descriptor-like' for raw (non-Miniscript) Script in wsh() (cannot be represented as a miniscript::Descriptor)
+#[derive(Clone, Debug, PartialEq)]
+pub struct WshScript(pub ScriptBuf);
 
 impl Evaluate for ast::BtcAmount {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
@@ -225,6 +230,19 @@ pub mod fns {
         Ok(spk.into())
     }
 
+    /// explicitScript(Descriptor|WshScript) -> Script
+    /// Get the underlying Script before any hashing is done - AKA the witnessScript for Wsh,
+    /// scriptPubKey for Wpkh, or the redeemScript for ShWpkh. Tr descriptors don't have an explicitScript.
+    /// To get the scriptPubKey of descriptors, use scriptPubKey().
+    pub fn explicitScript(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(match args.arg_into()? {
+            Value::Descriptor(desc) => desc.to_explicit_script()?,
+            Value::WshScript(wsh) => wsh.0,
+            other => bail!(Error::InvalidValue(other.into())),
+        }
+        .into())
+    }
+
     /// script::strip(Script) -> Script
     /// Strip debug markers from the given Script
     pub fn script_strip(args: Array, _: &ScopeRef) -> Result<Value> {
@@ -259,9 +277,10 @@ impl Value {
         Ok(match self {
             // Raw scripts are returned as-is
             Value::Script(script) => script,
-            // Descriptors/addresses are converted into their scriptPubKey
+            // Descriptors/Addresses/WshScript are converted into their scriptPubKey
             Value::Descriptor(descriptor) => descriptor.to_script_pubkey()?,
             Value::Address(address) => address.script_pubkey(),
+            Value::WshScript(wsh) => wsh.0.to_p2wsh(),
             // TapInfo returns the V1 witness program of the output key
             Value::TapInfo(tapinfo) => tapinfo.script_pubkey(),
             other => bail!(Error::NoSpkRepr(other.into())),
@@ -714,6 +733,13 @@ impl PrettyDisplay for AbsLockTime {
                 write!(f, "{}", time::fmt_timestamp(timestamp.to_consensus_u32()))
             }
         }
+    }
+}
+
+impl PrettyDisplay for WshScript {
+    const AUTOFMT_ENABLED: bool = false;
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
+        write!(f, "wsh({})", self.0.pretty(indent))
     }
 }
 

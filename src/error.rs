@@ -75,6 +75,9 @@ pub enum RuntimeError {
     #[error("Expected a string, not {}", ValErrFmt(.0))]
     NotString(Box<Value>),
 
+    #[error("Expected a WshScript, not {}", ValErrFmt(.0))]
+    NotWshScript(Box<Value>),
+
     #[error("Expected a single Xpub, not {0}")]
     NotSingleXpub(Box<miniscript::descriptor::DescriptorPublicKey>),
 

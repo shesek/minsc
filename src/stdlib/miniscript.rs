@@ -6,6 +6,7 @@ use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, Execute, ExprRepr, Result, Value};
+use crate::stdlib::btc::WshScript;
 use crate::util::{DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
@@ -43,13 +44,12 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set("TRIVIAL", Policy::Trivial).unwrap();
     scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
 
-    // Other descriptor functions
-    scope.set_fn("descriptor", fns::descriptor).unwrap();
-    scope.set_fn("explicitScript", fns::explicitScript).unwrap();
-
     // Policy to Script compilation
     scope.set_fn("tapscript", fns::tapscript).unwrap();
     scope.set_fn("segwitv0", fns::segwitv0).unwrap();
+
+    // Other descriptor functions
+    scope.set_fn("descriptor", fns::descriptor).unwrap();
 
     // multi() and thresh() are basically the same; a thresh() policy between keys compiles into Miniscript as multi()
     scope.set_fn("multi", fns::thresh).unwrap();
@@ -159,7 +159,7 @@ pub mod fns {
 
     /// `wsh(Policy) -> Descriptor`
     /// `wsh(Array<tagged:sortedmulti>) -> Descriptor` (see `sortedmulti()`)
-    /// `wsh(Script witnessScript) -> Script scriptPubKey``
+    /// `wsh(Script witnessScript) -> WshScript`
     pub fn wsh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Policy(policy) => {
@@ -170,7 +170,9 @@ pub mod fns {
                 let (_tag, thresh_k, pks): (String, _, _) = arr.try_into()?;
                 Descriptor::new_wsh_sortedmulti(thresh_k, pks)?.into()
             }
-            Value::Script(script) => script.to_p2wsh().into(),
+            // miniscript::Descriptor::Wsh cannot represent raw (non-Miniscript) Script,
+            // return a WshScript representation instead.
+            Value::Script(script) => WshScript(script).into(),
             _ => bail!(Error::InvalidArguments),
         })
     }
@@ -232,15 +234,6 @@ pub mod fns {
             Value::String(desc_str) => desc_str.parse()?,
             other => other.try_into()?,
         }))
-    }
-
-    /// explicitScript(Descriptor) -> Script
-    /// Get the Descriptor's underlying Script (before any hashing is done - AKA the witnessScript for Wsh,
-    /// scriptPubKey for Wpkh, or the redeemScript for ShWpkh). Tr descriptors don't have an explicitScript.
-    /// To get the scriptPubKey of descriptors, use scriptPubKey().
-    pub fn explicitScript(args: Array, _: &ScopeRef) -> Result<Value> {
-        let descriptor: Descriptor = args.arg_into()?;
-        Ok(descriptor.to_explicit_script()?.into())
     }
 }
 

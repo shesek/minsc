@@ -11,10 +11,10 @@ use bitcoin::{
 use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
 use crate::parser::Expr;
+use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
 use crate::util::{fmt_quoted_str, PrettyDisplay, EC};
 use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
-
-use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
+use stdlib::btc::WshScript;
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -37,6 +37,7 @@ pub enum Value {
     Policy(Policy),
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
+    WshScript(WshScript),
     Psbt(Psbt),
     WithProb(usize, Box<Value>), // Policy/Script with an associated execution probability (the `@` operator)
 
@@ -114,6 +115,7 @@ impl_from_variant!(Address, Value);
 impl_from_variant!(Network, Value);
 impl_from_variant!(Transaction, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
+impl_from_variant!(WshScript, Value);
 impl_from_variant!(Psbt, Value);
 
 impl From<Vec<Value>> for Value {
@@ -134,6 +136,7 @@ impl_simple_into_variant!(Number, Number, into_number, NotNumber);
 impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
+impl_simple_into_variant!(WshScript, WshScript, into_wsh_script, NotWshScript);
 
 // From Value to f64 primitive, with auto-coercion for integers
 impl TryFrom<Value> for f64 {
@@ -328,6 +331,7 @@ impl Value {
             Value::Function(_) => "function",
             Value::Network(_) => "network",
             Value::TapInfo(_) => "tapinfo",
+            Value::WshScript(_) => "wsh-script",
             Value::Psbt(_) => "psbt",
             Value::Array(_) => "array",
             Value::Symbol(_) => "symbol",
@@ -410,7 +414,7 @@ impl FromStr for Value {
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Mostly round-trip-able, see ReprExpr for a string representation that always is
+        // Mostly round-trip-able, see ExprRepr for a string representation that always is
         match self {
             Value::Number(x) => write!(f, "{}", x),
             Value::Bool(x) => write!(f, "{}", x),
@@ -430,6 +434,7 @@ impl fmt::Display for Value {
             Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
             Value::Script(x) => write!(f, "{}", x.pretty(None)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(None)),
+            Value::WshScript(x) => write!(f, "{}", x.pretty(None)),
         }
     }
 }
@@ -454,6 +459,7 @@ impl PrettyDisplay for Value {
             Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
             Value::Psbt(x) => write!(f, "{}", x.pretty(indent)),
+            Value::WshScript(x) => write!(f, "{}", x.pretty(indent)),
 
             // Use Display for other types that don't implement PrettyDisplay
             other => write!(f, "{}", other),
@@ -486,6 +492,7 @@ impl ExprRepr for Value {
             Transaction(tx) => write!(f, "tx(0x{})", bitcoin::consensus::serialize(tx).as_hex()),
             Script(script) => write!(f, "script(0x{})", script.as_bytes().as_hex()),
             Psbt(psbt) => write!(f, "psbt(0z{})", psbt),
+            WshScript(wsh) => write!(f, "wsh(script(0x{}))", wsh.0.as_bytes().as_hex()),
             TapInfo(tapinfo) => tapinfo.repr_fmt(f),
 
             // Descriptors require special handling when they have script paths (i.e. not (W)Pkh or script-less Tr)
