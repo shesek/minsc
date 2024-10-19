@@ -666,17 +666,20 @@ fn tap_key_origins_map(
 
                     // Provided as a map from xpubs (with associated key source) to the leaf_hashes
                     // For example: "tap_key_origins": [ xpubAAA/0/100: [ LEAF_HASH1, LEAF_HASH2 ] ]
-                    Value::Array(arr) => {
-                        let leaf_hashes = arr.try_into()?;
+                    //
+                    // Scripts may be provided in place of the LEAF_HASH to compute the hash automatically (via TryFrom<Value> for TapLeafHash)
+                    // For example: "tap_key_origins": [ xpubAAA/0/100: [ `xpubAAA/0/100 OP_CHECKSIG` ] ]
+                    Value::Array(leaves) => {
+                        let leaf_hashes = leaves.try_into()?;
                         let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
                         let source = (pk.master_fingerprint(), path);
                         (pk.derive_definite()?.into(), (leaf_hashes, source))
                     }
 
-                    // Provided as a map from xpubs (with associated key source) to a single script to compute the leaf hash for
+                    // Provided as a map from xpubs (with associated key source) to a single leaf as a script/hash
                     // For example: "tap_key_origins": [ xpubAAA/0/100: `xpubAAA/0/100 OP_CHECKSIG` ]
-                    Value::Script(script) => {
-                        let leaf_hash = TapLeafHash::from_script(&script, LeafVersion::TapScript);
+                    single_leaf @ (Value::Bytes(_) | Value::Script(_)) => {
+                        let leaf_hash = single_leaf.try_into()?;
                         let path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
                         let source = (pk.master_fingerprint(), path);
                         (pk.derive_definite()?.into(), (vec![leaf_hash], source))

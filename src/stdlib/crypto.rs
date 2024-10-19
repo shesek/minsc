@@ -177,6 +177,5 @@ impl_hash_conv!(hashes::sha256::Hash);
 impl_hash_conv!(hashes::sha256d::Hash);
 impl_hash_conv!(hashes::ripemd160::Hash);
 impl_hash_conv!(hashes::hash160::Hash);
-impl_hash_conv!(bitcoin::TapNodeHash);
-impl_hash_conv!(bitcoin::TapLeafHash);
 impl_hash_conv!(miniscript::hash256::Hash);
+impl_hash_conv!(bitcoin::TapNodeHash);

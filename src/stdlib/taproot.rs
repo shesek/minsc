@@ -313,6 +313,22 @@ impl TryFrom<Value> for bitcoin::taproot::TapTree {
     }
 }
 
+impl TryFrom<Value> for TapLeafHash {
+    type Error = Error;
+    fn try_from(value: Value) -> Result<Self> {
+        Ok(match value {
+            Value::Bytes(bytes) if bytes.len() == 32 => Self::from_slice(&bytes)?,
+            Value::Script(script) => TapLeafHash::from_script(&script, LeafVersion::TapScript),
+            v => bail!(Error::TaprootInvalidLeaf(v.into())),
+        })
+    }
+}
+impl From<TapLeafHash> for Value {
+    fn from(hash: TapLeafHash) -> Self {
+        hash.to_byte_array().to_vec().into()
+    }
+}
+
 fn tapinfo_huffman(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {
     let script_weights = scripts
         .into_iter()

@@ -250,6 +250,9 @@ pub enum RuntimeError {
     #[error("Script does not exists in Taproot tree")]
     TaprootScriptNotFound,
 
+    #[error("Invalid Taproot leaf, expected a 32 bytes TapLeaf hash or a Script to compute the TapLeaf hash for, not {}", ValErrFmt(.0))]
+    TaprootInvalidLeaf(Box<Value>),
+
     #[error["Miniscript hash pre-images must be exactly 32 bytes long"]]
     InvalidPreimageLen,
 
