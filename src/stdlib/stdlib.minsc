@@ -67,3 +67,15 @@ fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
 
 dyn fn log::env($label) = log("variables:\n----\n" + env::pretty() + "\n----");
 dyn fn log::debug_env($label) = log("variables:\n----\n" + env::debug() + "\n----");
+
+// Testing
+T = [];
+dyn fn test($topic, $test) {
+  T = T + [ $topic ];
+  $indent = if len(T) > 1 then join(fillArray(len(T)-1, "··"), "")+" " else "";
+  print("[TEST] " + $indent + join(T, " · "));
+  t::assert(if isFunction($test) then $test(T) else $test);
+}
+dyn fn t::assert($bool) = $bool || throw("["+last(T)+"] Assertion failed");
+dyn fn t::eq($a, $b) = ($a == $b) || throw("["+last(T)+"] Not equal: "+$a+" != "+$b);
+it = test;
