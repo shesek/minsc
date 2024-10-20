@@ -1,0 +1,34 @@
+test("Multisig 2-of-2", |T| {
+  $alice_sk = tprv8ZgxMBicQKsPfJtqwiW9WhjJHPZtDo8aUbCkkcG8sjHbpZqjghF6ZJ1Tze9fUHrhYyXSNfw5VPbCKEkoFKaDRUzctbSxmxSWNfAGDonxcTG/ *;
+  $bob_sk = tprv8ZgxMBicQKsPd13DKoKTUp2N6yMvzzUq2GUXTgJ28VoRpEXEJTnXCAqXBHm6sCAMgPNR9fwjcpzCWRpV9uqu85YEtSwb4dCoBGrPP84mLrR/ *;
+
+  $alice = tpubD6NzVbkrYhZ4YmvdqNAjv7PQrR5pP8KV3toY38JSJ15zf46WK64gjndLAmKEJp4z2xhPnC6h7T5pdQ1uT9dSUJBUF5YX6tBEZpMgDytLgS5/ *;
+  $bob = tpubD6NzVbkrYhZ4WU51DSz3tDgUfzssAKfjba5JkCLKYmbpeimzvrc7NfTPMStAugvBbyrii2jQKxDofyWVt2Kfxhjd2wz7BGAjNn35HnN7u2L/ *;
+
+  $multisig = wsh($alice && $bob);
+  assert::eq(address($multisig/0), tb1q58leaajpyvm5zpr5kxpuzfqth2sy94ka2zmat7l2eezcvl355slsjlap8g);
+  log("Multisig", $multisig);
+
+  $psbt = psbt [
+    "input": [
+      "prevout": b44c2d14732744392c555f0e96f6f4bce28ea1be4dd812dbbd29450610f3a7ae:1,
+      "utxo": $multisig/0:2 BTC,
+    ],
+    "outputs": [
+      bcrt1ql8nqx3q3v7napchr6ewy4tpyq5y08ywat84pen: 1.9 BTC,
+      $multisig/1:0.05 BTC, // change back to multisig
+    ],
+  ];
+
+  assert::eq(psbt::fee($psbt), 0.05 BTC);
+
+  // $signed_both = psbt::sign($psbt, [$alice_sk, $bob_sk]);
+  $signed_alice = psbt::sign($psbt, $alice_sk);
+  $signed_both = psbt::sign($signed_alice, $bob_sk);
+
+  $tx = psbt::extract(psbt::finalize($signed_both));
+
+  t::eq($tx, tx(0x02000000000101aea7f310064529bddb12d84dbea18ee2bcf4f6960e5f552c39442773142d4cb40100000000ffffffff02802b530b00000000160014f9e603441167a7d0e2e3d65c4aac240508f391dd404b4c0000000000220020f4bf33f97b51cbb176f2ada61dc7522d67e376c911453dcde837217cc586a52203483045022100aedd28d1bcc6d204e43ba0bbe1b302ff9b407022df512014907b695cc6fb05460220015a63904700d93654fd68849ae53e3950822ea284b23be38351046caa84b731014730440220259b7e95f73adebc4d3b3c0dfdb36c21390d9a738d757ecd4c5af10a392c505802204aefd85a3a078965c063252d4de480103ddd7d01b57be7dfefca8a843948c42d014621024f68a514e61e0f54f71212a0054023193665fa49f6b8edfc8c8c98565538a500ad2102345043eedf475c5d6aae23473bc1a9e617435ee0a0061c079e04f67dcb67bd35ac00000000));
+  log("Final TX", pretty($tx));
+
+})
