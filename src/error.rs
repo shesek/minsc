@@ -193,6 +193,9 @@ pub enum RuntimeError {
     #[error("sh() can only wrap wsh() or wpkh()")]
     InvalidShUse,
 
+    #[error("Transaction input #{0} does not exists")]
+    TxInputNotFound(usize),
+
     #[error("Script cannot be represented as an address: {}", .0.pretty(None))]
     NotAddressable(Box<bitcoin::ScriptBuf>),
 

@@ -256,7 +256,7 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
             "proprietary" => psbt.proprietary = val.try_into()?,
             "unknown" => psbt.unknown = val.try_into()?,
             "inputs" => {
-                for (vin, in_tags) in mapped_or_all(val, psbt.inputs.len())? {
+                for (vin, in_tags) in val.into_array()?.mapped_or_all(psbt.inputs.len())? {
                     let psbt_input = psbt
                         .inputs
                         .get_mut(vin)
@@ -265,7 +265,7 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
                 }
             }
             "outputs" => {
-                for (vout, out_tags) in mapped_or_all(val, psbt.outputs.len())? {
+                for (vout, out_tags) in val.into_array()?.mapped_or_all(psbt.outputs.len())? {
                     let psbt_output = psbt
                         .outputs
                         .get_mut(vout)
@@ -386,25 +386,6 @@ fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
         }
         Ok(())
     })
-}
-
-// Parse an Array that either contains a list of index:value tuples mapping from
-// element indexes to values, or a full list of all element values with no indexes.
-// Returned as a list of index:value tuples in both cases.
-fn mapped_or_all<T: FromValue>(arr: Value, expected_all_length: usize) -> Result<Vec<(usize, T)>> {
-    let arr = arr.into_array()?;
-    if let Some(Value::Array(first_el)) = arr.first() {
-        if let Some(Value::Number(_)) = first_el.first() {
-            // Provided as [ 0: $val0, 1: $val1, ... ]
-            return arr.try_into();
-        }
-    }
-    // Provided as [ $val0, $val1, ... ]
-    ensure!(
-        arr.len() == expected_all_length,
-        Error::InvalidLength(arr.len(), expected_all_length)
-    );
-    Ok(Vec::<T>::try_from(arr)?.into_iter().enumerate().collect())
 }
 
 fn create_psbt_with_tx(tags: Array) -> Result<Psbt> {
