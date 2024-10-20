@@ -1,0 +1,62 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master, dev, dv ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Check for errors
+      run: cargo check
+
+    - name: Check formatting
+      run: cargo fmt -- --check
+
+    - name: Check with Clippy
+      run: cargo clippy --all-targets --all-features -- -A clippy::redundant_field_names
+
+    - name: Build
+      run: cargo build --release
+
+    - name: Run tests
+      run: MINSC_EXE=target/release/minsc ./tests/test.sh
+
+    - name: Run examples
+      run: MINSC_EXE=target/release/minsc ./tests/examples.sh
+
+    - name: Prepare artifacts
+      run: strip target/release/minsc
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: minsc
+        path: target/release/minsc
