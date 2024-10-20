@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  Test:
+    runs-on: ubuntu-22.04
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+    - name: 📥 Checkout
+      uses: actions/checkout@v4
+
+    - name: 🗄️ Cache
+      uses: actions/cache@v4
+      with:
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+
+    - name: 🐛 Check for errors
+      run: cargo check --all-features
+
+    - name: 🧹 Check formatting
+      run: cargo fmt -- --check
+
+    - name: 📎 Check with Clippy
+      run: cargo clippy --all-targets --all-features
+
+    - name: 🔨 Build
+      run: cargo build --release
+
+    - name: 🧪 Run tests
+      run: MINSC_EXE=target/release/minsc ./tests/test.sh
+
+    - name: 📖 Run examples
+      run: MINSC_EXE=target/release/minsc ./tests/test.sh examples
+
+    - name: 📦 Prepare artifacts
+      run: strip target/release/minsc
+
+    - name: 📤️ Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: minsc
+        path: target/release/minsc
