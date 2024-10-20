@@ -14,7 +14,9 @@ DUST_AMOUNT=DUST_WSH; // also == DUST_TR
 // Uses the sha256 of G in DER encoding, as suggested by BIP 341: https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs
 // assert::eq(NUMS, pubkey(hash::sha256(0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)));
 NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
-TR_UNSPENDABLE = NUMS; // the default for tr(), can be overridden in user-land code
+
+// A unique NUMS as a derivable Xpub, using the SHA256 of $seed as the chain code
+fn xNUMS($seed) = pubkey(0x043587cf000000000000000000 + hash::sha256($seed) + 0x02 + bytes(NUMS))/0;
 
 // Useful as a default with CTV
 PREVOUT_NONE = 0000000000000000000000000000000000000000000000000000000000000000:0;
@@ -26,6 +28,10 @@ ENABLE_RBF = 0xFFFFFFFD;
 // Taproot
 //
 
+// The default unspendable key for tr(), can be overridden in user-land code
+TR_UNSPENDABLE = NUMS;
+
+// Create the witness stack for a script-path spend
 fn tr::script_witness($tr, $script, $stack) = $stack + [ $script, tr::ctrl($tr, $script) ];
 
 //
