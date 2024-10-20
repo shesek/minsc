@@ -93,8 +93,8 @@ pub enum RuntimeError {
     #[error("Expected a descriptor, not {}", ValErrFmt(.0))]
     NotDescriptor(Box<Value>),
 
-    #[error("Expected Script, not {}", ValErrFmt(.0))]
-    NotScript(Box<Value>),
+    #[error("Expected a Script (or script bytes), not {}. Perhaps you meant to use explicitScript()/scriptPubKey()", ValErrFmt(.0))]
+    NotScriptLike(Box<Value>),
 
     #[error("Expected a transaction, raw bytes or tagged list, not {}", ValErrFmt(.0))]
     NotTxLike(Box<Value>),
@@ -106,9 +106,6 @@ pub enum RuntimeError {
         "Expected a 4 bytes BIP32 fingerprint or a key to compute the fingerprint for, not {}", ValErrFmt(.0)
     )]
     NotFingerprintLike(Box<Value>),
-
-    #[error("Expected raw Script or Bytes, not {}. Perhaps you meant to use explicitScript()/scriptPubKey()?", ValErrFmt(.0))]
-    InvalidScriptConstructor(Box<Value>),
 
     #[error("Cannot represent as a scriptPubKey: {}", ValErrFmt(.0))]
     NoSpkRepr(Box<Value>),

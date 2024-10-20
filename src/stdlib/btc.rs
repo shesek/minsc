@@ -233,11 +233,7 @@ pub mod fns {
 
     /// script(Bytes|Script) -> Script
     pub fn script(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(match args.arg_into()? {
-            Value::Script(script) => script.into(),
-            Value::Bytes(bytes) => ScriptBuf::from(bytes).into(),
-            other => bail!(Error::InvalidScriptConstructor(other.into())),
-        })
+        Ok(Value::Script(args.arg_into()?))
     }
 
     /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
@@ -310,11 +306,13 @@ impl Value {
     pub fn is_script(&self) -> bool {
         matches!(self, Value::Script(_))
     }
+    pub fn into_script(self) -> Result<ScriptBuf> {
+        self.try_into()
+    }
 }
 
 // Convert from Value to Bitcoin types
 
-impl_simple_into_variant!(ScriptBuf, Script, into_script, NotScript);
 impl_simple_into_variant!(Network, Network, into_network, NotNetwork);
 
 impl TryFrom<Value> for Address {
@@ -328,6 +326,17 @@ impl TryFrom<Value> for Address {
                 addr.assume_checked()
             }
             v => bail!(Error::NotAddress(v.into())),
+        })
+    }
+}
+
+impl TryFrom<Value> for ScriptBuf {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(match val {
+            Value::Script(script) => script,
+            Value::Bytes(bytes) => bytes.into(),
+            other => bail!(Error::NotScriptLike(other.into())),
         })
     }
 }
