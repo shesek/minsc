@@ -29,7 +29,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("tr::ctrl", fns::ctrl).unwrap();
 
     // Convert a tr() descriptor into a TaprootSpendInfo
-    scope.set_fn("tr::tapInfo", fns::tapInfo).unwrap();
+    scope.set_fn("tr::tapinfo", fns::tapinfo).unwrap();
 
     // Low-level leaf/branch hash calculation. Shouldn't be used directly typically.
     scope.set_fn("tr::tapLeaf", fns::tapLeaf).unwrap();
@@ -122,10 +122,10 @@ pub mod fns {
         Ok(ctrl.serialize().into())
     }
 
-    /// tr::tapInfo(Descriptor|TapInfo) -> TapInfo
+    /// tr::tapinfo(Descriptor|TapInfo) -> TapInfo
     ///
     /// Convert the Tr Descriptor into a TapInfo (or return TapInfo as-is)
-    pub fn tapInfo(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn tapinfo(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::TapInfo(args.arg_into()?))
     }
 
