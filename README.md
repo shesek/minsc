@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/shesek/minsc.svg?branch=master)](https://travis-ci.org/shesek/minsc)
+[![Build Status](https://github.com/shesek/minsc/actions/workflows/rust.yml/badge.svg)](https://github.com/shesek/minsc/actions/workflows/rust.yml)
 [![crates.io](https://img.shields.io/crates/v/minsc.svg)](https://crates.io/crates/minsc)
 [![npm](https://img.shields.io/npm/v/minsc.svg?color=blue)](https://www.npmjs.com/package/minsc)
 [![MIT license](https://img.shields.io/github/license/shesek/minsc.svg?color=yellow)](https://github.com/shesek/minsc/blob/master/LICENSE)
@@ -6,15 +6,49 @@
 
 # Minsc
 
-### A Miniscript-based scripting language for Bitcoin contracts
+### A mini scripting language for all things Bitcoin
 
-Minsc is a high-level scripting language for expressing Bitcoin Script spending conditions.
+Minsc is a high-level, domain-specific language for Bitcoin scripting that simplifies the creation and fulfillment of complex spending conditions, using an expressive pseudo-code-like syntax. It has built-in support for Descriptors, Miniscript, Script, Transactions, PSBT, Taproot, Xpubs/Xprivs, CTV, and more.
+
+> [!NOTE]
+> The documentation and playground on the [`min.sc`](https://min.sc/) website are severely outdated.
+>
+> To explore some of Minsc's new abilities, check out the [`min.sc/v0.3`](https://min.sc/v0.3/) playground and the following examples:
+>
+> #### Descriptors, Miniscript & PSBT
+> - [Simple Taproot PSBT](https://min.sc/v0.3/#github=examples/taproot-psbt-simple.minsc) (P2TR key-path, BIP389 multi-path, BIP86)
+> - [Simple Multisig](https://min.sc/v0.3/#github=examples/multisig-simple.minsc) (P2WSH 2-of-2)
+> - [Co-signer with expiry](https://min.sc/v0.3/#github=examples/cosigner-with-expiry.minsc) (P2TR with Miniscript leaves, Green-like)
+> - [Multisig 3-of-3 into 2-of-3](https://min.sc/v0.3/#github=examples/3of3-into-2of3.minsc)
+> - [Hashed Timelock Contract](https://min.sc/v0.3/#github=examples/htlc.minsc) (HTLC)
+> - [Recovery after a delay period](https://min.sc/v0.3/#github=examples/recovery-after-delay.minsc) (simple CSV-based, delay period since the coins last moved)
+> - [Inheritance after a contest period](https://min.sc/v0.3/#github=examples/inheritance-after-contest-presigned.minsc) (2-stage using pre-signed transactions, contest delay period following the trigger tx)
+>
+> #### Manual & Script
+> - [Manual Signing](https://min.sc/v0.3/#github=examples/manual-signing-p2wpkh.minsc) (P2WPKH without Descriptors, Miniscript or PSBT)
+> - [Manual Scripting & Signing](https://min.sc/v0.3/#github=examples/manual-scripting-signing-p2wsh.minsc) (P2WSH without Descriptors, Miniscript or PSBT)
+> - [Simple CTV Whitelist](https://min.sc/v0.3/#github=examples/ctv-simple.minsc) (P2TR with raw Script leaves)
+> - [CTV Vault](https://min.sc/v0.3/#github=examples/ctv-vault.minsc) (WIP code)
+> - [Simplest CAT](https://min.sc/v0.3/#github=examples/cat-simplest.minsc)
+>
+> #### Elements/Liquid Introspection
+> - [Dutch Auction](https://min.sc/v0.3/#github=examples/elements-dutch-auction.minsc)
+> - [Token Sale with royalty](https://min.sc/v0.3/#github=examples/elements-sale-royalty.minsc) (recursive stateful contract, WIP code)
+>
+> --------
+> 
+> To learn more, you can also check out the Minsc standard library parts implemented in Minsc:
+> - [`src/stdlib/stdlib.minsc`](https://min.sc/v0.3/#github=src/stdlib/stdlib.minsc) (utilities for arrays, strings, testing and more)
+> - [`src/stdlib/btc.minsc`](https://min.sc/v0.3/#github=src/stdlib/btc.minsc) (transaction utilities, `Script` loop unrolling, control structures and more)
+> - [`src/stdlib/elements.minsc`](https://min.sc/v0.3/#github=src/stdlib/elements.minsc) (introspection, 64-bit arithmetic and more)
+
+<!-- Minsc is a high-level scripting language for expressing Bitcoin Script spending conditions.
 It is based on the [Miniscript](http://bitcoin.sipa.be/miniscript/) Policy language,
 with additional features and syntactic sugar sprinkled on top, including variables, functions, infix notation, human-readable times and more.
 
-Documentation & live playground are available on the website: https://min.sc
+Documentation & live playground are available on the website: https://min.sc 
 
-Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpay.shesek.info/)
+Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpay.shesek.info/) 
 
 ## Examples
 
@@ -68,7 +102,7 @@ Support development: [⛓️ on-chain or ⚡ lightning via BTCPay](https://btcpa
   ```
   [:arrow_forward: Try it live](https://min.sc/#c=%2F%2F%20Two%20factor%20authentication%20with%20a%20timeout%20recovery%20clause%0Afn%20two_factor%28%24user%2C%20%24provider%2C%20%24delay%29%20%3D%20%0A%20%20%24user%20%26%26%20%28likely%40%24provider%20%7C%7C%20older%28%24delay%29%29%3B%0A%0A%2F%2F%202FA%20where%20the%20user%20has%20a%202-of-2%20setup%20and%20the%20provider%20is%20a%203-of-4%20federation%0A%0A%24user%20%3D%20pk%28desktop_pk%29%20%26%26%20pk%28mobile_pk%29%3B%0A%24providers%20%3D%20%5B%20pk%28A%29%2C%20pk%28B%29%2C%20pk%28C%29%2C%20pk%28D%29%20%5D%3B%0A%0Atwo_factor%28%24user%2C%203%20of%20%24providers%2C%204%20months%29)
 
-More examples are available on https://min.sc.
+More examples are available on https://min.sc.-->
 
 ## Local installation
 
@@ -77,11 +111,11 @@ More examples are available on https://min.sc.
 ```bash
 $ cargo install minsc
 
-# Compile a minsc file
+# Execute a minsc file
 $ minsc examples/htlc.minsc
 
-# Compile from stdin
-$ echo 'pk(A) && older(1 week)' | minsc -
+# Execute from stdin
+$ echo 'pk(d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645c) && older(1 week)' | minsc -
 
 # Dump AST
 $ minsc examples/htlc.minsc --ast
@@ -89,17 +123,14 @@ $ minsc examples/htlc.minsc --ast
 
 Using the Rust API:
 ```rust
-use minsc::{parse, run, eval};
+use minsc::{parse, eval};
 
-let code = "pk(A) && older(1 week)";
-let ast = parse(&code).unwrap();
-let result = eval(ast).unwrap();
-// or parse+eval in one go with `run(&code)`
+let code = "pk(d0de0aaeaefad02b8bdc8a01a1b8b11c696bd3d66a2c5f10780d95b7df42645c) && older(1 week)";
+let res = eval(&code).unwrap(); // a minsc::Value
+println!("{}", res);
 
-let policy = result.into_policy().unwrap();
-println!("{}", policy);
-
-// also available: into_miniscript() and into_desc()
+// Extract the miniscript::Policy
+let policy = res.into_policy().unwrap();
 ```
 
 Full documentation for the Rust API is [available here](https://docs.rs/minsc/).
