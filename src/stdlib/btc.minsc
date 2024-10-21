@@ -59,18 +59,46 @@ fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::si
 // TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
 
 //
+// Script Looping utilities
+//
+
+// Loop unrolling: run $loop_body as long as $condition is met, up to $max_iterations times.
+// $loop_body can be a Script or a Function that accepts the iteration count and returns a Script.
+// For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
+// more advanced example with some comments: https://min.sc/v0.3/#gist=758c25489869d77d4ef624ea43f18c49
+fn unrollLoop($max_iterations, $condition, $loop_body) {
+  $body_fn = if isFunction($loop_body) then $loop_body else |_| $loop_body;
+
+  fn _unrollLoop($i) =
+    if $i < $max_iterations then `$condition OP_IF $body_fn($i) _unrollLoop($i+1) OP_ENDIF`
+    else `$condition OP_NOT OP_VERIFY` // fail the script if the condition is still met after $max_iterations
+  ;
+  _unrollLoop(0)
+}
+
+// Read the top stack item as the number of times to run $for_body
+// Example with accumulator: `0 <num> unrollFor(50, `OP_DUP OP_ROT OP_ADD OP_SWAP`)` to sum the numbers from <num> to 1
+fn unrollFor($max_iterations, $for_body) {
+  $body_fn = if isFunction($for_body) then $for_body else |_| $for_body;
+  `
+    unrollLoop($max_iterations, `OP_DUP OP_0NOTEQUAL`, |$i| `$body_fn($i) OP_1SUB`)
+    OP_DROP // drop the counter (always 0 by now)
+  `
+}
+
+//
 // Script Altstack manipulation
 //
 
 // ROLL/PICK from the altstack, for static $n
 fn rollAlt($n) = `
-  OP_FROMALTSTACK*$n
-  {`OP_SWAP OP_TOALTSTACK`*($n - 1)}
+  $n*OP_FROMALTSTACK
+  ($n-1)*`OP_SWAP OP_TOALTSTACK`
 `;
 fn pickAlt($n) = `
-  OP_FROMALTSTACK*$n
+  $n*OP_FROMALTSTACK
   OP_DUP OP_TOALTSTACK
-  {`OP_SWAP OP_TOALTSTACK`*($n - 1)}
+  ($n-1)*`OP_SWAP OP_TOALTSTACK`
 `;
 
 // ROLL/PICK from the altstack, using the number at the top of the stack as the depth
@@ -106,34 +134,6 @@ fn nFromAlt($max_n) = `
   // stack: <N total> <N counter>, alt stack: <el1> <el2> .. <elN>
   unrollFor($max_n, `OP_FROMALTSTACK OP_ROT*2`)
 `;
-
-//
-// Script Looping utilities
-//
-
-// Loop unrolling: run $loop_body as long as $condition is met, up to $max_iterations times
-// $loop_body can be a Script or a Function that accepts the iteration count and returns a Script.
-// For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
-// more advanced example with some comments: https://min.sc/v0.3/#gist=758c25489869d77d4ef624ea43f18c49
-fn unrollLoop($max_iterations, $condition, $loop_body) {
-  $body_fn = if isFunction($loop_body) then $loop_body else |_| $loop_body;
-
-  fn _unrollLoop($i) =
-    if $i < $max_iterations then `$condition OP_IF $body_fn($i) _unrollLoop($i+1) OP_ENDIF`
-    else `$condition OP_NOT OP_VERIFY` // fail the script if the condition is still met after $max_iterations
-  ;
-  _unrollLoop(0)
-}
-
-// Read the top stack item as the number of times to run $for_body
-// Example with accumulator: `0 <num> unrollFor(50, `OP_DUP OP_ROT OP_ADD OP_SWAP`)` to sum the numbers from <num> to 1
-fn unrollFor($max_iterations, $for_body) {
-  $body_fn = if isFunction($for_body) then $for_body else |_| $for_body;
-  `
-    unrollLoop($max_iterations, `OP_DUP OP_0NOTEQUAL`, |$i| `$body_fn($i) OP_1SUB`)
-    OP_DROP // drop the counter (always 0 by now)
-  `
-}
 
 //
 // Script Conditional control structures
@@ -200,14 +200,14 @@ fn select($scripts) =
 //
 
 MARK_SCRIPT=true;
-MARK_CTX="";
+MARK_CTX=[];
 // SCRIPT_MARKER_MAGIC available from Rust
 
 dyn fn mark($kind, $body) = if !MARK_SCRIPT then `` else
-  `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP {MARK_CTX+str($body)} OP_DROP`;
-dyn fn mark::comment($comment) = mark("comment", $comment);
-dyn fn mark::label($name) = mark("label", $name);
+  `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP str($body) OP_DROP`;
+dyn fn mark::comment($comment) = mark("comment", join(MARK_CTX+[str($comment)], " · "));
+dyn fn mark::label($name) = mark("label", join(MARK_CTX+[str($name)], "__"));
 dyn fn mark::ctx($$context, $$fn) {
-  MARK_CTX = MARK_CTX + $$context;
+  MARK_CTX = MARK_CTX + [ str($$context) ];
   $$fn()
 }
