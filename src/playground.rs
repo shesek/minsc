@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use serde::Serialize;
+use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 
 use miniscript::bitcoin::{Address, Network, ScriptBuf};
@@ -87,7 +88,7 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
         })
     };
     let result = _run_playground().map_err(|e| e.to_string())?;
-    Ok(JsValue::from_serde(&result).unwrap())
+    Ok(to_value(&result).unwrap())
 }
 
 fn run(code: &str) -> Result<Value, Error> {

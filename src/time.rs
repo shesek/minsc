@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 
 use bitcoin::relative::LockTime;
 
@@ -60,17 +60,20 @@ pub fn relative_time_to_seq(
     }
 }
 
-pub fn parse_datetime(s: &str) -> Result<NaiveDateTime, ParseError> {
+pub fn parse_datetime(s: &str) -> Result<DateTime<Utc>, ParseError> {
     // Date always suffixed with T, hours optionally suffixed with Z
     let s = s.trim_end_matches('Z');
     let dt = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").or_else(|_| {
         NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M").or_else(|_| -> Result<_, ParseError> {
-            Ok(NaiveDate::parse_from_str(s, "%Y-%m-%dT")?.and_hms(0, 0, 0))
+            Ok(NaiveDate::parse_from_str(s, "%Y-%m-%dT")?
+                .and_hms_opt(0, 0, 0)
+                .unwrap())
         })
     })?;
+    let dt = dt.and_utc();
     let ts = dt.timestamp();
     ensure!(
-        ts >= LOCKTIME_THRESHOLD as i64 && ts <= u32::max_value() as i64,
+        ts >= LOCKTIME_THRESHOLD as i64 && ts <= u32::MAX as i64,
         ParseError::InvalidDateTimeOutOfRange // TODO add date string to error
     );
     Ok(dt)
@@ -78,10 +81,10 @@ pub fn parse_datetime(s: &str) -> Result<NaiveDateTime, ParseError> {
 
 pub fn fmt_timestamp(ts: u32) -> impl std::fmt::Display {
     lazy_static! {
-        static ref MIN_TIME: NaiveTime = NaiveTime::from_hms(0, 0, 0);
+        static ref MIN_TIME: NaiveTime = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
     }
 
-    let ts = NaiveDateTime::from_timestamp(ts as i64, 0);
+    let ts = DateTime::from_timestamp(ts as i64, 0).expect("u32 within range");
     if ts.time() == *MIN_TIME {
         ts.format("%Y-%m-%dT")
     } else {
