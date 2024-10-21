@@ -235,7 +235,7 @@ pub enum RuntimeError {
     #[error("Invalid secret key length {0} (expected 32 for single key or 78 for xpub)")]
     InvalidSecKeyLen(usize),
 
-    #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash)")]
+    #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(Script|Array<Script>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash merkle_root)")]
     TaprootInvalidTrUse,
 
     #[error("Invalid Taproot unspendable key: {}", ValErrFmt(.0))]
