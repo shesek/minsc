@@ -60,7 +60,8 @@ function wordlistHints(wordlist, currWord) {
     })),
     ...wordlist.funcs.map(([ name, args ]) => ({
       text: name,
-      displayText: `${name}(${args || '..'})`,
+      // args are null for native functions
+      displayText: `${name}(${args != null ? args : '..'})`,
       hint: applyFuncHint
     }))
   ]

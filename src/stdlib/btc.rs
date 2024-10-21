@@ -511,10 +511,10 @@ pub fn fmt_script<W: fmt::Write>(
         }
         ScriptFmt::Minsc(false) => (),
         ScriptFmt::ScriptWiz => {
-            writeln!(f, "// ScriptWiz formatted")?;
+            writeln!(f, "// ScriptWiz formatted\n")?;
         }
         ScriptFmt::BitIde => {
-            writeln!(f, "// BitIDE formatted")?;
+            writeln!(f, "// BitIDE formatted\n")?;
         }
     }
 

@@ -118,8 +118,8 @@ lazy_static! {
         // or a welcome message if there aren't any.
         dyn fn main() = symbol({
             $env = str(env::pretty());
-            if !isEmpty($env) then "// Environment variables:\n\n" + $env
-            else "// Welcome! Put some variables in your environment and they will show up here."
+            if !isEmpty($env) then "// Defined variables:\n\n" + $env
+            else "// Welcome! Put some variables in your environment and they will show up here, or set a final return value."
         });
 
         // Wrap some String-returning functions to return a Symbol instead, to have them displayed in

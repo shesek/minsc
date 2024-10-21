@@ -139,7 +139,7 @@ pub mod fns {
         .into())
     }
 
-    /// Convert a multi-PubKey/SecKey/Descriptor into an array of singles
+    /// Convert a multi-path PubKey/SecKey/Descriptor into an array of singles
     ///
     /// singles(PubKey<Multi>|SecKey<Multi>|Descriptor<Multi>) -> Array<PubKey|SecKey|Descriptor>
     pub fn singles(args: Array, _: &ScopeRef) -> Result<Value> {
@@ -348,7 +348,7 @@ impl TryFrom<Value> for bip32::Fingerprint {
                 DescriptorPublicKey::MultiXPub(_) => bail!(Error::InvalidMultiXpub),
             },
             // Convert SecKey to PubKey, then get its Fingerprint
-            Value::SecKey(_) => Value::PubKey(val.try_into()?).try_into()?,
+            Value::SecKey(sk) => Value::PubKey(sk.to_public_()?).try_into()?,
             other => bail!(Error::NotFingerprintLike(other.into())),
         })
     }
