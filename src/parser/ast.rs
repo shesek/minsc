@@ -32,7 +32,7 @@ pub enum Expr {
     Int(i64),
     Float(f64),
     Duration(Duration),
-    DateTime(chrono::NaiveDateTime),
+    DateTime(chrono::DateTime<chrono::Utc>),
 }
 
 impl_from_variant!(i64, Expr, Int);
