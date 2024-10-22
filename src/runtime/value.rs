@@ -442,8 +442,11 @@ impl fmt::Display for Value {
 impl fmt::Display for Number {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Number::Int(x) => write!(f, "{}", x),
-            Number::Float(x) => write!(f, "{:?}", x),
+            Number::Int(n) => write!(f, "{}", n),
+            // Force decimal precision for round floats
+            // {:#} can do this too, but it also enables scientific notation which we want to avoid
+            Number::Float(n) if n.fract() == 0.0 => write!(f, "{:.1}", n),
+            Number::Float(n) => write!(f, "{}", n),
         }
     }
 }
