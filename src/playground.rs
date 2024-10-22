@@ -7,8 +7,10 @@ use wasm_bindgen::prelude::*;
 use miniscript::bitcoin::{Address, Network, ScriptBuf};
 use miniscript::{Descriptor, MiniscriptKey};
 
-use crate::util::DescriptorExt;
-use crate::{parse, Error, Evaluate, Execute, Library, PrettyDisplay, Scope, ScopeRef, Value};
+use crate::util::{DescriptorExt, TapInfoExt};
+use crate::{
+    parse, Error, Evaluate, Execute, ExprRepr, Library, PrettyDisplay, Scope, ScopeRef, Value,
+};
 
 #[derive(Serialize)]
 pub struct PlaygroundResult {
@@ -23,11 +25,11 @@ pub struct PlaygroundResult {
 }
 
 #[wasm_bindgen]
-pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue, JsValue> {
+pub fn run_playground(code: &str, network: &str) -> Result<JsValue, JsValue> {
     let _run_playground = || -> Result<PlaygroundResult, Error> {
         let network = Network::from_str(network)?;
 
-        let value = run(code)?;
+        let value = eval(code)?;
 
         let (mut policy, mut desc, mut script, mut addr, mut key, mut tapinfo, mut other) =
             (None, None, None, None, None, None, None);
@@ -52,9 +54,9 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
                 addr = Address::from_script(&script_, network).ok();
                 script = Some(script_)
             }
-            tapinfo_ @ Value::TapInfo(_) => {
+            Value::TapInfo(tapinfo_) => {
                 // Display the address of TaprootSpendInfo
-                let spk = tapinfo_.clone().into_spk()?;
+                let spk = tapinfo_.script_pubkey();
                 addr = Some(Address::from_script(&spk, network).unwrap());
                 tapinfo = Some(tapinfo_);
             }
@@ -91,8 +93,14 @@ pub fn run_playground(code: &str, network: &str) -> std::result::Result<JsValue,
     Ok(to_value(&result).unwrap())
 }
 
-fn run(code: &str) -> Result<Value, Error> {
+fn eval(code: &str) -> Result<Value, Error> {
     PLAYGROUND_SCOPE.with(|scope| Ok(parse(code)?.eval(scope)?))
+}
+
+#[wasm_bindgen]
+pub fn playground_eval(code: &str) -> Result<String, String> {
+    let result = eval(code).map_err(|e| e.to_string())?;
+    Ok(result.repr_str())
 }
 
 fn script_asm(script: &ScriptBuf) -> String {

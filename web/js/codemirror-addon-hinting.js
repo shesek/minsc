@@ -54,10 +54,13 @@ const matchSorter = currWord => (a, b) => {
 // Get hints from the built-in autocomplete list of stdlib variables/functions
 function wordlistHints(wordlist, currWord) {
   wordlist._hints = wordlist._hints || [
-    ...wordlist.vars.map(v => ({ text: v })),
+    ...wordlist.vars.map(([ name, type ]) => ({
+      text: name,
+      displayText: `${name} · ${type}`
+    })),
     ...wordlist.funcs.map(([ name, args ]) => ({
       text: name,
-      displayText: `${name}(${args != '[native]' ? args : '..'})`,
+      displayText: `${name}(${args || '..'})`,
       hint: applyFuncHint
     }))
   ]

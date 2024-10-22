@@ -1,19 +1,20 @@
 #!/bin/bash
-
-wasm-pack build --target nodejs --out-dir "$PWD/../node-pkg" "$PWD/.." --features wasm
+set -eo pipefail
+wasm-pack build --target nodejs --out-dir "$PWD/../node-pkg" "$PWD/.." --features playground
 
 node -p '
-  const [ vars, funcs ] = JSON.parse(require("../node-pkg/minsc.js").run(`
+  const [ vars, funcs ] = JSON.parse(require("../node-pkg/minsc.js").playground_eval(`
     [
-      env(0) | filter(|$kv| !isFunction($kv.1)) | map(|$kv| $kv.0),
-      env(0) | filter(|$kv| isFunction($kv.1)) | map(|$kv| $kv.0 + " " + str($kv.1)),
+      env(0) | filter(|$kv| !isFunction($kv.1)) | map(|$kv| $kv.0: typeof($kv.1)),
+      env(0) | filter(|$kv| isFunction($kv.1))  | map(|$kv| $kv.0: str($kv.1)),
     ]
   `));
+  const excluded = k => /^(_|OP_RETURN_|OP_PUSHBYTES_|OP_PUSHNUM_)|^(main|T)$/.test(k);
   JSON.stringify({
-    vars: vars.filter(v => v.length >= 2 && !v.startsWith("_")),
-    funcs: funcs.filter(v => !v.startsWith("_")).map(def => [
-        def.slice(0, def.indexOf(" ")),
-        def.slice(def.indexOf("(")+1, def.length-1)
+    vars: vars.filter(([k, _]) => !excluded(k)),
+    funcs: funcs.filter(([k, _]) => !excluded(k)).map(([ k, def ]) => [
+      k,
+      !def.includes("[native]") ? def.slice(def.indexOf("(")+1, def.length-1) : null
     ]),
   }, null, 2)
-' > js/stdlib-wordlist.json
+' | tee js/stdlib-wordlist.json
