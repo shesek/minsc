@@ -142,12 +142,32 @@ h1
   word-wrap break-word
   color #6897bb
 
-#share, #share-box
-  font-size 0.6rem
-  padding 0.2rem 0.4rem
+
+#editor-wrap
+  position relative
+
+#editor-bar *
+  font-size 0.7rem
+#editor-bar > *
+  padding 0.15rem 0.4rem
 #share-box
   width 13em
   margin-right 0.2rem
+
+// Use the state of #help-popover to display #help-contents
+// This is necessary until the 'overlay' CSS property is commonly available
+// https://stackoverflow.com/a/78098540/865693
+#help-contents
+  display none
+  position absolute
+  z-index 9
+  right 0px
+  top 35px
+  font-size 0.85rem
+  padding 0.4em 0.6em
+
+#help-popover:popover-open + #help-contents
+  display: block
 
 #ref
   h2

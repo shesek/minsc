@@ -1,7 +1,7 @@
 mixin box(title, collapsible=false, collapsed=false)
   - klass = collapsible ? 'collapsible' + (collapsed ? ' collapsed' : '') : ''
   .card.border-secondary&attributes(attributes)(class=klass)
-    h5.card-header.d-flex.justify-content-between
+    h5.card-header.d-flex.justify-content-between.align-items-center
       = title
       if collapsible
         +icon('arrows-expand')
@@ -40,11 +40,19 @@ body
     .row
       .col-md-8.col-lg-9
         #editor-wrap.card.border-secondary
-          h5.card-header.d-flex.justify-content-between
+          h5.card-header.d-flex.justify-content-between.align-items-center
             | Minsc
-            .d-flex.justify-content-end
+
+            #editor-bar.d-flex.justify-content-end.align-items-center
               input#share-box.form-control.form-control-sm.bg-dark.text-muted.d-none(readonly)
               a#share.btn.btn-sm.btn-secondary.bg-dark(href='#') #[+icon('link-45deg')] Share URL
+              button.btn.btn-sm.btn-secondary.bg-dark(popovertarget='help-popover') ⌨️ Shortcuts
+
+          #help-popover(popover)
+          #help-contents.card.border-secondary.
+            #[code F11] to toggle full-screen (in all panels) #[br]
+            #[code Ctrl-Space] to auto-complete
+
           #editor.card-text
 
           #error.alert.alert-warning

@@ -168,12 +168,13 @@ document.querySelectorAll('.card.collapsible').forEach(collapsible => {
 
 // Share button
 const share_box = document.querySelector('#share-box')
-share_el.addEventListener('click', _ => {
+share_el.addEventListener('click', e => {
+  e.preventDefault()
+
   share_el.classList.toggle('active')
   share_box.classList.toggle('d-none')
 
   if (share_el.classList.contains('active')) {
-    //share_box.value = share_el.href
     share_box.select()
   }
 })
