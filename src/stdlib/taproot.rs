@@ -173,6 +173,9 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
     };
 
     Ok(match (a, b) {
+        // Workaround for a bug in rust-miniscript, pending https://github.com/rust-bitcoin/rust-miniscript/pull/677
+        (Value::Policy(Policy::Key(pk)), None) => Descriptor::new_tr(pk, None)?.into(),
+
         // tr(Policy) -> Descriptor
         // Single policy, compiled into a script tree
         // Extracts the internal key from the policy, or uses the TR_UNSPENDABLE key
@@ -364,6 +367,7 @@ fn descriptor_from_policy(
         // If no key was provided, use the policy as-is
         None => policy,
     };
+
     Ok(policy.compile_tr(unspendable)?)
 }
 
