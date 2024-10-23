@@ -255,22 +255,30 @@ ScriptMarkCtx: Expr = "@@" <Paren<(<Expr> "," <Expr>)>> =>
   // Wraps the body expression in a dynamically-scoped function, to be evaluated from within the `mark::ctx()` scope.
   call("mark::ctx", vec![<>.0, ast::FnExpr { params: vec![], body: <>.1.into(), dynamic_scoping: true }.into()]);
 
-
-// Anonymous function expression
-FnExpr: Expr = <dyn_scoping:"dyn"?> <params:FnExprParams> <body:FnExprBody> =>
-    ast::FnExpr { params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
-FnExprParams = {
-  "|" <List0<IdentTerm, ",">> "|",
-  // No arguments should already be captured by the `List0`, but for some reason it isn't.
-  // Possibly because `||` is also a terminal for policy OR?
-  "||" => vec![],
-};
-FnExprBody = { Expr, FnBlockNoReturn };
-
-// Allow function bodies without an explicit final return value (true is returned by default).
-// Also used for FnDef below.
+// Allow function bodies without an explicit final return value (true is returned by default)
+// Used for FnExpr and FnDef.
 FnBlockNoReturn: Expr = "{" <Stmt*> "}" =>
   ast::Block { stmts: <>, return_value: None, use_main: false }.into();
+
+
+// Anonymous function expression
+FnExpr = { FnExpr1, FnExpr2 };
+
+// Rust-like with pipes, more suitable for callbacks: |$a, $b| $a+$b
+FnExpr1: Expr = <dyn_scoping:"dyn"?> <params:FnExpr1Params> <body:Either2<Expr, FnBlockNoReturn>> =>
+    ast::FnExpr { params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
+FnExpr1Params = {
+  "|" <List0<IdentTerm, ",">> "|",
+  // Zero arguments should be captures by the List0, but it isn't because `||` is pre-tokenized as OR
+  "||" => vec![],
+};
+
+// FnDef-like syntax, more suitable for chaining with FnDef: fn adder($a) = fn ($b) = $a+$b; adder(2)(3)
+FnExpr2: Expr = <dyn_scoping:"dyn"?> "fn" <params:Paren<List0<IdentTerm, ",">>> <body:Either3<("=" <Expr>), BlockExpr, FnBlockNoReturn>> =>
+    ast::FnExpr { params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
+
+// XXX Should probably settle on one syntax to rule them all. Maybe `($a, $b) => $a+$b`?
+
 
 // Binary infix operators with left associativity
 Infix: Expr = <lhs:InfixLHS> <op:InfixOp> <rhs:InfixRHS> =>
@@ -398,6 +406,9 @@ IfStmtElse: Vec<Stmt> = {
 ExprStmt: Stmt = <Expr> ";" => ast::ExprStmt(<>).into();
 
 // Helpers
+
+Either2<A, B>: Expr = { A, B };
+Either3<A, B, C>: Expr = { A, B };
 
 // A `S`-separated list of zero or more `T` values
 List0<T, S>: Vec<T> = <l:(<T> S)*> <t:T?> => concat(l, t);
