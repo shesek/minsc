@@ -114,7 +114,7 @@ fn nFromAlt($max_n) = `
 // Loop unrolling: run $loop_body as long as $condition is met, up to $max_iterations times
 // $loop_body can be a Script or a Function that accepts the iteration count and returns a Script.
 // For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
-// more advanced example with some comments: https://gist.github.com/shesek/758c25489869d77d4ef624ea43f18c49
+// more advanced example with some comments: https://min.sc/v0.3/#gist=758c25489869d77d4ef624ea43f18c49
 fn unrollLoop($max_iterations, $condition, $loop_body) {
   $body_fn = if isFunction($loop_body) then $loop_body else |_| $loop_body;
 
