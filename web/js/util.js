@@ -37,23 +37,30 @@ export function loadFile(hash) {
 }
 
 async function loadRepoFile(path) {
-  if (path.startsWith('examples/')) path=`shesek/minsc/master/${path}`
+  if (/^(examples|tests|src)\//.test(path)) path=`shesek/minsc/master/${path.replace(/\.minsc$/, '')}.minsc`
+  else if (/^(master|dev|20\d{4}-\w+)\//.test(path)) path=`shesek/minsc/${path.replace(/\.minsc$/, '')}.minsc`
+  else if (path.startsWith('https://github.com/')) path=path.slice(18)
+
   const parts = path.split('/')
   if (parts[2] == 'blob') parts.splice(2,1) // drop '/blob/' to support github.com web ui urls
+
   const resp = await fetch(`https://raw.githubusercontent.com/${parts.join('/')}`)
-  if (!resp.ok) throw new Error(resp)
-  return resp.text()
+  if (!resp.ok) throw new Error(`Github file ${parts.join('/')} returned ${resp.status}`)
+  const code = await resp.text()
+
+  // Strip final `env::pretty()` calls. This is used in example files meant to be run using CLI, but not needed in the playground.
+  return code.replace(/\s*\nenv::pretty\(\)\s*$/, '\n')
 }
 
 async function loadGist(identifier) {
   const [ gist_id, file_index ] = identifier.split(':')
   const resp = await fetch(`https://api.github.com/gists/${encodeURIComponent(gist_id)}`)
       , body = await resp.json()
-  if (!body.files) return Promise.reject('gist not found')
+  if (!resp.ok) throw new Error(`Gist ${gist_id} not found`)
 
   const filenames = Object.keys(body.files)
       , file = body.files[filenames[+file_index || 0]]
-  if (!file) return Promise.reject(`file #${file_index} not found`)
+  if (!file) throw new Error(`Gist file #${file_index} not found`)
 
   let code = file.content
 

@@ -50,7 +50,11 @@ if (code_file) {
   code_file.then(code => {
     editor.setValue(code)
     update('code_file')
-  }).catch(console.error)
+  }).catch(err => {
+    console.error(err)
+    editor.setValue(`// Failed loading code: ${err.message||err}`)
+    update('code_file')
+  })
 }
 
 // Handle evaluation result message from WebWorker
@@ -104,12 +108,13 @@ function update(source) {
   clearErrorMark()
 
   const code = editor.getValue()
-      , network = 'signet'
+      , network = 'testnet'
 
   const share_uri = `#c=${encode(code)}`
   share_el.href = share_uri
   share_box.value = share_el.href
-  if (source != 'init' && source != 'code_file') location.hash = share_uri
+  if (source != 'init' && source != 'code_file')
+    history.replaceState(null, '', share_uri)
 
   if (code) worker.postMessage({ code, network })
   else error_el.style.display = 'none'
