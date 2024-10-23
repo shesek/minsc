@@ -5,12 +5,10 @@ use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 
 use miniscript::bitcoin::{Address, Network, ScriptBuf};
-use miniscript::{Descriptor, MiniscriptKey};
+use miniscript::{Descriptor, ForEachKey, MiniscriptKey};
 
-use crate::util::{DescriptorExt, TapInfoExt};
-use crate::{
-    parse, Error, Evaluate, Execute, ExprRepr, Library, PrettyDisplay, Scope, ScopeRef, Value,
-};
+use crate::util::{DescriptorExt, PrettyDisplay, TapInfoExt};
+use crate::{parse, Error, Evaluate, Execute, ExprRepr, Library, Scope, ScopeRef, Value};
 
 #[derive(Serialize)]
 pub struct PlaygroundResult {
@@ -29,15 +27,18 @@ pub fn run_playground(code: &str, network: &str) -> Result<JsValue, JsValue> {
     let _run_playground = || -> Result<PlaygroundResult, Error> {
         let network = Network::from_str(network)?;
 
-        let value = eval(code)?;
-
         let (mut policy, mut desc, mut script, mut addr, mut key, mut tapinfo, mut other) =
             (None, None, None, None, None, None, None);
 
-        match value {
+        match eval(code)? {
             Value::Policy(policy_) => {
-                // Convert policies into a wsh() descriptor
-                desc = Some(Descriptor::new_wsh(policy_.compile()?)?);
+                // Compile policies into a wsh() descriptor
+                if policy_.for_each_key(|pk| !pk.is_x_only_key()) {
+                    // Has to explicitly check for x-only keys as a temporary workaround to avoid panicking
+                    // https://github.com/rust-bitcoin/rust-miniscript/pull/761
+                    let ms = policy_.compile().ok();
+                    desc = ms.and_then(|ms| Descriptor::new_wsh(ms).ok());
+                }
                 policy = Some(policy_);
             }
             Value::Descriptor(desc_) => desc = Some(desc_),

@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 
 use bitcoin::ScriptBuf;
 use miniscript::descriptor::{DescriptorType, ShInner, WshInner};
-use miniscript::{ScriptContext, Threshold};
+use miniscript::{ForEachKey, MiniscriptKey, ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, Result, Value};
@@ -172,6 +172,11 @@ pub mod fns {
     pub fn wsh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Policy(policy) => {
+                // Temporary workaround to avoid panicking (https://github.com/rust-bitcoin/rust-miniscript/pull/761)
+                ensure!(
+                    policy.for_each_key(|pk| !pk.is_x_only_key()),
+                    Error::InvalidWshXonly
+                );
                 let miniscript = policy.compile()?;
                 Descriptor::new_wsh(miniscript)?.into()
             }
