@@ -1,0 +1,159 @@
+// A simple CTV-based Vault with Taproot
+//
+// The cold key can sign and spend unconditionally using the internal key path.
+// The hot key can initiate a 2-stage withdrawal process with an enforced contest
+// delay period of $hot_delay, during which the $cold_pk may claim the funds back.
+fn Vault($cold_mpk, $hot_mpk, $hot_delay, $trigger_fee) {
+  // Create a TaprootInfo for making a deposit into the vault,
+  // using $cold_pk as the internal key and a single script for the hot spend path
+  fn deposit($child_num, $txo_amount) =
+    tr($cold_mpk/$child_num, _hot_path_script($cold_mpk/$child_num, $hot_mpk/$child_num, $txo_amount));
+
+  // Script for the time-delayed hot spend path, using CTV to only allow spending through the trigger tx
+  fn _hot_path_script($cold_pk, $hot_pk, $txo_amount) = `
+    // PREVOUT_NONE (0000..:0) as an input placeholder (does not affect the CTV hash)
+    ctv::hash(_trigger_psbt($cold_pk, $hot_pk, $txo_amount, PREVOUT_NONE)) OP_CTV OP_DROP
+    xonly($hot_pk) OP_CHECKSIG // not strictly necessary to also require a signature, but safer in case of address reuse
+  `;
+
+  // Create the withdrawal stage-1 trigger transaction
+  fn _trigger_psbt($cold_pk, $hot_pk, $txo_amount, $input) = psbt [
+    "input": $input,
+    "outputs": [
+      tr(pk($cold_pk) || (pk($hot_pk) && older($hot_delay))): $txo_amount - $trigger_fee - DUST_AMOUNT,
+      tr(pk($cold_pk) || pk($hot_pk)): DUST_AMOUNT, // anchor output for fee bumping
+    ]
+  ];
+
+  // Make a time-delayed hot withdrawal from the vault
+  fn Withdrawal($child_num, $txo_amount, $deposit_outpoint) {
+    $cold_pk = $cold_mpk/$child_num;
+    $hot_pk = $hot_mpk/$child_num;
+    $trigger_out_amount = $txo_amount - $trigger_fee - DUST_AMOUNT;
+
+    // Withdrawal stage-1 trigger transaction. Spends the deposit output, signed by $hot_pk.
+    // Can now be constructed with complete input/utxo information.
+    $trigger = _trigger_psbt($cold_pk, $hot_pk, $txo_amount, [
+      "prevout": $deposit_outpoint,
+      "utxo": deposit($child_num, $txo_amount):$txo_amount,
+      "tap_key_origins": [
+        $cold_pk,
+        $hot_pk: _hot_path_script($cold_pk, $hot_pk, $txo_amount),
+      ]
+    ]);
+
+    // Withdrawal stage-2 complete transaction PSBT. Spends the trigger output to complete the withdrawal after $hot_delay has passed
+    fn complete($outputs) = psbt [
+      "input": [
+        // Using a PSBT as the prevout both sets the txid:vout and extracts the information necessary for signing/spending (`utxo` not needed)
+        "prevout": $trigger:0,
+        "sequence": $hot_delay,
+      ],
+      "outputs": $outputs,
+    ];
+    fn complete_to($address, $complete_fee) = complete[ $address: $trigger_out_amount - $complete_fee ];
+
+    // Abort withdrawal transaction. Can spend the trigger output at any time, signed by $cold_pk
+    fn abort($outputs) = psbt [
+      "input": $trigger:0,
+      "outputs": $outputs
+    ];
+    fn abort_to($address, $abort_fee) = abort[ $address: $trigger_out_amount - $abort_fee ];
+    fn abort_to_cold($abort_fee) = abort_to(tr($cold_pk), $abort_fee);
+
+    // Create a CPFP transaction to fee-bump the trigger transaction
+    fn cpfp($additional_inputs, $change_outputs) = psbt [
+      "inputs": $additional_inputs + [ $trigger:1 ], // spend the anchor output (2nd)
+      "outputs": $change_outputs,
+    ];
+
+    // Withdrawal API
+    [ "trigger": $trigger, "complete": complete, "complete_to": complete_to, "abort": abort, "abort_to_cold": abort_to_cold, "cpfp": cpfp ]
+  }
+
+  // Simplified API for typical use, returns just the trigger+complete txs
+  fn withdraw($child, $txo_amount, $deposit_outpoint, $outputs) {
+    $wd = Withdrawal($child, $txo_amount, $deposit_outpoint);
+    [ $wd->trigger, $wd->complete($outputs) ]
+  }
+  fn withdraw_to($child, $txo_amount, $deposit_outpoint, $address, $complete_fee) {
+    $wd = Withdrawal($child, $txo_amount, $deposit_outpoint);
+    [ $wd->trigger, $wd->complete_to($address, $complete_fee) ]
+  }
+
+  // Make an unconditional withdrawal from the vault using the $cold_key. No time-delay, supports multiple inputs.
+  fn cold_withdraw($coins, $outputs) = psbt[
+    "inputs": map($coins, |[ $child_num, $txo_amount, $deposit_outpoint ]| [
+      "prevout": $deposit_outpoint,
+      "utxo": deposit($child_num, $txo_amount):$txo_amount,
+      "tap_key_origins":[ $cold_mpk/$child_num ],
+    ]),
+    "outputs": $outputs,
+  ];
+  fn cold_withdraw_to($coins, $address, $withdraw_fee) = cold_withdraw($coins, [
+    $address: sum(map($coins, |$coin| $coin.1)) - $withdraw_fee
+  ]);
+
+  // Vault API
+  [ "deposit": deposit, "withdrawal": Withdrawal, "withdraw": withdraw, "withdraw_to": withdraw_to, "cold_withdraw": cold_withdraw, "cold_withdraw_to": cold_withdraw_to ]
+}
+
+// Finalize the trigger PSBT. Transactions with non-Miniscript-compatible Script (CTV in this case)
+// require manual finalization instead of using Miniscript's psbt::finalize()
+fn finalize_trigger($trigger_psbt) {
+  $input = $trigger_psbt->inputs.0;
+  $hot_signature = $input->tap_script_sigs.0.1;
+  $trigger_ctrl = $input->tap_scripts.0.0;
+  $trigger_script = $input->tap_scripts.0.1.0;
+  psbt::finalize_witness($trigger_psbt, [
+    0: [ $hot_signature, $trigger_script, $trigger_ctrl ]
+  ])
+}
+// Finalize and extract the trigger transaction. psbt::extract_raw() needed for non-Miniscript-compatible Script
+fn finalize_extract_trigger($trigger_psbt) = psbt::extract_raw(finalize_trigger($trigger_psbt));
+
+// Setup Vault
+$cold_sk = xprv9s21ZrQH143K3Xuq83mkj7qByus7JPgT81E8SohtKAcdPUPXRmNg5tVoT2ek5XfMjvpyh1oPvAqfGJee4jnrTzyH4R49QiKWJoNGNYuPbq1;
+$hot_sk = xprv9s21ZrQH143K3TMKbDNpCPQ9m97mb91sXS6KjrPewZuoeNbW2qk7N6QqT9bFpB1X6jhGS8NEBrMADdYZf8QfRMTcJZsfbokCCUyZ7SH8Mzy;
+$cold = pubkey($cold_sk);
+$hot = pubkey($hot_sk);
+
+$vault = Vault($cold, $hot, 6 weeks, 300 sats);
+
+// Make a deposit
+$deposit = $vault->deposit(0, 1.5 BTC);
+$address = address($deposit, regtest);
+
+// Make a time-delayed withdrawal using the hot key
+$wd = $vault->withdrawal(0, 1.5 BTC, 249cdf05469f7586c77aa75e06526efea464b44eadff5d9a3828b9bf44455a2a:0);
+$complete_psbt = $wd->complete[
+  2NBGgi2wgVgznGE2iwWboZpnLhfL5Xp75cZ: 1.09999 BTC,
+  $vault->deposit(1, 0.4 BTC): 0.4 BTC, // change back to vault
+];
+
+$trigger_signed = psbt::sign($wd->trigger, $hot_sk);
+$complete_signed = psbt::sign($complete_psbt, $hot_sk);
+$trigger_tx = finalize_extract_trigger($trigger_signed);
+$complete_tx = psbt::finalize_extract($complete_signed);
+
+// Abort the hot withdrawal using the cold key
+$abort_psbt = $wd->abort_to_cold(1000 sat);
+$abort_tx = psbt::sign_extract($abort_psbt, $cold_sk); // short for sign, finalize & extract
+
+// Fee bump the hot withdrawal trigger
+$cpfp_psbt = $wd->cpfp(
+  // additional inputs and change
+  [ f96574cadbadd233658202063029e20e3de27397ffd129689d8f95138a6c7a76:0, 35035a47b5d5d1c1f7dff52b3b914cb04b370feeabd844ee1fd1a57bca9408c6:2 ],
+  [ bcrt1ql8nqx3q3v7napchr6ewy4tpyq5y08ywat84pen: 0.0234 BTC ]
+);
+
+// Make an immediate withdrawal using the cold key
+$cold_spend_tx = $vault->cold_withdraw([
+  [0, 1.5 BTC, 249cdf05469f7586c77aa75e06526efea464b44eadff5d9a3828b9bf44455a2a:0],
+  [1, 0.4 BTC, caf8137b26d77adc181ef93692a9e49fcd9c985f6394e75d1e446d105a69fb1f:1],
+], [
+  bcrt1q3x0krlxcmnkfrc70x5xf5zluxtlddlu70fqv35: 1.59999 BTC,
+  $vault->deposit(2, 0.3 BTC): 0.3 BTC,
+]) | psbt::sign_extract($cold_sk);
+
+env::pretty()

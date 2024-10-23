@@ -1,0 +1,46 @@
+//
+// Wallet setup
+//
+
+// Keys can also be provided as Xpubs (psbt::sign() will need to be done externally instead, but everything else will work)
+$main_key = xprv9s21ZrQH143K2f3noSpNkun5Min35bYejBNrkP3DMNYq657W9JDXcoWPdRCUQ9Sm4RUFgrpumSRbjhKcUbDAtqfUPVz75VCR2juEYK3o8wr/*;
+$recovery = xprv9s21ZrQH143K2J1EsECBEN7AwDTaZMij9Cp7nyKxCsu5iQ1csALduqAb8eWGNVwya999MQnwP7PTS8VrfJCRBof2S23zgjQTJzmHbicF7xz/*;
+
+// Normally the $main_key signs, but if the coins haven't moved for 1 year the $recovery keys can sign too
+// Users are expected to periodically 'roll over' UTXOs so the expiry isn't reached (unless they intend to recover)
+$policy = pk($main_key) || (pk($recovery) && older(1 year));
+
+// Generate wallet address #0 (code below assumes a0499e..:0 funded it with 0.5 BTC)
+$address = address(tr($policy/0), regtest);
+
+//
+// Spend from wallet
+//
+
+// Normal spend path with the $main_key (as the taproot internal key)
+$normal_spend = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:0,
+    "utxo": tr($policy/0):0.5 BTC,
+  ],
+  "outputs": [
+    2NBGgi2wgVgznGE2iwWboZpnLhfL5Xp75cZ:0.1 BTC,
+    tr($policy/1):0.399 BTC, // change
+  ]
+];
+$normal_spend_signed = psbt::sign($normal_spend, $main_key);
+$normal_spend_tx = psbt::finalize_extract($normal_spend_signed);
+
+
+// Recovery spend path with the $recovery keys, after 1 year of inactivity
+$recovery_spend = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:0,
+    "utxo": tr($policy/0):0.5 BTC,
+    "sequence": 1 year,
+  ],
+  "output": tr($recovery/1/0): 0.499 BTC, // send to the $recovery's full control
+];
+$recovery_spend_tx = psbt::sign_extract($recovery_spend, $recovery); // sign, finalize & extract
+
+env::pretty()

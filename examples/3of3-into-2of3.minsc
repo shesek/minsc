@@ -1,2 +1,49 @@
-// A 3-of-3 that turns into 2-of-3 after a timeout
-3 of [ pk(A), pk(B), pk(C), older(1 month 2 weeks) ]
+//
+// Wallet setup
+//
+
+// Keys can also be provided as Xpubs (psbt::sign() will need to be done externally instead, but everything else will work)
+$alice = xprv9s21ZrQH143K2J1EsECBEN7AwDTaZMij9Cp7nyKxCsu5iQ1csALduqAb8eWGNVwya999MQnwP7PTS8VrfJCRBof2S23zgjQTJzmHbicF7xz/*;
+$bob = xprv9s21ZrQH143K3aPunCLorPZiar1XqAo2WdXJf3UDYCiY1fQevcLdhM2Cn4g4voDksmBDedxguUCKi8yvcw2koFUZNpAjYC4wXyynjoJo2Ry/*;
+$charlie = xprv9s21ZrQH143K3Xuq83mkj7qByus7JPgT81E8SohtKAcdPUPXRmNg5tVoT2ek5XfMjvpyh1oPvAqfGJee4jnrTzyH4R49QiKWJoNGNYuPbq1/*;
+
+// A 3-of-3 that decays into a 2-of-3 after a timeout
+$desc = tr(3 of [ $alice, $bob, $charlie, older(6 months) ]);
+
+// Generate wallet address #0 (code below assumes 72877bd..:0 funded it with 0.5 BTC)
+$address = address($desc/0, regtest);
+
+//
+// Spend from wallet
+//
+
+// Spend with 3 signatures
+$3of3_psbt = psbt [
+  "input": [
+    "prevout": 72877bd944be3433d5030ef102922e52f7c40de8b5ca26fa8b7c724d341e936e:0,
+    "utxo": ($desc/0):0.5 BTC,
+  ],
+  "outputs": [
+    2NBGgi2wgVgznGE2iwWboZpnLhfL5Xp75cZ: 0.1 BTC,
+    ($desc/1): 0.399 BTC, // change back to decaying multisig
+  ],
+];
+$3of3_signed = psbt::sign($3of3_psbt, [ $alice, $bob, $charlie ]);
+$3of3_tx = psbt::finalize_extract($3of3_signed);
+
+// Spend with 2 signatures after 6 months
+$2of3_psbt = psbt [
+  "input": [
+    "prevout": 72877bd944be3433d5030ef102922e52f7c40de8b5ca26fa8b7c724d341e936e:0,
+    "utxo": ($desc/0):0.5 BTC,
+    "sequence": 6 months,
+  ],
+  "outputs": [
+    2NBGgi2wgVgznGE2iwWboZpnLhfL5Xp75cZ: 0.1 BTC,
+    tr($bob && $charlie)/1: 0.399 BTC, // change to a multisig between the 2 active signers
+  ],
+];
+$2of3_tx = psbt::sign_extract($2of3_psbt, [ $bob, $charlie ]); // short for sign, finalize & extract()
+$2of3_tx_bytes = bytes($2of3_tx);
+
+env::pretty()

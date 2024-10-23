@@ -1,0 +1,49 @@
+//
+// Wallet setup
+//
+
+$user = xprv9s21ZrQH143K2LnZmLg75SLXRP5xerKKRik4Ki14AzoZSexfMzFGz3NFpca17Rf87whZ37xyqaM7yVYepqnXFQZEc73NL3T3faPa1QbXFgJ/*;
+$cosigner = xpub661MyMwAqRbcGBFj976obwkRVzhWgh8ChjXSLk3Kk21S7P8Zjen8xm466td5AyD37tzqpqUcCxFty5WLzDB89NCqtK2T5vEdnsjL58usF8Y/*;
+
+// Normally the user and co-signer sign together, but if the coins haven't moved for 6 months the user can sign alone.
+// This allows the co-signer to enforce additional security measures, without requiring the user to give up self-custody.
+// Users are expected to periodically 'roll over' UTXOs so the expiry isn't reached (unless they intend it to).
+$co_wallet = pk($user) && (likely@pk($cosigner) || older(6 months));
+
+// Generate wallet address #0 (code below assumes a0499e..:0 funded it with 0.5 BTC)
+$address = address(tr($co_wallet/0));
+
+
+//
+// Spend from wallet
+//
+
+// Spend with co-signer cooperation
+$co_spend = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:0,
+    "utxo": tr($co_wallet/0):0.5 BTC,
+  ],
+  "outputs": [
+    tb1q3x0krlxcmnkfrc70x5xf5zluxtlddlu7dqepxa: 0.4 BTC,
+    tr($co_wallet/1): 0.099 BTC, // change
+  ]
+];
+$co_spend_user_signed = psbt::sign($co_spend, $user);
+// The co-signer will normally sign remotely and independently, after running some checks against the PSBT, applying rate limits, verifying 2FA, etc
+$co_spend_co_signed = psbt::sign($co_spend_user_signed, xprv9s21ZrQH143K3hBG35ZoEoogwxs2HEQMLWbqYMdiBgUTEaoRC7TtQxjcFbsqMxCJcJh1PaQusWBZyGmmdZwXoENrSsUn2CmBuVrKqu2rLmG);
+$co_spend_tx = psbt::finalize_extract($co_spend_co_signed);
+
+
+// Spend without the co-signer, after waiting for 6 months
+$unilateral_spend = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:0,
+    "utxo": tr($co_wallet/0):0.5 BTC,
+    "sequence": 6 months,
+  ],
+  "output": wpkh($user/1'/0): 0.499 BTC, // send to the $user's full control
+];
+$unilateral_spend_tx = psbt::sign_extract($unilateral_spend, $user); // sign, finalize & extract
+
+env::pretty()

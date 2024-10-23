@@ -1,0 +1,20 @@
+// Simplest example funding & spending a CAT-encumbered output using Taproot
+
+// Generate address
+$script = `"BAR" OP_CAT "FOOBAR" OP_EQUAL`;
+$tap = tr($script); // NUMS as the internal key
+$addr = address($tap, regtest);
+
+// Spend (assuming 2d8a8f..:0 funded $addr with 0.09 BTC+fees)
+$tx = tx [
+  "input": [
+    "prevout": 2d8a8fcbac473cd15bf44162db78ec888d40aba54b78dcb9a4da53a1774f8219:0,
+    // Need to provide a string that produces "FOOBAR" when concatenated with "BAR"
+    "witness": tr::script_witness($tap, $script, [ "FOO" ]),
+  ],
+  "output": tb1q0w8sael5x949cashazsqmdwetwp9jpv62vsac6:0.09 BTC,
+];
+
+$tx_hex = hex($tx);
+
+env::pretty()

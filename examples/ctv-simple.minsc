@@ -1,0 +1,33 @@
+// Create a Taproot with a CTV script leaf for each possible whitelisted destination address,
+// using NUMS as the internal key
+$tr = tr [
+  `ctv::hash[ "output": tb1qtk006y5n5y3gljm8vfgfyjj9apuxfahncydrm5:0.01 BTC ] OP_CTV`,
+  `ctv::hash[ "output": tb1qs2xpw2sc6vrl8u0x5mw2l9ff2tj4tsca82nq9w:0.01 BTC ] OP_CTV`,
+  5@`ctv::hash[ "output": tb1qegulj3g6kjg4xslxsh8a6znv78czc993zfdrju:0.01 BTC ] OP_CTV`,
+  // 5@ signifies the leaf is 5x most likely (optional, used to optimize tree structure)
+];
+$address = address($tr, signet);
+
+// Create a transaction spending $outpoint to the given destination
+fn spend($outpoint, $address, $amount) {
+  $leaf_script = `ctv::hash[ "output": $address:$amount ] OP_CTV`;
+
+  if !contains($tr->scripts, $leaf_script) {
+    throw("Not whitelisted: "+$amount+" to "+$address);
+  }
+
+  tx [
+    "input": [
+      "prevout": $outpoint,
+      "witness": tr::script_witness($tr, $leaf_script, []),
+      // short for "witness": [ $leaf_script, tr::ctrl($tr, $leaf_script) ],
+    ],
+    "output": $address:$amount,
+  ]
+}
+
+// Assuming bb30697c..:1 is an output funding $address with 0.01 BTC + mining fees
+$tx = spend(bb30697cc1444591e65482199b770ff0606895ab1ebee8791a04f6ac6da1e412:1, tb1qs2xpw2sc6vrl8u0x5mw2l9ff2tj4tsca82nq9w, 0.01 BTC);
+$tx_hex = hex($tx);
+
+env::pretty()

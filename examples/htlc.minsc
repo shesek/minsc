@@ -1,6 +1,39 @@
-// Traditional preimage-based HTLC
+// Setup some keys and a secret
+$alice = xprv9s21ZrQH143K3TMKbDNpCPQ9m97mb91sXS6KjrPewZuoeNbW2qk7N6QqT9bFpB1X6jhGS8NEBrMADdYZf8QfRMTcJZsfbokCCUyZ7SH8Mzy;
+$bob = xprv9s21ZrQH143K3QE9eS1BpBMo44QjHMahavrB23JMyS1eRyij6rhYmq7C7vxZtBe3HUvCVrZcoDZ3vkPT4FxSJaLdyoodJYPzKBxVXRc42Ge;
 
-$redeem = pk(A) && sha256(H);
-$refund = pk(B) && older(10);
+$secret_preimage = 0x0101010101010101010101010101010101010101010101010101010101010101;
+$secret_hash = 0x72cd6e8422c407fb6d098690f1130b7ded7ec2f7f5e1d30bd9d521f015363793;
 
-likely@$redeem || $refund
+// HTLC policy
+$redeem = pk($alice) && sha256($secret_hash);
+$refund = pk($bob) && older(heightwise 1 day); // 144 blocks
+$htlc = wsh($redeem || $refund);
+
+// Generate address (code below assumes a0499e..:1 funded it with 1.5 BTC)
+$address = address($htlc);
+
+// Redeem path, signed by Alice and includes the $secret_preimage
+$redeem_psbt = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:1,
+    "utxo": $htlc:1.5 BTC,
+    "sha256_preimages": [ $secret_preimage ],
+  ],
+  "output": wpkh($alice/12):1.499 BTC,
+];
+$redeem_signed = psbt::sign($redeem_psbt, $alice);
+$redeem_tx = psbt::finalize_extract($redeem_signed);
+
+// Refund path, signed by Bob after a timeout
+$refund_psbt = psbt [
+  "input": [
+    "prevout": a0499e20c8def7c8f5b1c04db191a5fd9ee313300b76c1a63a8281d86c78cf48:1,
+    "utxo": $htlc:1.5 BTC,
+    "sequence": heightwise 1 day,
+  ],
+  "output": wpkh($bob/13):1.499 BTC,
+];
+$refund_tx = psbt::sign_extract($refund_psbt, $bob); // sign, finalize & extract
+
+env::pretty()

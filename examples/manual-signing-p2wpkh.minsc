@@ -1,0 +1,32 @@
+//
+// Manual single-key signing example with SegwitV0 P2WPKH,
+// without using Descriptors, Miniscript, PSBT or Xpubs/Xprivs
+//
+
+// Address generation
+$sk = cMzLdeGd5vEqxB8B6VFQoRopQ3sLAAvEzDAoQgvX54xwofSWj1fx; // WIF
+$address = address(`0 hash::hash160(pubkey($sk))`); // real manual way
+assert::eq($address, address(wpkh($sk))); // easy way
+
+// Construct the unsigned transaction for sighash computation
+// (assuming af53f27..:0 funded $address with 0.1 BTC)
+$tx_unsigned = tx [
+  "input": af53f2762ca3fdee7c24a4de710d38e585ccabc7b86e35104b3f5c180a012eb7:0,
+  "outputs": [
+    tb1q69g8t98h6ed787k607jasngpwk3q4xypng6x3s:0.05 BTC,
+    $address:0.049 BTC,
+  ]
+];
+
+// Sign the transaction
+$sighash = tx::sighash($tx_unsigned, 0, [ $address:0.1 BTC ], SIGHASH_ALL);
+$signature = ecdsa::sign($sk, $sighash) + SIGHASH_ALL;
+
+// Construct the final transaction
+$tx_signed = tx::with_witness($tx_unsigned, [
+  0: [ $signature, pubkey($sk) ],
+]);
+  
+$tx_bytes = bytes($tx_signed);
+
+env::pretty()

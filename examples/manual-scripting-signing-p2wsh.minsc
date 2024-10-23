@@ -1,0 +1,40 @@
+//
+// Manual scripting and signing example with SegwitV0 P2WSH,
+// without using Descriptors, Miniscript, PSBT or Xpubs/Xprivs
+//
+
+// Script & Address generation
+$sk = cMzLdeGd5vEqxB8B6VFQoRopQ3sLAAvEzDAoQgvX54xwofSWj1fx; // WIF
+$script = `
+  // Require a signature by $sk
+  pubkey($sk) OP_CHECKSIGVERIFY
+
+  // And a number that matches 3+?=7
+  3 OP_ADD 7 OP_EQUAL
+`;
+$address = address(`0 hash::sha256($script)`); // real manual way
+assert::eq($address, address(wsh($script))); // easy way
+
+// Construct the unsigned transaction for sighash computation
+// (assuming 417dcb..:1 funded $address with 0.1 BTC)
+$tx = tx [
+  "input": 417dcb2a87f0bb41d14998ff3c70b8c16b42920ac12bc2269abe7a21c7de775b:1,
+  "outputs": [
+    tb1q0uflhmfcy0nfrzrxjqwqnp0ttrx9gqf03pthe0:0.05 BTC,
+    tb1q3x0krlxcmnkfrc70x5xf5zluxtlddlu7dqepxa:0.049 BTC,
+  ]
+];
+
+// Sign the transaction
+$sighash = tx::sighash($tx, 0, [ wsh($script):0.1 BTC ], SIGHASH_ALL);
+$signature = ecdsa::sign($sk, $sighash) + SIGHASH_ALL;
+
+// Construct the final transaction
+$tx_with_witness = tx::with_witness($tx, [
+  // 4 is the matching number
+  0: [ 4, $signature, $script ],
+]);
+
+$tx_hex = hex($tx_with_witness);
+
+env::pretty()
