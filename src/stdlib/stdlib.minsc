@@ -62,8 +62,10 @@ fn assert::msg($bool, $msg) = $bool || throw($msg);
 
 // Scope inspection
 dyn fn env::pretty() = env() | map(|$kv| $kv.0+" = "+pretty($kv.1)+" // "+typeof($kv.1)) | join("\n\n")| symbol();
+dyn fn env::repr() = env() | filter(|$kv| !isFunction($kv.1)) | map(|$kv| $kv.0+" = "+repr($kv.1)+"; // "+typeof($kv.1)) | join("\n\n") | symbol();
 dyn fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | symbol();
 fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
+
 
 dyn fn log::env($label) = log("variables:\n----\n" + env::pretty() + "\n----");
 dyn fn log::debug_env($label) = log("variables:\n----\n" + env::debug() + "\n----");
