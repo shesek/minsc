@@ -83,13 +83,15 @@ pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Policy> {
             AndOr::And => Policy::And(into_policies(policies)?),
             AndOr::Or => Policy::Or(into_prob_policies(policies)?),
         }
-    } else {
+    } else if !policies.is_empty() {
         // Otherwise, simulate it through thresh(). This works similarly, except for not supporting execution probabilities.
         let policies = into_policies(policies)?;
         Policy::Thresh(match andor {
             AndOr::And => Threshold::and_n(policies),
             AndOr::Or => Threshold::or_n(policies),
         })
+    } else {
+        bail!(Error::InvalidArguments)
     })
 }
 
@@ -102,10 +104,10 @@ pub mod fns {
     //
 
     pub fn or(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Policy::Or(into_prob_policies(args.into_inner())?).into())
+        Ok(multi_andor(AndOr::Or, args.into_inner())?.into())
     }
     pub fn and(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Policy::And(into_policies(args.into_inner())?).into())
+        Ok(multi_andor(AndOr::And, args.into_inner())?.into())
     }
     pub fn thresh(args: Array, _: &ScopeRef) -> Result<Value> {
         let args = args.check_varlen(2, usize::MAX)?;
