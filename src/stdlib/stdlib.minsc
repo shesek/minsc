@@ -27,18 +27,31 @@ fn flatMap($arr, $fn) = fold($arr, [], |$acc, $el| $acc + $fn($el));
 
 fn reduce($arr, $fn) = if !isEmpty($arr) then fold(tail($arr), $arr.0, $fn) else null;
 
+fn filterMap($arr, $fn) = flatMap($arr, |$el| { $r = $fn($el); if $r != filterMap::skip then [$r] else [] });
+filterMap::skip = symbol("filterMap::skip");
+
 fn find($arr, $fn)  = foldUntil($arr, null,  |$acc, $el| if $fn($el)  then true:$el  else false:null);
 fn some($arr, $fn)  = foldUntil($arr, false, |$acc, $el| if $fn($el)  then true:true else false:false);
 fn every($arr, $fn) = !some($arr, |$el| !$fn($el));
 
 fn contains($arr, $needle) = some($arr, |$el| $el == $needle);
+fn reverse($arr) = map(keys($arr), |$i| $arr.(len($arr)-$i-1));
+fn startsWith($arr, $prefix) = (len($arr) >= len($prefix)) && every(keys($prefix), |$i| $arr.$i == $prefix.$i);
 
-fn concat($xs) = reduce($xs, |$acc, $x| $acc + $x);
-sum = concat; // works for arrays, bytes, strings and numbers
+fn concat($xs) = reduce($xs, |$acc, $x| $acc + $x); // works for arrays, bytes, strings and numbers
+fn sum($nums) = if !isEmpty($nums) then concat($nums) else 0;
+fn flatten($arrays) = if !isEmpty($arrays) then concat($arrays) else [];
 
 // Null handling utilities
 fn mapNullable($value, $fn) = if $value != null then $fn($value) else null;
 fn coalesce($values) = find($values, |$v| $v != null);
+
+// Immutably update the given fields, returning a new updated array
+fn update($original, $updated_fields) {
+  $updated_keys = map($updated_fields, |[$k, _]| $k);
+  $updated_fields + remove($original, $updated_keys)
+}
+fn remove($original, $keys) = filter($original, |[$k, _]| !contains($keys, $k));
 
 // String utilities
 fn join($strs, $sep) =

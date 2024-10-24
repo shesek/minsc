@@ -10,13 +10,17 @@ SIGHASH_ALL_ANYONECANPAY=0x81, SIGHASH_NONE_ANYONECANPAY=0x82, SIGHASH_SINGLE_AN
 DUST_WPKH=294, DUST_WSH=330, DUST_TR=330, DUST_P2A=240, DUST_PRE_SW=546,
 DUST_AMOUNT=DUST_WSH; // also == DUST_TR
 
+// Pay-to-anchor witness program
+P2A = `1 0x4e73`;
+
 // A point with unknown discrete logarithm (to eliminate key-path spend)
 // Uses the sha256 of G in DER encoding, as suggested by BIP 341: https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#constructing-and-spending-taproot-outputs
 // assert::eq(NUMS, pubkey(hash::sha256(0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)));
 NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
 
-// A unique NUMS as a derivable Xpub, using the SHA256 of $seed as the chain code
-fn xNUMS($seed) = pubkey(0x043587cf000000000000000000 + hash::sha256($seed) + 0x02 + bytes(NUMS))/0;
+// A unique NUMS as a derivable Xpub, using the SHA256 of $seed as the chain code (mainnet/testnet)
+fn xNUMS($seed) = pubkey(0x0488b21e000000000000000000 + hash::sha256($seed) + 0x02 + bytes(NUMS))/0;
+fn tNUMS($seed) = pubkey(0x043587cf000000000000000000 + hash::sha256($seed) + 0x02 + bytes(NUMS))/0;
 
 // Useful as a default with CTV
 PREVOUT_NONE = 0000000000000000000000000000000000000000000000000000000000000000:0;
@@ -31,11 +35,11 @@ ENABLE_RBF = 0xFFFFFFFD;
 // The default unspendable key for tr(), can be overridden in user-land code
 TR_UNSPENDABLE = NUMS;
 
-// Create the witness stack for a script-path spend
+// Create the witness stack for a Taproot script-path spend
 fn tr::script_witness($tr, $script, $stack) = $stack + [ $script, tr::ctrl($tr, $script) ];
 
 //
-// Transaction utilities
+// Transactions/PSBT
 //
 
 // Simplified SigHash API given a Transaction and its UTXOs
@@ -57,6 +61,49 @@ fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::si
 ], $vin, $script_leaf);
 
 // TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
+
+fn psbt::finalize_witness($psbt, $input_witnesses) = psbt::update($psbt, [
+  "inputs": map($input_witnesses, |$in_wit|
+    $in_wit.0: [ "final_script_witness": $in_wit.1 ]
+  )
+]);
+
+fn psbt::sign_extract($psbt, $keys) =
+  psbt::extract(psbt::finalize(psbt::sign($psbt, $keys)));
+
+//
+// Script utilities
+//
+
+OP::NOT_EQ_VERIFY = `OP_EQUAL OP_NOT OP_VERIFY`;
+
+// ROLL/PICK from the bottom of the stack (1 for the bottom-most stack element - NOT 0)
+// stack in: <index>, stack out: <element>
+OP::PICK_BOTTOM = `OP_TOALTSTACK OP_DEPTH OP_FROMALTSTACK OP_SUB OP_PICK`;
+OP::ROLL_BOTTOM = `OP_TOALTSTACK OP_DEPTH OP_FROMALTSTACK OP_SUB OP_ROLL`;
+
+// ROLL/PICK from the bottom of the stack, for static $n (1 for bottom-most)
+fn rollBottom($n) = `OP_DEPTH {if $n==1 then OP_1SUB else `$n OP_SUB`} OP_ROLL`;
+fn pickBottom($n) = `OP_DEPTH {if $n==1 then OP_1SUB else `$n OP_SUB`} OP_PICK`;
+
+OP::SHIFT = rollBottom(1);
+
+// Verify that the top stack element is exactly 1 or 0
+OP::MINIMAL_BOOL = `OP_DUP OP_SIZE OP_EQUALVERIFY`;
+
+// Sort the top 2 stack elements (higher placed at the top)
+OP::2SORT = `OP_2DUP OP_GREATERTHAN OP_IF OP_SWAP OP_ENDIF`;
+
+
+// MUL for small constant numbers
+OP::2MUL = `OP_DUP OP_ADD`;
+OP::3MUL = `OP_DUP OP::2MUL OP_ADD`;
+OP::4MUL = OP::2MUL*2;
+OP::5MUL = `OP_DUP OP::4MUL OP_ADD`;
+OP::6MUL = `OP::3MUL OP::2MUL`;
+OP::7MUL = `OP_DUP OP::6MUL OP_ADD`;
+OP::8MUL = `OP::4MUL OP::2MUL`;
+OP::9MUL = OP::3MUL*2;
 
 //
 // Script Looping utilities
