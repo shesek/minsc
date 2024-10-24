@@ -5,7 +5,7 @@ use miniscript::descriptor::{ShInner, WshInner};
 use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, Error, Evaluate, Execute, ExprRepr, Result, Value};
+use crate::runtime::{Array, Error, Evaluate, ExprRepr, Result, Value};
 use crate::stdlib::btc::WshScript;
 use crate::util::{DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
@@ -17,8 +17,6 @@ pub use crate::runtime::AndOr;
 // even when not used for Miniscript-related stuff.
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
-    MINISCRIPT_LIB.exec(scope).unwrap();
-
     let mut scope = scope.borrow_mut();
 
     // Miniscript Policy functions exposed in the Minsc runtime
@@ -32,6 +30,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("hash256", fns::hash256).unwrap();
     scope.set_fn("ripemd160", fns::ripemd160).unwrap();
     scope.set_fn("hash160", fns::hash160).unwrap();
+    scope.set_fn("any", fns::or).unwrap(); // alias
+    scope.set_fn("all", fns::and).unwrap(); // alias
 
     // Miniscript Descriptor functions
     scope.set_fn("wpkh", fns::wpkh).unwrap();
@@ -53,18 +53,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
     // multi() and thresh() are basically the same; a thresh() policy between keys compiles into Miniscript as multi()
     scope.set_fn("multi", fns::thresh).unwrap();
-}
 
-lazy_static! {
-    static ref MINISCRIPT_LIB: crate::Library = r#"
-        fn any($policies) = 1 of $policies;
-        fn all($policies) = len($policies) of $policies;
-
-        // likely probability alias, for e.g. `likely@pk(A) || pk(B)`
-        likely = 10;
-    "#
-    .parse()
-    .unwrap();
+    // likely probability alias, for e.g. `likely@pk(A) || pk(B)`
+    scope.set("likely", 10i64).unwrap();
 }
 
 impl Evaluate for ast::Thresh {
@@ -76,8 +67,11 @@ impl Evaluate for ast::Thresh {
 }
 
 // AND/OR for policies, with support for >2 policies using thresh()
-pub fn multi_andor(andor: AndOr, policies: Vec<Value>) -> Result<Policy> {
-    Ok(if policies.len() == 2 {
+pub fn multi_andor(andor: AndOr, mut policies: Vec<Value>) -> Result<Policy> {
+    Ok(if policies.len() == 1 {
+        // If just one policy was provided, return it as-is
+        policies.remove(0).try_into()?
+    } else if policies.len() == 2 {
         // Use Miniscript's and()/or() when there are exactly 2 policies (more are not supported)
         match andor {
             AndOr::And => Policy::And(into_policies(policies)?),
@@ -103,12 +97,26 @@ pub mod fns {
     // Miniscript Policy functions
     //
 
-    pub fn or(args: Array, _: &ScopeRef) -> Result<Value> {
+    /// `or(Policy, Policy, ..) -> Policy`  
+    /// `or(Array<Policy>) -> Policy`
+    pub fn or(mut args: Array, _: &ScopeRef) -> Result<Value> {
+        if args.len() == 1 && args[0].is_array() {
+            args = args.remove(0).into_array()?;
+        }
         Ok(multi_andor(AndOr::Or, args.into_inner())?.into())
     }
-    pub fn and(args: Array, _: &ScopeRef) -> Result<Value> {
+
+    /// `and(Policy, Policy, ..) -> Policy`  
+    /// `and(Array<Policy>) -> Policy`
+    pub fn and(mut args: Array, _: &ScopeRef) -> Result<Value> {
+        if args.len() == 1 && args[0].is_array() {
+            args = args.remove(0).into_array()?;
+        }
         Ok(multi_andor(AndOr::And, args.into_inner())?.into())
     }
+
+    /// `thresh(Int thresh_n, Policy, Policy, ..) -> Policy`  
+    /// `thresh(Int thresh_n, Array<Policy>) -> Policy`
     pub fn thresh(args: Array, _: &ScopeRef) -> Result<Value> {
         let args = args.check_varlen(2, usize::MAX)?;
         let is_array_call = args.len() == 2 && args[1].is_array();
@@ -116,10 +124,8 @@ pub mod fns {
         let thresh_n: usize = args_iter.next_into()?;
 
         let policies = if is_array_call {
-            // Called as thresh($n, $policies_array)
             into_policies(args_iter.next_into()?)?
         } else {
-            // Called as thresh($n, $policy1, $policy2, ...)
             into_policies(args_iter.collect())?
         };
 
