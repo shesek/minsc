@@ -59,6 +59,36 @@ fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::si
 // TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
 
 //
+// Script utilities
+//
+
+// Verify that the top stack element is exactly 1 or 0
+OP::MINIMAL_BOOL = `OP_DUP OP_SIZE OP_EQUALVERIFY`;
+
+// MUL for small constant numbers
+OP::MUL2 = `OP_DUP OP_ADD`;
+OP::MUL3 = `OP_DUP*2 OP_ADD*2`;
+OP::MUL4 = OP::MUL2*2;
+OP::MUL5 = `OP_DUP OP::MUL4 OP_ADD`;
+OP::MUL6 = `OP::MUL3 OP::MUL2`;
+OP::MUL7 = `OP_DUP OP::MUL6 OP_ADD`;
+OP::MUL8 = `OP::MUL4 OP::MUL2`;
+OP::MUL9 = OP::MUL3*2;
+
+// Static lookup table by index
+// For example: `3 lookup([10,11,12,13,14])` will leave `13` on the stack
+// stack in: <index>, stack out: <values[index]>
+fn lookup($values) = `
+  OP_TOALTSTACK // keep index number aside
+  reverse($values) // reversed so that index 0 gets the first element
+  OP_FROMALTSTACK OP_PICK // get index lookup result
+  OP_TOALTSTACK // keep lookup result aside
+  OP_2DROP*(len($values)/2) OP_DROP*(len($values)%2) // cleanup table
+  OP_FROMALTSTACK
+`;
+// h/t https://github.com/coins/bitcoin-scripts/
+
+//
 // Script Looping utilities
 //
 
