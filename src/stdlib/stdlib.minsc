@@ -59,9 +59,8 @@ fn join($strs, $sep) =
   else if len($strs) == 1 then $strs.0
   else concat([ $strs.0 ] + map(tail($strs), |$str| $sep + $str));
 
-// Tag extraction. Works nicely with the pipe operator: ["a":["b":2]] | t("a") | t("b")
-fn t($tagged, $tag) = $tagged | find(|$el| $el.0 == $tag) | mapNullable(|$el| $el.1);
-fn ts($tagged, $tag) = $tagged | filter(|$el| $el.0 == $tag) | map(|$el| $el.1);
+// Array tag extraction with multiple values (`$tagged->$tag` can be used for a single value)
+fn t::multi($tagged, $tag) = $tagged | filter(|$kv| $kv.0 == $tag) | map(|$kv| $kv.1);
 
 
 //

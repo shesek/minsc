@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::{fmt, mem, ops, vec};
 
-use crate::runtime::{Error, FromValue, Result, Value};
+use crate::runtime::{Error, FieldAccess, FromValue, Result, Value};
 use crate::util::{fmt_list, PrettyDisplay};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,6 +105,21 @@ impl Array {
         self.check_len(0)
             .map_err(|e| Error::InvalidArgumentsError(e.into()))
             .map(|_| ())
+    }
+}
+
+impl FieldAccess for Array {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        // Returns the first element tagged with `field`. There may be more.
+        // Getting multiple values is possible through `t::multi($array, $field)`
+        for el in self.into_inner() {
+            if let Value::Array(mut el_arr) = el {
+                if el_arr.len() == 2 && el_arr[0] == *field {
+                    return Some(el_arr.remove(1));
+                }
+            }
+        }
+        None
     }
 }
 

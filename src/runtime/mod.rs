@@ -229,6 +229,30 @@ impl Evaluate for ast::ArrayAccess {
     }
 }
 
+impl Evaluate for ast::FieldAccess {
+    fn eval(&self, scope: &ScopeRef) -> Result<Value> {
+        let target = self.target.eval(scope)?;
+        let field = self.field.eval(scope)?;
+        let result = target.get_field(&field);
+        if self.check_exists {
+            Ok(result.is_some().into())
+        } else {
+            result.ok_or_else(|| Error::FieldNotFound(field.into()))
+        }
+    }
+}
+pub trait FieldAccess {
+    fn get_field(self, field: &Value) -> Option<Value>;
+}
+impl FieldAccess for Value {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        match self {
+            Value::Array(array) => array.get_field(field),
+            _ => None,
+        }
+    }
+}
+
 impl Evaluate for ast::FnExpr {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let func = Function::from_expr(self.clone(), scope.make_ref());
@@ -396,8 +420,9 @@ impl Evaluate for Expr {
             Expr::And(x) => x.eval(scope)?,
             Expr::Thresh(x) => x.eval(scope).ctx("of")?,
             Expr::Block(x) => x.eval(scope)?,
-            Expr::Array(x) => x.eval(scope)?, // .ctx("[]")?,
-            Expr::ArrayAccess(x) => x.eval(scope).ctx("dot access")?,
+            Expr::Array(x) => x.eval(scope)?,
+            Expr::ArrayAccess(x) => x.eval(scope)?,
+            Expr::FieldAccess(x) => x.eval(scope)?,
             Expr::ScriptFrag(x) => x.eval(scope).ctx("`` script")?,
             Expr::FnExpr(x) => x.eval(scope)?, // cannot fail
             Expr::Infix(x) => x.eval(scope)?,  // dedicated error type

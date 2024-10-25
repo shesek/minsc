@@ -119,6 +119,9 @@ pub enum RuntimeError {
     #[error("Array index out of range")]
     ArrayIndexOutOfRange,
 
+    #[error("Field does not exists: {}", ValErrFmt(.0))]
+    FieldNotFound(Box<Value>),
+
     #[error("Required value missing")]
     MissingValue,
 

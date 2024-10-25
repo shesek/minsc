@@ -77,7 +77,7 @@ SimpleExpr = {
   Negate,
   Thresh,
   InfixProb,
-  ArrayAccess,
+  ChildAccess,
 };
 
 // An even more reduced set of expressions for use where SimpleExpr cannot be parsed unambiguously
@@ -130,12 +130,12 @@ SimpleCall: Expr = <func:Ident> <args:CallArgs> => ast::Call { func: func.into()
 
 // A call with an expression as the function, e.g. foo(1)(2) or {|a| a+1}(2)
 ExprCall: Expr = <func:ExprCallFunc> <args:CallArgs> => ast::Call { func: func.into(), args }.into();
-ExprCallFunc = { WrapExpr, Call, ArrayAccess };
+ExprCallFunc = { WrapExpr, Call, ChildAccess };
 
 // Pipe call, e.g. `$first_arg | func($extra_args...)` -> `func($first_arg, $extra_args...)`
 PipeCall: Expr = <first_arg:PipeCallLHS> "|" <func:PipeCallFunc> <extra_args:CallArgs> =>
   ast::Call { func: func.into(), args: prepend(extra_args, first_arg) }.into();
-PipeCallLHS = { SExpr, ArrayAccess, Duration };
+PipeCallLHS = { SExpr, ChildAccess, Duration };
 PipeCallFunc = { Ident, WrapExpr };
 
 WrapExpr = { Paren<Expr>, BlockExpr };
@@ -168,15 +168,19 @@ ArraySquare: Expr = "[" <List0<Expr, ",">> "]" =>
 ArrayCurly: Expr = "{" <e1:Expr> "," <e2:Expr> "}" =>
   ast::Array(vec![e1, e2]).into();
 
-ArrayAccess_: Expr = <array:ArrayAccessLHS> "." <index:ArrayAccessRHS> =>
+// Array/Field child access
+ChildAccess = { ArrayAccess, FieldAccess }; // left-associative recursion
+ChildAccessLHS = { Ident, SimpleCall, BlockExpr, Bytes, ChildAccess }; // would be nice to have: Array, Paren<Expr>
+
+// Array element access - `$arr.3`, `$arr.$n`, `$arr.($n+1)`, `$arr.{$n+1}`
+ArrayAccess_: Expr = <array:ChildAccessLHS> "." <index:ArrayAccessRHS> =>
   ast::ArrayAccess { array: array.into(), index: index.into() }.into();
-ArrayAccessLHS = { Ident, SimpleCall, BlockExpr, Bytes, ArrayAccess }; // would be nice to have: Array, Paren<Expr>
 ArrayAccessRHS = { Int, Ident, Paren<Expr>, BlockExpr };
 
 // Hack :<
 // $arr.0.1 gets tokenized with 0.1 as a single FLOAT token during the lexer stage.
 // This fixes it by transforming the resulting $arr.(0.1) to ($arr.0).1
-ArrayAccessFixFloat: Expr = <array:ArrayAccessLHS> "." <two_indices:FLOAT> =>? {
+ArrayAccessFixFloat: Expr = <array:ChildAccessLHS> "." <two_indices:FLOAT> =>? {
   let mut current = array;
   for index in two_indices.split(".") {
     let index: i64 = index.parse().map_err(ParseError::from)?;
@@ -185,6 +189,11 @@ ArrayAccessFixFloat: Expr = <array:ArrayAccessLHS> "." <two_indices:FLOAT> =>? {
   Ok(current)
 };
 ArrayAccess = { ArrayAccess_, ArrayAccessFixFloat };
+
+// Field access - `$target->field`, `$target->("field")`, `$target->{"field"}`
+FieldAccess: Expr = <target:ChildAccessLHS> "->" <field:FieldAccessRHS> <check_exists:"?"?> =>
+  ast::FieldAccess { target: target.into(), field: field.into(), check_exists: check_exists.is_some() }.into();
+FieldAccessRHS = { IdentTerm => Expr::String(<>.0), Paren<Expr>, BlockExpr };
 
 // An xpub or standalone public key with bip32 origin (33 bytes or 32 for x-only, uncompressed is unsupported)
 // Standalone keys with no origin are indistinguishable from other Bytes, and so are constructed as such and later coerced.
@@ -221,7 +230,7 @@ String: Expr = STRING => parser::string_from_escaped_str(&<>[1..<>.len()-1]);
 // Script fragment enclosed in backticks
 ScriptFrag: Expr = "`" <fragments:ScriptFragPart*> "`" => ast::ScriptFrag { fragments }.into();
 ScriptFragPart = {
-  Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, ArrayAccess,
+  Ident, Number, String, Bytes, PubKey, DateTime, SimpleCall, ChildAccess,
   BlockExpr, "<" <SimpleExpr> ">", "<" <Duration> ">", "<" <SlashOp> ">",
   ScriptFragPart_Infix, ScriptFragPart_Mark,
 };
@@ -229,7 +238,7 @@ ScriptFragPart = {
 ScriptFragPart_Infix: Expr = <lhs:ScriptFragPart> <op:InfixOpScriptSafe> <rhs:ScriptFragPart_RHS> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
 
-ScriptFragPart_RHS = { SExpr, ArrayAccess };
+ScriptFragPart_RHS = { SExpr, ChildAccess };
 
 // Script Marker syntax, only valid within script fragments.
 // Translated into the AST as a Call, it probably shouldn't.

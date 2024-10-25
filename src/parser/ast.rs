@@ -15,6 +15,7 @@ pub enum Expr {
     Ident(Ident),
     Array(Array),
     ArrayAccess(ArrayAccess),
+    FieldAccess(FieldAccess),
     SlashOp(SlashOp),
     ScriptFrag(ScriptFrag),
     FnExpr(FnExpr),
@@ -129,6 +130,15 @@ pub struct ArrayAccess {
     pub index: Box<Expr>,
 }
 impl_from_variant!(ArrayAccess, Expr);
+
+#[derive(Debug, Clone)]
+pub struct FieldAccess {
+    pub target: Box<Expr>,
+    pub field: Box<Expr>,
+    /// When enabled (using `$target->field?`), the field access expression returns a boolean indicating whether the field exists
+    pub check_exists: bool,
+}
+impl_from_variant!(FieldAccess, Expr);
 
 #[derive(Debug, Clone)]
 pub struct ScriptFrag {
