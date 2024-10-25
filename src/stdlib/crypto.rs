@@ -154,6 +154,9 @@ impl TryFrom<Value> for bitcoin::ecdsa::Signature {
     }
 }
 
+// Convert from native types to Value
+impl_simple_to_value!(bitcoin::ecdsa::Signature, sig, sig.to_vec());
+
 // Convert Value <-> Hash types
 macro_rules! impl_hash_conv {
     ($name:path) => {

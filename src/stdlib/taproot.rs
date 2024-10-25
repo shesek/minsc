@@ -6,7 +6,7 @@ use std::sync::Arc;
 use bitcoin::hashes::Hash;
 use bitcoin::hex::DisplayHex;
 use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
-use bitcoin::{ScriptBuf, XOnlyPublicKey};
+use bitcoin::{taproot, ScriptBuf, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey};
 
 use super::miniscript::{multi_andor, AndOr};
@@ -309,7 +309,7 @@ impl TryFrom<Value> for NodeInfo {
         })
     }
 }
-impl TryFrom<Value> for bitcoin::taproot::TapTree {
+impl TryFrom<Value> for taproot::TapTree {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(NodeInfo::try_from(value)?.try_into()?)
@@ -427,13 +427,13 @@ impl TryFrom<Value> for bitcoin::secp256k1::schnorr::Signature {
         Ok(Self::from_slice(&val.into_bytes()?)?)
     }
 }
-impl TryFrom<Value> for bitcoin::taproot::Signature {
+impl TryFrom<Value> for taproot::Signature {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(Self::from_slice(&val.into_bytes()?)?)
     }
 }
-impl TryFrom<Value> for bitcoin::taproot::LeafVersion {
+impl TryFrom<Value> for taproot::LeafVersion {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
@@ -443,12 +443,16 @@ impl TryFrom<Value> for bitcoin::taproot::LeafVersion {
         })
     }
 }
-impl TryFrom<Value> for bitcoin::taproot::ControlBlock {
+impl TryFrom<Value> for taproot::ControlBlock {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(Self::decode(&val.into_bytes()?)?)
     }
 }
+
+impl_simple_to_value!(taproot::Signature, sig, sig.to_vec());
+impl_simple_to_value!(taproot::ControlBlock, ctrl, ctrl.serialize());
+impl_simple_to_value!(LeafVersion, ver, Value::Bytes(vec![ver.to_consensus()]));
 
 impl PrettyDisplay for TaprootSpendInfo {
     const AUTOFMT_ENABLED: bool = true;
@@ -597,7 +601,7 @@ impl<'a> PrettyDisplay for NodeTree<'a> {
     }
 }
 
-impl PrettyDisplay for bitcoin::taproot::TapTree {
+impl PrettyDisplay for taproot::TapTree {
     const AUTOFMT_ENABLED: bool = false; // Enabled for the rendered NodeTree
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {

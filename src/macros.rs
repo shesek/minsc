@@ -75,6 +75,45 @@ macro_rules! iif {
     };
 }
 
+// Helper macros for conversions into Value
+
+macro_rules! impl_simple_to_value {
+    ($src:ty, $var:tt, $expr:expr) => {
+        impl From<$src> for Value {
+            fn from($var: $src) -> Self {
+                $expr.into()
+            }
+        }
+    };
+}
+macro_rules! impl_simple_to_array {
+    ($src:ty, $var:tt, $expr:expr) => {
+        impl_simple_to_value!($src, $var, Value::array_of($expr));
+    };
+}
+macro_rules! impl_simple_iter_to_array {
+    ($src:ty, $var:tt, $expr:expr) => {
+        impl_simple_to_value!($src, $var, Array($expr.map(Into::into).collect()));
+    };
+}
+
+macro_rules! add_tags {
+    ($struct:ident, $tags:tt, $($field:ident),+) => {
+        $tags.extend([$(
+            Value::array_of((stringify!($field), $struct.$field))
+        ),+]);
+    };
+}
+macro_rules! add_opt_tags {
+    ($struct:ident, $tags:tt, $($field:ident),+) => {
+        $(
+            if let Some(val) = $struct.$field {
+                $tags.push(Value::array_of((stringify!($field), val)));
+            }
+        )+
+    };
+}
+
 // Helper macros for PrettyDisplay field formatting
 
 macro_rules! fmt_field {

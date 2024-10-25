@@ -8,17 +8,13 @@ use crate::util::{fmt_list, PrettyDisplay};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);
 
-impl From<Vec<Value>> for Array {
-    fn from(vec: Vec<Value>) -> Array {
-        Array(vec)
-    }
-}
 impl ops::Deref for Array {
     type Target = Vec<Value>;
     fn deref(&self) -> &Vec<Value> {
         &self.0
     }
 }
+
 impl ops::DerefMut for Array {
     fn deref_mut(&mut self) -> &mut Vec<Value> {
         &mut self.0
@@ -108,6 +104,7 @@ impl Array {
     }
 }
 
+// Tagged array field access
 impl FieldAccess for Array {
     fn get_field(self, field: &Value) -> Option<Value> {
         // Returns the first element tagged with `field`. There may be more.
@@ -182,6 +179,23 @@ impl<A: Into<Value>, B: Into<Value>> From<(A, B)> for Array {
 impl<A: Into<Value>, B: Into<Value>, C: Into<Value>> From<(A, B, C)> for Array {
     fn from((a, b, c): (A, B, C)) -> Self {
         Array(vec![a.into(), b.into(), c.into()])
+    }
+}
+
+// Generic conversion from native set types into Array
+impl<T: Into<Value>> From<Vec<T>> for Array {
+    fn from(value: Vec<T>) -> Self {
+        Array(value.into_iter().map(Into::into).collect())
+    }
+}
+impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Array {
+    fn from(value: BTreeMap<K, V>) -> Self {
+        Array(
+            value
+                .into_iter()
+                .map(|(k, v)| Value::array_of((k, v)))
+                .collect(),
+        )
     }
 }
 

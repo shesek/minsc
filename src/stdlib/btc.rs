@@ -473,6 +473,20 @@ impl TryFrom<Value> for Witness {
     }
 }
 
+// Convert from Bitcoin types to Value
+
+impl_simple_iter_to_array!(Witness, wit, wit.to_vec().into_iter());
+impl_simple_to_array!(
+    bitcoin::transaction::TxOut,
+    txout,
+    (
+        ("script_pubkey", txout.script_pubkey),
+        ("amount", i64::try_from(txout.value.to_sat()).unwrap()),
+    )
+);
+
+impl_simple_iter_to_array!(Witness, wit, wit.to_vec().into_iter());
+
 // Display
 
 impl PrettyDisplay for ScriptBuf {

@@ -10,7 +10,9 @@ use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut, XOnlyPublic
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 use miniscript::DescriptorPublicKey;
 
-use crate::runtime::{Array, Error, FromValue, Mutable, Number::Int, Result, ScopeRef, Value};
+use crate::runtime::{
+    Array, Error, FieldAccess, FromValue, Mutable, Number::Int, Result, ScopeRef, Value,
+};
 use crate::util::{
     self, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, PsbtTaprootExt, TapInfoExt, EC,
 };
@@ -30,7 +32,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::extract", fns::extract).unwrap();
     scope.set_fn("psbt::extract_raw", fns::extract_raw).unwrap();
 
-    scope.set_fn("psbt::unsigned_tx", fns::unsigned_tx).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
     scope.set_fn("psbt::sighash", fns::sighash).unwrap();
 }
@@ -177,13 +178,6 @@ pub mod fns {
         // interpreter checks and can be used with manual finalization of arbitrary (non-Miniscript-compatible) Script.
         // XXX enable absurd fee check?
         Ok(psbt.extract_tx_unchecked_fee_rate().into())
-    }
-
-    /// psbt::unsigned_tx(Psbt) -> Transaction
-    ///
-    /// Get the PSBT's unsigned transaction (PSBT_GLOBAL_UNSIGNED_TX)
-    pub fn unsigned_tx(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(args.arg_into::<Psbt>()?.unsigned_tx.into())
     }
 
     /// psbt::fee(Psbt) -> Int
@@ -750,6 +744,55 @@ impl psbt::GetKey for XprivSet {
             .transpose()
     }
 }
+
+// PSBT fields accessors
+impl FieldAccess for Psbt {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        Some(match field.as_str()? {
+            "unsigned_tx" => self.unsigned_tx.into(),
+            "version" => self.version.into(),
+            "input" | "inputs" => Value::array_of(self.inputs),
+            "output" | "outputs" => Value::array_of(self.outputs),
+            "xpub" => Value::array_of(self.xpub),
+            "unknown" => Value::array_of(self.unknown),
+            "proprietary" => Value::array_of(self.proprietary),
+            "fee" => {
+                // Returns -1 if the fee cannot be calcuated or if it overflows i64 (~92 billion BTC, ~4400x more than can exists)
+                // Use psbt::fee() if you prefer an exception to be raised instead.
+                let fee = self.fee().ok();
+                let fee = fee.and_then(|f| f.to_sat().try_into().ok());
+                fee.unwrap_or(-1i64).into()
+            }
+            _ => {
+                return None;
+            }
+        })
+    }
+}
+
+impl From<psbt::Input> for Value {
+    #[rustfmt::skip]
+    fn from(input: psbt::Input) -> Self {
+        let mut tags = Vec::with_capacity(21);
+        add_opt_tags!(input, tags, witness_utxo, non_witness_utxo, sighash_type, redeem_script, witness_script, tap_key_sig, tap_internal_key, tap_merkle_root, final_script_sig, final_script_witness);
+        add_tags!(input, tags, partial_sigs, tap_scripts, tap_script_sigs, tap_key_origins, ripemd160_preimages, sha256_preimages, hash160_preimages, hash256_preimages, bip32_derivation, unknown, proprietary);
+        Value::array(tags)
+    }
+}
+impl From<psbt::Output> for Value {
+    #[rustfmt::skip]
+    fn from(output: psbt::Output) -> Self {
+        let mut tags = Vec::with_capacity(8);
+        add_opt_tags!(output, tags, redeem_script, witness_script, tap_internal_key);
+        add_tags!(output, tags, bip32_derivation, tap_key_origins, unknown, proprietary);
+        // TODO tap_tree
+        Value::array(tags)
+    }
+}
+
+impl_simple_to_value!(psbt::PsbtSighashType, ty, ty.to_u32());
+impl_simple_to_array!(raw::Key, k, (k.type_value as i64, k.key));
+impl_simple_to_array!(raw::ProprietaryKey, k, (k.prefix, k.subtype as i64, k.key));
 
 impl PrettyDisplay for Psbt {
     const AUTOFMT_ENABLED: bool = false;

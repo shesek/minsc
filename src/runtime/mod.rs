@@ -248,6 +248,7 @@ impl FieldAccess for Value {
     fn get_field(self, field: &Value) -> Option<Value> {
         match self {
             Value::Array(array) => array.get_field(field),
+            Value::Psbt(psbt) => psbt.get_field(field),
             _ => None,
         }
     }

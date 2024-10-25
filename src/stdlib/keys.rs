@@ -211,6 +211,18 @@ impl From<Xpriv> for Value {
     }
 }
 
+impl_simple_to_value!(bip32::Fingerprint, fp, fp.to_bytes().to_vec());
+impl_simple_to_value!(bip32::ChildNumber, cn, u32::from(cn));
+impl_simple_iter_to_array!(bip32::DerivationPath, path, path.into_iter().copied());
+impl_simple_to_value!(
+    secp256k1::PublicKey,
+    key,
+    DescriptorPublicKey::Single(SinglePub {
+        key: SinglePubKey::FullKey(key.into()),
+        origin: None,
+    })
+);
+
 // Convert from Value to bitcoin/secp256k1 keys
 
 impl TryFrom<Value> for secp256k1::SecretKey {

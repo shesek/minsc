@@ -74,9 +74,9 @@ impl From<f64> for Value {
         Number::Float(n).into()
     }
 }
-impl From<u8> for Value {
-    fn from(num: u8) -> Value {
-        Number::Int(num.into()).into()
+impl From<u32> for Value {
+    fn from(num: u32) -> Value {
+        (num as i64).into()
     }
 }
 impl From<usize> for Value {
@@ -118,11 +118,6 @@ impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl_from_variant!(WshScript, Value);
 impl_from_variant!(Psbt, Value);
 
-impl From<Vec<Value>> for Value {
-    fn from(vec: Vec<Value>) -> Value {
-        Value::Array(Array(vec))
-    }
-}
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
         Value::String(s.to_string())
@@ -310,6 +305,23 @@ impl_delegate_array_conv!((A, ), A: FromValue);
 impl_delegate_array_conv!((A, B), A: FromValue, B: FromValue);
 impl_delegate_array_conv!((A, B, C), A: FromValue, B: FromValue, C: FromValue);
 
+// Generic conversion from sets into a Value
+impl<A: Into<Value>, B: Into<Value>> From<(A, B)> for Value {
+    fn from(value: (A, B)) -> Self {
+        Value::Array(value.into())
+    }
+}
+impl<T: Into<Value>> From<Vec<T>> for Value {
+    fn from(value: Vec<T>) -> Self {
+        Value::Array(value.into())
+    }
+}
+impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
+    fn from(value: BTreeMap<K, V>) -> Self {
+        Value::Array(value.into())
+    }
+}
+
 //
 // Value impl
 //
@@ -337,6 +349,13 @@ impl Value {
             Value::Symbol(_) => "symbol",
             Value::Number(Number::Int(_)) => "int",
             Value::Number(Number::Float(_)) => "float",
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::String(str) => Some(str),
+            _ => None,
         }
     }
 
