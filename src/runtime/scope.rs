@@ -43,7 +43,7 @@ impl Scope {
     pub fn set_fn<K: Into<Ident>>(&mut self, key: K, pt: NativeFunctionPt) -> Result<()> {
         let key = key.into();
         let func = NativeFunction::new(pt, Some(key.clone()));
-        self.set(key, func)
+        self.set(key, Value::function(func))
     }
 
     /// Get a builtin variable, which must be available in scope

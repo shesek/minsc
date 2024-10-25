@@ -76,8 +76,7 @@ pub struct WshScript(pub ScriptBuf);
 impl Evaluate for ast::BtcAmount {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let amount_n = self.0.eval(scope)?.into_f64()?;
-        let amount = SignedAmount::from_float_in(amount_n, self.1)?;
-        Ok(Value::from(amount.to_sat()))
+        Ok(SignedAmount::from_float_in(amount_n, self.1)?.into())
     }
 }
 
@@ -474,17 +473,23 @@ impl TryFrom<Value> for Witness {
 impl_simple_to_value!(Version, ver, ver.0);
 impl_simple_to_value!(Sequence, seq, seq.to_consensus_u32());
 impl_simple_to_value!(AbsLockTime, time, time.to_consensus_u32());
-impl_simple_to_array!(OutPoint, outpoint, (outpoint.txid, outpoint.vout));
-impl_simple_iter_to_array!(Witness, wit, wit.to_vec().into_iter());
-impl_simple_to_array!(
+impl_simple_to_value!(OutPoint, outpoint, (outpoint.txid, outpoint.vout));
+impl_simple_to_value!(Witness, wit, wit.to_vec());
+impl_simple_to_value!(SignedAmount, amt, amt.to_sat());
+// Panics for out-of-range `Amount`s (i64 can represent up to ~92 billion BTC, ~4400x more than can exists),
+// which should be impossible to construct within Minsc (but can be passed from Rust code).
+// Uses to_signed() to convert from u64 to i64 with a useful OutOfRangeError message.
+impl_simple_to_value!(Amount, amt, amt.to_signed().unwrap());
+
+impl_simple_to_value!(
     bitcoin::transaction::TxOut,
     txout,
     (
         ("script_pubkey", txout.script_pubkey),
-        ("amount", i64::try_from(txout.value.to_sat()).unwrap()),
+        ("amount", txout.value),
     )
 );
-impl_simple_to_array!(
+impl_simple_to_value!(
     bitcoin::transaction::TxIn,
     txin,
     (
@@ -501,15 +506,26 @@ impl_simple_to_value!(Txid, txid, {
     txid.reverse();
     txid
 });
+// Panics for out-of-range `Weight`s, which should be impossible to construct
+impl_simple_to_value!(
+    bitcoin::Weight,
+    w,
+    i64::try_from(w.to_wu()).expect("out of range weight")
+);
 
 // Transaction fields accessors
 impl FieldAccess for Transaction {
     fn get_field(self, field: &Value) -> Option<Value> {
         Some(match field.as_str()? {
             "version" => self.version.into(),
-            "lock_time" => self.lock_time.into(),
-            "input" | "inputs" => Value::array_of(self.input),
-            "output" | "outputs" => Value::array_of(self.output),
+            "locktime" => self.lock_time.into(),
+            "input" | "inputs" => self.input.into(),
+            "output" | "outputs" => self.output.into(),
+
+            "txid" => self.compute_txid().into(),
+            "weight" => self.weight().into(),
+            "vsize" => self.vsize().into(),
+            "size" => self.total_size().into(),
             _ => {
                 return None;
             }

@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
+use std::iter::FromIterator;
 use std::{fmt, mem, ops, vec};
 
 use crate::runtime::{Error, FieldAccess, FromValue, Result, Value};
@@ -165,6 +166,13 @@ impl IntoIterator for Array {
     }
 }
 
+// Generic conversion from an iterator of any convertible type into an Array
+impl<V: Into<Value>> FromIterator<V> for Array {
+    fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
+        Self(iter.into_iter().map(Into::into).collect())
+    }
+}
+
 // Generic conversion from 1/2/3/4-tuples of any convertible type into an Array
 impl<A: Into<Value>> From<(A,)> for Array {
     fn from((a,): (A,)) -> Self {
@@ -189,18 +197,13 @@ impl<A: Into<Value>, B: Into<Value>, C: Into<Value>, D: Into<Value>> From<(A, B,
 
 // Generic conversion from native set types into Array
 impl<T: Into<Value>> From<Vec<T>> for Array {
-    fn from(value: Vec<T>) -> Self {
-        Array(value.into_iter().map(Into::into).collect())
+    fn from(vec: Vec<T>) -> Self {
+        Array::from_iter(vec)
     }
 }
 impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Array {
-    fn from(value: BTreeMap<K, V>) -> Self {
-        Array(
-            value
-                .into_iter()
-                .map(|(k, v)| Value::array_of((k, v)))
-                .collect(),
-        )
+    fn from(map: BTreeMap<K, V>) -> Self {
+        Array::from_iter(map)
     }
 }
 

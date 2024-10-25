@@ -211,7 +211,7 @@ pub mod fns {
         };
         // Return a tagged array, later detected by wsh() to construct a SortedMultiVec. Uses an unusual representation because
         // sortedmulti() is not a quite descriptor nor a policy, and so cannot be represented directly as a first-class Minsc Value.
-        Ok(Value::array_of(("sortedmulti", thresh_k, pks)))
+        Ok(("sortedmulti", thresh_k, pks).into())
     }
 
     //

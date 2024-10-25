@@ -73,12 +73,11 @@ pub mod fns {
         let (tapinfo, with_parity): (TaprootSpendInfo, Option<bool>) = args.args_into()?;
         let key = tapinfo.output_key();
 
-        if with_parity.unwrap_or(false) {
-            let parity = tapinfo.output_key_parity().to_u8() as i64;
-            Ok(Value::array_of((key, parity)))
+        Ok(if with_parity.unwrap_or(false) {
+            (key, tapinfo.output_key_parity()).into()
         } else {
-            Ok(key.into())
-        }
+            key.into()
+        })
     }
 
     /// tr::merkleRoot(TapInfo) -> Hash
@@ -87,10 +86,10 @@ pub mod fns {
     pub fn merkleRoot(args: Array, _: &ScopeRef) -> Result<Value> {
         let tapinfo: TaprootSpendInfo = args.arg_into()?;
 
-        Ok(Value::Bytes(match tapinfo.merkle_root() {
-            None => vec![], // empty byte vector signifies an empty script tree
-            Some(root) => root.to_byte_array().to_vec(),
-        }))
+        Ok(match tapinfo.merkle_root() {
+            None => Vec::<u8>::new().into(), // empty byte vector signifies an empty script tree
+            Some(root) => root.into(),
+        })
     }
 
     /// tr::scripts(TapInfo|Descriptor) -> Array<Script>
@@ -119,7 +118,7 @@ pub mod fns {
         let ctrl = tapinfo
             .control_block(&(script, leaf_ver))
             .ok_or(Error::TaprootScriptNotFound)?;
-        Ok(ctrl.serialize().into())
+        Ok(ctrl.into())
     }
 
     /// tr::tapinfo(Descriptor|TapInfo) -> TapInfo
@@ -326,11 +325,8 @@ impl TryFrom<Value> for TapLeafHash {
         })
     }
 }
-impl From<TapLeafHash> for Value {
-    fn from(hash: TapLeafHash) -> Self {
-        hash.to_byte_array().to_vec().into()
-    }
-}
+
+impl_simple_to_value!(TapLeafHash, hash, hash.to_byte_array().to_vec());
 
 fn tapinfo_huffman(internal_key: XOnlyPublicKey, scripts: Vec<Value>) -> Result<TaprootSpendInfo> {
     let script_weights = scripts

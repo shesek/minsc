@@ -63,33 +63,14 @@ pub struct Symbol {
 // Value conversions
 //
 
-// From primitive numbers to Value
-impl From<i64> for Value {
-    fn from(n: i64) -> Value {
-        Number::Int(n).into()
-    }
-}
-impl From<f64> for Value {
-    fn from(n: f64) -> Value {
-        Number::Float(n).into()
-    }
-}
-impl From<u32> for Value {
-    fn from(num: u32) -> Value {
-        (num as i64).into()
-    }
-}
-impl From<i32> for Value {
-    fn from(num: i32) -> Value {
-        (num as i64).into()
-    }
-}
-impl From<usize> for Value {
-    fn from(num: usize) -> Value {
-        // TODO this should use TryFrom
-        Number::Int(num.try_into().unwrap()).into()
-    }
-}
+// From primitive types to Value
+impl_simple_to_value!(i64, n, Number::Int(n));
+impl_simple_to_value!(f64, n, Number::Float(n));
+impl_simple_to_value!(u32, n, n as i64);
+impl_simple_to_value!(i32, n, n as i64);
+impl_simple_to_value!(usize, n, i64::try_from(n).unwrap()); // XXX should not panic
+impl_simple_to_value!(&str, s, s.to_string());
+
 impl TryFrom<u64> for Value {
     type Error = Error;
     fn try_from(num: u64) -> Result<Self> {
@@ -97,10 +78,10 @@ impl TryFrom<u64> for Value {
     }
 }
 
-// From NativeFunction/UserFunction to Value
-impl<T: Into<Function>> From<T> for Value {
+// From any Into<Array> type to Value
+impl<T: Into<Array>> From<T> for Value {
     fn from(f: T) -> Self {
-        Value::Function(f.into())
+        Value::Array(f.into())
     }
 }
 
@@ -109,7 +90,6 @@ impl_from_variant!(bool, Value, Bool);
 impl_from_variant!(Number, Value);
 impl_from_variant!(String, Value);
 impl_from_variant!(Vec<u8>, Value, Bytes);
-impl_from_variant!(Array, Value);
 impl_from_variant!(Symbol, Value);
 impl_from_variant!(Policy, Value);
 impl_from_variant!(Descriptor, Value);
@@ -123,12 +103,6 @@ impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl_from_variant!(WshScript, Value);
 impl_from_variant!(Psbt, Value);
 
-impl From<&str> for Value {
-    fn from(s: &str) -> Self {
-        Value::String(s.to_string())
-    }
-}
-
 // From Value to the underlying enum inner type
 // Simple extraction of the enum variant, with no specialized type coercion logic
 impl_simple_into_variant!(bool, Bool, into_bool, NotBool);
@@ -137,6 +111,7 @@ impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
 impl_simple_into_variant!(WshScript, WshScript, into_wsh_script, NotWshScript);
+
 
 // From Value to f64 primitive, with auto-coercion for integers
 impl TryFrom<Value> for f64 {
@@ -310,23 +285,6 @@ impl_delegate_array_conv!((A, ), A: FromValue);
 impl_delegate_array_conv!((A, B), A: FromValue, B: FromValue);
 impl_delegate_array_conv!((A, B, C), A: FromValue, B: FromValue, C: FromValue);
 
-// Generic conversion from sets into a Value
-impl<A: Into<Value>, B: Into<Value>> From<(A, B)> for Value {
-    fn from(value: (A, B)) -> Self {
-        Value::Array(value.into())
-    }
-}
-impl<T: Into<Value>> From<Vec<T>> for Value {
-    fn from(value: Vec<T>) -> Self {
-        Value::Array(value.into())
-    }
-}
-impl<K: Into<Value>, V: Into<Value>> From<BTreeMap<K, V>> for Value {
-    fn from(value: BTreeMap<K, V>) -> Self {
-        Value::Array(value.into())
-    }
-}
-
 //
 // Value impl
 //
@@ -421,8 +379,15 @@ impl Value {
     pub fn array(elements: Vec<Value>) -> Self {
         Value::Array(Array(elements))
     }
-    pub fn array_of(array: impl Into<Array>) -> Self {
-        Value::Array(array.into())
+
+    pub fn function(func: impl Into<Function>) -> Self {
+        Value::Function(func.into())
+    }
+}
+
+impl<V: Into<Value>> std::iter::FromIterator<V> for Value {
+    fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
+        Array::from_iter(iter).into()
     }
 }
 

@@ -90,8 +90,6 @@ pub mod fns {
         } else {
             EC.sign_schnorr_no_aux_rand(&msg, &keypair)
         }
-        .serialize()
-        .to_vec()
         .into())
     }
 
@@ -156,6 +154,8 @@ impl TryFrom<Value> for bitcoin::ecdsa::Signature {
 
 // Convert from native types to Value
 impl_simple_to_value!(bitcoin::ecdsa::Signature, sig, sig.to_vec());
+impl_simple_to_value!(secp256k1::schnorr::Signature, sig, sig.serialize().to_vec());
+impl_simple_to_value!(secp256k1::Message, msg, msg[..].to_vec());
 
 // Convert Value <-> Hash types
 macro_rules! impl_hash_conv {

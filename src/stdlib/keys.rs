@@ -143,84 +143,70 @@ pub mod fns {
     ///
     /// singles(PubKey<Multi>|SecKey<Multi>|Descriptor<Multi>) -> Array<PubKey|SecKey|Descriptor>
     pub fn singles(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Value::array(match args.arg_into()? {
-            Value::PubKey(pk) => pk.into_single_keys().into_iter().map(Into::into).collect(),
-            Value::SecKey(sk) => sk.into_single_keys().into_iter().map(Into::into).collect(),
-            Value::Descriptor(desc) => desc
-                .into_single_descriptors()?
-                .into_iter()
-                .map(Into::into)
-                .collect(),
+        Ok(match args.arg_into()? {
+            Value::PubKey(pk) => pk.into_single_keys().into(),
+            Value::SecKey(sk) => sk.into_single_keys().into(),
+            Value::Descriptor(desc) => desc.into_single_descriptors()?.into(),
             other => bail!(Error::InvalidValue(other.into())),
-        }))
+        })
     }
 }
 
 // Convert from bitcoin/secp256k1 keys to Value
 
-impl From<XOnlyPublicKey> for Value {
-    fn from(pk: XOnlyPublicKey) -> Self {
-        Value::PubKey(DescriptorPublicKey::Single(SinglePub {
-            key: SinglePubKey::XOnly(pk),
-            origin: None,
-        }))
-    }
-}
-impl From<TweakedPublicKey> for Value {
-    fn from(pk: TweakedPublicKey) -> Self {
-        pk.to_inner().into()
-    }
-}
-
-impl From<bitcoin::PublicKey> for Value {
-    fn from(pk: bitcoin::PublicKey) -> Self {
-        Value::PubKey(DescriptorPublicKey::Single(SinglePub {
-            key: SinglePubKey::FullKey(pk),
-            origin: None,
-        }))
-    }
-}
-
-impl From<Xpub> for Value {
-    fn from(xpub: Xpub) -> Self {
-        Value::PubKey(DescriptorPublicKey::XPub(DescriptorXKey {
-            xkey: xpub,
-            derivation_path: DerivationPath::master(),
-            wildcard: descriptor::Wildcard::None,
-            origin: if xpub.depth > 0 {
-                Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
-            } else {
-                None
-            },
-        }))
-    }
-}
-
-impl From<Xpriv> for Value {
-    fn from(xprv: Xpriv) -> Self {
-        Value::SecKey(DescriptorSecretKey::XPrv(DescriptorXKey {
-            xkey: xprv,
-            derivation_path: DerivationPath::master(),
-            wildcard: descriptor::Wildcard::None,
-            origin: if xprv.depth > 0 {
-                Some((xprv.parent_fingerprint, [xprv.child_number][..].into()))
-            } else {
-                None
-            },
-        }))
-    }
-}
-
-impl_simple_to_value!(bip32::Fingerprint, fp, fp.to_bytes().to_vec());
-impl_simple_to_value!(bip32::ChildNumber, cn, u32::from(cn));
-impl_simple_iter_to_array!(bip32::DerivationPath, path, path.into_iter().copied());
 impl_simple_to_value!(
-    secp256k1::PublicKey,
-    key,
+    bitcoin::PublicKey,
+    pk,
     DescriptorPublicKey::Single(SinglePub {
-        key: SinglePubKey::FullKey(key.into()),
+        key: SinglePubKey::FullKey(pk),
         origin: None,
     })
+);
+impl_simple_to_value!(
+    XOnlyPublicKey,
+    pk,
+    DescriptorPublicKey::Single(SinglePub {
+        key: SinglePubKey::XOnly(pk),
+        origin: None,
+    })
+);
+impl_simple_to_value!(TweakedPublicKey, pk, pk.to_inner());
+impl_simple_to_value!(secp256k1::PublicKey, pk, bitcoin::PublicKey::from(pk));
+impl_simple_to_value!(secp256k1::Parity, p, p.to_u8() as i64);
+impl_simple_to_value!(
+    Xpub,
+    xpub,
+    DescriptorPublicKey::XPub(DescriptorXKey {
+        xkey: xpub,
+        derivation_path: DerivationPath::master(),
+        wildcard: descriptor::Wildcard::None,
+        origin: if xpub.depth > 0 {
+            Some((xpub.parent_fingerprint, [xpub.child_number][..].into()))
+        } else {
+            None
+        },
+    })
+);
+impl_simple_to_value!(
+    Xpriv,
+    xprv,
+    DescriptorSecretKey::XPrv(DescriptorXKey {
+        xkey: xprv,
+        derivation_path: DerivationPath::master(),
+        wildcard: descriptor::Wildcard::None,
+        origin: if xprv.depth > 0 {
+            Some((xprv.parent_fingerprint, [xprv.child_number][..].into()))
+        } else {
+            None
+        },
+    })
+);
+impl_simple_to_value!(bip32::Fingerprint, fp, fp.to_bytes().to_vec());
+impl_simple_to_value!(bip32::ChildNumber, cn, u32::from(cn));
+impl_simple_to_value!(
+    bip32::DerivationPath,
+    path,
+    path.into_iter().copied().collect::<Array>()
 );
 
 // Convert from Value to bitcoin/secp256k1 keys

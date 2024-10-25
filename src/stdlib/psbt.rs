@@ -104,10 +104,10 @@ pub mod fns {
     pub fn try_finalize(args: Array, _: &ScopeRef) -> Result<Value> {
         let mut psbt: Psbt = args.arg_into()?;
         let errors = match psbt.finalize_mut(&EC) {
+            Err(errors) => errors,
             Ok(()) => vec![],
-            Err(errors) => errors.iter().map(|e| Value::from(e.to_string())).collect(),
         };
-        Ok(Value::array_of((psbt, errors)))
+        Ok((psbt, errors).into())
     }
 
     // psbt::sign(Psbt, Xpriv|Array<Xpriv>|Array<SinglePk:SingleSk> sign_keys, Bool finalize=false) -> Psbt
@@ -135,25 +135,8 @@ pub mod fns {
     // and `Failed` as an `Array<Int:String>` mapping input indexes to the error encountered while trying to sign them.
     pub fn try_sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, keys) = args.args_into()?;
-
         let (signed, failed) = sign_psbt(&mut psbt, keys)?;
-
-        let signed = signed
-            .into_iter()
-            .map(|(input_index, pks)| {
-                let pks: Vec<Value> = match pks {
-                    SigningKeys::Ecdsa(pks) => pks.into_iter().map(Into::into).collect(),
-                    SigningKeys::Schnorr(pks) => pks.into_iter().map(Into::into).collect(),
-                };
-                Value::array_of((input_index, pks))
-            })
-            .collect::<Vec<_>>();
-        let failed = failed
-            .into_iter()
-            .map(|(input_index, error)| Value::array_of((input_index, error.to_string())))
-            .collect::<Vec<_>>();
-
-        Ok(Value::array_of((psbt, signed, failed)))
+        Ok((psbt, signed, failed).into())
     }
 
     /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
@@ -182,7 +165,7 @@ pub mod fns {
 
     /// psbt::fee(Psbt) -> Int
     pub fn fee(args: Array, _: &ScopeRef) -> Result<Value> {
-        args.arg_into::<Psbt>()?.fee()?.to_sat().try_into()
+        Ok(args.arg_into::<Psbt>()?.fee()?.into())
     }
 
     /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes
@@ -192,7 +175,7 @@ pub mod fns {
         let mut sighash_cache = SighashCache::new(&psbt.unsigned_tx);
 
         let sighash_msg = psbt.sighash_msg(input_index, &mut sighash_cache, tapleaf_hash)?;
-        Ok(sighash_msg.to_secp_msg()[..].to_vec().into())
+        Ok(sighash_msg.into())
     }
 }
 
@@ -418,8 +401,8 @@ fn create_psbt_with_tx(tags: Array) -> Result<Psbt> {
             }
 
             // Collect other PSBT tags to forward to update_psbt()
-            "psbt_version" => psbt_tags.push(Value::array_of(("version", val))),
-            other_tag => psbt_tags.push(Value::array_of((other_tag, val))),
+            "psbt_version" => psbt_tags.push(("version", val).into()),
+            other_tag => psbt_tags.push((other_tag, val).into()),
         }
 
         Ok(())
@@ -453,7 +436,7 @@ impl TryFrom<Value> for PsbtTxIn {
                     "sequence" => tx_input.sequence = val.try_into()?,
 
                     // Collect other PSBT tags to forward to update_input()
-                    other_tag => psbt_input_tags.push(Value::array_of((other_tag, val))),
+                    other_tag => psbt_input_tags.push((other_tag, val).into()),
                 }
                 Ok(())
             })?;
@@ -524,7 +507,7 @@ impl TryFrom<Value> for PsbtTxOut {
                     }
 
                     // Collect other PSBT tags to forward to update_output()
-                    other_tag => psbt_output_tags.push(Value::array_of((other_tag, val))),
+                    other_tag => psbt_output_tags.push((other_tag, val).into()),
                 }
                 Ok(())
             })?;
@@ -751,11 +734,13 @@ impl FieldAccess for Psbt {
         Some(match field.as_str()? {
             "unsigned_tx" => self.unsigned_tx.into(),
             "version" => self.version.into(),
-            "input" | "inputs" => Value::array_of(self.inputs),
-            "output" | "outputs" => Value::array_of(self.outputs),
-            "xpub" => Value::array_of(self.xpub),
-            "unknown" => Value::array_of(self.unknown),
-            "proprietary" => Value::array_of(self.proprietary),
+            "input" | "inputs" => self.inputs.into(),
+            "output" | "outputs" => self.outputs.into(),
+            "xpub" => self.xpub.into(),
+            "unknown" => self.unknown.into(),
+            "proprietary" => self.proprietary.into(),
+
+            "txid" => self.unsigned_tx.compute_txid().into(),
             "fee" => {
                 // Returns -1 if the fee cannot be calcuated or if it overflows i64 (~92 billion BTC, ~4400x more than can exists)
                 // Use psbt::fee() if you prefer an exception to be raised instead.
@@ -791,8 +776,19 @@ impl From<psbt::Output> for Value {
 }
 
 impl_simple_to_value!(psbt::PsbtSighashType, ty, ty.to_u32());
-impl_simple_to_array!(raw::Key, k, (k.type_value as i64, k.key));
-impl_simple_to_array!(raw::ProprietaryKey, k, (k.prefix, k.subtype as i64, k.key));
+impl_simple_to_value!(raw::Key, k, (k.type_value as i64, k.key));
+impl_simple_to_value!(raw::ProprietaryKey, k, (k.prefix, k.subtype as i64, k.key));
+impl_simple_to_value!(psbt::SignError, e, e.to_string());
+impl_simple_to_value!(miniscript::psbt::Error, e, e.to_string());
+impl_simple_to_value!(miniscript::psbt::PsbtSighashMsg, msg, msg.to_secp_msg());
+impl_simple_to_value!(
+    SigningKeys,
+    pks,
+    match pks {
+        SigningKeys::Ecdsa(pks) => Value::from(pks),
+        SigningKeys::Schnorr(pks) => Value::from(pks),
+    }
+);
 
 impl PrettyDisplay for Psbt {
     const AUTOFMT_ENABLED: bool = false;
