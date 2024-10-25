@@ -249,6 +249,7 @@ impl FieldAccess for Value {
         match self {
             Value::Array(array) => array.get_field(field),
             Value::Psbt(psbt) => psbt.get_field(field),
+            Value::Transaction(tx) => tx.get_field(field),
             _ => None,
         }
     }

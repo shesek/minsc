@@ -12,7 +12,8 @@ use miniscript::psbt::PsbtExt;
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
 use crate::runtime::{
-    eval_exprs, Array, Error, Evaluate, Execute, Float, Int, Mutable, Result, ScopeRef, Value,
+    eval_exprs, Array, Error, Evaluate, Execute, FieldAccess, Float, Int, Mutable, Result,
+    ScopeRef, Value,
 };
 use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, TapInfoExt, EC};
 use crate::{ast, time, Library};
@@ -200,17 +201,12 @@ pub mod fns {
     /// `txid(Transaction|Bytes|Array<Tagged>) -> Bytes`
     /// `txid(Psbt) -> Bytes`
     pub fn txid(args: Array, _: &ScopeRef) -> Result<Value> {
-        let mut txid = match args.arg_into()? {
+        Ok(match args.arg_into()? {
             Value::Psbt(psbt) => psbt.unsigned_tx.compute_txid(),
             Value::Transaction(tx) => tx.compute_txid(),
             tx_like => Transaction::try_from(tx_like)?.compute_txid(),
         }
-        .to_byte_array()
-        .to_vec();
-        // Reverse when converted to Bytes to match the standard display order,
-        // reversed back in `TryFrom<Value> for Txid` (below). FIXME find a better way
-        txid.reverse();
-        Ok(Value::Bytes(txid))
+        .into())
     }
 
     /// Attach input witnesses, returning a new modified Transaction with them
@@ -475,6 +471,10 @@ impl TryFrom<Value> for Witness {
 
 // Convert from Bitcoin types to Value
 
+impl_simple_to_value!(Version, ver, ver.0);
+impl_simple_to_value!(Sequence, seq, seq.to_consensus_u32());
+impl_simple_to_value!(AbsLockTime, time, time.to_consensus_u32());
+impl_simple_to_array!(OutPoint, outpoint, (outpoint.txid, outpoint.vout));
 impl_simple_iter_to_array!(Witness, wit, wit.to_vec().into_iter());
 impl_simple_to_array!(
     bitcoin::transaction::TxOut,
@@ -484,8 +484,38 @@ impl_simple_to_array!(
         ("amount", i64::try_from(txout.value.to_sat()).unwrap()),
     )
 );
+impl_simple_to_array!(
+    bitcoin::transaction::TxIn,
+    txin,
+    (
+        ("prevout", txin.previous_output),
+        ("sequence", txin.sequence),
+        ("witness", txin.witness),
+        ("script_sig", txin.script_sig),
+    )
+);
+impl_simple_to_value!(Txid, txid, {
+    let mut txid = txid.to_byte_array().to_vec();
+    // Reverse when converted to Bytes to match the standard display order,
+    // reversed back in `TryFrom<Value> for Txid`. FIXME find a better way to handle this
+    txid.reverse();
+    txid
+});
 
-impl_simple_iter_to_array!(Witness, wit, wit.to_vec().into_iter());
+// Transaction fields accessors
+impl FieldAccess for Transaction {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        Some(match field.as_str()? {
+            "version" => self.version.into(),
+            "lock_time" => self.lock_time.into(),
+            "input" | "inputs" => Value::array_of(self.input),
+            "output" | "outputs" => Value::array_of(self.output),
+            _ => {
+                return None;
+            }
+        })
+    }
+}
 
 // Display
 

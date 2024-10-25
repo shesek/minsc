@@ -79,6 +79,11 @@ impl From<u32> for Value {
         (num as i64).into()
     }
 }
+impl From<i32> for Value {
+    fn from(num: i32) -> Value {
+        (num as i64).into()
+    }
+}
 impl From<usize> for Value {
     fn from(num: usize) -> Value {
         // TODO this should use TryFrom
