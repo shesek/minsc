@@ -521,6 +521,7 @@ impl FieldAccess for Value {
             Value::Descriptor(x) => x.get_field(field),
             Value::TapInfo(x) => x.get_field(field),
             Value::Address(x) => x.get_field(field),
+            Value::WshScript(x) => x.get_field(field),
             _ => None,
         }
     }

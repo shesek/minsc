@@ -552,6 +552,20 @@ impl FieldAccess for Address {
     }
 }
 
+impl FieldAccess for WshScript {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        Some(match field.as_str()? {
+            "script_pubkey" => self.0.to_p2wsh().into(),
+            "explicit_script" => self.0.into(),
+            "address_type" => bitcoin::AddressType::P2wsh.into(),
+            "witness_program" => bitcoin::WitnessProgram::p2wsh(&self.0).into(),
+            _ => {
+                return None;
+            }
+        })
+    }
+}
+
 // Display
 
 impl PrettyDisplay for ScriptBuf {
