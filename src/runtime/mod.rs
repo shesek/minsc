@@ -246,18 +246,6 @@ impl Evaluate for ast::FieldAccess {
 pub trait FieldAccess {
     fn get_field(self, field: &Value) -> Option<Value>;
 }
-impl FieldAccess for Value {
-    fn get_field(self, field: &Value) -> Option<Value> {
-        match self {
-            Value::Array(x) => x.get_field(field),
-            Value::Psbt(x) => x.get_field(field),
-            Value::Transaction(x) => x.get_field(field),
-            Value::Descriptor(x) => x.get_field(field),
-            Value::TapInfo(x) => x.get_field(field),
-            _ => None,
-        }
-    }
-}
 
 impl Evaluate for ast::FnExpr {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {

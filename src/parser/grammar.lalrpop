@@ -170,7 +170,7 @@ ArrayCurly: Expr = "{" <e1:Expr> "," <e2:Expr> "}" =>
 
 // Array/Field child access
 ChildAccess = { ArrayAccess, FieldAccess }; // left-associative recursion
-ChildAccessLHS = { Ident, SimpleCall, BlockExpr, Bytes, ChildAccess }; // would be nice to have: Array, Paren<Expr>
+ChildAccessLHS = { ChildAccess, Ident, SimpleCall, BlockExpr, Address, PubKey, SecKey }; // would be nice to have: Array, Paren<Expr>
 
 // Array element access - `$arr.3`, `$arr.$n`, `$arr.($n+1)`, `$arr.{$n+1}`
 ArrayAccess_: Expr = <array:ChildAccessLHS> "." <index:ArrayAccessRHS> =>

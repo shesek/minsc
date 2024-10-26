@@ -11,7 +11,7 @@ use bitcoin::{
 use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
 use crate::parser::Expr;
-use crate::runtime::{Array, Error, Evaluate, Function, Result, Scope};
+use crate::runtime::{Array, Error, Evaluate, FieldAccess, Function, Result, Scope};
 use crate::util::{fmt_quoted_str, PrettyDisplay, EC};
 use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 use stdlib::btc::WshScript;
@@ -111,7 +111,6 @@ impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
 impl_simple_into_variant!(WshScript, WshScript, into_wsh_script, NotWshScript);
-
 
 // From Value to f64 primitive, with auto-coercion for integers
 impl TryFrom<Value> for f64 {
@@ -509,6 +508,20 @@ impl ExprRepr for Value {
                 write!(f, "{}@", p)?;
                 x.repr_fmt(f)
             }
+        }
+    }
+}
+
+impl FieldAccess for Value {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        match self {
+            Value::Array(x) => x.get_field(field),
+            Value::Psbt(x) => x.get_field(field),
+            Value::Transaction(x) => x.get_field(field),
+            Value::Descriptor(x) => x.get_field(field),
+            Value::TapInfo(x) => x.get_field(field),
+            Value::Address(x) => x.get_field(field),
+            _ => None,
         }
     }
 }

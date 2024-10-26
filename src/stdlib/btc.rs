@@ -475,6 +475,10 @@ impl_simple_to_value!(Sequence, seq, seq.to_consensus_u32());
 impl_simple_to_value!(AbsLockTime, time, time.to_consensus_u32());
 impl_simple_to_value!(OutPoint, outpoint, (outpoint.txid, outpoint.vout));
 impl_simple_to_value!(Witness, wit, wit.to_vec());
+impl_simple_to_value!(bitcoin::WitnessVersion, ver, ver.to_num() as i64);
+impl_simple_to_value!(bitcoin::AddressType, t, t.to_string());
+impl_simple_to_value!(bitcoin::WitnessProgram, w, (w.version(), w.program()));
+impl_simple_to_value!(&bitcoin::script::PushBytes, p, p.as_bytes().to_vec());
 impl_simple_to_value!(SignedAmount, amt, amt.to_sat());
 // Panics for out-of-range `Amount`s (i64 can represent up to ~92 billion BTC, ~4400x more than can exists),
 // which should be impossible to construct within Minsc (but can be passed from Rust code).
@@ -513,7 +517,8 @@ impl_simple_to_value!(
     i64::try_from(w.to_wu()).expect("out of range weight")
 );
 
-// Transaction fields accessors
+// Field accessors
+
 impl FieldAccess for Transaction {
     fn get_field(self, field: &Value) -> Option<Value> {
         Some(match field.as_str()? {
@@ -526,6 +531,20 @@ impl FieldAccess for Transaction {
             "weight" => self.weight().into(),
             "vsize" => self.vsize().into(),
             "size" => self.total_size().into(),
+            _ => {
+                return None;
+            }
+        })
+    }
+}
+
+impl FieldAccess for Address {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        Some(match field.as_str()? {
+            "script_pubkey" => self.script_pubkey().into(),
+            "address_type" => self.address_type()?.into(),
+            "witness_program" => self.witness_program()?.into(),
+            "qr_uri" => self.to_qr_uri().into(),
             _ => {
                 return None;
             }
