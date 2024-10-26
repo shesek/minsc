@@ -1,12 +1,14 @@
 use std::fmt;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use bitcoin::bip32::{self, ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::hex::DisplayHex;
-use bitcoin::{psbt, secp256k1, taproot, PublicKey};
+use bitcoin::taproot::TaprootSpendInfo;
+use bitcoin::{psbt, secp256k1, PublicKey};
 use miniscript::descriptor::{
-    DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
+    self, DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
 };
 use miniscript::{
     bitcoin, DefiniteDescriptorKey, Descriptor, ForEachKey, MiniscriptKey, TranslatePk, Translator,
@@ -26,7 +28,7 @@ pub trait TapInfoExt {
         bitcoin::ScriptBuf::new_witness_program(&self.witness_program())
     }
 }
-impl TapInfoExt for taproot::TaprootSpendInfo {
+impl TapInfoExt for TaprootSpendInfo {
     fn witness_program(&self) -> bitcoin::WitnessProgram {
         bitcoin::WitnessProgram::p2tr_tweaked(self.output_key())
     }
@@ -34,10 +36,10 @@ impl TapInfoExt for taproot::TaprootSpendInfo {
 
 pub trait PsbtTaprootExt {
     /// Update PSBT fields using the TaprootSpendInfo
-    fn update_with_taproot(&mut self, tapinfo: &taproot::TaprootSpendInfo) -> Result<()>;
+    fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()>;
 }
 impl PsbtTaprootExt for psbt::Input {
-    fn update_with_taproot(&mut self, tapinfo: &taproot::TaprootSpendInfo) -> Result<()> {
+    fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
         self.tap_merkle_root = tapinfo.merkle_root();
         self.tap_internal_key = Some(tapinfo.internal_key());
         self.tap_scripts = tapinfo
@@ -53,7 +55,7 @@ impl PsbtTaprootExt for psbt::Input {
     }
 }
 impl PsbtTaprootExt for psbt::Output {
-    fn update_with_taproot(&mut self, tapinfo: &taproot::TaprootSpendInfo) -> Result<()> {
+    fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
         self.tap_internal_key = Some(tapinfo.internal_key());
         // `tap_key_origins` needs to be filled in manually
         // TODO autofill `tap_tree`
@@ -101,6 +103,21 @@ pub trait DescriptorExt {
     fn to_address(&self, network: bitcoin::Network) -> Result<bitcoin::Address> {
         Ok(self.derive_definite()?.address(network)?)
     }
+
+    /// Get the witness program. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn witness_program(&self) -> Result<Option<bitcoin::WitnessProgram>> {
+        Ok(self
+            .to_address(bitcoin::Network::Bitcoin)?
+            .witness_program())
+    }
+
+    /// Get the inner Tr, if it is a Tr descriptors
+    fn tr(&self) -> Option<&descriptor::Tr<DescriptorPublicKey>>;
+
+    /// Get a TaprootSpendInfo representation of this Tr descriptor
+    /// Returna an Ok(None) for non-Taproot descriptors, or an Err for Taproot
+    /// descriptors that are not definite (contain underived wildcards).
+    fn tap_info(&self) -> Result<Option<Arc<TaprootSpendInfo>>>;
 }
 
 impl DescriptorExt for Descriptor<DescriptorPublicKey> {
@@ -114,6 +131,24 @@ impl DescriptorExt for Descriptor<DescriptorPublicKey> {
             Error::UnexpectedMultiPathDescriptor(self.clone().into())
         );
         Ok(self.at_derivation_index(0).expect("index is valid"))
+    }
+
+    fn tr(&self) -> Option<&descriptor::Tr<DescriptorPublicKey>> {
+        match self {
+            Descriptor::Tr(tr) => Some(tr),
+            _ => None,
+        }
+    }
+
+    fn tap_info(&self) -> Result<Option<Arc<TaprootSpendInfo>>> {
+        if matches!(self, Descriptor::Tr(_)) {
+            Ok(match self.definite()? {
+                Descriptor::Tr(tr) => Some(tr.spend_info().clone()),
+                _ => unreachable!(),
+            })
+        } else {
+            Ok(None)
+        }
     }
 }
 

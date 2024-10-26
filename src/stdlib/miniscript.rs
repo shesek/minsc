@@ -1,12 +1,12 @@
 use std::convert::{TryFrom, TryInto};
 use std::{fmt, sync::Arc};
 
-use miniscript::descriptor::{ShInner, WshInner};
+use miniscript::descriptor::{DescriptorType, ShInner, WshInner};
 use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, Error, Evaluate, ExprRepr, Result, Value};
-use crate::stdlib::btc::WshScript;
+use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, Result, Value};
+use crate::stdlib::{btc::WshScript, taproot::tap_scripts_to_val};
 use crate::util::{DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
@@ -245,6 +245,39 @@ pub mod fns {
     }
 }
 
+// Descriptor fields accessors
+impl FieldAccess for Descriptor {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        Some(match field.as_str()? {
+            "descriptor_type" => self.desc_type().into(),
+            "max_weight" => self.max_weight_to_satisfy().ok()?.into(),
+            "singles" => self.into_single_descriptors().ok()?.into(),
+            "is_safe" => self.sanity_check().is_ok().into(),
+            "is_multipath" => self.is_multipath().into(),
+            "is_wildcard" => self.has_wildcard().into(),
+            "is_definite" => (!self.has_wildcard() && !self.is_multipath()).into(),
+
+            // Only available for definite descriptors (non-multi-path and no underived wildcards)
+            "script_pubkey" | "scriptPubKey" => self.to_script_pubkey().ok()?.into(),
+            "explicit_script" | "explicitScript" => self.to_explicit_script().ok()?.into(),
+            // Only available for definite segwit descriptors
+            "witness_program" => self.witness_program().ok()??.into(),
+
+            // Only available for taproot descriptors (similar fields mirrored on TaprootSpendInfo)
+            "internal_key" => self.tr()?.internal_key().clone().into(),
+            // Only available for definite taproot descriptors
+            "merkle_root" => self.tap_info().ok()??.merkle_root()?.into(),
+            "output_key" => self.tap_info().ok()??.output_key().into(),
+            "output_key_parity" => self.tap_info().ok()??.output_key_parity().into(),
+            "scripts" => tap_scripts_to_val(&*self.tap_info().ok()??),
+            _ => {
+                return None;
+            }
+            // TODO address_type
+        })
+    }
+}
+
 fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
     values
         .into_iter()
@@ -266,6 +299,8 @@ fn into_prob_policies(values: Vec<Value>) -> Result<Vec<(usize, Arc<Policy>)>> {
         })
         .collect()
 }
+
+impl_simple_to_value!(DescriptorType, t, format!("{:?}", t));
 
 // Convert from Value to Miniscript types
 

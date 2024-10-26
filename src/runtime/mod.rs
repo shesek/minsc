@@ -252,6 +252,7 @@ impl FieldAccess for Value {
             Value::Array(x) => x.get_field(field),
             Value::Psbt(x) => x.get_field(field),
             Value::Transaction(x) => x.get_field(field),
+            Value::Descriptor(x) => x.get_field(field),
             Value::TapInfo(x) => x.get_field(field),
             _ => None,
         }
