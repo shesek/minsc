@@ -1,13 +1,14 @@
 use std::convert::{TryFrom, TryInto};
 use std::{fmt, sync::Arc};
 
+use bitcoin::ScriptBuf;
 use miniscript::descriptor::{DescriptorType, ShInner, WshInner};
 use miniscript::{ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, Result, Value};
 use crate::stdlib::{btc::WshScript, taproot::tap_scripts_to_val};
-use crate::util::{DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt};
+use crate::util::{DeriveExt, DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 pub use crate::runtime::AndOr;
@@ -245,7 +246,8 @@ pub mod fns {
     }
 }
 
-// Descriptor fields accessors
+// Field accessors
+
 impl FieldAccess for Descriptor {
     fn get_field(self, field: &Value) -> Option<Value> {
         Some(match field.as_str()? {
@@ -258,8 +260,9 @@ impl FieldAccess for Descriptor {
             "is_definite" => (!self.has_wildcard() && !self.is_multipath()).into(),
 
             // Only available for definite descriptors (non-multi-path and no underived wildcards)
-            "script_pubkey" | "scriptPubKey" => self.to_script_pubkey().ok()?.into(),
-            "explicit_script" | "explicitScript" => self.to_explicit_script().ok()?.into(),
+            "script_pubkey" => self.to_script_pubkey().ok()?.into(),
+            // Only available for definite non-taproot descriptors
+            "explicit_script" => self.to_explicit_script().ok()?.into(),
             // Only available for definite segwit descriptors
             "witness_program" => self.witness_program().ok()??.into(),
 
@@ -274,6 +277,30 @@ impl FieldAccess for Descriptor {
                 return None;
             }
             // TODO address_type
+        })
+    }
+}
+
+impl FieldAccess for Policy {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        fn compile<Ctx: miniscript::ScriptContext>(policy: &Policy) -> Result<ScriptBuf> {
+            Ok(policy.compile::<Ctx>()?.derive_keys()?.encode())
+        }
+        Some(match field.as_str()? {
+            "keys" => self.keys().into_iter().cloned().collect(),
+            "is_valid" => self.is_valid().is_ok().into(),
+            "is_safe" => self.is_safe_nonmalleable().0.into(),
+            "is_nonmalleable" => self.is_safe_nonmalleable().1.into(),
+            "is_wildcard" => self.has_wildcards().into(),
+            "is_definite" => (!self.has_wildcards()).into(),
+
+            // Script compilation fields are only available for Policies that are `$p->is_valid && $p->is_safe && $p->is_nonmalleable && $p->is_definite`
+            // You can use the tapscript()/segwitv0() functions to get a more useful exception instead of a 'field not found'
+            "tapscript" => compile::<miniscript::Tap>(&self).ok()?.into(),
+            "segwitv0" => compile::<miniscript::Segwitv0>(&self).ok()?.into(),
+            _ => {
+                return None;
+            }
         })
     }
 }
@@ -314,10 +341,7 @@ impl TryFrom<Value> for Policy {
             // PubKeys are coerced into a pk() policy
             Value::PubKey(pubkey) => Ok(Policy::Key(pubkey)),
             // SecKeys are coerced into a PubKey, then to a pk()
-            Value::SecKey(seckey) => {
-                let pubkey = seckey.to_public_()?;
-                Ok(Policy::Key(pubkey))
-            }
+            Value::SecKey(seckey) => Ok(Policy::Key(seckey.to_public_()?)),
             v => Err(Error::NotPolicyLike(v.into())),
         }
     }
