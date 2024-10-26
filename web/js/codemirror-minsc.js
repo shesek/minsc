@@ -12,15 +12,15 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     // @ Execution probability operator
     // Matched early to tell apart from @ used as markers inside script fragments
     // (and also has to match prior to numbers and variables)
-    {regex: /(\d+)\s*(@)/, token: ["number", "operator"]},
-    {regex: /(likely)\s*(@)/, token: ["builtin", "operator"]},
-    {regex: /([$a-zA-Z_][$a-zA-Z_0-9:]*)\s*(@)/, token: ["variable-3", "operator"]},
+    {regex: /(\d+)(\s*)(@)/, token: ["number", null, "operator"]},
+    {regex: /(likely)(\s*)(@)/, token: ["builtin", null,  "operator"]},
+    {regex: /([$a-zA-Z_][$a-zA-Z_0-9:]*)(@)/, token: ["variable-3", "operator"]},
 
     // Time durations
-    {regex: /\d+(\.\d+)?\s+(years?|months?|weeks?|days?|hours?|min(?:utes?|s)|seconds?)\b/, token: "number"},
+    {regex: /(heightwise\s+)?\d+(\.\d+)?\s+(years?|months?|weeks?|days?|hours?|min(?:utes?|s)|seconds?)\b/, token: "number"},
 
     // BTC amounts
-    {regex: /\d+(?:\.\d+)?\s+(?:BTC|mBTC|uBTC|bits?|satoshis?|sats?|msats?)\b/, token: "number"},
+    {regex: /-?\d+(?:\.\d+)?\s+(?:BTC|mBTC|uBTC|bits?|satoshis?|sats?|msats?)\b/, token: "number"},
 
     // Block height durations
     {regex: /\d+\s+blocks?\b/, token: "number"},
@@ -46,7 +46,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /(?:[123mn][1-9A-HJ-NP-Za-km-z]{25,34}|(bc|tb|bcrt)1[0-9a-z]{38,59}|(BC|TB|BCRT)1[0-9A-Z]{38,59})\b(?![_$]|::)/, token: "number"},
 
     // Numbers
-    {regex: /\b-?\d+(?:\.\d+)?\b/, token: "number"},
+    {regex: /-?\d+(?:\.\d+)?\b/, token: "number"},
 
     // Strings
     {regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: "string"},
@@ -66,9 +66,6 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\()/, token: ["atom", null], indent: true},
     {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\[)/, token: ["atom", null], indent: true},
 
-    // PUSH in Script's Debug format
-    {regex: /(OP_PUSHBYTES\w*)\s+([a-f0-9]+)\b/, token: ["variable-2", "number"]},
-
     // BIP32 derivation
     {regex: /(\d+)(h)\b/, token: ["number", "operator"]}, // hardened derivation step with number literal
     {regex: /\*h\b/, token: "operator"}, // hardened wildcard
@@ -80,7 +77,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /(?:[a-zA-Z][a-zA-Z0-9]{0,24}|(?:[a-zA-Z][a-zA-Z0-9]*)?[_$][a-zA-Z0-9_$]*|[a-zA-Z_$][a-zA-Z0-9_$]*(?:::[a-zA-Z0-9_$]+)+)(?![a-zA-Z0-9$_]|::)/, token: "variable-3" },
 
     // Numeric array index
-    {regex: /\.\d+\b/, token: "property"},
+    {regex: /(\.)(\s*)(\d+)\b/, token: ["operator", null, "property"]},
 
     // Script fragment start/end
     {regex:/`/, token: "property"},
@@ -88,7 +85,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     // Script markers
     {regex: /\s*@@/, token: "property"},
     {regex: /\s*@[\w_$:]*/, token: "property"},
-    {regex: /(#)\s*("(?:[^\\]|\\.)*?")/, token: ["property", "comment"]},
+    {regex: /(#)(\s*)("(?:[^\\]|\\.)*?")/, token: ["property", null, "comment"]},
     {regex: /#/, token: "property"},
 
     // Infix operators
@@ -114,11 +111,15 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
 // Mode for displaying Minsc's evaluation result
 CodeMirror.defineSimpleMode("minsc-output",{
   start: [
+    // PUSH in Script's Debug format
+    {regex: /(OP_PUSHBYTES_\d+)(\s+)([a-f0-9]+)\b/, token: ["variable-2", null, "number"]},
+
+    // Reuse minsc_rules except for multi-line comments
+    ...minsc_rules.start.filter(r => r.next != 'comment'),
+
     // Highlight 0x-less hex sequences of any length >5 bytes
     // Not valid as Minsc code and not used to Display Minsc Values, but may appear as Debug output.
     {regex: /(?:[a-f0-9]{2}){5,}\b/, token: "number"},
-    // Reuse the rest of minsc_rules, except for multi-line comments
-    ...minsc_rules.start.filter(r => r.next != 'comment'),
   ],
   // `meta` and `comment` not needed for output
 });

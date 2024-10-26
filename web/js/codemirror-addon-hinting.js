@@ -20,7 +20,7 @@ CodeMirror.registerHelper("hint", "multihint", (cm, options) => {
   // Skip short and all-numeric words
   if (options.minSearchLen != null && currWord.length < options.minSearchLen)
     return;
-  if (!/[a-zA-Z$]/.test(currWord))
+  if (/^\d+$/.test(currWord))
     return;
 
   const listhints = wordlistHints(wordlist, currWord)

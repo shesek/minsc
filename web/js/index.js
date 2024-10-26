@@ -207,7 +207,7 @@ const editor = CodeMirror(document.querySelector('#editor'), {
     closeCharacters: /[\s()\[\]{};>,]/,
     minAnyhintLen: 3,
   },
-  highlightSelectionMatches: { showToken: /[\w$:]/, annotateScrollbar: true },
+  highlightSelectionMatches: { showToken: /[\w$]/, annotateScrollbar: true },
   // continueComments: true // could not get this to work. :<
   extraKeys: {
     ...full_screen_keys,
