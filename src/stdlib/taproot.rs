@@ -11,8 +11,10 @@ use miniscript::descriptor::{self, DescriptorPublicKey};
 
 use super::miniscript::{multi_andor, AndOr};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
-use crate::runtime::{Array, Error, Result, Value};
-use crate::util::{self, fmt_list, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, EC};
+use crate::runtime::{Array, Error, FieldAccess, Result, Value};
+use crate::util::{
+    self, fmt_list, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, TapInfoExt, EC,
+};
 use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -21,11 +23,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     // Taproot Descriptor/TaprootSpendInfo construction
     scope.set_fn("tr", fns::tr).unwrap();
 
-    // Functions for extracting information out of Descriptors/TaprootSpendInfo
-    scope.set_fn("tr::internalKey", fns::internalKey).unwrap();
-    scope.set_fn("tr::outputKey", fns::outputKey).unwrap();
-    scope.set_fn("tr::merkleRoot", fns::merkleRoot).unwrap();
-    scope.set_fn("tr::scripts", fns::scripts).unwrap();
+    // Construct the witness control block
     scope.set_fn("tr::ctrl", fns::ctrl).unwrap();
 
     // Convert a tr() descriptor into a TaprootSpendInfo
@@ -55,57 +53,9 @@ pub mod fns {
         super::tr(a, b, &scope.borrow())
     }
 
-    /// tr::internalKey(TapInfo|Descriptor) -> PubKey
-    ///
-    /// Get the internal x-only key of the given TapInfo/Descriptor
-    pub fn internalKey(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(match args.arg_into()? {
-            Value::TapInfo(tapinfo) => tapinfo.internal_key().into(),
-            Value::Descriptor(Descriptor::Tr(tr)) => tr.internal_key().clone().into(),
-            _ => bail!(Error::InvalidArguments),
-        })
-    }
-
-    /// tr::outputKey(TapInfo) -> PubKey | (PubKey, Number)
-    ///
-    /// Get the output key of the given TapInfo, optionally with the parity as a tuple of (key, parity)
-    pub fn outputKey(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (tapinfo, with_parity): (TaprootSpendInfo, Option<bool>) = args.args_into()?;
-        let key = tapinfo.output_key();
-
-        Ok(if with_parity.unwrap_or(false) {
-            (key, tapinfo.output_key_parity()).into()
-        } else {
-            key.into()
-        })
-    }
-
-    /// tr::merkleRoot(TapInfo) -> Hash
-    ///
-    /// Get the merkle root hash of the given TapInfo
-    pub fn merkleRoot(args: Array, _: &ScopeRef) -> Result<Value> {
-        let tapinfo: TaprootSpendInfo = args.arg_into()?;
-
-        Ok(match tapinfo.merkle_root() {
-            None => Vec::<u8>::new().into(), // empty byte vector signifies an empty script tree
-            Some(root) => root.into(),
-        })
-    }
-
-    /// tr::scripts(TapInfo|Descriptor) -> Array<Script>
-    ///
-    /// Get an array of all scripts in the tree
-    pub fn scripts(args: Array, _: &ScopeRef) -> Result<Value> {
-        let tapinfo: TaprootSpendInfo = args.arg_into()?;
-        let scripts = tapinfo.script_map().keys();
-        Ok(Value::array(
-            scripts.map(|(script, _)| script.clone().into()).collect(),
-        ))
-    }
-
     /// tr::ctrl(TapInfo|Descriptor, Script|Policy, Byte version=TapScript) -> Array<Script>
     ///
-    /// Get the control block for the given script/policy
+    /// Construct the witness control block for the given Script/Policy
     pub fn ctrl(args: Array, _: &ScopeRef) -> Result<Value> {
         let (tapinfo, script_or_policy, leaf_ver): (TaprootSpendInfo, Value, Option<LeafVersion>) =
             args.args_into()?;
@@ -123,7 +73,7 @@ pub mod fns {
 
     /// tr::tapinfo(Descriptor|TapInfo) -> TapInfo
     ///
-    /// Convert the Tr Descriptor into a TapInfo (or return TapInfo as-is)
+    /// Convert Tr Descriptor into a TapInfo (or return TapInfo as-is)
     pub fn tapinfo(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::TapInfo(args.arg_into()?))
     }
@@ -148,15 +98,42 @@ pub mod fns {
     }
 }
 
+// TaprootSpendInfo field accessors
+impl FieldAccess for TaprootSpendInfo {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        // Similar fields are available on tr() Descriptors
+        Some(match field.as_str()? {
+            "script_pubkey" => self.script_pubkey().into(),
+            "witness_program" => self.witness_program().into(),
+            "address_type" => bitcoin::AddressType::P2tr.into(),
+
+            "internal_key" => self.internal_key().into(),
+            "merkle_root" => self.merkle_root()?.into(),
+            "output_key" => self.output_key().into(),
+            "output_key_parity" => self.output_key_parity().into(),
+            "scripts" => tap_scripts_to_val(&self),
+            _ => {
+                return None;
+            }
+        })
+    }
+}
+
+/// As a flat Array of Script, with no leaf versions
+pub fn tap_scripts_to_val(tapinfo: &TaprootSpendInfo) -> Value {
+    let scripts_vers = tapinfo.script_map().keys();
+    scripts_vers.map(|(script, _)| script.clone()).collect()
+}
+
 impl TryFrom<Value> for TaprootSpendInfo {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value {
             Value::TapInfo(tapinfo) => tapinfo,
-            Value::Descriptor(desc) => match desc.definite()? {
-                miniscript::Descriptor::Tr(tr_desc) => (*tr_desc.spend_info()).clone(),
-                _ => bail!(Error::NotTapInfoLike(Value::Descriptor(desc).into())),
-            },
+            Value::Descriptor(desc) => (*desc
+                .tap_info()?
+                .ok_or_else(|| Error::NotTapInfoLike(Value::Descriptor(desc).into()))?)
+            .clone(),
             v => bail!(Error::NotTapInfoLike(v.into())),
         })
     }

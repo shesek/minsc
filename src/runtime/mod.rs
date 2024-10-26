@@ -249,9 +249,10 @@ pub trait FieldAccess {
 impl FieldAccess for Value {
     fn get_field(self, field: &Value) -> Option<Value> {
         match self {
-            Value::Array(array) => array.get_field(field),
-            Value::Psbt(psbt) => psbt.get_field(field),
-            Value::Transaction(tx) => tx.get_field(field),
+            Value::Array(x) => x.get_field(field),
+            Value::Psbt(x) => x.get_field(field),
+            Value::Transaction(x) => x.get_field(field),
+            Value::TapInfo(x) => x.get_field(field),
             _ => None,
         }
     }
