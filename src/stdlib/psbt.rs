@@ -28,9 +28,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("psbt::sign", fns::sign).unwrap();
     scope.set_fn("psbt::try_sign", fns::try_sign).unwrap();
     scope.set_fn("psbt::extract", fns::extract).unwrap();
-    scope
-        .set_fn("psbt::extract_non_ms", fns::extract_non_ms)
-        .unwrap();
+    scope.set_fn("psbt::extract_raw", fns::extract_raw).unwrap();
 
     scope.set_fn("psbt::unsigned_tx", fns::unsigned_tx).unwrap();
     scope.set_fn("psbt::fee", fns::fee).unwrap();
@@ -170,15 +168,15 @@ pub mod fns {
         Ok(psbt.extract(&EC)?.into())
     }
 
-    /// psbt::extract_non_ms(Psbt) -> Transaction
+    /// psbt::extract_raw(Psbt) -> Transaction
     ///
     /// Extract the PSBT finalized transaction, without running the Miniscript interpreter checks.
-    pub fn extract_non_ms(args: Array, _: &ScopeRef) -> Result<Value> {
+    pub fn extract_raw(args: Array, _: &ScopeRef) -> Result<Value> {
         let psbt: Psbt = args.arg_into()?;
         // Uses rust-bitcoin's Psbt::extract_tx(). Unlike rust-miniscript's PsbtExt::extract(), this does not run the
         // interpreter checks and can be used with manual finalization of arbitrary (non-Miniscript-compatible) Script.
-        // Also unlike it, this includes a check for absurdly high fees (over 25k sat/vb) -- TODO make fee check configurable, support in both variants
-        Ok(psbt.extract_tx()?.into())
+        // XXX enable absurd fee check?
+        Ok(psbt.extract_tx_unchecked_fee_rate().into())
     }
 
     /// psbt::unsigned_tx(Psbt) -> Transaction
