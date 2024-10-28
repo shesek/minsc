@@ -7,8 +7,8 @@ use bitcoin::hex::DisplayHex;
 use bitcoin::psbt::{self, raw, Psbt, SigningErrors, SigningKeys, SigningKeysMap};
 use bitcoin::taproot::{self, LeafVersion, TapLeafHash};
 use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut, XOnlyPublicKey};
+use miniscript::descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
-use miniscript::DescriptorPublicKey;
 
 use crate::runtime::{
     Array, Error, FieldAccess, FromValue, Mutable, Number::Int, Result, ScopeRef, Value,
@@ -202,17 +202,31 @@ fn sign_psbt(psbt: &mut Psbt, keys_val: Value) -> Result<(SigningKeysMap, Signin
         Value::Array(keys) if !keys.is_empty() => {
             // Peek at the first array element to determine its format
             match keys.first().expect("not empty") {
-                // Keys provided as tagged array of [ $single_pk1:$single_sk1, $single_pk2:$single_sk2, ... ]
+                // Keys provided as a map of [ $single_pk1:$single_sk1, $single_pk2:$single_sk2, ... ]
                 Value::Array(_) => {
                     psbt.sign(&BTreeMap::<PublicKey, PrivateKey>::try_from(keys)?, &EC)
                 }
+
                 // Keys provided as [ $xpriv1, $xpriv2, ... ]
-                Value::SecKey(_) => psbt.sign(&XprivSet(keys.try_into()?), &EC),
+                Value::SecKey(DescriptorSecretKey::XPrv(_)) => {
+                    psbt.sign(&XprivSet(keys.try_into()?), &EC)
+                }
+
+                // Keys provided as [ $single_sk1, $single_sk2, ... ]
+                Value::SecKey(DescriptorSecretKey::Single(_)) => {
+                    psbt.sign(&single_seckeys_to_map(keys)?, &EC)
+                }
                 _ => bail!(Error::PsbtInvalidSignKeys),
             }
         }
-        // Key provided as a single Xpriv
-        Value::SecKey(_) => psbt.sign(&Xpriv::try_from(keys_val)?, &EC),
+        // Key provided as one Xpriv
+        Value::SecKey(DescriptorSecretKey::XPrv(_)) => psbt.sign(&Xpriv::try_from(keys_val)?, &EC),
+
+        // Key provided as one single key
+        Value::SecKey(DescriptorSecretKey::Single(_)) => {
+            psbt.sign(&single_seckey_to_map(PrivateKey::try_from(keys_val)?), &EC)
+        }
+
         // TODO support signing with MultiXpriv
         _ => bail!(Error::PsbtInvalidSignKeys),
     };
@@ -726,6 +740,20 @@ impl psbt::GetKey for XprivSet {
             .find_map(|xpriv| xpriv.get_key(key_request.clone(), secp).transpose())
             .transpose()
     }
+}
+
+fn single_seckey_to_map(sk: PrivateKey) -> BTreeMap<PublicKey, PrivateKey> {
+    let mut map = BTreeMap::new();
+    map.insert(sk.public_key(&EC), sk);
+    map
+}
+fn single_seckeys_to_map(keys: Array) -> Result<BTreeMap<PublicKey, PrivateKey>> {
+    keys.into_iter_of()
+        .map(|sk| {
+            let sk: PrivateKey = sk?;
+            Ok((sk.public_key(&EC), sk))
+        })
+        .collect()
 }
 
 // PSBT fields accessors

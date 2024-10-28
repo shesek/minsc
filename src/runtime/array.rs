@@ -27,6 +27,10 @@ impl Array {
         self.0
     }
 
+    pub fn into_iter_of<T: FromValue>(self) -> impl Iterator<Item = Result<T>> {
+        self.into_iter().map(T::from_value)
+    }
+
     pub fn check_len(self, expected_len: usize) -> Result<Self> {
         ensure!(
             self.len() == expected_len,
