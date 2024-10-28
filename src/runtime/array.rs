@@ -57,9 +57,17 @@ impl Array {
         expected_all_length: usize,
     ) -> Result<Vec<(usize, T)>> {
         if let Some(Value::Array(first_el)) = self.first() {
-            if let Some(Value::Number(_)) = first_el.first() {
-                // Provided as [ 0: $val0, 1: $val1, ... ]
-                return self.try_into();
+            if first_el.len() == 2 {
+                // Differentiating the two cases assumes that the value type *is not a number*
+                #[allow(clippy::get_first)]
+                match (first_el.get(0), first_el.get(1)) {
+                    (Some(Value::Number(_)), Some(Value::Number(_))) => (),
+                    (Some(Value::Number(_)), Some(_non_number)) => {
+                        // Provided as [ 0: $val0, 1: $val1, ... ]
+                        return self.try_into();
+                    }
+                    _ => (),
+                }
             }
         }
         // Provided as [ $val0, $val1, ... ]
