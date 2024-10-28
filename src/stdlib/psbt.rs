@@ -765,7 +765,7 @@ impl PrettyDisplay for Psbt {
         fmt_field!(self, unsigned_tx, f, sep, is_first, "{}", self.unsigned_tx.pretty(inner_indent));
         fmt_field!(self, version, f, sep, is_first);
         fmt_map_field!(self, xpub, f, sep, is_first, inner_indent,
-            |f, (pk, src), _| write!(f, "[{}/{}]{}", src.0, src.1, pk));
+            |f, (pk, src), _| write!(f, "[{}]{}", src.pretty(None), pk));
         fmt_map_field!(self, proprietary, f, sep, is_first, inner_indent);
         fmt_map_field!(self, unknown, f, sep, is_first, inner_indent);
 
@@ -801,7 +801,7 @@ impl PrettyDisplay for psbt::Input {
         fmt_opt_field!(self, redeem_script, f, sep, is_first, "{}", redeem_script.pretty(inner_indent));
         fmt_opt_field!(self, witness_script, f, sep, is_first, "{}", witness_script.pretty(inner_indent));
         fmt_map_field!(self, bip32_derivation, f, sep, is_first, inner_indent,
-            |f, (pk, src), _| write!(f, "[{}/{}]{}", src.0, src.1, pk));
+            |f, (pk, src), _| write!(f, "[{}]{}", src.pretty(None), pk));
 
         fmt_opt_field!(self, final_script_sig, f, sep, is_first, "{}", final_script_sig.pretty(None));
         fmt_opt_field!(self, final_script_witness, f, sep, is_first, "{}", final_script_witness.pretty(None));
@@ -845,7 +845,7 @@ impl PrettyDisplay for psbt::Output {
         fmt_opt_field!(self, redeem_script, f, sep, is_first, "{}", redeem_script.pretty(inner_indent));
         fmt_opt_field!(self, witness_script, f, sep, is_first, "{}", witness_script.pretty(inner_indent));
         fmt_map_field!(self, bip32_derivation, f, sep, is_first, inner_indent,
-            |f, (pk, src), _| write!(f, "[{}/{}]{}", src.0, src.1, pk));
+            |f, (pk, src), _| write!(f, "[{}]{}", src.pretty(None), pk));
         fmt_opt_field!(self, tap_internal_key, f, sep, is_first);
         fmt_opt_field!(self, tap_tree, f, sep, is_first, "{}", tap_tree.pretty(inner_indent));
         fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent, fmt_tap_key_origin);
@@ -861,13 +861,12 @@ fn fmt_tap_key_origin<W: fmt::Write>(
     (pk, (leaf_hashes, src)): (&XOnlyPublicKey, &(Vec<TapLeafHash>, bip32::KeySource)),
     _indent: Option<usize>,
 ) -> fmt::Result {
-    if !leaf_hashes.is_empty() {
-        write!(f, "[{}/{}]{}: {}", src.0, src.1, pk, leaf_hashes.pretty(None))
-    } else {
-        write!(f, "[{}/{}]{}", src.0, src.1, pk)
+    match leaf_hashes.len() {
+        0 => write!(f, "[{}]{}", src.pretty(None), pk),
+        1 => write!(f, "[{}]{}: {}", src.pretty(None), pk, leaf_hashes[0].pretty(None)),
+        _ => write!(f, "[{}]{}: {}", src.pretty(None), pk, leaf_hashes.pretty(None)),
     }
 }
-
 impl_simple_pretty!(raw::Key, k, "[{}, 0x{}]", k.type_value, k.key.as_hex());
 impl_simple_pretty!(
     raw::ProprietaryKey,
@@ -876,4 +875,12 @@ impl_simple_pretty!(
     k.prefix.as_hex(),
     k.subtype,
     k.key.as_hex()
+);
+impl_simple_pretty!(
+    &bip32::KeySource,
+    (fp, path),
+    "{}{}{}",
+    fp,
+    if path.is_empty() { "" } else { "/" },
+    path
 );
