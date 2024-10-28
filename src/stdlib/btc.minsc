@@ -254,7 +254,8 @@ dyn fn mark($kind, $body) = if !MARK_SCRIPT then `` else
   `SCRIPT_MARKER_MAGIC OP_DROP $kind OP_DROP str($body) OP_DROP`;
 dyn fn mark::comment($comment) = mark("comment", join(MARK_CTX+[str($comment)], " · "));
 dyn fn mark::label($name) = mark("label", join(MARK_CTX+[str($name)], "__"));
-dyn fn mark::ctx($$context, $$fn) {
-  MARK_CTX = MARK_CTX + [ str($$context) ];
-  $$fn()
-}
+dyn fn mark::ctx($context, $fn) = `
+  #("BEGIN "+$context)
+  $fn(MARK_CTX + [ str($context) ])
+  #("END "+$context)
+`;

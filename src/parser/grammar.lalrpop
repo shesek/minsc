@@ -252,8 +252,8 @@ ScriptFragPart_Mark: Expr = {
 
 // Defined separately because it is also allowed outside ``
 ScriptMarkCtx: Expr = "@@" <Paren<(<Expr> "," <Expr>)>> =>
-  // Wraps the body expression in a dynamically-scoped function, to be evaluated from within the `mark::ctx()` scope.
-  call("mark::ctx", vec![<>.0, ast::FnExpr { params: vec![], body: <>.1.into(), dynamic_scoping: true }.into()]);
+  // Wraps the body expression in a closure takes accepts the updated MARK_CTX as an argument from `mark::ctx()`
+  call("mark::ctx", vec![<>.0, ast::FnExpr { params: vec!["MARK_CTX".into()], body: <>.1.into(), dynamic_scoping: false }.into()]);
 
 // Allow function bodies without an explicit final return value (true is returned by default)
 // Used for FnExpr and FnDef.
