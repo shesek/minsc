@@ -1,0 +1,182 @@
+//
+// Simple lookup tables using OP_PICK to index into a set of pre-determined values
+//
+// Based on @RobinLinus's https://github.com/coins/bitcoin-scripts/blob/master/op_lookup.md
+
+//
+// -- One-time lookup --
+//
+
+// One-time lookup by index, with immediate cleanup
+// For example: `3 lookup([10,11,12,13,14])` will leave `13` on the stack
+// stack in: <index>, stack out: <values[index]>
+fn lookup($values) = `
+  verifyWithin(0, len($values)) // verify index is valid
+  OP_TOALTSTACK // keep index number aside
+  reverse($values) // reversed so that index 0 gets the first element
+  OP_FROMALTSTACK OP_ROLL // get index lookup result
+  OP_TOALTSTACK // keep lookup result aside
+  dropMany(len($values)-1) // cleanup table (looked-up value was already ROLL'd)
+  OP_FROMALTSTACK
+`;
+
+// left-inclusive only
+fn verifyWithin($min, $max) = `OP_DUP $min $max OP_WITHIN OP_VERIFY`;
+
+fn dropMany($num) = `OP_2DROP*($num/2) OP_DROP*($num%2)`;
+
+//
+// -- One-time lookup example --
+//
+
+// A script that allows the spender to pick from a list of pubkeys to sign with
+// (In practice this should probably use separate Taproot leaves, just an example.)
+$alice = 0x021942596b6badd2c7fa82397ddd489a4867bfc5b51d7572c969b4b94ef3db8c20;
+$bob = 0x0362f7012e8bb7a9bf8f99fb7991877e8c15663aef2ffcfb6ace473840e67bd1be;
+$charlie = 0x02f769cf92a3d5a6bd6ece3ad3de7adb6021d3c42fbfbd1090fce9de1a2b80afc5;
+
+$script_pick = `lookup[ $alice, $bob, $charlie ] OP_CHECKSIG`;
+// Spent with a witness of e.g. `<signature> 2` to sign with Charlie's key.
+
+
+// exp2() for 4-bit numbers (0-15) using a pre-computed lookup table
+// stack in: <n>, stack out: <2**n>
+OP::EXP2_4B = lookup(fillArray(16, |$n| 2 ** $n));
+
+$script_exp2 = `10 OP::EXP2_4B`; // -> 1024
+$exp2_cost = len(OP::EXP2_4B); // 58 WU per lookup
+
+//
+// -- Reusable lookup tables --
+//
+
+// To make efficient repeated lookups to the same table, we can keep the table at the bottom of the stack for reuse,
+// referenced using its position from the bottom as an identifier that remains fixed throughout execution.
+
+// To read from the bottom, we can use OP_DEPTH and the PICK_BOTTOM composite opcode available in the stdlib.
+// (Note the bottom-most element is at index 1 - using 0-indexed positions would cost 1 extra WU per lookup.)
+OP::PICK_BOTTOM = `OP_TOALTSTACK OP_DEPTH OP_FROMALTSTACK OP_SUB OP_PICK`;
+
+// With this, we can implement a utility function to help manage multiple reusable lookup tables.
+// The $start_pos (1-indexed) can be used if there are other stack elements preceding the tables.
+fn tables($tables, $start_pos=1) {
+  [ _, $lookups ] = fold($tables, [ $start_pos, [] ], |[ $start_pos, $lookups ], $table| {
+    [ $name, $values ] = $table;
+    $lookup = `{if $start_pos == 1 then OP_1ADD else `$start_pos OP_ADD`} OP::PICK_BOTTOM`;
+    $verify_pos = verifyWithin(0, len($values)); // can be skipped for known-to-be-valid input
+    [ $start_pos+len($values), $lookups+[ $name: $lookup, "checked_"+$name: `$verify_pos $lookup` ] ]
+  });
+  $tables_values = map($tables, |[ _, $values ]| $values);
+  $total_entries = sum(map($tables_values, len));
+  // Expected to have one final stack element to keep by the time $cleanup is executed
+  $cleanup = `OP_TOALTSTACK dropMany($total_entries) OP_FROMALTSTACK`;
+  $lookups + [ "DATA": `$tables_values`, "CLEANUP": $cleanup ]
+}
+
+//
+// -- Reusable lookup tables example --
+//
+
+// Two lookup tables, one for exp2 and one for primes
+$lookup = tables [
+  "exp2": fillArray(16, |$n| 2**$n),
+  "primes": [ 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97 ],
+];
+
+$script_tables = `
+  3 2
+  // stack: <a> <b>
+  // (provided in the witness, part of script for the example)
+
+  # "Put witness aside, insert lookup tables at the bottom and get it back"
+  OP_TOALTSTACK*2
+  $lookup->DATA
+  OP_FROMALTSTACK*2
+  // stack: <lookup tables> <a> <b>
+
+  # "Run some calculations"
+  $lookup->primes // primes(b) -> 5
+  $lookup->exp2 // exp2(primes(b)) -> 32
+  OP_SWAP
+  $lookup->exp2 // exp2(a) -> 8
+  $lookup->exp2 // exp2(exp2(a)) -> 256
+
+  OP_ADD // exp2(primes(b)) + exp2(exp2(a))
+  // stack: <lookup tables> <288>
+
+  # "Cleanup"
+  $lookup->CLEANUP
+  // stack: <288>
+`;
+
+// $script_tables_wiz = script::wiz($script_tables);
+
+$tables_cost = len($lookup->DATA) + len($lookup->CLEANUP); // 104 WU for the tables
+$t_exp2_cost = len($lookup->exp2); // 6 WU per lookup (slightly cheaper to reach the bottom-most table)
+$t_primes_cost = len($lookup->primes); // 8 WU per lookup
+$t_checked_cost = len($lookup->checked_primes); // +8-10 WU for the checked_ lookups (depending on table size)
+
+// There's a trick to reduce cleanup cost: https://github.com/coins/bitcoin-scripts/blob/master/op_lookup.md#efficient-cleanup
+
+
+//
+// -- 4-bit OP_MUL --
+//
+// Wrapped in a function because it generates a lot of output.
+// To run and see the output, rename from MUL_main() to main()
+fn MUL_main() {
+
+  //
+  // -- With one-time lookup --
+  //
+
+  // Multiply two 4-bit numbers
+  // stack in: <a> <b>, stack out: <a*b>
+  OP::MUL_4B = `
+    // Lookup <b> in the first table to retrieve its start position offset into the second table
+    lookup(fillArray(16, |$n| $n*16)) // stack: <a> <offsets[b]>
+
+    // Add <a> to <b>'s offset to calculate the index into the second products table
+    OP_ADD // stack: <offsets[b]+a>
+
+    // Pre-compute every a*b product, and lookup into it using the calculated index
+    // Equivalent to `products[offsets[b]+a]`, or `products[b*16 + a]`
+    lookup(flatten(fillArray(16, |$a| fillArray(16, |$b| $a*$b))))
+  `;
+
+  // $script_mul = `13 4 OP::MUL_4B`;
+  $mul_cost = len(OP::MUL_4B); // 666 WU per multiplication
+
+  //
+  // -- With reusable tables --
+  //
+
+  $lookup = tables [
+    "offsets": fillArray(16, |$n| $n*16),
+    "products": flatten(fillArray(16, |$a| fillArray(16, |$b| $a*$b))),
+  ];
+
+  // stack in: <a> <b>, stack out: <a*b>
+  OP::MUL_4BT = `$lookup->offsets OP_ADD $lookup->products`;
+
+  $tables_cost = len($lookup->DATA) + len($lookup->CLEANUP); // 641 WU for the tables
+  $t_mul_cost = len(OP::MUL_4BT); // 15 WU per multiplication
+
+  // Example use:
+  $script_mul_tables = `
+    $lookup->DATA
+
+    4 3 OP::MUL_4BT // -> 12
+    9 OP::MUL_4BT // -> 108
+
+    $lookup->CLEANUP
+  `;
+
+  // Can replace the offsets lookup table with OP::MUL16
+  OP::MUL16 = `OP_DUP OP_ADD`*4; // each `DUP ADD` doubles
+  $mlookup = tables [ "products": flatten(fillArray(16, |$a| fillArray(16, |$b| $a*$b))) ];
+  OP::MUL_4BM = `OP::MUL16 OP_ADD $mlookup->products`;
+  $m_mul_cost = len(OP::MUL_4BM); // 15 WU -- same as the previous $t_mul_cost, but without the 46 WU offsets table
+
+  env::pretty()
+}

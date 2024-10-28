@@ -1,0 +1,123 @@
+//
+// CTV Congestion Control
+//
+// See https://utxos.org/uses/scaling/ for an overview. From the link:
+//
+// When there is a high demand for blockspace it becomes very expensive to make transactions.
+// By using OP_CTV, a large volume payment processor may aggregate all their payments
+// into a single O(1) transaction for purposes of confirmation. Then, some time later, the
+// payments can be expanded out of that UTXO when the demand for blockspace is decreased.
+
+
+//
+// Tree Setup & Funding
+//
+
+// Split up the flat list of $payments into a CTV transaction tree
+fn ctvPayTree($payments, $tx_fee) {
+  if len($payments) == 1 {
+    // A final leaf node. Represents a payment output to a recipient's scriptPubKey
+    [ "script": $payments.0.0, "amount": $payments.0.1 ]
+  } else {
+    // A branch node. Represents a CTV output that expands into a transaction with 2 outputs,
+    // where each output can either be another CTV expansion branch or a final leaf payment.
+    $left_size = len($payments) / 2;
+    $right_size = len($payments) - $left_size;
+    $left = ctvPayTree(slice($payments, 0, $left_size), $tx_fee);
+    $right = ctvPayTree(slice($payments, $left_size, $right_size), $tx_fee);
+    // Uses a radix of 2 to keep the example simpler, 4-5 for would be more optimal.
+
+    // ctv::hash() adds a default tx input (spending 000000...:0) when there are no inputs. The prevout txid:vout
+    // doesn't affect the CTV hash, and will get updated later once the outpoint funding the tree root is known.
+    $tx = tx [
+      "outputs": [
+        $left->script: $left->amount,
+        $right->script: $right->amount,
+      ]
+    ];
+
+    [ "script": `ctv::hash($tx) OP_CTV`,
+      "amount": $left->amount + $right->amount + $tx_fee, // fee added
+      "tx": $tx, "left": $left, "right": $right ]
+  }
+}
+
+// Construct the tree
+$tree = ctvPayTree([
+  tb1qrs85zz939tsf3nd3wsmjk3ye68zyfk4lxlkhmn: 0.1 BTC,
+  tb1qv6rm00j52pvjqwv5dd2un9d6vfnqdp0m8fx8vx: 0.2 BTC,
+  2MuSM1zTT3AUawArKp1MAc9KjpwTEsLZA75: 0.3 BTC,
+  tb1qqlzzgn3x5xnuhmz7e7xen8l8sll9h9lnf43ekl: 0.4 BTC,
+  2Mxo1dGnHBPZjR9Gone5fyxnMSn7qJcaizt: 0.5 BTC,
+], 200 sat);
+
+// The total funding amount needed, including transaction fees for the entire tree
+$total_amount = $tree->amount;
+
+// $tree->script can be paid to directly as a bare scriptPubKey, however wrapping in P2WSH makes
+// it easier to fund it from a wallet. The rest of the tree expansion will use bare scriptPubKeys.
+$tree_address = address(wsh($tree->script));
+
+// The outpoint funding the tree's address/scriptPubKey, used as the initial input for expanding the tree.
+// Could specify just the txid:vout if bare scriptPubKey was used. For P2WSH, the witnessScript needs to be provided too.
+// $init_input = 0808943750af3eeac3cc0d5e74823a3f3bec154af98579fd1c1344b40181d00f:0;
+$init_input = [ "prevout": 0808943750af3eeac3cc0d5e74823a3f3bec154af98579fd1c1344b40181d00f:0, "witness": [ $tree->script ] ];
+
+
+//
+// Tree Expansion
+//
+
+// With the $init_input funding outpoint known, we can finalize the tree with the actual outpoints descending from $init_input.
+// Returned as a flat list of nodes, each with the `path` leading to it, its final `outpoint` and the updated transaction.
+fn finalizeNodes($node, $outpoint, $path=[]) {
+  $node = $node + [ "outpoint": $outpoint, "path": $path ];
+  if $node->tx? {
+    // Update the transaction input to spend the $outpoint, keeping other transactions fields as they were
+    $tx = tx [ "input": $outpoint, "outputs": $node->tx->outputs, "version": $node->tx->version, "locktime": $node->tx->locktime ];
+    $node = update($node, [ "tx": $tx ]);
+    $left_flat = finalizeNodes($node->left, txid($tx):0, $path+[0]);
+    $right_flat = finalizeNodes($node->right, txid($tx):1, $path+[1]);
+    [ remove($node, [ "left", "right" ]) ] + $left_flat + $right_flat
+  } else {
+    [ $node ]
+  }
+}
+
+// Finalize the $tree to descent from the $init_input
+$tree_nodes = finalizeNodes($tree, $init_input);
+
+// The full set of transactions needed to fully expand the tree
+$tree_txs_hex = filterMap($tree_nodes, |$n| if $n->tx? then hex($n->tx) else filterMap::skip); 
+
+//
+// Recipient's PoV
+//
+
+// Get the chain of transactions leading up to the $destination:$amount payment
+fn findPayRoute($tree_nodes, [$destination, $amount]) {
+  // Find the node paying $amount to the $destination
+  $pay_node = find($tree_nodes, |$n| $n->script == $destination && $n->amount == $amount);
+  $pay_node != null || throw("Payment not found");
+
+  // Find all nodes leading up to the payment, excluding the payment node itself
+  $route = filter($tree_nodes, |$n| startsWith($pay_node->path, $n->path) && $n != $pay_node);
+
+  // Returns a tuple with the expansion transactions and the final outpoint funding $destination:$amount
+  [ map($route, |$n| $n->tx), $pay_node->outpoint ]
+}
+
+// The subset of transactions a recipient cares about to get their coins at $final_outpoint.
+// This can also serve as a proof of payment inclusion.
+[$pay_route_txs, $final_outpoint] = findPayRoute($tree_nodes, tb1qqlzzgn3x5xnuhmz7e7xen8l8sll9h9lnf43ekl:0.4 BTC);
+
+// If $init_input was updated to an outpoint funding $tree_address with $tree->amount (1.500008 BTC),
+// it should be possible to broadcast these transactions in order:
+$pay_route_hex = map($pay_route_txs, hex);
+
+// The last transaction in the chain includes the recipient's $final_outpoint
+assert::eq(txid(last($pay_route_txs)), $final_outpoint.0);
+assert::eq(last($pay_route_txs)->outputs.($final_outpoint.1)->script_pubkey, tb1qqlzzgn3x5xnuhmz7e7xen8l8sll9h9lnf43ekl->script_pubkey);
+assert::eq(last($pay_route_txs)->outputs.($final_outpoint.1)->amount, 0.4 BTC);
+
+env::pretty()

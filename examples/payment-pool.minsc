@@ -1,0 +1,316 @@
+//
+// A simple payment pool for shared UTXO ownership, with unilateral exit guaranteed by an N-of-N multisig & pre-signing
+//
+// The pool enables its members to send/receive on-chain payments from/to the shared UTXO, after exchanging
+// signatures that guarantee everyone's ability to exit unilaterally from the new pool UTXO created by the payment.
+//
+// This implementation uses pre-signing and does not require covenants, but does require interactivity for each payment.
+// A revocation mechanism could enable off-chain payments between members, but this is not implemented here.
+
+// Note: to keep things simpler and focus on the core ideas of UTXO co-ownership, transactions are created with 0 fees.
+// This can be tested on regtest with `-minrelaytxfee=0`. On mainnet, zero-fee package relay (via 1P1C/TRUC) could allow
+// to CPFP them, however using this today would be more practical with transactions that pay at least the minimum relay fee.
+
+fn Pool($users, $outpoint) {
+  $descriptor = tr(and(map($users, |[$pk, _]| $pk))); // Taproot N-of-N multisig
+  $pool_amount = sum(map($users, |[_, $balance]| $balance));
+  $pool_input = [ "prevout": $outpoint, "utxo": $descriptor:$pool_amount ];
+
+  // Close the pool, returning everyone's bitcoins to their address
+  fn close() = psbt [
+    "input": $pool_input,
+    "outputs": map($users, |[$pk, $balance]| tr($pk): $balance),
+  ];
+
+  // Give $user_pk their balance, send the rest to a new pool without them
+  fn exit($user_pk) {
+    if len($users) <= 2 {
+      // Close the pool entirely if only a single member remains once $user_pk exits
+      [ "psbt": close() ]
+    } else {
+      // Exiting is a special case of send() - we send the user's entire balance to the user's address
+      send($user_pk, tr($user_pk), $users->{$user_pk})
+    }
+  }
+
+  // An on-chain payment deducted from the $sender_pk balance
+  fn send($sender_pk, $to_address, $amount) {
+    assert($users->{$sender_pk} >= $amount);
+    $new_balances = update($users, [
+      $sender_pk: $users->{$sender_pk} - $amount
+    ]) | filter(|[_, $balance]| $balance > 0);
+
+    // The $sender_pk could've been removed if they used up their entire balance
+    $remaining_pks = map($new_balances, |[$pk, _]| $pk);
+
+    // Send change to a multisig between all (remaining) pool members.
+    // If there's only one remaining member, change will be sent to a '1-of-1' with their pk as the Taproot internal key.
+    $change_desc = tr(and($remaining_pks));
+
+    $psbt = psbt [
+      "input": $pool_input,
+      "outputs": [
+        $to_address: $amount,
+        $change_desc: $pool_amount - $amount,
+      ]
+    ];
+
+    // The new pool that will be created by this payment's change output
+    $new_pool = Pool($new_balances, txid($psbt):1);
+    [ "psbt": $psbt, "new_pool": $new_pool ]
+  }
+
+  // Prepare a payment request to be sent to the other pool members for approval
+  fn request_send($sender_sk, $to_address, $amount) {
+    $send = send(pubkey($sender_sk), $to_address, $amount);
+    $req = [
+      // Provide the payment details necessary to reconstruct the PSBT and new Pool state
+      "sender": pubkey($sender_sk),
+      "to_address": $to_address,
+      "amount": $amount,
+      // Provide our signatures for the new exit tree transactions
+      // This indirectly signs over the payment address and amount too
+      "exit_sigs": $send->new_pool->presign_exits($sender_sk),
+    ];
+    [ $send, $req ]
+  }
+
+  // Verify the payment request and the exit tree signatures provided with it, and return our signatures
+  fn approve_send($approver_sk, $req) {
+    // Reconstruct the send transaction PSBT, new Pool state and exit transactions on our own
+    // (we don't trust the sender to do this for us) and verify the sender's signatures against them
+    $send = send($req->sender, $req->to_address, $req->amount);
+    $send->new_pool->check_exit_sigs($req->sender, $req->exit_sigs) || throw("Invalid exit signatures");
+
+    $exit_sigs = $send->new_pool->presign_exits($approver_sk);
+    $send_psbt_signed = psbt::sign($send->psbt, $approver_sk);
+
+    // The $exit_sigs are exchanged immediately, but we don't share $send_psbt_signed until we get everyone else's $exit_sigs
+    [ $exit_sigs, $send_psbt_signed ]
+  }
+
+  // Pre-sign all exit transactions that require signing by the $sk, returned as a map from the exit path to the signature
+  fn presign_exits($sk) = map(requires_presign_by(pubkey($sk)), |$exit|
+    $exit->exit_path: psbt::sign($exit->psbt, $sk)->input.0->tap_script_sigs.0.1
+  );
+
+  // Need to pre-sign everyone else's exit transactions, but not the member's own -- the right to execute them
+  // is reserved to the member. Also, we don't (can't) sign paths where we already exited the pool's membership.
+  // For a pool with A, B and C the following 4 exit paths would have to be pre-signed by B: A, C, A->C, C->A
+  fn requires_presign_by($pk) = filter(all_exit_paths(), |$exit| !contains($exit->exit_path, $pk));
+
+  // Verify $pk's exit tree signatures are valid for the current pool state
+  fn check_exit_sigs($pk, $signatures) = every(requires_presign_by($pk), |$exit| {
+    $sighash = psbt::sighash($exit->psbt, 0, $exit->psbt->inputs.0->tap_scripts.0.1.0);
+    schnorr::verify($pk, $sighash, $signatures->{$exit->exit_path})
+  });
+
+  // Retrieve all possible exit paths for all members as a flat array of exits,
+  // each with the fields 'exit_path', 'psbt' and (if the pool hasn't ended) the 'new_pool'
+  //
+  // For a pool with A, B and C there are a total of 9 possible exit paths: A, B, C, A->B, A->C, B->A, B->C, C->A and C->B
+  // Because the second exit forces the third, some exit paths share the same transactions,
+  // resulting in a total of 6 unique exit transactions: A, A->B+C, B, B->A+C, C and C->A+B.
+  fn all_exit_paths($exited_path=[]) = flatMap($users, |[$pk, _]| {
+    $exit_path = $exited_path + [$pk];
+    $exit = exit($pk) + [ "exit_path": $exit_path ];
+    $new_pool_exits = if $exit->new_pool? then $exit->new_pool->all_exit_paths($exit_path) else [];
+    [ $exit ] + $new_pool_exits
+  });
+
+  // Get the finalized PSBT for unilaterally exiting the pool
+  fn unilateral_exit($sk, $exit_sigs) {
+    $exit = exit(pubkey($sk));
+    $exit_path = [pubkey($sk)];
+    $tap_leaf = $exit->psbt->inputs.0->tap_scripts.0.1.0; // there's only one
+
+    // Add pre-exchanged signatures given by the other members
+    $exit_path_sigs = filterMap($exit_sigs, |[$signer_pk, $signer_sigs]|
+      if $signer_sigs->{$exit_path}? then [$signer_pk, $tap_leaf]: $signer_sigs->{$exit_path}
+      else filterMap::skip);
+    $psbt = psbt::update($exit->psbt, [
+      "inputs": [ 0: [ "tap_script_sigs": $exit_path_sigs ] ]
+    ]);
+
+    // Make the final signature by the member's own key, then finalize
+    psbt::finalize(psbt::sign($psbt, $sk))
+  }
+
+  // Transition the pool and exit signatures to reflect `$exited_pk` exiting the pool
+	fn exit_transition($exited_pk, $exit_sigs) = [
+    // New Pool with updated balances and outpoint (the exit's change)
+    exit($exited_pk)->new_pool,
+
+    // Only keep relevant signatures for the exit paths that follow $exited_pk's exit,
+    // and chop $exited_pk off the start of the path
+    map($exit_sigs, |[$signer_pk, $signer_sigs]|
+   	 $signer_pk: filterMap($signer_sigs, |[$exit_path, $sig]|
+   	   if $exit_path.0 == $exited_pk then tail($exit_path): $sig
+   	   else filterMap::skip
+   	 )
+  	)
+  ];
+
+  // Receive an incoming payment, merged into the shared pool UTXO
+  fn receive($receiver_pk, $amount, $payer_inputs, $payer_change_outputs) {
+    $new_balances = update($users, [
+      $receiver_pk: $users->{$receiver_pk} + $amount
+    ]);
+
+    // Requires pre-exchanging the payer's inputs/outputs for the payment, so that
+    // the new pool exit transactions may be signed over prior to receiving the payment
+    $psbt = psbt [
+      "inputs":  [ $pool_input ] + $payer_inputs,
+      "outputs": [ $descriptor: $pool_amount + $amount ] + $payer_change_outputs,
+    ];
+
+    // The new pool that will be created by this incoming payment
+    $new_pool = Pool($new_balances, txid($psbt):0);
+    [ "psbt": $psbt, "new_pool": $new_pool ]
+  }
+
+  // Pool API
+  [ "amount": $pool_amount, "users": $users, "descriptor": $descriptor,
+    "close": close, "exit": exit, "send": send, "receive": receive,
+    "request_send": request_send, "approve_send": approve_send,
+    "unilateral_exit": unilateral_exit, "exit_transition": exit_transition,
+    "presign_exits": presign_exits, "check_exit_sigs": check_exit_sigs,
+    "all_exit_paths": all_exit_paths,
+  ]
+}
+
+ 
+//
+// Pool Setup & Initial Funding
+//
+
+$alice_sk = tprv8ZgxMBicQKsPeYhpp2MBqGBnyj7vXpcdWCwAgRcVbikG5qtcexfwxjNSLKjWGJMCyxBdznejsBgcxMsvKkX7HKJHN25vUPN2szNSc9v7dEp;
+$bob_sk = tprv8ZgxMBicQKsPdq39mgAAVuWXXrZ4ugiLRzEHLQgd66oWb6TKuUcc7ArvxA8R29Cp65WwChKFq1ELbjCTucZvoe3qn1VjBmGWkiHFq3Fmfiu;
+$charlie_sk = tprv8ZgxMBicQKsPdDn2hsPujGzeCU8hLwRTX2zp7TFA4RE42zJ3ExWNoCTsQXC2BHVGgEfCdZP9YoV3XHDuDhzCPuw29i74osGgYRxLZ6jfUuh;
+$alice = pubkey($alice_sk), $bob = pubkey($bob_sk), $charlie = pubkey($charlie_sk);
+
+$pool_address = address(tr($alice && $bob && $charlie), regtest);
+
+// The pool members create a PSBT to co-fund the $pool_address (each contributing their initial share), but
+// *don't* sign it yet. With it they can derive the funding PSBT txid:vout and use it to construct the Pool:
+$pool_s1 = Pool([
+  $alice: 5000 sat,
+  $bob: 10000 sat,
+  $charlie: 20000 sat,
+], 409e7033a310b6728755acc454172f6f5d4f5dac9da67c5d833088cb3f0a889c:0);
+
+assert::eq($pool_s1->amount, 35000 sat);
+assert::eq($pool_address, address($pool_s1->descriptor, regtest));
+
+// The pool members sign and exchange each other's exit signatures for the initial pool state
+$pool_s1_exit_sigs = [
+  $alice: $pool_s1->presign_exits($alice_sk),
+  $bob: $pool_s1->presign_exits($bob_sk),
+  $charlie: $pool_s1->presign_exits($charlie_sk),
+];
+assert($pool_s1->check_exit_sigs($alice, $pool_s1_exit_sigs->{$alice}));
+assert($pool_s1->check_exit_sigs($bob, $pool_s1_exit_sigs->{$bob}));
+assert($pool_s1->check_exit_sigs($charlie, $pool_s1_exit_sigs->{$charlie}));
+
+// Once all the pre-signed exits are verified, the members sign the funding PSBT and broadcast it to create the pool.
+
+// To run the example transactions below, you can make a simple payment to fund $pool_address with 35k sats (0.00035 BTC),
+// and change 409e703..:0 in the Pool() construction above with your funding transaction txid:vout.
+
+
+//
+// Sending Payments
+//
+
+// Alice prepares a payment request to send to the other pool members for approval,
+// which includes Alice's signatures over the new exit tree transactions
+[$send, $send_req] = $pool_s1->request_send($alice_sk, bcrt1qnu8l8ue9vaky4l60cmudfltgh5a07s0d2ehyq8, 400 sat);
+
+// The other members verify the request and provide their own exit tree signatures (but *not* the signed payment PSBT, yet)
+[$send_bob_exit_sigs, $send_bob_psbt] = $pool_s1->approve_send($bob_sk, $send_req);
+[$send_charlie_exit_sigs, $send_charlie_psbt] = $pool_s1->approve_send($charlie_sk, $send_req);
+
+// Every member verifies everyone else's signatures over the exit tree transactions
+assert($send->new_pool->check_exit_sigs($alice, $send_req->exit_sigs));
+assert($send->new_pool->check_exit_sigs($bob, $send_bob_exit_sigs));
+assert($send->new_pool->check_exit_sigs($charlie, $send_charlie_exit_sigs));
+
+// Now they can exchange the signed PSBT for Alice's payment, combine and broadcast
+$send_alice_psbt = psbt::sign($send->psbt, $alice_sk);
+$send_combined = $send_alice_psbt + $send_bob_psbt + $send_charlie_psbt;
+$send_tx = psbt::finalize_extract($send_combined);
+
+// First output is Alice's payment, second output sends change back to the pool's 3-of-3
+assert::eq($send_tx->output.0->amount, 400 sat);
+assert::eq($send_tx->output.0->script_pubkey, bcrt1qnu8l8ue9vaky4l60cmudfltgh5a07s0d2ehyq8->script_pubkey);
+assert::eq($send_tx->output.1->amount, $pool_s1->amount - 400 sat);
+assert::eq($send_tx->output.1->script_pubkey, $pool_s1->descriptor->script_pubkey);
+assert::eq($send_tx->output.1->script_pubkey, tr($alice && $bob && $charlie)->script_pubkey);
+
+// Once it confirms the members transition into the new Pool state, keeping the latest round's exit signatures
+// (We don't care about older signatures -- can forget $pool_s1_exit_sigs once $send_tx confirms sufficiently)
+$pool_s2 = $send->new_pool; // each party should reconstruct the send->new_pool themselves, as done in approve_send()
+$pool_s2_exit_sigs = [ $alice: $send_req->exit_sigs, $bob: $send_bob_exit_sigs, $charlie: $send_charlie_exit_sigs ];
+
+assert::eq($pool_s2->users, [ $alice: 4600, $bob: 10000, $charlie: 20000 ]);
+assert::eq($pool_s2->amount, 34600);
+assert::eq($pool_s2->amount, $send_tx->output.1->amount);
+
+
+//
+// Exiting Unilaterally
+//
+
+// Charlie exits using the others' pre-signed exit signatures, plus a fresh signature by their key
+$charlie_exit_tx = psbt::extract($pool_s2->unilateral_exit($charlie_sk, $pool_s2_exit_sigs));
+
+// First output is Charlie's exit, second output sends change to a 2-of-2 between the remaining pool members
+assert::eq($charlie_exit_tx->output.0->amount, 20000 sat);
+assert::eq($charlie_exit_tx->output.0->script_pubkey, tr($charlie)->script_pubkey);
+assert::eq($charlie_exit_tx->output.1->amount, $pool_s2->amount - 20000 sat);
+assert::eq($charlie_exit_tx->output.1->script_pubkey, tr($alice && $bob)->script_pubkey);
+
+// Once it confirms, the remaining members notice it and transition into the new pool state
+[$pool_s3, $pool_s3_exit_sigs] = $pool_s2->exit_transition($charlie, $pool_s2_exit_sigs);
+
+assert::eq($pool_s3->users, [ $alice: 4600, $bob: 10000 ]);
+assert::eq($pool_s3->descriptor, tr($alice && $bob));
+assert::eq($pool_s3->amount, $charlie_exit_tx->output.1->amount);
+assert::eq($pool_s3->descriptor->script_pubkey, $charlie_exit_tx->output.1->script_pubkey);
+    
+// Alice exits too
+$alice_exit_tx = psbt::extract($pool_s3->unilateral_exit($alice_sk, $pool_s3_exit_sigs));
+
+// First output is Alice's exit
+assert::eq($alice_exit_tx->output.0->amount, 4600 sat);
+assert::eq($alice_exit_tx->output.0->script_pubkey, tr($alice)->script_pubkey);
+assert::eq($alice_exit_tx->output.1->amount, 10000 sat);
+// What remains is Bob's balance, sent directly to Bob's address
+assert::eq($alice_exit_tx->output.1->script_pubkey, tr($bob)->script_pubkey);
+
+// The pool is now closed.
+
+
+// main() function to control display output, remove/rename it to see full values for all defined variables
+fn main() = [
+  "pool_address": $pool_address,
+  "pool_s1": $pool_s1,
+  
+  // If you fund $pool_s1_address with 35,000 sats and update the outpoint in the Pool() construction,
+  // you should be able to broadcast the following three transactions in order:
+  "alice_send_tx_hex": hex($send_tx),
+  "charlie_exit_tx_hex": hex($charlie_exit_tx),
+  "alice_exit_tx_hex": hex($alice_exit_tx),
+  
+  //"pool_s1_exit_sigs": $pool_s1_exit_sigs,
+  //"alice_send_tx": $send_tx,
+  //"charlie_exit_tx": $charlie_exit_tx,
+  //"alice_exit_tx": $alice_exit_tx,
+];
+
+// Receiving not fully demonstrated here, but the process is:
+// 1. The payer first shares the inputs and change outputs they intend to use for the payment (without signing them).
+// 2. `receive()` creates the incoming payment PSBT, spending the pool UTXO alongside the payer's inputs to create a new pool UTXO with updated balances.
+// 3. The members exchange their exit signatures, then sign the incoming payment PSBT.
+// 4. The PSBT is returned to the payer, who adds their signatures and broadcasts the transaction.
+// 5. The members wait for the transaction to confirm and transition into the new state.

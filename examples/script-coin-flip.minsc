@@ -1,0 +1,206 @@
+// Fair coin flip betting
+//
+// Based on @RobinLinus's https://github.com/coins/bitcoin-scripts/blob/master/betcoins.md
+
+// This script implements a fair coin flip betting mechanism using a commit-reveal scheme. The typical approach — concatenating a nonce
+// with the committed value — requires features not available in Script (OP_CAT/OP_SUBSTR). Instead, we can use the *length* of the preimage
+// to represent a committed bit: 16 bytes for bit 1, or 17 bytes for bit 0.
+//
+// Each player generates a random nonce of 16/17 bytes to commit to their bit choice, and exchanges the hashed nonce commitments.
+// The script then checks the nonce preimage lengths (revealed in the witness) to determine the winner and hand them control over the coins.
+
+// Example redeem transactions on Testnet4:
+//
+// Implementation #1: https://mempool.space/testnet4/tx/a7ba50e0e6c97eacc66e2a2ac8a43a4e42a831b13dc8cb6424e470348bdfaaf1
+// Implementation #2: https://mempool.space/testnet4/tx/c62c3c4c40feb1850f17ccbd33693c26d3ce83910c5a3fe5c058f30ecec8c6e7
+
+
+//
+// Implementation #1 - with no withholding attack prevention
+//
+
+// Make a random bit commitment
+fn commitment() {
+  $preimage = rand::bytes(if rand::f64() < 0.5 then 16 else 17);
+  [ $preimage, hash::sha256($preimage) ]
+}
+
+// Reveal a single bit committed to by $commit
+// stack in: <$commit's preimage>, stack out: <0/1>
+fn reveal($commit) = `
+  // Verify $commit == sha256(preimage)
+  OP_DUP OP_SHA256 $commit OP_EQUALVERIFY
+  // Get the preimage's length, drop the preimage
+  OP_SIZE OP_SWAP OP_DROP
+  // Leave 0/1 on the stack based on the length (expected to be 16/17)
+  16 OP_EQUAL
+`;
+
+// Reveal two committed bits and use them for a fair coin flip
+// stack in: <preimage2> <preimage1>, stack out: <0/1>
+fn coinflip($commit1, $commit2) = `
+  reveal($commit1) OP_SWAP
+  reveal($commit2)
+  OP_EQUAL // XNOR the 2 bits to produce 1 'fair bit'
+`;
+
+// Coin flip outcome logic implemented in Minsc, to check who won outside of Script
+fn coinflip::outcome($preimage1, $preimage2) =
+  if (len($preimage1) == 16) == (len($preimage2) == 16) then 1 else 0;
+
+// Execute the coin flip, giving control to $pk1 if the outcome is 1 or to $pk2 if it's 0
+// stack in (witness): <winner's signature> <preimage2> <preimage1>, stack out: TRUE or fail
+fn bet($commit1, $commit2, $pk1, $pk2) = `
+  coinflip($commit1, $commit2)
+  // stack: <winner's signature> <coinflip 0/1>
+  OP_IF $pk1 OP_ELSE $pk2 OP_ENDIF
+  OP_CHECKSIG
+`;
+
+// -- Setup & Commitment --
+
+// Player1 and Player2 each has a pair of keys
+$sk1 = tprv8ZgxMBicQKsPdt2nRMPaBVd6W6gubcDmQGu4WeHtJ12kBmHCBJgFJ7XiSqskHcY37L5S7t8cwHXpXpftWfmvHTTxsLSu2vE2bAG5QAvsaQd;
+$sk2 = tprv8ZgxMBicQKsPejwxWXdrBc1Ppkyf7fZkSFiWnLiBxEu66fCmBd8PUM1v8FWBAq5vby5GVAUSuuNxbJPRjssqmbqEL5UcFFgxL62n6s7JUd9;
+$pk1 = pubkey($sk1), $pk2 = pubkey($sk2);
+
+// Each prepares a bit commitment (${preimage1,commit}1 are Player1's, ${preimage,commit}2 are Player2's)
+$preimage1 = 0xadae0d279ff552deccb16ba94b6bd72b, $commit1 = hash::sha256($preimage1); // bit 1 (16 bytes long)
+$preimage2 = 0x9d053dfefcdb4ccb96276607a322f61301, $commit2 = hash::sha256($preimage2); // bit 0 (17 bytes long)
+// Commitments are hardcoded for the example, normally picked at random with commitment():
+// [$preimage1, $commit1] = commitment();
+// [$preimage2, $commit2] = commitment();
+
+
+// They share $pk{1,2} and $commit{1,2} with each other (but not the preimages),
+// and can use it to construct the script and address:
+$script = bet($commit1, $commit2, $pk1, $pk2);
+$address = address(wsh($script), regtest);
+
+// -- Funding --
+
+// The total amount to be deposited by both players (0.25 BTC each)
+$total_amount = 0.5 BTC;
+
+// ANYONECANPAY and PSBT can be used to ensure each player contributes their part atomically, without the risk of 'going first'.
+// For the example we assume this is the funding outpoint:
+$outpoint = 0xe625c2f73128955bef47c3a44148bc4fa1e8bb91536a322ff7dea8b09db0f061:0;
+
+// -- Reveal --
+
+// Once the deposit transaction confirms, they can reveal the preimages to each other
+// and check who won (1 means Player1 is the winner, 0 means it's Player2)
+$outcome = coinflip::outcome($preimage1, $preimage2);
+
+// -- Redeem --
+
+// The winner can construct the redeem transaction, sending their prize to an address of their choosing
+fn redeem_to($winner_addr) = psbt[
+  "input": [
+    "prevout": $outpoint,
+    "utxo": wsh($script):$total_amount,
+    "bip32_derivation": [ $pk1, $pk2 ],
+  ],
+  "output": $winner_addr: $total_amount - 200 sat,
+];
+
+// Create the redeem transaction and sign it with the winner's key
+$redeem = if $outcome == 1 {
+  // Player1 won the coin flip
+  psbt::sign(redeem_to(2MubHP5weTEwq5XsSiWTuMFZjgSgWgTeLb8), $sk1)
+} else {
+  // Player2 won the coin flip
+  psbt::sign(redeem_to(bcrt1qnu8l8ue9vaky4l60cmudfltgh5a07s0d2ehyq8), $sk2)
+};
+
+// Finalize the input witness with the 2 preimages and the winner's signature
+$redeem_final = psbt::finalize_witness($redeem, [
+  0: [ $redeem->inputs.0->partial_sigs.0.1, $preimage2, $preimage1, $script ]
+]);
+
+$redeem_tx = psbt::extract_raw($redeem_final);
+// $redeem_tx_hex = hex($redeem_tx);
+
+// Redeem script with witness stack elements (excluding the P2WSH witnessScript),
+// can be used to debug through script execution using e.g. https://ide.scriptwiz.app/
+//$script_with_witness = `slice($redeem_tx->inputs.0->witness, 0, 3) $script`;
+
+
+//
+// Implementation #2 - with a security deposit to disincentivize withholding attacks
+//
+
+// To prevent players from withholding their nonce preimages and delaying the bet resolution indefinitely,
+// we can return part of the deposited coins to the loser, giving them something to lose by not cooperating.
+//
+// Forcing the winner to return the security deposit to the loser (rather than gaining unconditional control as in the previous example)
+// can be achieved by exchanging pre-signed transactions for each possible outcome. To prevent the signatures from being misused,
+// Taproot is used with a separate script leaf for each outcome which ensures signatures are only valid within the intended leaf.
+//
+// More advanced pre-signing constructs can eliminate withholding attacks entirely, rather than just disincentivizing them (see betcoins.md).
+
+
+// A script leaf for the $winner_outcome. Unlike the previous bet(), here we require a signature by both
+// keys and not only the winner's, and verify that the bet's outcome matches the expected $winner_outcome.
+// stack in: <signature pk2> <signature pk1> <preimage2> <preimage1>, stack out: TRUE or fail
+fn bet::leaf($commit1, $commit2, $winner_outcome, $pk1, $pk2) = `
+  coinflip($commit1, $commit2)
+  $winner_outcome OP_EQUALVERIFY
+  xonly($pk1) OP_CHECKSIGVERIFY
+  xonly($pk2) OP_CHECKSIG
+`;
+
+// A Taproot tree for the two possible outcomes (uses NUMS as the internal key by default)
+fn bet::tap($commit1, $commit2, $pk1, $pk2) = tr[
+  bet::leaf($commit1, $commit2, 1, $pk1, $pk2), // Player1 wins
+  bet::leaf($commit1, $commit2, 0, $pk1, $pk2), // Player2 wins
+];
+
+// Some alternatives:
+// - Can use different pubkeys for each outcome in place of separate Taproot leaves (more WU)
+// - Can use OP_CODESEPARATOR in place of separate Taproot leaves (less WU), but rust-bitcoin's PSBT signing doesn't support it
+// - Can use OP_CHECKTEMPLATEVERIFY in place of pre-signing (least WU), but we want it to work today :)
+
+
+// -- Setup --
+
+// The security deposit amount returned to the loser (deducted from the $total_amount)
+$security_deposit = 0.1 BTC;
+
+// Reuses the same commitments/keys from the previous example
+$tap = bet::tap($commit1, $commit2, $pk1, $pk2);
+$tap_addr = address($tap, regtest);
+
+// Player1 pre-signs the winning transaction for Player2, with a sighash bound to Player2's winning script leaf
+$p2_wins_leaf = bet::leaf($commit1, $commit2, 0, $pk1, $pk2);
+$p2_wins_psbt = psbt[
+  "input": [ "prevout": $outpoint, "utxo": $tap:$total_amount ],
+  // $security_deposit returned to loser $pk1, the rest sent to winner $pk2
+  "output": tr($pk2): $total_amount - $security_deposit - 300 sat,
+  "output": tr($pk1): $security_deposit,
+];
+$p2_wins_p1_sig = schnorr::sign($sk1, psbt::sighash($p2_wins_psbt, 0, $p2_wins_leaf));
+// (Player2 does the same in reverse -- skipped here for brevity)
+
+// -- Funding --
+// The players deposit into the address *only after* the pre-signed transactions are exchanged
+
+// -- Redeem --
+// If Player2 wins (the case with the hardcoded commitments), they can add their signature and finalize the transaction
+$p2_wins_p2_sig = schnorr::sign($sk2, psbt::sighash($p2_wins_psbt, 0, $p2_wins_leaf));
+$p2_wins_tx = psbt::finalize_witness($p2_wins_psbt, [
+  0: tr::script_witness($tap, $p2_wins_leaf, [ $p2_wins_p2_sig, $p2_wins_p1_sig, $preimage2, $preimage1 ])
+]) | psbt::extract_raw();
+// $p2_wins_hex = hex($p2_wins_tx);
+
+// To debug script execution with witness elements:
+// $tap_script_with_witness = `slice($p2_wins_tx->input.0->witness, 0, 4) $p2_wins_leaf`;
+
+
+//
+// Implementation #3 - with a forced reveal (or lose) mechanism
+//
+// See https://github.com/coins/bitcoin-scripts/blob/master/betcoins.md#solution-without-collateral
+// TODO, left as an exercise to the reader for now. :)
+
+env::pretty()
