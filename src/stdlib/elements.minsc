@@ -52,11 +52,10 @@ fn checkOutput($vout, $asset_id, $amount, $spk_tup) = `
   checkOutputSpk($vout, $spk_tup)
 `;
 
-fn checkOutputSpk($vout, $spk_tup) = `
-  // $spk_tup is a tuple of the witness version and program
+fn checkOutputSpk($vout, [ $witness_version, $witness_prog ]) = `
   $vout OP_INSPECTOUTPUTSCRIPTPUBKEY
-  $spk_tup.0 OP_EQUALVERIFY
-  $spk_tup.1 OP_EQUALVERIFY
+  $witness_version OP_EQUALVERIFY
+  $witness_prog OP_EQUALVERIFY
 `;
 
 fn checkSameAsset($vin, $vout) = `

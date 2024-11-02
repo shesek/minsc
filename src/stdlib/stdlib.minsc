@@ -30,8 +30,8 @@ fn reduce($arr, $fn) = if !isEmpty($arr) then fold(tail($arr), $arr.0, $fn) else
 fn filterMap($arr, $fn) = flatMap($arr, |$el| { $r = $fn($el); if $r != filterMap::skip then [$r] else [] });
 filterMap::skip = symbol("filterMap::skip");
 
-fn find($arr, $fn)  = foldUntil($arr, null,  |$acc, $el| if $fn($el)  then true:$el  else false:null);
-fn some($arr, $fn)  = foldUntil($arr, false, |$acc, $el| if $fn($el)  then true:true else false:false);
+fn find($arr, $fn) = foldUntil($arr, null,  |$acc, $el| if $fn($el) then true:$el  else false:null);
+fn some($arr, $fn) = foldUntil($arr, false, |$acc, $el| if $fn($el) then true:true else false:false);
 fn every($arr, $fn) = !some($arr, |$el| !$fn($el));
 
 fn contains($arr, $needle) = some($arr, |$el| $el == $needle);
@@ -59,9 +59,8 @@ fn join($strs, $sep) =
   else if len($strs) == 1 then $strs.0
   else concat([ $strs.0 ] + map(tail($strs), |$str| $sep + $str));
 
-// Array tag extraction with multiple values (`$tagged->$tag` can be used for a single value)
-fn t::multi($tagged, $tag) = $tagged | filter(|$kv| $kv.0 == $tag) | map(|$kv| $kv.1);
-
+// Array tag extraction with multiple values (`$tagged->tag` can be used for a single value)
+fn t::multi($tagged, $tag) = $tagged | filter(|[$k, _]| $k == $tag) | map(|[_, $v]| $v);
 
 //
 // Dev utilities
@@ -73,11 +72,10 @@ fn assert::eq($a, $b) = ($a == $b) || throw("Not equal: "+$a+" != "+$b+"");
 fn assert::msg($bool, $msg) = $bool || throw($msg);
 
 // Scope inspection
-dyn fn env::pretty() = env() | map(|$kv| $kv.0+" = "+pretty($kv.1)+" // "+typeof($kv.1)) | join("\n\n")| symbol();
-dyn fn env::repr() = env() | filter(|$kv| !isFunction($kv.1)) | map(|$kv| $kv.0+" = "+repr($kv.1)+"; // "+typeof($kv.1)) | join("\n\n") | symbol();
-dyn fn env::debug() = env() | map(|$kv| $kv.0+" = "+_debug_nonfn($kv.1)) | join("\n\n") | symbol();
+dyn fn env::pretty() = env() | map(|[$k:$v]| $k+" = "+pretty($v)+" // "+typeof($v)) | join("\n\n") | symbol();
+dyn fn env::repr() = env() | filter(|[$k:$v]| !isFunction($v)) | map(|[$k:$v]| $k+" = "+repr($v)+"; // "+typeof($v)) | join("\n\n") | symbol();
+dyn fn env::debug() = env() | map(|[$k:$v]| $k+" = "+_debug_nonfn($v)) | join("\n\n") | symbol();
 fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
-
 
 dyn fn log::env($label) = log("variables:\n----\n" + env::pretty() + "\n----");
 dyn fn log::debug_env($label) = log("variables:\n----\n" + env::debug() + "\n----");

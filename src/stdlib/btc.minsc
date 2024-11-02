@@ -63,8 +63,8 @@ fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::si
 // TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
 
 fn psbt::finalize_witness($psbt, $input_witnesses) = psbt::update($psbt, [
-  "inputs": map($input_witnesses, |$in_wit|
-    $in_wit.0: [ "final_script_witness": $in_wit.1 ]
+  "inputs": map($input_witnesses, |[ $input_index, $witness ]|
+    $input_index: [ "final_script_witness": $witness ]
   )
 ]);
 
@@ -197,7 +197,7 @@ fn nFromAlt($max_n) = `
 // ]
 fn ifelseif($clauses) = if isEmpty($clauses) then `` else `
   // Check all clauses but the last, running the first one that matches
-  map(initial($clauses), |$clause| `$clause.0 OP_IF $clause.1 OP_ELSE`)
+  map(initial($clauses), |[ $condition, $body ]| `$condition OP_IF $body OP_ELSE`)
 
   // The last clause is checked using OP_VERIFY instead of another IF..ELSE to save some bytes.
   { if last($clauses).0 != default then `last($clauses).0 OP_VERIFY` else ``}
@@ -216,7 +216,7 @@ fn match($clauses) = if isEmpty($clauses) then `` else
   ifelseif(
     // DUP the value being matched to keep it available for the next clause, while allowing condition
     // scripts to consume it (with e.g. OP_EQUAL). It will be removed before the matching script is run.
-    map(initial($clauses), |$clause| `OP_DUP $clause.0`: `OP_DROP $clause.1`)
+    map(initial($clauses), |[ $condition, $body ]| `OP_DUP $condition`: `OP_DROP $body`)
 
     // The last clause doesn't need to DUP/DROP as there are no more conditions that need the value.
     // In the case of a `default` branch, the value will remain available on stack.
@@ -225,9 +225,9 @@ fn match($clauses) = if isEmpty($clauses) then `` else
 
 // Match the item at the top of the stack for equality.
 // For example: switch[ 0: `$alice_pk OP_CHECKSIG`, 1: `<6 months> OP_CSV OP_DROP` ]
-fn switch($clauses) = match(map($clauses, |$clause| {
-  $condition = if $clause.0 != default then `$clause.0 OP_EQUAL` else default;
-  $condition: $clause.1
+fn switch($clauses) = match(map($clauses, |[ $condition, $body ]| {
+  $condition = if $condition != default then `$condition OP_EQUAL` else default;
+  $condition: $body
 }));
 
 // Pop an index number off the stack and execute the `$scripts` branch with that index.
