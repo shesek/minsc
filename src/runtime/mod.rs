@@ -3,6 +3,7 @@ use std::convert::TryInto;
 
 use crate::parser::{ast, Expr, Stmt};
 use crate::stdlib;
+pub use ast::AssignTarget;
 
 pub use crate::error::{ResultExt, RuntimeError as Error};
 pub type Result<T> = std::result::Result<T, Error>;
@@ -36,7 +37,7 @@ impl Execute for ast::Assign {
         let readonly = scope.as_readonly();
         for assignment in &self.0 {
             let value = assignment.rhs.eval(&readonly)?;
-            scope.borrow_mut().set(assignment.lhs.clone(), value)?;
+            assignment.lhs.unpack(value, &mut scope.borrow_mut())?;
         }
         Ok(())
     }
@@ -405,6 +406,31 @@ impl Evaluate for ast::Block {
         } else {
             // Return an implicit true by default. Only allowed by the grammar for Blocks representing function bodies or programs.
             Ok(true.into())
+        }
+    }
+}
+
+impl ast::AssignTarget {
+    pub fn unpack(&self, value: Value, scope: &mut Scope) -> Result<()> {
+        match self {
+            AssignTarget::Ident(ident) if ident.0 == "_" => Ok(()),
+            AssignTarget::Ident(ident) => scope.set(ident.clone(), value),
+            AssignTarget::List(targets) => {
+                let Value::Array(array) = value else {
+                    bail!(Error::UnpackArrayExpected(
+                        self.clone().into(),
+                        value.into()
+                    ));
+                };
+                ensure!(
+                    targets.len() == array.len(),
+                    Error::UnpackInvalidArrayLen(array.len(), targets.len(), self.clone().into())
+                );
+                for (target, array_el) in targets.iter().zip(array) {
+                    target.unpack(array_el, scope)?;
+                }
+                Ok(())
+            }
         }
     }
 }

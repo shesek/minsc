@@ -6,7 +6,7 @@ use miniscript::policy::compiler::CompilerError;
 use miniscript::{descriptor, TranslateErr};
 
 use crate::parser::ast::{Ident, InfixOp};
-use crate::{stdlib, PrettyDisplay, Value};
+use crate::{ast, stdlib, PrettyDisplay, Value};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -33,6 +33,12 @@ pub enum RuntimeError {
 
     #[error("Undefined variable: {0}")]
     VarNotFound(Ident),
+
+    #[error("Expected an array to unpack into {}, not {}", &.0, ValErrFmt(.1))]
+    UnpackArrayExpected(Box<ast::AssignTarget>, Box<Value>),
+
+    #[error("Expected an array of length {1} to unpack into {2}, received an array of {0}")]
+    UnpackInvalidArrayLen(usize, usize, Box<ast::AssignTarget>),
 
     #[error("Expected a function, not {}", ValErrFmt(.0))]
     NotFn(Box<Value>),
@@ -96,7 +102,7 @@ pub enum RuntimeError {
     #[error("Expected a Script (or script bytes), not {}. Perhaps you meant to use explicitScript()/scriptPubKey()", ValErrFmt(.0))]
     NotScriptLike(Box<Value>),
 
-    #[error("Expected a transaction, raw bytes or tagged list, not {}", ValErrFmt(.0))]
+    #[error("Expected a Transaction (also accepted as raw bytes, tagged list or PSBT), not {}", ValErrFmt(.0))]
     NotTxLike(Box<Value>),
 
     #[error("Expected txid bytes or tx, not {}", ValErrFmt(.0))]
@@ -452,6 +458,9 @@ impl<'a> fmt::Display for ValErrFmt<'a> {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParseError {
+    #[error("Invalid assignemnt target")]
+    InvalidAssignTarget,
+
     #[error("ParseFloatError: {0}")]
     ParseFloatError(#[from] std::num::ParseFloatError),
 

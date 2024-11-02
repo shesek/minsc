@@ -3,6 +3,8 @@ use miniscript::{bitcoin, descriptor};
 use bitcoin::address::{self, Address};
 use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
+use crate::util::fmt_list;
+
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -149,7 +151,7 @@ impl_from_variant!(ScriptFrag, Expr);
 /// An anonymous function expression
 #[derive(Debug, Clone)]
 pub struct FnExpr {
-    pub params: Vec<Ident>,
+    pub params: Vec<AssignTarget>,
     pub body: Box<Expr>,
     pub dynamic_scoping: bool,
 }
@@ -241,7 +243,7 @@ impl_from_variant!(BtcAmount, Expr);
 #[derive(Debug, Clone)]
 pub struct FnDef {
     pub ident: Ident,
-    pub params: Vec<Ident>,
+    pub params: Vec<AssignTarget>,
     pub body: Expr,
     pub dynamic_scoping: bool,
 }
@@ -254,8 +256,15 @@ impl_from_variant!(Assign, Stmt);
 
 #[derive(Debug, Clone)]
 pub struct Assignment {
-    pub lhs: Ident,
+    pub lhs: AssignTarget,
     pub rhs: Expr,
+}
+
+// Used for assignment and function parameters
+#[derive(Debug, Clone)]
+pub enum AssignTarget {
+    Ident(Ident),
+    List(Vec<AssignTarget>),
 }
 
 /// A call statement whose return value is discarded
@@ -281,6 +290,22 @@ impl Expr {
         match self {
             Expr::Ident(ident) => Some(ident),
             _ => None,
+        }
+    }
+}
+
+impl From<&str> for AssignTarget {
+    fn from(s: &str) -> Self {
+        Self::Ident(s.into())
+    }
+}
+impl std::fmt::Display for AssignTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AssignTarget::Ident(ident) => write!(f, "{}", ident),
+            AssignTarget::List(items) => {
+                fmt_list(f, items.iter(), None, |f, item, _| write!(f, "{}", item))
+            }
         }
     }
 }

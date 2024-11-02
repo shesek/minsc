@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::parser::{ast, Expr, Ident};
+use crate::parser::{ast, AssignTarget, Expr, Ident};
 use crate::runtime::{Array, Error, Evaluate, Result, ScopeRef, Value};
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub enum Function {
 #[derive(Clone)]
 pub struct UserFunction {
     pub ident: Option<Ident>,
-    pub params: Vec<Ident>,
+    pub params: Vec<AssignTarget>,
     pub body: Expr,
     pub scope: Option<ScopeRef>,
 }
@@ -55,9 +55,8 @@ impl Call for UserFunction {
             // For lexically-scoped functions, create a child scope of the scope where the function was defined.
             // For dynamically-scoped function, create a child of the caller scope.
             let mut scope = self.scope.as_ref().unwrap_or(caller_scope).child();
-            for (index, value) in args.into_iter().enumerate() {
-                let ident = self.params.get(index).unwrap();
-                scope.set(ident.clone(), value)?;
+            for (param_target, arg_value) in self.params.iter().zip(args) {
+                param_target.unpack(arg_value, &mut scope)?;
             }
             self.body.eval(&scope.into_ref())
         };

@@ -4,7 +4,7 @@ use std::str::FromStr;
 pub use crate::error::ParseError;
 
 pub mod ast;
-pub use ast::{Expr, Ident, Library, Stmt};
+pub use ast::{AssignTarget, Expr, Ident, Library, Stmt};
 
 lalrpop_mod!(
     #[allow(clippy::all)]
@@ -29,6 +29,33 @@ impl FromStr for Library {
     }
 }
 impl_tryfrom_fromstr!(Library);
+
+// The grammar reuses the Expr Array/Ident types as an AssignTarget to play nicely with LR(1) grammar.
+// This converts them into an AssignTarget, or reject ones that are invalid.
+// See https://github.com/lalrpop/lalrpop/issues/552#issuecomment-778923903
+impl TryFrom<Expr> for AssignTarget {
+    type Error = ParseError;
+    fn try_from(expr: Expr) -> Result<Self, ParseError> {
+        use ast::{Infix, InfixOp::Colon};
+        Ok(match expr {
+            Expr::Ident(ident) => Self::Ident(ident),
+            Expr::Array(ast::Array(mut items)) => {
+                // Colon tuple syntax is supported within Array brackets, as e.g. `[$txid:$vout]` (it cannot be
+                // supported without it due to grammar conflicts). Must peek to check prior to taking ownership.
+                if items.len() == 1 && matches!(items[0], Expr::Infix(Infix { op: Colon, .. })) {
+                    let Expr::Infix(ast::Infix { lhs, rhs, .. }) = items.remove(0) else {
+                        unreachable!()
+                    };
+                    Self::List(vec![Self::try_from(*lhs)?, Self::try_from(*rhs)?])
+                } else {
+                    let targets = items.into_iter().map(Self::try_from);
+                    Self::List(targets.collect::<Result<_, _>>()?)
+                }
+            }
+            _ => bail!(ParseError::InvalidAssignTarget),
+        })
+    }
+}
 
 // Utility functions used by the grammar
 
