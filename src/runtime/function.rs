@@ -36,43 +36,40 @@ pub trait Call {
 
 impl Call for Function {
     fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
-        match self {
-            Function::User(f) => f.call(args, caller_scope),
-            Function::Native(f) => f.call(args, caller_scope), // wraps with CallError context internally
+        let (res, ident) = match self {
+            Function::User(f) => (f.call(args, caller_scope), &f.ident),
+            Function::Native(f) => (f.call(args, caller_scope), &f.ident),
+        };
+        // Wrap errors with a CallError stack context, except for throw() which is excluded
+        if !ident.as_ref().is_some_and(|ident| ident.0 == "throw") {
+            res.map_err(|e| Error::CallError(ident.clone(), e.into()))
+        } else {
+            res
         }
     }
 }
 
 impl Call for UserFunction {
     fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
-        let _call = || {
-            ensure!(
-                self.params.len() == args.len(),
-                Error::InvalidArgumentsError(
-                    Error::InvalidLength(args.len(), self.params.len()).into(),
-                )
-            );
-            // For lexically-scoped functions, create a child scope of the scope where the function was defined.
-            // For dynamically-scoped function, create a child of the caller scope.
-            let mut scope = self.scope.as_ref().unwrap_or(caller_scope).child();
-            for (param_target, arg_value) in self.params.iter().zip(args) {
-                param_target.unpack(arg_value, &mut scope)?;
-            }
-            self.body.eval(&scope.into_ref())
-        };
-        _call().map_err(|e| Error::CallError(self.ident.clone(), e.into()))
+        ensure!(
+            self.params.len() == args.len(),
+            Error::InvalidArgumentsError(
+                Error::InvalidLength(args.len(), self.params.len()).into(),
+            )
+        );
+        // For lexically-scoped functions, create a child scope of the scope where the function was defined.
+        // For dynamically-scoped function, create a child of the caller scope.
+        let mut scope = self.scope.as_ref().unwrap_or(caller_scope).child();
+        for (param_target, arg_value) in self.params.iter().zip(args) {
+            param_target.unpack(arg_value, &mut scope)?;
+        }
+        self.body.eval(&scope.into_ref())
     }
 }
 
 impl Call for NativeFunction {
     fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
-        (self.pt)(Array(args), caller_scope).map_err(|e| {
-            if self.ident.as_ref().is_some_and(|ident| ident.0 == "throw") {
-                e // Don't include the `throw()` function in the CallError stack context.
-            } else {
-                Error::CallError(self.ident.clone(), e.into())
-            }
-        })
+        (self.pt)(Array(args), caller_scope)
     }
 }
 
