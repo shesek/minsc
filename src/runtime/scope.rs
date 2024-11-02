@@ -62,7 +62,7 @@ impl Scope {
         // then sorted by key name to retain deterministic order
         let mut env = self.local_env(&mut seen_keys);
 
-        let mut next_parent = self.parent.as_ref().map(ScopeRef::make_ref);
+        let mut next_parent = self.parent.as_ref().map(ScopeRef::clone_ref);
         while let Some(parent) = next_parent {
             depth += 1;
             if max_depth > 0 && depth == max_depth {
@@ -74,7 +74,7 @@ impl Scope {
             }
 
             env.append(&mut parent.local_env(&mut seen_keys));
-            next_parent = parent.parent.as_ref().map(ScopeRef::make_ref);
+            next_parent = parent.parent.as_ref().map(ScopeRef::clone_ref);
         }
         env
     }
@@ -110,7 +110,7 @@ thread_local! {
 impl Scope {
     /// Get a real-only ScopeRef for the cached global root scope
     pub fn root() -> ScopeRef<ReadOnly> {
-        ROOT.with(ScopeRef::make_ref)
+        ROOT.with(ScopeRef::clone_ref)
     }
 
     /// Create a new owned child Scope under the global root scope
@@ -149,7 +149,7 @@ impl<A: ScopeAccess> ScopeRef<A> {
     }
 
     /// Get a read-only ScopeRef pointing to the same inner Scope
-    pub fn make_ref(&self) -> ScopeRef<ReadOnly> {
+    pub fn clone_ref(&self) -> ScopeRef<ReadOnly> {
         ScopeRef(Rc::clone(&self.0), PhantomData)
     }
 
@@ -162,7 +162,7 @@ impl<A: ScopeAccess> ScopeRef<A> {
     /// Create a new owned Scope that is a child of this scope
     pub fn child(&self) -> Scope {
         Scope {
-            parent: Some(self.make_ref()),
+            parent: Some(self.clone_ref()),
             ..Default::default()
         }
     }
@@ -177,7 +177,7 @@ impl ScopeRef<Mutable> {
         ScopeRef(self.0, PhantomData)
     }
     pub fn as_readonly(&self) -> ScopeRef<ReadOnly> {
-        self.make_ref()
+        self.clone_ref()
     }
 }
 
@@ -188,7 +188,7 @@ impl Default for ScopeRef<Mutable> {
 }
 impl Clone for ScopeRef<ReadOnly> {
     fn clone(&self) -> Self {
-        self.make_ref()
+        self.clone_ref()
     }
 }
 impl Clone for ScopeRef<Mutable> {

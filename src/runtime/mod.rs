@@ -255,7 +255,7 @@ pub trait FieldAccess: Sized {
 
 impl Evaluate for ast::FnExpr {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        let func = Function::from_expr(self.clone(), scope.make_ref());
+        let func = Function::from_expr(self.clone(), scope.clone_ref());
         Ok(Value::function(func))
     }
 }
@@ -392,10 +392,15 @@ lazy_static! {
 
 impl Evaluate for ast::Block {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        // Execute the Block's stmts under a new child scope, with no visible side-effects
-        let scope = scope.child().into_ref();
-        self.stmts.exec(&scope)?;
-        let scope = scope.into_readonly();
+        let scope = if self.stmts.is_empty() {
+            // If there aren't any statements, we can evaluate the Block's return value directly under its parent scope
+            scope.clone_ref()
+        } else {
+            // Execute the Block's statements under a new child scope, with no visible side-effects in the parent scope
+            let child_scope = scope.child().into_ref();
+            self.stmts.exec(&child_scope)?;
+            child_scope.into_readonly()
+        };
 
         if let Some(return_value) = &self.return_value {
             // Use the Block's final expression as its return value. Required for BlockExpr.
