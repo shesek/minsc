@@ -122,6 +122,9 @@ pub enum RuntimeError {
     #[error("Field does not exists: {}", ValErrFmt(.0))]
     FieldNotFound(Box<Value>),
 
+    #[error("Attempted to access an array field with multiple values: {} (can use `t::multi($arr, $field)` to get them as an array)", ValErrFmt(.0))]
+    FieldArrayTagDuplicated(Box<Value>),
+
     #[error("Required value missing")]
     MissingValue,
 

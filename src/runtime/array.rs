@@ -107,17 +107,20 @@ impl Array {
 
 // Tagged array field access
 impl FieldAccess for Array {
-    fn get_field(self, field: &Value) -> Option<Value> {
-        // Returns the first element tagged with `field`. There may be more.
-        // Getting multiple values is possible through `t::multi($array, $field)`
+    fn get_field_fallible(self, field: &Value) -> Result<Option<Value>> {
+        let mut field_value = None;
         for el in self.into_inner() {
             if let Value::Array(mut el_arr) = el {
                 if el_arr.len() == 2 && el_arr[0] == *field {
-                    return Some(el_arr.remove(1));
+                    ensure!(
+                        field_value.is_none(),
+                        Error::FieldArrayTagDuplicated(field.clone().into())
+                    );
+                    field_value = Some(el_arr.remove(1));
                 }
             }
         }
-        None
+        Ok(field_value)
     }
 }
 

@@ -513,17 +513,17 @@ impl ExprRepr for Value {
 }
 
 impl FieldAccess for Value {
-    fn get_field(self, field: &Value) -> Option<Value> {
+    fn get_field_fallible(self, field: &Value) -> Result<Option<Value>> {
         match self {
-            Value::Array(x) => x.get_field(field),
-            Value::Psbt(x) => x.get_field(field),
-            Value::Transaction(x) => x.get_field(field),
-            Value::Policy(x) => x.get_field(field),
-            Value::Descriptor(x) => x.get_field(field),
-            Value::TapInfo(x) => x.get_field(field),
-            Value::Address(x) => x.get_field(field),
-            Value::WshScript(x) => x.get_field(field),
-            _ => None,
+            Value::Array(x) => x.get_field_fallible(field),
+            Value::Psbt(x) => x.get_field_fallible(field),
+            Value::Transaction(x) => x.get_field_fallible(field),
+            Value::Policy(x) => x.get_field_fallible(field),
+            Value::Descriptor(x) => x.get_field_fallible(field),
+            Value::TapInfo(x) => x.get_field_fallible(field),
+            Value::Address(x) => x.get_field_fallible(field),
+            Value::WshScript(x) => x.get_field_fallible(field),
+            _ => Ok(None),
         }
     }
 }

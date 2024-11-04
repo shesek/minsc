@@ -275,8 +275,7 @@ impl FieldAccess for Descriptor {
             "scripts" => tap_scripts_to_val(&*self.tap_info().ok()??),
             _ => {
                 return None;
-            }
-            // TODO address_type
+            } // TODO address_type
         })
     }
 }
