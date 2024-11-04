@@ -209,8 +209,11 @@ pub enum RuntimeError {
     #[error("Transaction input #{0} does not exists")]
     TxInputNotFound(usize),
 
-    #[error("Script cannot be represented as an address: {}", .0.pretty(None))]
-    NotAddressable(Box<bitcoin::ScriptBuf>),
+    #[error("Script {} cannot be represented as an address: {0}", .1.pretty(None))]
+    NotAddressable(
+        #[source] bitcoin::address::FromScriptError,
+        Box<bitcoin::ScriptBuf>,
+    ),
 
     #[error("Number operation overflowed")]
     Overflow,

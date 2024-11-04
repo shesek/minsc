@@ -411,8 +411,7 @@ impl fmt::Display for Value {
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
             Value::Descriptor(x) => write!(f, "{:#}", x), // not round-trip-able (ExprRepr is)
-            Value::Address(x) => write!(f, "{}", x),
-            Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
+            Value::Function(x) => write!(f, "{}", x),     // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
             Value::Psbt(x) => write!(f, "{}", x.pretty(None)),
@@ -421,6 +420,7 @@ impl fmt::Display for Value {
             Value::Array(x) => write!(f, "{}", x.pretty(None)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
             Value::Script(x) => write!(f, "{}", x.pretty(None)),
+            Value::Address(x) => write!(f, "{}", x.pretty(None)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(None)),
             Value::WshScript(x) => write!(f, "{}", x.pretty(None)),
         }
@@ -447,6 +447,7 @@ impl PrettyDisplay for Value {
             Value::SecKey(x) => write!(f, "{}", x.pretty(indent)),
             Value::Array(x) => write!(f, "{}", x.pretty(indent)),
             Value::Script(x) => write!(f, "{}", x.pretty(indent)),
+            Value::Address(x) => write!(f, "{}", x.pretty(indent)),
             Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
             Value::Psbt(x) => write!(f, "{}", x.pretty(indent)),

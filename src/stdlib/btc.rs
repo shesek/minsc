@@ -175,16 +175,28 @@ impl Evaluate for ast::Duration {
 pub mod fns {
     use super::*;
 
-    /// Generate an address
-    /// address(Script|Descriptor|PubKey|TapInfo|Address, Network=testnet) -> Address
+    /// Generate an address  
+    /// `address(Script|Descriptor|PubKey|TapInfo|Address, Network with_network=testnet) -> Address`
+    ///
+    /// Parse an address, optionally verifying that it matches the given network  
+    /// `address(String, verify_network Network=None) -> Address`
     pub fn address(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (spk, network): (Value, Option<Network>) = args.args_into()?;
-        let spk = spk.into_spk()?;
-        let network = network.unwrap_or(Network::Testnet);
-
-        Ok(Address::from_script(&spk, network)
-            .map_err(|_| Error::NotAddressable(spk.into()))?
-            .into())
+        let (addr_or_spk, network): (Value, Option<Network>) = args.args_into()?;
+        Ok(match addr_or_spk {
+            Value::String(address_str) => {
+                let address: Address<_> = address_str.parse()?;
+                match network {
+                    Some(network) => address.require_network(network)?,
+                    None => address.assume_checked(),
+                }
+            }
+            spk => {
+                let spk = spk.into_spk()?;
+                Address::from_script(&spk, network.unwrap_or(Network::Testnet))
+                    .map_err(|e| Error::NotAddressable(e, spk.into()))?
+            }
+        }
+        .into())
     }
 
     /// tx(Bytes|Array<Tagged>|Transaction) -> Transaction
@@ -808,13 +820,26 @@ impl PrettyDisplay for bitcoin::TxOut {
     const AUTOFMT_ENABLED: bool = false;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
-        if let Ok(address) = Address::from_script(&self.script_pubkey, Network::Testnet) {
+        match Address::from_script(&self.script_pubkey, Network::Testnet) {
             // XXX always uses the Testnet version bytes
-            write!(f, "{}", address)?;
-        } else {
-            write!(f, "{}", self.script_pubkey.pretty(None))?;
+            Ok(address) if address.address_type().is_some() => write!(f, "{}", address)?,
+            _ => write!(f, "{}", self.script_pubkey.pretty(None))?,
         }
         write!(f, ":{} BTC", self.value.to_btc())
+    }
+}
+
+impl PrettyDisplay for Address {
+    const AUTOFMT_ENABLED: bool = false;
+
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        if self.address_type().is_some() {
+            // Use the base58/bech32 encoded string if its a standard address type (known witness program/length),
+            write!(f, "{}", self)
+        } else {
+            // Otherwise, encode as a `address(scriptPubKey)` call
+            write!(f, "address({})", self.script_pubkey().pretty(None))
+        }
     }
 }
 
