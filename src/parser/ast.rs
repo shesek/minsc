@@ -172,6 +172,7 @@ pub enum InfixOp {
     Add,
     Subtract,
     Multiply,
+    Power,
     Mod,
     Eq,
     NotEq,

@@ -306,18 +306,22 @@ impl ast::InfixOp {
             (Gte, Num(Float(a)), Num(Float(b))) => (a >= b).into(),
             (Lte, Num(Float(a)), Num(Float(b))) => (a <= b).into(),
 
-            // + - * / % for numbers (integers and floats cannot be mixed)
+            // + - * / % ** for numbers (integers and floats cannot be mixed)
             (Add, Num(Int(a)), Num(Int(b))) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
             (Subtract, Num(Int(a)), Num(Int(b))) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
             (Multiply, Num(Int(a)), Num(Int(b))) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
             (Divide, Num(Int(a)), Num(Int(b))) => a.checked_div(b).ok_or(Error::Overflow)?.into(),
             (Mod, Num(Int(a)), Num(Int(b))) => (a % b).into(),
+            (Power, Num(Int(a)), Num(Int(b))) => {
+                a.checked_pow(b.try_into()?).ok_or(Error::Overflow)?.into()
+            }
 
             (Add, Num(Float(a)), Num(Float(b))) => (a + b).into(),
             (Subtract, Num(Float(a)), Num(Float(b))) => (a - b).into(),
             (Multiply, Num(Float(a)), Num(Float(b))) => (a * b).into(),
             (Divide, Num(Float(a)), Num(Float(b))) => (a / b).into(),
             (Mod, Num(Float(a)), Num(Float(b))) => (a % b).into(),
+            (Power, Num(Float(a)), Num(Float(b))) => a.powf(b).into(),
 
             // + for arrays, bytes and strings
             (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
