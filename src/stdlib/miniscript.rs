@@ -144,18 +144,22 @@ pub mod fns {
         Ok(Policy::Key(args.arg_into()?).into())
     }
 
-    pub fn sha256(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Policy::Sha256(args.arg_into()?).into())
+    macro_rules! impl_policy_hash_fn {
+        ($hash_name:ident, $policy_variant:path) => {
+            pub fn $hash_name(args: Array, _: &ScopeRef) -> Result<Value> {
+                let hash = args.arg_into().map_err(|e| {
+                    // A specialized error for possible misuse of policy functions to hash data (e.g. sha256() instead of hash::sha256())
+                    Error::InvalidMiniscriptPolicyHash(stringify!($hash_name), e.into())
+                })?;
+                Ok($policy_variant(hash).into())
+            }
+        };
     }
-    pub fn hash256(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Policy::Hash256(args.arg_into()?).into())
-    }
-    pub fn ripemd160(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Policy::Ripemd160(args.arg_into()?).into())
-    }
-    pub fn hash160(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(Policy::Hash160(args.arg_into()?).into())
-    }
+
+    impl_policy_hash_fn!(sha256, Policy::Sha256);
+    impl_policy_hash_fn!(hash256, Policy::Hash256);
+    impl_policy_hash_fn!(ripemd160, Policy::Ripemd160);
+    impl_policy_hash_fn!(hash160, Policy::Hash160);
 
     //
     // Miniscript Descriptor functions

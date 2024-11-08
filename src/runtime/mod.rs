@@ -140,6 +140,7 @@ impl Evaluate for ast::And {
     }
 }
 
+#[derive(Debug)]
 pub enum AndOr {
     And,
     Or,
@@ -156,7 +157,7 @@ fn eval_andor(operands: &[Expr], scope: &ScopeRef, andor: AndOr) -> Result<Value
             let policies = [&[first_operand], &eval_exprs(scope, &operands[1..])?[..]].concat();
             stdlib::miniscript::multi_andor(andor, policies).map(Into::into)
         }
-        _ => Err(Error::InvalidArguments),
+        other => Err(Error::InvalidAndOrOperand(andor, other.into())),
     }
 }
 
@@ -181,6 +182,15 @@ fn eval_bool_andor(
         }
     }
     Ok((!stop_on).into())
+}
+
+impl std::fmt::Display for AndOr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::And => write!(f, "&&"),
+            Self::Or => write!(f, "||"),
+        }
+    }
 }
 
 impl Evaluate for ast::Ident {

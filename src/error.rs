@@ -6,7 +6,7 @@ use miniscript::policy::compiler::CompilerError;
 use miniscript::{descriptor, TranslateErr};
 
 use crate::parser::ast::{Ident, InfixOp};
-use crate::{ast, stdlib, PrettyDisplay, Value};
+use crate::{ast, runtime, stdlib, PrettyDisplay, Value};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -134,7 +134,7 @@ pub enum RuntimeError {
     #[error("Required value missing")]
     MissingValue,
 
-    #[error("Invalid value: {}", ValErrFmt(.0))]
+    #[error("Unexpected value: {}", ValErrFmt(.0))]
     InvalidValue(Box<Value>),
 
     #[error("Expected length {1}, not {0}")]
@@ -157,6 +157,17 @@ pub enum RuntimeError {
 
     #[error("Invalid arguments")]
     InvalidArguments,
+
+    #[error("Invalid {0} operand: expected booleans or policies, not {}", ValErrFmt(.1))]
+    InvalidAndOrOperand(runtime::AndOr, Box<Value>),
+
+    #[error(
+        "{1} (attempted to construct Miniscript {0}() policy, did you mean to use hash::{0}()?)"
+    )]
+    InvalidMiniscriptPolicyHash(&'static str, Box<RuntimeError>),
+
+    #[error("Expected a PubKey, not a Miniscript pk() policy (did you mean to use pubkey()?)")]
+    UnexpectedPubKeyPolicy,
 
     #[error("No inner wildcard xpubs to derive")]
     NonDeriveableNoWildcard,

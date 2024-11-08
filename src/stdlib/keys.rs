@@ -16,6 +16,7 @@ use crate::runtime::{Array, Error, Evaluate, Mutable, Result, ScopeRef, Value};
 use crate::util::{
     hash_to_child_vec, DeriveExt, DescriptorPubKeyExt, DescriptorSecretKeyExt, PrettyDisplay, EC,
 };
+use crate::PolicyDpk as Policy;
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -259,12 +260,12 @@ impl TryFrom<Value> for bitcoin::PrivateKey {
 impl TryFrom<Value> for DescriptorPublicKey {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
-        match value {
-            Value::PubKey(pubkey) => Ok(pubkey),
-            Value::SecKey(seckey) => Ok(seckey.to_public_()?),
+        Ok(match value {
+            Value::PubKey(pubkey) => pubkey,
+            Value::SecKey(seckey) => seckey.to_public_()?,
             // Bytes are coerced into a single PubKey if they are 33 or 32 bytes long,
             // or to an Xpub if they're 78 bytes long
-            Value::Bytes(bytes) => Ok(match bytes.len() {
+            Value::Bytes(bytes) => match bytes.len() {
                 33 | 32 => DescriptorPublicKey::Single(SinglePub {
                     origin: None,
                     key: match bytes.len() {
@@ -275,9 +276,13 @@ impl TryFrom<Value> for DescriptorPublicKey {
                 }),
                 78 => Value::from(Xpub::decode(&bytes)?).try_into()?,
                 len => bail!(Error::InvalidPubKeyLen(len)),
-            }),
-            v => Err(Error::NotPubKey(v.into())),
-        }
+            },
+            // A specialized error for misusing pk() policies as pubkeys
+            Value::Policy(Policy::Key(_)) => {
+                bail!(Error::UnexpectedPubKeyPolicy)
+            }
+            v => bail!(Error::NotPubKey(v.into())),
+        })
     }
 }
 
