@@ -149,7 +149,7 @@ IfExprThenVal = { BlockExpr, "then" <Expr> };
 
 And: Expr = <List2<AndOrBranch, "&&">> => ast::And(<>).into();
 Or: Expr = <List2<AndOrBranch, "||">> => ast::Or(<>).into();
-AndOrBranch = { SimpleExpr, SlashOp };
+AndOrBranch = { SimpleExpr, SlashOp, Infix };
 
 Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
   ast::Thresh { thresh: thresh.into(), policies: policies.into() }.into();
@@ -294,7 +294,9 @@ FnExpr2: Expr = <dyn_scoping:"dyn"?> "fn" <params:Paren<List0<AssignTarget, ",">
 // Binary infix operators with left associativity
 Infix: Expr = <lhs:InfixLHS> <op:InfixOp> <rhs:InfixRHS> =>
    ast::Infix { op, lhs: lhs.into(), rhs: rhs.into() }.into();
-InfixRHS = { SimpleExpr, And, Or, SlashOp, Duration }; // Expr - IfExpr - FnExpr - Infix - ColonOp
+InfixRHS = { SimpleExpr, SlashOp, Duration }; // Expr - IfExpr - FnExpr - Infix - ColonOp - And - Or
+
+
 InfixLHS = { InfixRHS, Infix }; // left-associative recursion
 InfixOp = { InfixOpScriptSafe, InfixOpNonScript };
 InfixOpScriptSafe: ast::InfixOp = {
