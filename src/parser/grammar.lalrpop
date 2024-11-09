@@ -264,13 +264,12 @@ ScriptFragPart_Mark: Expr = {
 // Defined separately because it is also allowed outside ``
 ScriptMarkCtx: Expr = "@@" <Paren<(<Expr> "," <Expr>)>> =>
   // Wraps the body expression in a closure takes accepts the updated MARK_CTX as an argument from `mark::ctx()`
-  call("mark::ctx", vec![<>.0, ast::FnExpr { params: vec!["MARK_CTX".into()], body: <>.1.into(), dynamic_scoping: false }.into()]);
+  call("mark::ctx", vec![<>.0, ast::FnExpr { params: ast::FnParams { required: vec!["MARK_CTX".into()], ..Default::default() }, body: <>.1.into(), dynamic_scoping: false }.into()]);
 
 // Allow function bodies without an explicit final return value (true is returned by default)
 // Used for FnExpr and FnDef.
 FnBlockNoReturn: Expr = "{" <Stmt*> "}" =>
   ast::Block { stmts: <>, return_value: None, use_main: false }.into();
-
 
 // Anonymous function expression
 FnExpr = { FnExpr1, FnExpr2 };
@@ -279,14 +278,14 @@ FnExpr = { FnExpr1, FnExpr2 };
 FnExpr1: Expr = <dyn_scoping:"dyn"?> <params:FnExpr1Params> <body:Either2<Expr, FnBlockNoReturn>> =>
     ast::FnExpr { params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
 FnExpr1Params = {
-  "|" <List0<AssignTarget, ",">> "|",
-  // Zero arguments should be captures by the List0, but it isn't because `||` is pre-tokenized as OR
-  "||" => vec![],
+  "|" <FnParams> "|",
+  // Zero arguments should be captured as an empty FnParams, but it isn't because `||` is pre-tokenized as OR
+  "||" => ast::FnParams::default(),
 };
 
 // FnDef-like syntax, more suitable for chaining with FnDef: fn adder($a) = fn ($b) = $a+$b; adder(2)(3)
-FnExpr2: Expr = <dyn_scoping:"dyn"?> "fn" <params:Paren<List0<AssignTarget, ",">>> <body:Either3<("=" <Expr>), BlockExpr, FnBlockNoReturn>> =>
-    ast::FnExpr { params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
+FnExpr2: Expr = <dyn_scoping:"dyn"?> "fn" <params:Paren<FnParams>> <body:Either3<("=" <Expr>), BlockExpr, FnBlockNoReturn>> =>
+    ast::FnExpr { params: params, body: body.into(), dynamic_scoping: dyn_scoping.is_some() }.into();
 
 // XXX Should probably settle on one syntax to rule them all. Maybe `($a, $b) => $a+$b`?
 
@@ -401,7 +400,7 @@ Assign: Stmt = "let"? <assigns:List1<Assignment, ",">> ";" =>
 Assignment: ast::Assignment = <lhs:AssignTarget> "=" <rhs:Expr> =>
     ast::Assignment { lhs, rhs };
 
-FnDef: Stmt = <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <params:Paren<List0<AssignTarget, ",">>> <body:FnDefBody> =>
+FnDef: Stmt = <dyn_scoping:"dyn"?> "fn" <ident:IdentTerm> <params:Paren<FnParams>> <body:FnDefBody> =>
   ast::FnDef { ident, params, body, dynamic_scoping: dyn_scoping.is_some() }.into();
 
 FnDefBody = { "=" <Expr> ";", <BlockExpr> ";"?, <FnBlockNoReturn> ";"? };
@@ -426,6 +425,13 @@ AssignTarget: AssignTarget = {
   // https://github.com/lalrpop/lalrpop/issues/552#issuecomment-778923903
   Array =>? Ok(AssignTarget::try_from(<>)?),
 };
+
+// Function parameters. Used for FnExpr and FnDef
+FnParams: ast::FnParams = List0<FnParam, ","> =>? Ok(ast::FnParams::try_from(<>)?);
+// Allows optional parameters in any position to play nicely with LR(1) grammar.
+// FnParams::try_from() will reject optional parameters that don't appear last.
+FnParam: (AssignTarget, Option<Expr>) = <AssignTarget> <("=" <FnParamDefault>)?>;
+FnParamDefault = { Number, Ident, Bytes, String, DateTime, Address, PubKey, SecKey, SimpleCall, Array, ScriptFrag, ChildAccess, WrapExpr };
 
 // Helpers
 

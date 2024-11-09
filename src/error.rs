@@ -474,10 +474,23 @@ impl<'a> fmt::Display for ValErrFmt<'a> {
     }
 }
 
+impl RuntimeError {
+    pub fn invalid_length(actual: usize, min: usize, max: usize) -> Self {
+        if min == max {
+            Self::InvalidLength(actual, min)
+        } else {
+            Self::InvalidVarLength(actual, min, max)
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum ParseError {
     #[error("Invalid assignemnt target")]
     InvalidAssignTarget,
+
+    #[error("Optional function parameters must appear last")]
+    InvalidOptionalParamPosition,
 
     #[error("ParseFloatError: {0}")]
     ParseFloatError(#[from] std::num::ParseFloatError),

@@ -1,6 +1,6 @@
-use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::{fmt, iter};
 
 use bitcoin::bip32::{self, ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
@@ -703,6 +703,24 @@ impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
         } else {
             self.writer.write_str(buf)
         }
+    }
+}
+
+pub trait PeekableExt: Iterator {
+    /// Like take_while(), but borrows checked items and doesn't consume the last non-matching one
+    /// Similarly to https://docs.rs/itertools/latest/itertools/trait.Itertools.html#method.peeking_take_while
+    fn peeking_take_while<F>(&mut self, accept: F) -> impl Iterator<Item = Self::Item>
+    where
+        F: FnMut(&Self::Item) -> bool + Copy;
+}
+
+impl<I: Iterator> PeekableExt for iter::Peekable<I> {
+    fn peeking_take_while<F>(&mut self, accept: F) -> impl Iterator<Item = Self::Item>
+    where
+        F: FnMut(&Self::Item) -> bool + Copy,
+    {
+        // h/t https://www.reddit.com/r/rust/comments/f8ae6q/comment/jwuyzgo/
+        iter::from_fn(move || self.next_if(accept))
     }
 }
 

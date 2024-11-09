@@ -36,7 +36,7 @@ ENABLE_RBF = 0xFFFFFFFD;
 TR_UNSPENDABLE = NUMS;
 
 // Create the witness stack for a Taproot script-path spend
-fn tr::script_witness($tr, $script, $stack) = $stack + [ $script, tr::ctrl($tr, $script) ];
+fn tr::script_witness($tr, $script, $stack=[]) = $stack + [ $script, tr::ctrl($tr, $script) ];
 
 //
 // Transactions/PSBT

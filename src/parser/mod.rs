@@ -1,10 +1,12 @@
 use std::convert::TryFrom;
 use std::str::FromStr;
 
+use crate::util::PeekableExt;
+
 pub use crate::error::ParseError;
 
 pub mod ast;
-pub use ast::{AssignTarget, Expr, Ident, Library, Stmt};
+pub use ast::{AssignTarget, Expr, FnParams, Ident, Library, Stmt};
 
 lalrpop_mod!(
     #[allow(clippy::all)]
@@ -54,6 +56,31 @@ impl TryFrom<Expr> for AssignTarget {
             }
             _ => bail!(ParseError::InvalidAssignTarget),
         })
+    }
+}
+
+// The grammar accepts optional function parameters in any position. This splits up the required
+// and optional ones, and ensures there aren't any optional parameters in an invalid position.
+impl TryFrom<Vec<(AssignTarget, Option<Expr>)>> for FnParams {
+    type Error = ParseError;
+    fn try_from(params: Vec<(AssignTarget, Option<Expr>)>) -> Result<Self, ParseError> {
+        let mut params = params.into_iter().peekable();
+        // Take all required, then all optional, then ensure there are none left
+        let required = params
+            .by_ref()
+            .peeking_take_while(|(_, default)| default.is_none())
+            .map(|(target, _)| target)
+            .collect();
+        let optional = params
+            .by_ref()
+            .peeking_take_while(|(_, default)| default.is_some())
+            .map(|(target, default)| (target.clone(), default.unwrap()))
+            .collect();
+        ensure!(
+            params.next().is_none(),
+            ParseError::InvalidOptionalParamPosition
+        );
+        Ok(Self { required, optional })
     }
 }
 

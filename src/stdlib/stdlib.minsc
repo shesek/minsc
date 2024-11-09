@@ -67,9 +67,8 @@ fn t::multi($tagged, $tag) = $tagged | filter(|[$k, _]| $k == $tag) | map(|[_, $
 //
 
 // Assertion
-fn assert($bool) = $bool || throw("Assertion failed");
+fn assert($bool, $msg="Assertion failed") = $bool || throw($msg);
 fn assert::eq($a, $b) = ($a == $b) || throw("Not equal: "+$a+" != "+$b+"");
-fn assert::msg($bool, $msg) = $bool || throw($msg);
 
 // Scope inspection
 dyn fn env::pretty() = env() | map(|[$k:$v]| $k+" = "+pretty($v)+" // "+typeof($v)) | join("\n\n") | symbol();
@@ -77,8 +76,8 @@ dyn fn env::repr() = env() | filter(|[$k:$v]| !isFunction($v)) | map(|[$k:$v]| $
 dyn fn env::debug() = env() | map(|[$k:$v]| $k+" = "+_debug_nonfn($v)) | join("\n\n") | symbol();
 fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
 
-dyn fn log::env($label) = log("variables:\n----\n" + env::pretty() + "\n----");
-dyn fn log::debug_env($label) = log("variables:\n----\n" + env::debug() + "\n----");
+dyn fn log::env($label="") = log("variables:\n----\n" + env::pretty() + "\n----");
+dyn fn log::debug_env($label="") = log("variables:\n----\n" + env::debug() + "\n----");
 
 // Testing
 T = [];

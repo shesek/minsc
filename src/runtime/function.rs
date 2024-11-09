@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::parser::{ast, AssignTarget, Expr, Ident};
+use crate::parser::{ast, Expr, FnParams, Ident};
 use crate::runtime::{Array, Error, Evaluate, Result, ScopeRef, Value};
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub enum Function {
 #[derive(Clone)]
 pub struct UserFunction {
     pub ident: Option<Ident>,
-    pub params: Vec<AssignTarget>,
+    pub params: FnParams,
     pub body: Expr,
     pub scope: Option<ScopeRef>,
 }
@@ -51,19 +51,36 @@ impl Call for Function {
 
 impl Call for UserFunction {
     fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
+        let min_args = self.params.required.len();
+        let max_args = min_args + self.params.optional.len();
         ensure!(
-            self.params.len() == args.len(),
+            args.len() >= min_args && args.len() <= max_args,
             Error::InvalidArgumentsError(
-                Error::InvalidLength(args.len(), self.params.len()).into(),
+                Error::invalid_length(args.len(), min_args, max_args).into()
             )
         );
+        let mut args = args.into_iter();
+
         // For lexically-scoped functions, create a child scope of the scope where the function was defined.
         // For dynamically-scoped function, create a child of the caller scope.
         let mut scope = self.scope.as_ref().unwrap_or(caller_scope).child();
-        for (param_target, arg_value) in self.params.iter().zip(args) {
+
+        for param_target in self.params.required.iter() {
+            let arg_value = args.next().expect("checked");
             param_target.unpack(arg_value, &mut scope)?;
         }
-        self.body.eval(&scope.into_ref())
+
+        // A shared ScopeRef is needed for optional parameters, to evaluate their default value (which may refer previous parameters)
+        let scope = scope.into_ref();
+        for (param_target, default_value) in self.params.optional.iter() {
+            let arg_value = match args.next() {
+                Some(val) => val,
+                None => default_value.eval(&scope.as_readonly())?,
+            };
+            param_target.unpack(arg_value, &mut scope.borrow_mut())?;
+        }
+
+        self.body.eval(&scope.into_readonly())
     }
 }
 
@@ -164,11 +181,18 @@ impl fmt::Display for UserFunction {
             write!(f, "{}", ident)?;
         }
         write!(f, "(")?;
-        for (i, param_name) in self.params.iter().enumerate() {
+        for (i, param_name) in self.params.required.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
             }
             write!(f, "{}", param_name)?;
+        }
+        for (i, (param_name, _default)) in self.params.optional.iter().enumerate() {
+            if !self.params.required.is_empty() || i > 0 {
+                write!(f, ", ")?;
+            }
+            // _default Expr is not Display-able, just show a '?' to indicate its optional
+            write!(f, "{}?", param_name)?;
         }
         write!(f, ")")
     }

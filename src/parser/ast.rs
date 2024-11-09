@@ -151,7 +151,7 @@ impl_from_variant!(ScriptFrag, Expr);
 /// An anonymous function expression
 #[derive(Debug, Clone)]
 pub struct FnExpr {
-    pub params: Vec<AssignTarget>,
+    pub params: FnParams,
     pub body: Box<Expr>,
     pub dynamic_scoping: bool,
 }
@@ -244,7 +244,7 @@ impl_from_variant!(BtcAmount, Expr);
 #[derive(Debug, Clone)]
 pub struct FnDef {
     pub ident: Ident,
-    pub params: Vec<AssignTarget>,
+    pub params: FnParams,
     pub body: Expr,
     pub dynamic_scoping: bool,
 }
@@ -266,6 +266,13 @@ pub struct Assignment {
 pub enum AssignTarget {
     Ident(Ident),
     List(Vec<AssignTarget>),
+}
+
+// Used for FnExpr and FnDef
+#[derive(Debug, Clone, Default)]
+pub struct FnParams {
+    pub required: Vec<AssignTarget>,
+    pub optional: Vec<(AssignTarget, Expr)>, // with default value
 }
 
 /// A call statement whose return value is discarded
