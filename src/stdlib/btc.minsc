@@ -68,8 +68,8 @@ fn psbt::finalize_witness($psbt, $input_witnesses) = psbt::update($psbt, [
   )
 ]);
 
-fn psbt::sign_extract($psbt, $keys) =
-  psbt::extract(psbt::finalize(psbt::sign($psbt, $keys)));
+fn psbt::finalize_extract($psbt) = psbt::extract(psbt::finalize($psbt));
+fn psbt::sign_extract($psbt, $keys) = psbt::extract(psbt::finalize(psbt::sign($psbt, $keys)));
 
 //
 // Script utilities

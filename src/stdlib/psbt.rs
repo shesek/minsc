@@ -110,19 +110,15 @@ pub mod fns {
         Ok((psbt, errors).into())
     }
 
-    // psbt::sign(Psbt, Xpriv|Array<Xpriv>|Array<SinglePk:SingleSk> sign_keys, Bool finalize=false) -> Psbt
+    // psbt::sign(Psbt, Xpriv|Array<Xpriv>|Array<SinglePk:SingleSk> sign_keys) -> Psbt
     //
     // Attempt to sign all transaction inputs, raising an error if any fail.
     pub fn sign(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (mut psbt, keys, finalize): (_, _, Option<bool>) = args.args_into()?;
+        let (mut psbt, keys) = args.args_into()?;
 
         let (_signed, failed) = sign_psbt(&mut psbt, keys)?;
         ensure!(failed.is_empty(), Error::PsbtSigning(failed));
         // XXX check signed?
-
-        if finalize.unwrap_or(false) {
-            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
-        }
 
         Ok(psbt.into())
     }
@@ -139,15 +135,12 @@ pub mod fns {
         Ok((psbt, signed, failed).into())
     }
 
-    /// psbt::extract(Psbt, Bool finalize=false) -> Transaction
+    /// psbt::extract(Psbt) -> Transaction
     ///
-    /// Extract the PSBT finalized transaction. Will run the Miniscript interpreter sanity checks.  
-    /// Also possible using `tx(Psbt)` (without the `finalize` option, for pre-finalized PSBT only)
+    /// Extract the PSBT finalized transaction (The PSBT must already be finalized).
+    /// Will run the Miniscript interpreter sanity checks. Also possible using `tx(Psbt)`.
     pub fn extract(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (mut psbt, finalize): (Psbt, Option<bool>) = args.args_into()?;
-        if finalize.unwrap_or(false) {
-            psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
-        }
+        let psbt: Psbt = args.arg_into()?;
         // Uses rust-miniscript's PsbtExt::extract(), which only works with Miniscript-compatible Scripts
         Ok(psbt.extract(&EC)?.into())
     }
