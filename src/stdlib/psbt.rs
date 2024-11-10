@@ -15,7 +15,7 @@ use crate::runtime::{
 };
 use crate::stdlib::btc::WshScript;
 use crate::util::{
-    self, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, PsbtTaprootExt, TapInfoExt, EC,
+    self, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, PsbtInExt, PsbtOutExt, TapInfoExt, EC,
 };
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -433,33 +433,44 @@ impl TryFrom<Value> for PsbtTxIn {
         let mut psbt_input = psbt::Input::default();
         let mut psbt_input_tags = Array(vec![]);
 
+        let mut prevout = None;
+
         let arr = value.into_array()?;
-        if arr.len() == 2 && arr.get(1).is_some_and(Value::is_number) {
-            // Tx input provided as a simple $txid:$vout tuple with just the prevout
-            tx_input.previous_output = Value::Array(arr).try_into()?;
+        if arr.len() == 2 && arr[1].is_number() {
+            // Tx input provided as a tuple of the tx:vout prevout
+            prevout = Some(Value::Array(arr));
         } else {
             // Tx input and PSBT metadata provided as a tagged list
             arr.for_each_unique_tag(|tag, val| {
                 match tag {
-                    // The entire input may be provided under the "input" tag, or alternatively as individual fields
-                    // (script_sig and witness are not settable - the constructed tx should be unsigned)
-                    "input" => tx_input = val.try_into()?,
-                    "prevout" => tx_input.previous_output = val.try_into()?,
+                    "prevout" => prevout = Some(val),
                     "sequence" => tx_input.sequence = val.try_into()?,
+                    // (script_sig and witness are not settable - the constructed tx should be unsigned)
 
                     // Collect other PSBT tags to forward to update_input()
                     other_tag => psbt_input_tags.push((other_tag, val).into()),
                 }
                 Ok(())
             })?;
-
-            ensure!(
-                tx_input.previous_output != Default::default(),
-                Error::PsbtTxInMissingFields
-            );
-
             update_input(&mut psbt_input, psbt_input_tags)?;
         }
+        let prevout = prevout.ok_or(Error::PsbtTxInMissingFields)?;
+
+        // If the `prevout` was specified using a PSBT or Transaction, use the spent output info to populate the input PSBT fields
+        if let Value::Array(prevout_arr) = &prevout {
+            if prevout_arr.len() == 2 {
+                match (&prevout_arr[0], &prevout_arr[1]) {
+                    (Value::Psbt(prev_psbt), Value::Number(vout)) => {
+                        psbt_input.update_with_prevout_psbt(prev_psbt, (*vout).try_into()?)?;
+                    }
+                    (Value::Transaction(prev_tx), Value::Number(vout)) => {
+                        psbt_input.update_with_prevout_tx(prev_tx, (*vout).try_into()?)?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        tx_input.previous_output = prevout.try_into()?;
 
         Ok(PsbtTxIn(tx_input, psbt_input))
     }

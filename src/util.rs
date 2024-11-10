@@ -5,8 +5,8 @@ use std::{fmt, iter};
 use bitcoin::bip32::{self, ChildNumber, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::hex::DisplayHex;
-use bitcoin::taproot::TaprootSpendInfo;
-use bitcoin::{psbt, secp256k1, PublicKey};
+use bitcoin::taproot::{ControlBlock, TaprootSpendInfo};
+use bitcoin::{key::TapTweak, psbt, secp256k1, PublicKey, Transaction};
 use miniscript::descriptor::{
     self, DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
 };
@@ -34,11 +34,17 @@ impl TapInfoExt for TaprootSpendInfo {
     }
 }
 
-pub trait PsbtTaprootExt {
-    /// Update PSBT fields using the TaprootSpendInfo
+pub trait PsbtInExt {
+    /// Update PSBT fields using the TaprootSpendInfo of the spent output
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()>;
+
+    /// Update PSBT fields using the PSBT of the spent transaction
+    fn update_with_prevout_psbt(&mut self, prev_psbt: &psbt::Psbt, vout: usize) -> Result<()>;
+
+    /// Update PSBT fields using the spent transaction
+    fn update_with_prevout_tx(&mut self, prev_tx: &Transaction, vout: usize) -> Result<()>;
 }
-impl PsbtTaprootExt for psbt::Input {
+impl PsbtInExt for psbt::Input {
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
         self.tap_merkle_root = tapinfo.merkle_root();
         self.tap_internal_key = Some(tapinfo.internal_key());
@@ -50,12 +56,74 @@ impl PsbtTaprootExt for psbt::Input {
         // `tap_key_origins` needs to be filled in manually
         Ok(())
     }
+
+    fn update_with_prevout_psbt(&mut self, prev_psbt: &psbt::Psbt, vout: usize) -> Result<()> {
+        self.update_with_prevout_tx(&prev_psbt.unsigned_tx, vout)?;
+
+        let prevout = prev_psbt
+            .outputs
+            .get(vout)
+            .ok_or_else(|| Error::PsbtOutputNotFound(vout))?;
+
+        self.bip32_derivation
+            .extend(prevout.bip32_derivation.clone());
+        self.tap_key_origins.extend(prevout.tap_key_origins.clone());
+        self.proprietary.extend(prevout.proprietary.clone());
+        self.unknown.extend(prevout.unknown.clone());
+
+        if let Some(witness_script) = &prevout.witness_script {
+            self.witness_script = Some(witness_script.clone());
+        }
+        if let Some(redeem_script) = &prevout.redeem_script {
+            self.redeem_script = Some(redeem_script.clone());
+        }
+        if let Some(internal_key) = prevout.tap_internal_key {
+            self.tap_internal_key = Some(internal_key);
+        }
+        if let Some(tap_tree) = &prevout.tap_tree {
+            let merkle_root = tap_tree.root_hash();
+            self.tap_merkle_root = Some(merkle_root);
+
+            // Convert the output's tap_tree into the input's tap_scripts (requires the internal key to be known)
+            if let Some(internal_key) = self.tap_internal_key {
+                let (_, output_key_parity) = internal_key.tap_tweak(&EC, Some(merkle_root));
+                self.tap_scripts
+                    .extend(tap_tree.script_leaves().map(|leaf| {
+                        let ctrl = ControlBlock {
+                            leaf_version: leaf.version(),
+                            merkle_branch: leaf.merkle_branch().clone(),
+                            internal_key,
+                            output_key_parity,
+                        };
+                        (ctrl, (leaf.script().into(), leaf.version()))
+                    }));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn update_with_prevout_tx(&mut self, prev_tx: &Transaction, vout: usize) -> Result<()> {
+        self.witness_utxo = Some(
+            prev_tx
+                .output
+                .get(vout)
+                .ok_or_else(|| Error::PsbtOutputNotFound(vout))?
+                .clone(),
+        );
+        Ok(())
+    }
 }
-impl PsbtTaprootExt for psbt::Output {
+
+pub trait PsbtOutExt {
+    /// Update PSBT fields using the TaprootSpendInfo
+    fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()>;
+}
+impl PsbtOutExt for psbt::Output {
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
         self.tap_internal_key = Some(tapinfo.internal_key());
         // `tap_key_origins` needs to be filled in manually
-        // TODO autofill `tap_tree`
+        // TODO `tap_tree`
         Ok(())
     }
 }

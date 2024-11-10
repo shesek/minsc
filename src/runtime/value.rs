@@ -45,7 +45,7 @@ pub enum Value {
     Symbol(Symbol),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Number {
     Int(i64),
     Float(f64),
