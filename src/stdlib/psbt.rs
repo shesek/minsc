@@ -13,6 +13,7 @@ use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 use crate::runtime::{
     Array, Error, FieldAccess, FromValue, Mutable, Number::Int, Result, ScopeRef, Value,
 };
+use crate::stdlib::btc::WshScript;
 use crate::util::{
     self, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, PsbtTaprootExt, TapInfoExt, EC,
 };
@@ -234,9 +235,9 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
     tags.for_each_tag(|tag, val| {
         match tag {
             "version" => psbt.version = val.try_into()?,
-            "xpub" => psbt.xpub = xpub_map(val)?,
-            "proprietary" => psbt.proprietary = val.try_into()?,
-            "unknown" => psbt.unknown = val.try_into()?,
+            "xpub" => psbt.xpub.append(&mut xpub_map(val)?),
+            "proprietary" => psbt.proprietary.append(&mut val.try_into()?),
+            "unknown" => psbt.unknown.append(&mut val.try_into()?),
             "inputs" => {
                 for (vin, in_tags) in val.into_array()?.mapped_or_all(psbt.inputs.len())? {
                     let psbt_input = psbt
@@ -266,35 +267,38 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
     })
 }
 
-fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
+fn update_input(input: &mut psbt::Input, tags: Array) -> Result<()> {
     let mut descriptor = None;
     let mut tapinfo = None;
+    let mut wshscript: Option<WshScript> = None;
     let mut utxo_amount = None;
     tags.for_each_unique_tag(|tag, val| {
         match tag {
-            "partial_sigs" => psbt_input.partial_sigs = val.try_into()?,
-            "sighash_type" => psbt_input.sighash_type = Some(val.try_into()?),
-            "redeem_script" => psbt_input.redeem_script = Some(val.try_into()?),
-            "witness_script" => psbt_input.witness_script = Some(val.try_into()?),
-            "bip32_derivation" => psbt_input.bip32_derivation = bip32_derivation_map(val)?,
-            "final_script_sig" => psbt_input.final_script_sig = Some(val.try_into()?),
-            "final_script_witness" => psbt_input.final_script_witness = Some(val.try_into()?),
-            "ripemd160_preimages" => psbt_input.ripemd160_preimages = hash_preimages(val)?,
-            "sha256_preimages" => psbt_input.sha256_preimages = hash_preimages(val)?,
-            "hash160_preimages" => psbt_input.hash160_preimages = hash_preimages(val)?,
-            "hash256_preimages" => psbt_input.hash256_preimages = hash_preimages(val)?,
-            "tap_key_sig" => psbt_input.tap_key_sig = Some(val.try_into()?),
-            "tap_script_sigs" => psbt_input.tap_script_sigs = val.try_into()?,
-            "tap_scripts" => psbt_input.tap_scripts = tap_scripts_map(val)?,
-            "tap_key_origins" => psbt_input.tap_key_origins = tap_key_origins_map(val)?,
-            "tap_internal_key" => psbt_input.tap_internal_key = Some(val.try_into()?),
-            "tap_merkle_root" => psbt_input.tap_merkle_root = Some(val.try_into()?),
-            "proprietary" => psbt_input.proprietary = val.try_into()?,
-            "unknown" => psbt_input.unknown = val.try_into()?,
-            "non_witness_utxo" => psbt_input.non_witness_utxo = Some(val.try_into()?),
+            "partial_sigs" => input.partial_sigs.append(&mut val.try_into()?),
+            "sighash_type" => input.sighash_type = Some(val.try_into()?),
+            "redeem_script" => input.redeem_script = Some(val.try_into()?),
+            "witness_script" => input.witness_script = Some(val.try_into()?),
+            "bip32_derivation" => input
+                .bip32_derivation
+                .append(&mut bip32_derivation_map(val)?),
+            "final_script_sig" => input.final_script_sig = Some(val.try_into()?),
+            "final_script_witness" => input.final_script_witness = Some(val.try_into()?),
+            "ripemd160_preimages" => input.ripemd160_preimages.append(&mut hash_preimages(val)?),
+            "sha256_preimages" => input.sha256_preimages.append(&mut hash_preimages(val)?),
+            "hash160_preimages" => input.hash160_preimages.append(&mut hash_preimages(val)?),
+            "hash256_preimages" => input.hash256_preimages.append(&mut hash_preimages(val)?),
+            "tap_key_sig" => input.tap_key_sig = Some(val.try_into()?),
+            "tap_script_sigs" => input.tap_script_sigs.append(&mut val.try_into()?),
+            "tap_scripts" => input.tap_scripts.append(&mut tap_scripts_map(val)?),
+            "tap_key_origins" => input.tap_key_origins.append(&mut tap_key_origins_map(val)?),
+            "tap_internal_key" => input.tap_internal_key = Some(val.try_into()?),
+            "tap_merkle_root" => input.tap_merkle_root = Some(val.try_into()?),
+            "proprietary" => input.proprietary.append(&mut val.try_into()?),
+            "unknown" => input.unknown.append(&mut val.try_into()?),
+            "non_witness_utxo" => input.non_witness_utxo = Some(val.try_into()?),
             "witness_utxo" | "utxo" => {
                 // If the UTXO was specified using a DescriptorTaprootSpendInfo/WshScript,
-                // also use them to populate the PSBT fields.
+                // keep them to later also use them to populate the PSBT fields.
                 if let Value::Array(arr) = &val {
                     match arr.first() {
                         Some(Value::Descriptor(desc)) if descriptor.is_none() => {
@@ -303,18 +307,19 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
                         Some(Value::TapInfo(tap)) if tapinfo.is_none() => {
                             tapinfo = Some(tap.clone())
                         }
-                        Some(Value::WshScript(wsh)) => {
-                            psbt_input.witness_script = Some(wsh.0.clone())
+                        Some(Value::WshScript(wsh)) if wshscript.is_none() => {
+                            wshscript = Some(wsh.clone());
                         }
                         _ => {}
                     }
                 }
-                psbt_input.witness_utxo = Some(val.try_into()?);
+                input.witness_utxo = Some(val.try_into()?);
             }
 
-            // Keep the descriptor, tapinfo and amount to later construct the utxo and populate the PSBT fields
+            // Keep the descriptor/tapinfo/wsh_script and amount fields to later construct the utxo and populate the PSBT fields
             "descriptor" => descriptor = Some(val.try_into()?),
             "tap_info" => tapinfo = Some(val.try_into()?),
+            "wsh_script" => wshscript = Some(val.try_into()?),
             "amount" | "utxo_amount" => utxo_amount = Some(val.try_into()?),
 
             _ => bail!(Error::TagUnknown),
@@ -324,19 +329,21 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
 
     // Populate PSBT fields using the Descriptor/TaprootSpendInfo, if available
     let mut utxo_spk = None;
-    if let Some(descriptor) = &descriptor {
-        psbt_input.update_with_descriptor_unchecked(descriptor)?;
+    if let Some(descriptor) = descriptor {
+        input.update_with_descriptor_unchecked(&descriptor)?;
         utxo_spk = Some(descriptor.script_pubkey());
-    } else if let Some(tapinfo) = &tapinfo {
-        psbt_input.update_with_taproot(tapinfo)?;
+    } else if let Some(tapinfo) = tapinfo {
+        input.update_with_taproot(&tapinfo)?;
         utxo_spk = Some(tapinfo.script_pubkey());
+    } else if let Some(wsh) = wshscript {
+        utxo_spk = Some(wsh.script_pubkey());
+        input.witness_script = Some(wsh.0);
     }
 
-    // Automatically fill in the witness_utxo if utxo amount and scriptPubKey are known
-    if let (None, Some(utxo_amount), Some(utxo_spk)) =
-        (&psbt_input.witness_utxo, utxo_amount, utxo_spk)
+    // Automatically fill in the witness_utxo if the utxo amount and scriptPubKey are known
+    if let (None, Some(utxo_amount), Some(utxo_spk)) = (&input.witness_utxo, utxo_amount, utxo_spk)
     {
-        psbt_input.witness_utxo = Some(TxOut {
+        input.witness_utxo = Some(TxOut {
             script_pubkey: utxo_spk,
             value: utxo_amount,
         });
@@ -345,23 +352,21 @@ fn update_input(psbt_input: &mut psbt::Input, tags: Array) -> Result<()> {
     Ok(())
 }
 
-fn update_output(psbt_output: &mut psbt::Output, tags: Array) -> Result<()> {
+fn update_output(out: &mut psbt::Output, tags: Array) -> Result<()> {
     tags.for_each_unique_tag(|tag, val| {
         match tag {
-            "redeem_script" => psbt_output.redeem_script = Some(val.try_into()?),
-            "witness_script" => psbt_output.witness_script = Some(val.try_into()?),
-            "bip32_derivation" => psbt_output.bip32_derivation = bip32_derivation_map(val)?,
-            "tap_internal_key" => psbt_output.tap_internal_key = Some(val.try_into()?),
-            "tap_tree" => psbt_output.tap_tree = Some(val.try_into()?),
-            "tap_key_origins" => psbt_output.tap_key_origins = tap_key_origins_map(val)?,
-            "proprietary" => psbt_output.proprietary = val.try_into()?,
-            "unknown" => psbt_output.unknown = val.try_into()?,
-            "descriptor" => psbt_output
+            "redeem_script" => out.redeem_script = Some(val.try_into()?),
+            "witness_script" => out.witness_script = Some(val.try_into()?),
+            "bip32_derivation" => out.bip32_derivation.append(&mut bip32_derivation_map(val)?),
+            "tap_internal_key" => out.tap_internal_key = Some(val.try_into()?),
+            "tap_tree" => out.tap_tree = Some(val.try_into()?),
+            "tap_key_origins" => out.tap_key_origins.append(&mut tap_key_origins_map(val)?),
+            "proprietary" => out.proprietary.append(&mut val.try_into()?),
+            "unknown" => out.unknown.append(&mut val.try_into()?),
+            "descriptor" => out
                 .update_with_descriptor_unchecked(&val.try_into()?)
                 .map(|_| ())?,
-            "tap_info" => psbt_output
-                .update_with_taproot(&val.try_into()?)
-                .map(|_| ())?,
+            "tap_info" => out.update_with_taproot(&val.try_into()?).map(|_| ())?,
             // note: PsbtTxOut calls update_with{descriptor,taproot}() itself and does not forward the "descriptor"
             // and "tap_info" tags here. This will need to be refactored if anything more complex is done here.
             _ => bail!(Error::TagUnknown),
@@ -473,13 +478,16 @@ impl TryFrom<Value> for PsbtTxOut {
             // Tx output provided as a $scriptPubKeyLike:$amount tuple
             let (spk_like, amount): (Value, _) = arr.try_into()?;
 
-            // If the scriptPubKey was specified using a Descriptor or a TaprootSpendInfo, also use them to populate the PSBT fields
+            // If the scriptPubKey was specified using a Descriptor/TaprootSpendInfo/WshScript, also use them to populate the PSBT fields
             match &spk_like {
                 Value::Descriptor(descriptor) => {
                     psbt_output.update_with_descriptor_unchecked(&descriptor.definite()?)?;
                 }
                 Value::TapInfo(tapinfo) => {
                     psbt_output.update_with_taproot(tapinfo)?;
+                }
+                Value::WshScript(wsh) => {
+                    psbt_output.witness_script = Some(wsh.explicit_script());
                 }
                 _ => {}
             }
@@ -494,23 +502,24 @@ impl TryFrom<Value> for PsbtTxOut {
             let mut amount = None;
             arr.for_each_unique_tag(|tag, val| {
                 match tag {
-                    // The entire output may be provided under the "output" tag, or alternatively as individual fields
-                    "output" => tx_output = Some(val.try_into()?),
                     "amount" => amount = Some(val.try_into()?),
                     "script_pubkey" => spk = Some(val.try_into()?),
 
-                    // Use the Descriptor to populate the PSBT fields and to construct the scriptPubKey
+                    // Use the Descriptor/TaprootSpendInfo/WshScript to populate the PSBT fields and to construct the scriptPubKey
                     "descriptor" => {
                         let descriptor = val.try_into()?;
                         psbt_output.update_with_descriptor_unchecked(&descriptor)?;
                         spk.get_or_insert_with(|| descriptor.script_pubkey());
                     }
-
-                    // Use the TaprootSpendInfo to populate the PSBT fields and to construct the scriptPubKey
                     "tap_info" => {
                         let tapinfo = val.try_into()?;
                         psbt_output.update_with_taproot(&tapinfo)?;
                         spk.get_or_insert_with(|| tapinfo.script_pubkey());
+                    }
+                    "wsh_script" => {
+                        let wsh: WshScript = val.try_into()?;
+                        psbt_output.witness_script = Some(wsh.explicit_script());
+                        spk.get_or_insert_with(|| wsh.script_pubkey());
                     }
 
                     // Collect other PSBT tags to forward to update_output()

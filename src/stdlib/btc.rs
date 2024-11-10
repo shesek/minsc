@@ -567,7 +567,7 @@ impl FieldAccess for Address {
 impl FieldAccess for WshScript {
     fn get_field(self, field: &Value) -> Option<Value> {
         Some(match field.as_str()? {
-            "script_pubkey" => self.0.to_p2wsh().into(),
+            "script_pubkey" => self.script_pubkey().into(),
             "explicit_script" => self.0.into(),
             "address_type" => bitcoin::AddressType::P2wsh.into(),
             "witness_program" => bitcoin::WitnessProgram::p2wsh(&self.0).into(),
@@ -575,6 +575,18 @@ impl FieldAccess for WshScript {
                 return None;
             }
         })
+    }
+}
+
+impl WshScript {
+    pub fn script_pubkey(&self) -> ScriptBuf {
+        self.0.to_p2wsh()
+    }
+    pub fn explicit_script(&self) -> ScriptBuf {
+        self.0.clone()
+    }
+    pub fn explicit_script_ref(&self) -> &Script {
+        self.0.as_script()
     }
 }
 

@@ -42,14 +42,11 @@ impl PsbtTaprootExt for psbt::Input {
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
         self.tap_merkle_root = tapinfo.merkle_root();
         self.tap_internal_key = Some(tapinfo.internal_key());
-        self.tap_scripts = tapinfo
-            .script_map()
-            .iter()
-            .map(|(script_ver, _)| {
+        self.tap_scripts
+            .extend(tapinfo.script_map().iter().map(|(script_ver, _)| {
                 let ctrl = tapinfo.control_block(script_ver).expect("must exists");
                 (ctrl, script_ver.clone())
-            })
-            .collect();
+            }));
         // `tap_key_origins` needs to be filled in manually
         Ok(())
     }
