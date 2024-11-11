@@ -10,13 +10,12 @@ use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut, XOnlyPublic
 use miniscript::descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
+use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::{
     Array, Error, FieldAccess, FromValue, Mutable, Number::Int, Result, ScopeRef, Value,
 };
 use crate::stdlib::btc::WshScript;
-use crate::util::{
-    self, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, PsbtInExt, PsbtOutExt, TapInfoExt, EC,
-};
+use crate::util::{DescriptorExt, DescriptorPubKeyExt, PsbtInExt, PsbtOutExt, TapInfoExt, EC};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -837,7 +836,7 @@ impl PrettyDisplay for Psbt {
     #[rustfmt::skip]
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
-            util::indentation_params(indent);
+            indentation_params(indent);
         let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
         let mut is_first = true;
 
@@ -850,11 +849,11 @@ impl PrettyDisplay for Psbt {
         fmt_map_field!(self, unknown, f, sep, is_first, inner_indent);
 
         write!(f, ",{sep}\"inputs\": ")?;
-        util::fmt_list(f, &mut self.inputs.iter(), inner_indent,
+        fmt_list(f, &mut self.inputs.iter(), inner_indent,
             |f, input, in_indent| write!(f, "{}", input.pretty(in_indent)))?;
 
         write!(f, ",{sep}\"outputs\": ")?;
-        util::fmt_list(f, &mut self.outputs.iter(), inner_indent,
+        fmt_list(f, &mut self.outputs.iter(), inner_indent,
             |f, output, out_indent| write!(f, "{}", output.pretty(out_indent)))?;
 
         write!(f, "{newline_or_space}{:indent_w$}]", "")
@@ -867,7 +866,7 @@ impl PrettyDisplay for psbt::Input {
     #[rustfmt::skip]
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
-            util::indentation_params(indent);
+            indentation_params(indent);
         let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
         let mut is_first = true;
 
@@ -917,7 +916,7 @@ impl PrettyDisplay for psbt::Output {
     #[rustfmt::skip]
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
-            util::indentation_params(indent);
+            indentation_params(indent);
         let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
         let mut is_first = true;
 

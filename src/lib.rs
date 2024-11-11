@@ -21,8 +21,8 @@ use std::convert::TryInto;
 
 pub use error::{Error, ParseError, RuntimeError};
 pub use parser::{ast, Expr, Ident, Library, Stmt};
+pub use runtime::display::{self, PrettyDisplay};
 pub use runtime::{Evaluate, Execute, ExprRepr, Number, Scope, ScopeRef, Value};
-pub use util::PrettyDisplay;
 
 use miniscript::{descriptor, policy};
 

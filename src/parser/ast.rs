@@ -3,7 +3,7 @@ use miniscript::{bitcoin, descriptor};
 use bitcoin::address::{self, Address};
 use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
-use crate::util::fmt_list;
+use crate::display::fmt_list;
 
 /// Expressions have no side-effects and produce a value
 #[derive(Debug, Clone)]

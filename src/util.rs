@@ -1,10 +1,8 @@
+use std::iter;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::{fmt, iter};
 
-use bitcoin::bip32::{self, ChildNumber, DerivationPath, IntoDerivationPath};
-use bitcoin::hashes::{sha256, Hash};
-use bitcoin::hex::DisplayHex;
+use bitcoin::bip32::{self, DerivationPath, IntoDerivationPath};
 use bitcoin::taproot::{ControlBlock, TaprootSpendInfo};
 use bitcoin::{key::TapTweak, psbt, secp256k1, PublicKey, Transaction};
 use miniscript::descriptor::{
@@ -20,7 +18,7 @@ lazy_static! {
     pub static ref EC: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
 }
 
-// Taproot utilities
+// TaprootSpendInfo
 
 pub trait TapInfoExt {
     fn witness_program(&self) -> bitcoin::WitnessProgram;
@@ -28,22 +26,28 @@ pub trait TapInfoExt {
         bitcoin::ScriptBuf::new_witness_program(&self.witness_program())
     }
 }
+
 impl TapInfoExt for TaprootSpendInfo {
     fn witness_program(&self) -> bitcoin::WitnessProgram {
         bitcoin::WitnessProgram::p2tr_tweaked(self.output_key())
     }
 }
 
+//
+// PSBT
+//
+
 pub trait PsbtInExt {
-    /// Update PSBT fields using the TaprootSpendInfo of the spent output
+    /// Populate PSBT fields using the TaprootSpendInfo of the spent output
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()>;
 
-    /// Update PSBT fields using the PSBT of the spent transaction
+    /// Populate PSBT fields using the PSBT of the spent transaction
     fn update_with_prevout_psbt(&mut self, prev_psbt: &psbt::Psbt, vout: usize) -> Result<()>;
 
-    /// Update PSBT fields using the spent transaction
+    /// Populate PSBT fields using the spent transaction
     fn update_with_prevout_tx(&mut self, prev_tx: &Transaction, vout: usize) -> Result<()>;
 }
+
 impl PsbtInExt for psbt::Input {
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
         self.tap_merkle_root = tapinfo.merkle_root();
@@ -128,7 +132,107 @@ impl PsbtOutExt for psbt::Output {
     }
 }
 
-// Miniscript utilities
+//
+// Public/Secret Keys
+//
+
+pub trait DescriptorPubKeyExt: Sized {
+    /// Convert into a definite pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn definite(self) -> Result<DefiniteDescriptorKey>;
+
+    /// Convert into a derived pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn derive_definite(self) -> Result<bitcoin::PublicKey> {
+        Ok(self.definite()?.derive_public_key(&EC)?)
+    }
+
+    /// Convert into a derived x-only pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn derive_xonly(self) -> Result<bitcoin::XOnlyPublicKey> {
+        Ok(self.derive_definite()?.inner.into())
+    }
+
+    /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
+    fn derivation_paths(&self) -> Vec<DerivationPath>;
+}
+impl DescriptorPubKeyExt for DescriptorPublicKey {
+    fn definite(self) -> Result<DefiniteDescriptorKey> {
+        ensure!(
+            !self.has_wildcard(),
+            Error::UnexpectedWildcardPubKey(self.clone().into())
+        );
+        ensure!(
+            !self.is_multipath(),
+            Error::UnexpectedMultiPathPubKey(self.clone().into())
+        );
+        Ok(self.at_derivation_index(0).expect("index is valid"))
+    }
+
+    fn derivation_paths(&self) -> Vec<DerivationPath> {
+        match self {
+            DescriptorPublicKey::MultiXPub(mxpub) => mxpub.derivation_paths.paths().clone(),
+            DescriptorPublicKey::XPub(xpub) => vec![xpub.derivation_path.clone()],
+            DescriptorPublicKey::Single(single) => {
+                vec![single
+                    .origin
+                    .as_ref()
+                    .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
+            }
+        }
+    }
+}
+
+pub trait DescriptorSecretKeyExt {
+    /// Like `DescriptorPublicKey::full_derivation_paths()`, which isn't available for secret keys
+    fn full_derivation_paths(&self) -> Vec<DerivationPath>;
+
+    fn to_public_(&self) -> Result<DescriptorPublicKey>;
+}
+impl DescriptorSecretKeyExt for DescriptorSecretKey {
+    fn full_derivation_paths(&self) -> Vec<DerivationPath> {
+        match self {
+            DescriptorSecretKey::MultiXPrv(xprv) => {
+                let origin_path = if let Some((_, ref path)) = xprv.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                };
+                xprv.derivation_paths
+                    .paths()
+                    .iter()
+                    .map(|p| origin_path.extend(p))
+                    .collect()
+            }
+            DescriptorSecretKey::XPrv(ref xpub) => {
+                let origin_path = if let Some((_, ref path)) = xpub.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                };
+                vec![origin_path.extend(&xpub.derivation_path)]
+            }
+            DescriptorSecretKey::Single(ref single) => {
+                vec![if let Some((_, ref path)) = single.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                }]
+            }
+        }
+    }
+
+    // Pending https://github.com/rust-bitcoin/rust-miniscript/pull/757
+    fn to_public_(&self) -> Result<DescriptorPublicKey> {
+        Ok(match self {
+            DescriptorSecretKey::Single(_) | DescriptorSecretKey::XPrv(_) => self.to_public(&EC)?,
+            DescriptorSecretKey::MultiXPrv(mxprv) => {
+                DescriptorPublicKey::MultiXPub(multi_xpriv_to_public(mxprv)?)
+            }
+        })
+    }
+}
+
+//
+// Miniscript
+//
 
 pub trait MiniscriptExt<T: miniscript::ScriptContext> {
     fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, T>>;
@@ -145,6 +249,11 @@ impl<Ctx: miniscript::ScriptContext> MiniscriptExt<Ctx>
         )
     }
 }
+
+//
+// Descriptors
+//
+
 pub trait DescriptorExt {
     /// Convert into a Descriptor over definite pubkeys. Errors if the descriptor contains underived wildcards or multi-path derivations.
     fn definite(&self) -> Result<Descriptor<DefiniteDescriptorKey>>;
@@ -217,7 +326,9 @@ impl DescriptorExt for Descriptor<DescriptorPublicKey> {
     }
 }
 
-// BIP32 derivation utilities
+//
+// BIP32 derivation
+//
 
 pub trait DeriveExt: Sized {
     /// Always derives when called directly on Xpubs/Xprivs, even if their wildcard modifier
@@ -519,102 +630,6 @@ where
     // XXX could use miniscript::translate_hash_clone!() if is used std::result:Result or if we avoided replacing Result with a type alias
 }
 
-// Keys utilities
-
-pub trait DescriptorPubKeyExt: Sized {
-    /// Convert into a definite pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
-    fn definite(self) -> Result<DefiniteDescriptorKey>;
-
-    /// Convert into a derived pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
-    fn derive_definite(self) -> Result<bitcoin::PublicKey> {
-        Ok(self.definite()?.derive_public_key(&EC)?)
-    }
-
-    /// Convert into a derived x-only pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
-    fn derive_xonly(self) -> Result<bitcoin::XOnlyPublicKey> {
-        Ok(self.derive_definite()?.inner.into())
-    }
-
-    /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
-    fn derivation_paths(&self) -> Vec<DerivationPath>;
-}
-
-impl DescriptorPubKeyExt for DescriptorPublicKey {
-    fn definite(self) -> Result<DefiniteDescriptorKey> {
-        ensure!(
-            !self.has_wildcard(),
-            Error::UnexpectedWildcardPubKey(self.clone().into())
-        );
-        ensure!(
-            !self.is_multipath(),
-            Error::UnexpectedMultiPathPubKey(self.clone().into())
-        );
-        Ok(self.at_derivation_index(0).expect("index is valid"))
-    }
-
-    fn derivation_paths(&self) -> Vec<DerivationPath> {
-        match self {
-            DescriptorPublicKey::MultiXPub(mxpub) => mxpub.derivation_paths.paths().clone(),
-            DescriptorPublicKey::XPub(xpub) => vec![xpub.derivation_path.clone()],
-            DescriptorPublicKey::Single(single) => {
-                vec![single
-                    .origin
-                    .as_ref()
-                    .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
-            }
-        }
-    }
-}
-
-pub trait DescriptorSecretKeyExt {
-    /// Like `DescriptorPublicKey::full_derivation_paths()`, which isn't available for secret keys
-    fn full_derivation_paths(&self) -> Vec<DerivationPath>;
-
-    fn to_public_(&self) -> Result<DescriptorPublicKey>;
-}
-impl DescriptorSecretKeyExt for DescriptorSecretKey {
-    fn full_derivation_paths(&self) -> Vec<DerivationPath> {
-        match self {
-            DescriptorSecretKey::MultiXPrv(xprv) => {
-                let origin_path = if let Some((_, ref path)) = xprv.origin {
-                    path.clone()
-                } else {
-                    DerivationPath::from(vec![])
-                };
-                xprv.derivation_paths
-                    .paths()
-                    .iter()
-                    .map(|p| origin_path.extend(p))
-                    .collect()
-            }
-            DescriptorSecretKey::XPrv(ref xpub) => {
-                let origin_path = if let Some((_, ref path)) = xpub.origin {
-                    path.clone()
-                } else {
-                    DerivationPath::from(vec![])
-                };
-                vec![origin_path.extend(&xpub.derivation_path)]
-            }
-            DescriptorSecretKey::Single(ref single) => {
-                vec![if let Some((_, ref path)) = single.origin {
-                    path.clone()
-                } else {
-                    DerivationPath::from(vec![])
-                }]
-            }
-        }
-    }
-
-    fn to_public_(&self) -> Result<DescriptorPublicKey> {
-        Ok(match self {
-            DescriptorSecretKey::Single(_) | DescriptorSecretKey::XPrv(_) => self.to_public(&EC)?,
-            DescriptorSecretKey::MultiXPrv(mxprv) => {
-                DescriptorPublicKey::MultiXPub(multi_xpriv_to_public(mxprv)?)
-            }
-        })
-    }
-}
-
 // Pending https://github.com/rust-bitcoin/rust-miniscript/pull/757
 fn multi_xpriv_to_public(
     mxprv: &DescriptorMultiXKey<bip32::Xpriv>,
@@ -692,85 +707,6 @@ fn multi_xpriv_to_public(
         wildcard: mxprv.wildcard,
     })
 }
-
-/// Compute a derivation path from a sha256 hash.
-///
-/// Format is a bit peculiar, it's 9 u32's with the top bit as 0 (for unhardened
-/// derivation). We take each u32 in the hash (big endian) and mask off the top bit.
-/// Then we go over the 8 u32s and make a 8 bit u32 from the top bits.
-///
-/// This is because the ChildNumber is a enum u31 where the top bit is used to
-/// indicate hardened or not, so we can't just do the simple thing.
-///
-/// Copied from https://github.com/sapio-lang/sapio/blob/072b8835dcf4ba6f8f00f3a5d9034ef8e021e0a7/ctv_emulators/src/lib.rs
-pub fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
-    let a: [u8; 32] = h.to_byte_array();
-    let b: [[u8; 4]; 8] = unsafe { std::mem::transmute(a) };
-    let mut c: Vec<ChildNumber> = b
-        .iter()
-        // Note: We mask off the top bit. This removes 8 bits of entropy from the hash,
-        // but we add it back in later.
-        .map(|x| (u32::from_be_bytes(*x) << 1) >> 1)
-        .map(ChildNumber::from)
-        .collect();
-    // Add a unique 9th path for the MSB's
-    c.push(
-        b.iter()
-            .enumerate()
-            .map(|(i, x)| (u32::from_be_bytes(*x) >> 31) << i)
-            .sum::<u32>()
-            .into(),
-    );
-    c
-}
-
-pub fn fmt_quoted_str<W: fmt::Write>(f: &mut W, str: &str) -> fmt::Result {
-    write!(f, "\"")?;
-    for char in str.chars() {
-        match char {
-            '\r' => write!(f, "\\r")?,
-            '\n' => write!(f, "\\n")?,
-            '\t' => write!(f, "\\t")?,
-            '"' => write!(f, "\\\"")?,
-            _ => write!(f, "{}", char)?,
-        };
-    }
-    write!(f, "\"")
-}
-
-pub fn quote_str(s: &str) -> String {
-    let mut quoted = String::with_capacity(s.len());
-    fmt_quoted_str(&mut quoted, s).unwrap();
-    quoted
-}
-
-/// A Write wrapper that allows up the `limit` bytes to be written through it to the inner `writer`.
-/// If the limit is reached, an fmt::Error is raised. This is used as an optimization by PrettyDisplay.
-pub struct LimitedWriter<'a, W: fmt::Write + ?Sized> {
-    writer: &'a mut W,
-    limit: usize,
-    total: usize,
-}
-impl<'a, W: fmt::Write + ?Sized> LimitedWriter<'a, W> {
-    pub fn new(writer: &'a mut W, limit: usize) -> Self {
-        LimitedWriter {
-            writer,
-            limit,
-            total: 0,
-        }
-    }
-}
-impl<W: fmt::Write + ?Sized> fmt::Write for LimitedWriter<'_, W> {
-    fn write_str(&mut self, buf: &str) -> fmt::Result {
-        self.total += buf.len();
-        if self.total > self.limit {
-            Err(fmt::Error)
-        } else {
-            self.writer.write_str(buf)
-        }
-    }
-}
-
 pub trait PeekableExt: Iterator {
     /// Like take_while(), but borrows checked items and doesn't consume the last non-matching one
     /// Similarly to https://docs.rs/itertools/latest/itertools/trait.Itertools.html#method.peeking_take_while
@@ -787,109 +723,4 @@ impl<I: Iterator> PeekableExt for iter::Peekable<I> {
         // h/t https://www.reddit.com/r/rust/comments/f8ae6q/comment/jwuyzgo/
         iter::from_fn(move || self.next_if(accept))
     }
-}
-
-/// Display-like with custom formatting options, newlines/indentation handling and the ability to implement on foreign types
-pub trait PrettyDisplay: Sized {
-    const AUTOFMT_ENABLED: bool;
-    const MAX_ONELINER_LENGTH: usize = 125;
-
-    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result;
-
-    /// Use multi-line indented formatting for long lines ove MAX_ONELINER_LENGTH,
-    /// or the one-liner formatting otherwise
-    fn auto_fmt<W: fmt::Write>(&self, w: &mut W, indent: Option<usize>) -> fmt::Result {
-        if !Self::AUTOFMT_ENABLED || indent.is_none() || self.prefer_multiline_anyway() {
-            return self.pretty_fmt(w, indent);
-        }
-
-        // Try formatting into a buffer with no newlines first, to determine whether it exceeds the length limit.
-        // The LimitedWriter will reject writes once the limit is reached, terminating the process midway through.
-        let mut one_liner = String::new();
-        let mut lwriter = LimitedWriter::new(&mut one_liner, Self::MAX_ONELINER_LENGTH);
-        if self.pretty_fmt(&mut lwriter, None).is_ok() {
-            // Fits in MAX_ONELINER_LIMIT, forward the buffered string to the outer `w` formatter
-            write!(w, "{}", one_liner)
-        } else {
-            // The one-liner was too long, use multi-line formatting with indentation instead
-            self.pretty_fmt(w, indent)
-        }
-    }
-
-    /// Don't try fitting into a one-liner if this test passes
-    fn prefer_multiline_anyway(&self) -> bool {
-        false
-    }
-
-    /// Get back a Display-able struct with pretty-formatting
-    fn pretty(&self, indent: Option<usize>) -> PrettyDisplayer<Self> {
-        PrettyDisplayer {
-            inner: self,
-            indent,
-        }
-    }
-    fn pretty_multiline(&self) -> PrettyDisplayer<Self> {
-        self.pretty(Some(0))
-    }
-
-    fn pretty_str(&self) -> String {
-        self.pretty(None).to_string()
-    }
-    fn multiline_str(&self) -> String {
-        self.pretty_multiline().to_string()
-    }
-}
-
-/// A wrapper type implementing Display over PrettyDisplay::auto_fmt()
-#[derive(Debug)]
-pub struct PrettyDisplayer<'a, T: PrettyDisplay> {
-    inner: &'a T,
-    /// Setting this implies enabling new-lines
-    indent: Option<usize>,
-}
-impl<'a, T: PrettyDisplay> fmt::Display for PrettyDisplayer<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.inner.auto_fmt(f, self.indent)
-    }
-}
-
-pub const LIST_INDENT_WIDTH: usize = 2;
-
-pub fn fmt_list<T, F, W, I>(w: &mut W, iter: I, indent: Option<usize>, func: F) -> fmt::Result
-where
-    W: fmt::Write,
-    I: Iterator<Item = T>,
-    F: Fn(&mut W, T, Option<usize>) -> fmt::Result,
-{
-    let (newline_or_space, inner_indent, indent_w, inner_indent_w) = indentation_params(indent);
-
-    write!(w, "[")?;
-    for (i, item) in iter.enumerate() {
-        if i > 0 {
-            write!(w, ",")?;
-        }
-        write!(w, "{newline_or_space}{:inner_indent_w$}", "")?;
-        func(w, item, inner_indent)?;
-    }
-    write!(w, "{newline_or_space}{:indent_w$}]", "")
-}
-
-impl<T: PrettyDisplay> PrettyDisplay for Vec<T> {
-    const AUTOFMT_ENABLED: bool = true;
-    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
-        fmt_list(f, self.iter(), indent, |f, el, inner_indent| {
-            write!(f, "{}", el.pretty(inner_indent))
-        })
-    }
-}
-
-impl_simple_pretty!(Vec<u8>, bytes, "0x{}", bytes.as_hex());
-
-pub fn indentation_params(indent: Option<usize>) -> (&'static str, Option<usize>, usize, usize) {
-    let newline_or_space = iif!(indent.is_some(), "\n", " ");
-    let inner_indent = indent.map(|n| n + 1);
-    let indent_w = indent.map_or(0, |n| n * LIST_INDENT_WIDTH);
-    let inner_indent_w = inner_indent.map_or(0, |n| n * LIST_INDENT_WIDTH);
-
-    (newline_or_space, inner_indent, indent_w, inner_indent_w)
 }

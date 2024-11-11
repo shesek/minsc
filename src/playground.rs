@@ -7,7 +7,8 @@ use wasm_bindgen::prelude::*;
 use miniscript::bitcoin::{Address, Network, ScriptBuf};
 use miniscript::{Descriptor, ForEachKey, MiniscriptKey};
 
-use crate::util::{DescriptorExt, PrettyDisplay, TapInfoExt};
+use crate::display::PrettyDisplay;
+use crate::util::{DescriptorExt, TapInfoExt};
 use crate::{parse, Error, Evaluate, Execute, ExprRepr, Library, Scope, ScopeRef, Value};
 
 #[derive(Serialize)]

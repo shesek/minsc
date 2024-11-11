@@ -150,7 +150,7 @@ macro_rules! fmt_map_field {
                 write!($f, ",")?;
             }
             write!($f, "{}\"{}\": ", $sep, stringify!($field))?;
-            util::fmt_list($f, &mut $self.$field.iter(), $inner_indent, $el_fn)?;
+            crate::display::fmt_list($f, &mut $self.$field.iter(), $inner_indent, $el_fn)?;
         }
     };
     // Format using the key/value's PrettyDisplay by default

@@ -11,11 +11,12 @@ use bitcoin::{
 use miniscript::psbt::PsbtExt;
 
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
+use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::{
     eval_exprs, Array, Error, Evaluate, Execute, FieldAccess, Float, Int, Mutable, Result,
     ScopeRef, Value,
 };
-use crate::util::{self, fmt_list, DescriptorExt, PrettyDisplay, TapInfoExt, EC};
+use crate::util::{DescriptorExt, TapInfoExt, EC};
 use crate::{ast, time, Library};
 
 lazy_static! {
@@ -612,7 +613,7 @@ pub fn fmt_script<W: fmt::Write>(
     format: ScriptFmt,
     indent: Option<usize>,
 ) -> fmt::Result {
-    use crate::util::{quote_str as quote, LIST_INDENT_WIDTH as INDENT};
+    use crate::display::{quote_str as quote, INDENT_WIDTH as INDENT};
     use bitcoin::opcodes::all::{OP_ELSE, OP_ENDIF, OP_IF, OP_NOTIF};
 
     let mut indent_w = indent.map_or(0, |n| n * INDENT);
@@ -763,8 +764,7 @@ impl PrettyDisplay for Transaction {
     const MAX_ONELINER_LENGTH: usize = 200;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
-        let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
-            util::indentation_params(indent);
+        let (newline_or_space, inner_indent, indent_w, inner_indent_w) = indentation_params(indent);
         let field_sep = format!("{newline_or_space}{:inner_indent_w$}", "");
         write!(f, r#"tx [{field_sep}"version": {}"#, self.version.0)?;
         if self.lock_time != AbsLockTime::ZERO {
@@ -806,7 +806,7 @@ impl PrettyDisplay for bitcoin::TxIn {
             write!(f, "{}", self.previous_output)
         } else {
             let (newline_or_space, _inner_indent, indent_w, inner_indent_w) =
-                util::indentation_params(indent);
+                indentation_params(indent);
             let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
 
             write!(f, "[{sep}\"prevout\": {}", self.previous_output)?;

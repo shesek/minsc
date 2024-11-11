@@ -10,11 +10,10 @@ use bitcoin::{taproot, ScriptBuf, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey};
 
 use super::miniscript::{multi_andor, AndOr};
+use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Array, Error, FieldAccess, Result, Value};
-use crate::util::{
-    self, fmt_list, DescriptorExt, DescriptorPubKeyExt, PrettyDisplay, TapInfoExt, EC,
-};
+use crate::util::{DescriptorExt, DescriptorPubKeyExt, TapInfoExt, EC};
 use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -556,8 +555,7 @@ impl<'a> PrettyDisplay for NodeTree<'a> {
     const AUTOFMT_ENABLED: bool = true;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
-        let (newline_or_space, inner_indent, indent_w, inner_indent_w) =
-            util::indentation_params(indent);
+        let (newline_or_space, inner_indent, indent_w, inner_indent_w) = indentation_params(indent);
         match self {
             NodeTree::Leaf((script, _)) => {
                 // TODO leaf version not encoded

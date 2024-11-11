@@ -3,8 +3,8 @@ use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use std::{fmt, mem, ops, vec};
 
+use crate::display::{fmt_list, PrettyDisplay};
 use crate::runtime::{Error, FieldAccess, FromValue, Result, Value};
-use crate::util::{fmt_list, PrettyDisplay};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Array(pub Vec<Value>);

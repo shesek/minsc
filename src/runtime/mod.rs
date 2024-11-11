@@ -9,6 +9,7 @@ pub use crate::error::{ResultExt, RuntimeError as Error};
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub mod array;
+pub mod display;
 pub mod function;
 pub mod scope;
 pub mod value;

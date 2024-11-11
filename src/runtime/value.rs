@@ -12,7 +12,7 @@ use descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 
 use crate::parser::Expr;
 use crate::runtime::{Array, Error, Evaluate, FieldAccess, Function, Result, Scope};
-use crate::util::{fmt_quoted_str, PrettyDisplay, EC};
+use crate::util::EC;
 use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 use stdlib::btc::WshScript;
 
@@ -398,35 +398,6 @@ impl FromStr for Value {
     }
 }
 
-// Display
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Mostly round-trip-able, see ExprRepr for a string representation that always is
-        match self {
-            Value::Number(x) => write!(f, "{}", x),
-            Value::Bool(x) => write!(f, "{}", x),
-            Value::Bytes(x) => write!(f, "0x{}", x.as_hex()),
-            Value::String(x) => fmt_quoted_str(f, x),
-            Value::Policy(x) => write!(f, "{}", x),
-            Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Descriptor(x) => write!(f, "{:#}", x), // not round-trip-able (ExprRepr is)
-            Value::Function(x) => write!(f, "{}", x),     // not round-trip-able (cannot be)
-            Value::Network(x) => write!(f, "{}", x),
-            Value::Symbol(x) => write!(f, "{}", x),
-            Value::Psbt(x) => write!(f, "{}", x.pretty(None)),
-            Value::SecKey(x) => write!(f, "{}", x.pretty(None)),
-            Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
-            Value::Array(x) => write!(f, "{}", x.pretty(None)),
-            Value::Transaction(x) => write!(f, "{}", x.pretty(None)),
-            Value::Script(x) => write!(f, "{}", x.pretty(None)),
-            Value::Address(x) => write!(f, "{}", x.pretty(None)),
-            Value::TapInfo(x) => write!(f, "{}", x.pretty(None)),
-            Value::WshScript(x) => write!(f, "{}", x.pretty(None)),
-        }
-    }
-}
-
 impl fmt::Display for Number {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -435,26 +406,6 @@ impl fmt::Display for Number {
             // {:#} can do this too, but it also enables scientific notation which we want to avoid
             Number::Float(n) if n.fract() == 0.0 => write!(f, "{:.1}", n),
             Number::Float(n) => write!(f, "{}", n),
-        }
-    }
-}
-impl PrettyDisplay for Value {
-    const AUTOFMT_ENABLED: bool = true;
-
-    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
-        match self {
-            Value::PubKey(x) => write!(f, "{}", x.pretty(indent)),
-            Value::SecKey(x) => write!(f, "{}", x.pretty(indent)),
-            Value::Array(x) => write!(f, "{}", x.pretty(indent)),
-            Value::Script(x) => write!(f, "{}", x.pretty(indent)),
-            Value::Address(x) => write!(f, "{}", x.pretty(indent)),
-            Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
-            Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
-            Value::Psbt(x) => write!(f, "{}", x.pretty(indent)),
-            Value::WshScript(x) => write!(f, "{}", x.pretty(indent)),
-
-            // Use Display for other types that don't implement PrettyDisplay
-            other => write!(f, "{}", other),
         }
     }
 }
