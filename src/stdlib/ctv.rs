@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::{Transaction, TxIn};
 use miniscript::bitcoin;
@@ -35,7 +37,12 @@ pub mod fns {
     ///
     /// Example: ctv::hash([ "outputs": [ wpkh($bob_pk): 10000 sats, wpkh($alice_pk): 25000 sats ] ])
     pub fn hash(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (mut tx, input_index): (Transaction, Option<u32>) = args.args_into()?;
+        let (tx, input_index): (_, Option<u32>) = args.args_into()?;
+        let mut tx = match tx {
+            Value::Psbt(psbt) => psbt.unsigned_tx,
+            Value::Transaction(tx) => tx,
+            other => other.try_into()?,
+        };
 
         ensure!(!tx.output.is_empty(), Error::InvalidArguments);
 
