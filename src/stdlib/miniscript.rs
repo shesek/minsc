@@ -8,7 +8,7 @@ use miniscript::{ForEachKey, MiniscriptKey, ScriptContext, Threshold};
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, Result, Value};
 use crate::stdlib::{btc::WshScript, taproot::tap_scripts_to_val};
-use crate::util::{DeriveExt, DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt};
+use crate::util::{DeriveExt, DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt, TapInfoExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
 pub use crate::runtime::AndOr;
@@ -278,10 +278,12 @@ impl FieldAccess for Descriptor {
             // Only available for taproot descriptors (similar fields mirrored on TaprootSpendInfo)
             "internal_key" => self.tr()?.internal_key().clone().into(),
             // Only available for definite taproot descriptors
-            "merkle_root" => self.tap_info().ok()??.merkle_root()?.into(),
             "output_key" => self.tap_info().ok()??.output_key().into(),
             "output_key_parity" => self.tap_info().ok()??.output_key_parity().into(),
             "scripts" => tap_scripts_to_val(&*self.tap_info().ok()??),
+            // Only available for definite taproot descriptors with script paths
+            "merkle_root" => self.tap_info().ok()??.merkle_root()?.into(),
+            "script_tree" => self.tap_info().ok()??.script_tree()?.into(),
             _ => {
                 return None;
             } // TODO address_type

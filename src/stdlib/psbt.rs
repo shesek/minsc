@@ -808,9 +808,8 @@ impl From<psbt::Output> for Value {
     #[rustfmt::skip]
     fn from(output: psbt::Output) -> Self {
         let mut tags = Vec::with_capacity(8);
-        add_opt_tags!(output, tags, redeem_script, witness_script, tap_internal_key);
+        add_opt_tags!(output, tags, redeem_script, witness_script, tap_internal_key, tap_tree);
         add_tags!(output, tags, bip32_derivation, tap_key_origins, unknown, proprietary);
-        // TODO tap_tree
         Value::array(tags)
     }
 }

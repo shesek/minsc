@@ -1,10 +1,13 @@
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::convert::{TryFrom, TryInto};
 use std::iter;
 use std::marker::PhantomData;
+use std::result::Result as StdResult;
 use std::sync::Arc;
 
 use bitcoin::bip32::{self, DerivationPath, IntoDerivationPath};
-use bitcoin::taproot::{ControlBlock, TaprootSpendInfo};
-use bitcoin::{key::TapTweak, psbt, secp256k1, PublicKey, Transaction};
+use bitcoin::taproot::{self, ControlBlock, LeafVersion, NodeInfo, TapNodeHash, TaprootSpendInfo};
+use bitcoin::{key::TapTweak, psbt, secp256k1, PublicKey, ScriptBuf, Transaction};
 use miniscript::descriptor::{
     self, DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
 };
@@ -18,18 +21,140 @@ lazy_static! {
     pub static ref EC: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
 }
 
-// TaprootSpendInfo
+//
+// Taproot
+//
 
 pub trait TapInfoExt {
     fn witness_program(&self) -> bitcoin::WitnessProgram;
-    fn script_pubkey(&self) -> bitcoin::ScriptBuf {
+
+    fn script_pubkey(&self) -> ScriptBuf {
         bitcoin::ScriptBuf::new_witness_program(&self.witness_program())
+    }
+
+    /// Construct a `TapNode` tree structure representation for this `TaprootSpendInfo`.
+    /// Returns `None` if there are no script paths, panics if the `TaprootSpendInfo` has
+    /// invalid merkle proofs (should be impossible to construct).
+    fn script_tree(&self) -> Option<TapNode<'_>>;
+
+    /// Reconstruct the `NodeInfo` for this `TaprootSpendInfo`.
+    /// Returns `None` if there are no script paths, panics for invalid `TaprootSpendInfo`.
+    fn node_info(&self) -> Option<NodeInfo> {
+        let tree = self.script_tree()?;
+        Some(tree.try_into().expect("should have valid tree depth"))
+        // XXX it would be more efficient to construct the NodeInfo directly from the TaprootSpendInfo merkle proofs, without
+        // going through TapNode. However, the rust-bitcoin API does not allow constructing NodeInfo with explicit merkle proofs.
+        // Instead, this first expands into the TapNode tree structure, then flattens back using NodeInfo::combine().
     }
 }
 
 impl TapInfoExt for TaprootSpendInfo {
     fn witness_program(&self) -> bitcoin::WitnessProgram {
         bitcoin::WitnessProgram::p2tr_tweaked(self.output_key())
+    }
+
+    fn script_tree(&self) -> Option<TapNode<'_>> {
+        let merkle_root = self.merkle_root()?;
+        let tree = TapNode::from_script_map(self.script_map(), merkle_root)
+            .expect("TaprootSpendInfo merkle proofs expected to be valid");
+        Some(tree)
+    }
+}
+
+/// A tree structure representation for Taproot scripts.
+/// Unlike rust-bitcoin's TapTree/NodeInfo, which are flat.
+#[derive(Debug)]
+pub enum TapNode<'a> {
+    Leaf(&'a (ScriptBuf, LeafVersion)),
+    Branch(Box<TapNode<'a>>, Box<TapNode<'a>>),
+    Hidden(TapNodeHash),
+}
+
+// The TaprootSpendInfo script_map structure
+type ScriptMerkleProofMap =
+    BTreeMap<(ScriptBuf, LeafVersion), BTreeSet<taproot::TaprootMerkleBranch>>;
+
+impl TapNode<'_> {
+    /// Construct the `TapNode` tree structure from the Taproot scripts, their merkle proofs and the merkle root.
+    /// Returns `None` if any of the merkle proofs are invalid (don't connect to the root).
+    pub fn from_script_map(
+        script_map: &ScriptMerkleProofMap,
+        merkle_root: TapNodeHash,
+    ) -> Option<TapNode<'_>> {
+        // First, build a map of all known nodes indexed by their hash, using an intermediate Node structure
+        enum Node<'a> {
+            Leaf(&'a (ScriptBuf, LeafVersion)),
+            Branch(TapNodeHash, TapNodeHash), // children referenced by hash, not an actual tree (yet)
+        }
+        let mut node_map = HashMap::new();
+
+        for (script_leaf, merkle_branches) in script_map {
+            // Insert leaf nodes to map
+            let leaf_hash = TapNodeHash::from_script(&script_leaf.0, script_leaf.1);
+            node_map.insert(leaf_hash, Node::Leaf(script_leaf));
+
+            // Process each merkle branch leading to this leaf script (there may multiple for duplicated scripts)
+            for merkle_branch in merkle_branches {
+                let mut current_hash = leaf_hash;
+                for sibling_hash in merkle_branch.iter() {
+                    // Insert branch nodes to map
+                    let branch_hash = TapNodeHash::from_node_hashes(current_hash, *sibling_hash); // XXX could cache
+                    node_map
+                        .entry(branch_hash)
+                        .or_insert_with(|| Node::Branch(current_hash, *sibling_hash));
+                    current_hash = branch_hash;
+                }
+                // All branches should converge to the root hash
+                if current_hash != merkle_root {
+                    return None;
+                }
+            }
+        }
+
+        // Now, going from the root node, convert the intermediate Node structure into a nested TapNode tree structure
+        fn tree<'a>(hash: &TapNodeHash, map: &HashMap<TapNodeHash, Node<'a>>) -> TapNode<'a> {
+            match map.get(hash) {
+                Some(Node::Branch(a, b)) => {
+                    TapNode::Branch(tree(a, map).into(), tree(b, map).into())
+                }
+                Some(Node::Leaf(leaf)) => TapNode::Leaf(leaf),
+                None => TapNode::Hidden(*hash),
+            }
+        }
+        Some(tree(&merkle_root, &node_map))
+    }
+}
+
+impl TryFrom<TapNode<'_>> for NodeInfo {
+    // Can fail with InvalidMerkleTreeDepth if the TapNode depth exceeds the limit
+    type Error = taproot::TaprootBuilderError;
+
+    fn try_from(node: TapNode<'_>) -> StdResult<Self, Self::Error> {
+        Ok(match node {
+            TapNode::Branch(a, b) => NodeInfo::combine((*a).try_into()?, (*b).try_into()?)?,
+            TapNode::Leaf((script, ver)) => NodeInfo::new_leaf_with_ver(script.clone(), *ver),
+            TapNode::Hidden(hash) => NodeInfo::new_hidden_node(hash),
+        })
+    }
+}
+
+pub trait TapTreeExt {
+    /// Construct a `ScriptMerkleProofMap` representation of this `TapTree` (same as used
+    /// by `TaprootSpendInfo`), which can then be used to construct a `TapNode`/`NodeInfo`.
+    fn script_map(&self) -> ScriptMerkleProofMap;
+}
+impl TapTreeExt for taproot::TapTree {
+    fn script_map(&self) -> ScriptMerkleProofMap {
+        let mut script_map = BTreeMap::new();
+        for leaf in self.script_leaves() {
+            script_map
+                .entry((leaf.script().into(), leaf.version()))
+                .or_insert_with(BTreeSet::new)
+                .insert(leaf.merkle_branch().clone());
+        }
+        script_map
+        // XXX could implement a TapNode::from_script_map() variant that accepts
+        // the TapTree structure directly, so that its data doesn't have to be copied.
     }
 }
 
@@ -126,8 +251,15 @@ pub trait PsbtOutExt {
 impl PsbtOutExt for psbt::Output {
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
         self.tap_internal_key = Some(tapinfo.internal_key());
+
+        if let Some(node_info) = tapinfo.node_info() {
+            // Can fail if the TaprootSpendInfo has hidden nodes
+            if let Ok(tap_tree) = node_info.try_into() {
+                self.tap_tree = Some(tap_tree);
+            }
+        }
+
         // `tap_key_origins` needs to be filled in manually
-        // TODO `tap_tree`
         Ok(())
     }
 }
