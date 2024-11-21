@@ -68,8 +68,6 @@ worker.addEventListener('message', ({ data }) => {
     error_el.style.display = 'block'
   } else if (data.result) {
     const r = data.result
-    //console.log(r)
-    error_el.style.display = 'none'
     outputs_el.style.display = 'block'
 
     output_el_policy.style.display = r.policy ? 'block' : 'none'
@@ -106,6 +104,7 @@ worker.addEventListener('message', ({ data }) => {
 // Send code to WebWorker for evaluation
 function update(source) {
   clearErrorMark()
+  error_el.style.display = 'none'
 
   const code = editor.getValue()
       , network = 'testnet'
