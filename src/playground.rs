@@ -44,12 +44,12 @@ pub fn run_playground(code: &str, network: &str) -> Result<JsValue, JsValue> {
             }
             Value::Descriptor(desc_) => desc = Some(desc_),
             Value::PubKey(key_) => {
-                // Convert pubkeys into wpkh()/tr() descriptors
-                desc = Some(if key_.is_x_only_key() {
-                    Descriptor::new_tr(key_.clone(), None)?
-                } else {
-                    Descriptor::new_wpkh(key_.clone())?
-                });
+                // Create a wpkh() descriptor for non-x-only keys
+                if !key_.is_x_only_key() {
+                    desc = Some(Descriptor::new_wpkh(key_.clone())?);
+                }
+                // Avoids auto-creating a tr() descriptor for x-only keys because we can't be sure
+                // if they're meant as the internal key or the output key.
                 key = Some(key_);
             }
             Value::Script(script_) => {
