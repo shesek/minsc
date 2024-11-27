@@ -329,6 +329,22 @@ impl TryFrom<Value> for Xpriv {
     }
 }
 
+/// Type wrapper for converting into the top-most master Xpriv that the DescriptorSecretKey points to,
+/// without applying derivation steps like the Xpriv conversion (above). Also unlike it, this works
+/// with multi-Xprivs too since all paths point to the same parent key.
+#[derive(Debug, Clone)]
+pub struct MasterXpriv(pub Xpriv);
+impl TryFrom<Value> for MasterXpriv {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        Ok(Self(match val.try_into()? {
+            DescriptorSecretKey::XPrv(xprv) => xprv.xkey,
+            DescriptorSecretKey::MultiXPrv(xprv) => xprv.xkey,
+            sk @ DescriptorSecretKey::Single(_) => bail!(Error::NotXpriv(sk.into())),
+        }))
+    }
+}
+
 // Convert from Value to BIP32 types
 
 impl TryFrom<Value> for bip32::Fingerprint {

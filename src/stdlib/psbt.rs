@@ -14,8 +14,9 @@ use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::{
     Array, Error, FieldAccess, FromValue, Mutable, Number::Int, Result, ScopeRef, Value,
 };
-use crate::stdlib::btc::WshScript;
 use crate::util::{DescriptorExt, DescriptorPubKeyExt, PsbtInExt, PsbtOutExt, TapInfoExt, EC};
+
+use super::{btc::WshScript, keys::MasterXpriv};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -201,8 +202,8 @@ fn sign_psbt(psbt: &mut Psbt, keys_val: Value) -> Result<(SigningKeysMap, Signin
                 }
 
                 // Keys provided as [ $xpriv1, $xpriv2, ... ]
-                Value::SecKey(DescriptorSecretKey::XPrv(_)) => {
-                    psbt.sign(&XprivSet(keys.try_into()?), &EC)
+                Value::SecKey(DescriptorSecretKey::XPrv(_) | DescriptorSecretKey::MultiXPrv(_)) => {
+                    psbt.sign(&XprivSet::try_from(keys)?, &EC)
                 }
 
                 // Keys provided as [ $single_sk1, $single_sk2, ... ]
@@ -212,15 +213,16 @@ fn sign_psbt(psbt: &mut Psbt, keys_val: Value) -> Result<(SigningKeysMap, Signin
                 _ => bail!(Error::PsbtInvalidSignKeys),
             }
         }
-        // Key provided as one Xpriv
-        Value::SecKey(DescriptorSecretKey::XPrv(_)) => psbt.sign(&Xpriv::try_from(keys_val)?, &EC),
+        // Key provided as an Xpriv
+        Value::SecKey(DescriptorSecretKey::XPrv(_) | DescriptorSecretKey::MultiXPrv(_)) => {
+            psbt.sign(&MasterXpriv::try_from(keys_val)?.0, &EC)
+        }
 
-        // Key provided as one single key
+        // Key provided as a single key
         Value::SecKey(DescriptorSecretKey::Single(_)) => {
             psbt.sign(&single_seckey_to_map(PrivateKey::try_from(keys_val)?), &EC)
         }
 
-        // TODO support signing with MultiXpriv
         _ => bail!(Error::PsbtInvalidSignKeys),
     };
     // Returns input signing failures in the the Ok variant. An Err is only raised if the `seckeys` argument is invalid.
@@ -736,9 +738,26 @@ impl TryFrom<Value> for raw::ProprietaryKey {
     }
 }
 
-// GetKey wrapper around Vec<Xpriv>, needed as a workaround for https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
-// Could otherwise directly use `psbt.sign(&Vec::<Xpriv>::try_from(seckeys)?, &EC)`
+// GetKey wrapper around Vec<Xpriv>
 struct XprivSet(Vec<Xpriv>);
+
+// Convert an Array into a set of Xprivs used for PSBT signing.
+// Unlike the the standard TryInto<Xpriv> conversion which derives the final child Xpriv after applying all derivation
+// steps, this instead uses the top-most known Xpriv without deriving. The PSBT bip32_derivation/tap_key_origins fields
+// are expected to point to the fingerprint of the top-most key, and not to that of the child.
+impl TryFrom<Array> for XprivSet {
+    type Error = Error;
+    fn try_from(arr: Array) -> Result<Self> {
+        Ok(Self(
+            arr.into_iter_of()
+                .map(|xprv: Result<MasterXpriv>| Ok(xprv?.0))
+                .collect::<Result<Vec<Xpriv>>>()?,
+        ))
+    }
+}
+
+// Needed as a workaround for https://github.com/rust-bitcoin/rust-bitcoin/pull/2850
+// Could otherwise use Psbt::sign() with the inner Vec<Xpriv>.
 impl psbt::GetKey for XprivSet {
     type Error = <Xpriv as psbt::GetKey>::Error;
 

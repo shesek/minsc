@@ -90,6 +90,9 @@ pub enum RuntimeError {
     #[error("Expected a single Xpriv, not {0}")]
     NotSingleXpriv(Box<miniscript::descriptor::DescriptorSecretKey>),
 
+    #[error("Expected an Xpriv (single or multi-path), not {0}")]
+    NotXpriv(Box<miniscript::descriptor::DescriptorSecretKey>),
+
     #[error("Expected TapInfo or tr() Descriptor, not {}", ValErrFmt(.0))]
     NotTapInfoLike(Box<Value>),
 
