@@ -1,8 +1,9 @@
 use std::convert::TryFrom;
 
-use bitcoin::hashes::{self, Hash};
+use bitcoin::hashes::{self, sha256, Hash};
 use bitcoin::secp256k1::{self, rand};
-use rand::{random, thread_rng, RngCore};
+use rand::{thread_rng, Rng, RngCore, SeedableRng};
+use rand_chacha::ChaCha12Rng;
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Result, Value};
@@ -101,26 +102,38 @@ pub mod fns {
     }
 
     // Generate a random Bytes sequence
-    /// rand::bytes(Int size) -> Bytes
+    /// rand::bytes(Int size[, Bytes seed]) -> Bytes
     pub fn rand_bytes(args: Array, _: &ScopeRef) -> Result<Value> {
-        let size = args.arg_into()?;
+        let (size, seed) = args.args_into()?;
         let mut bytes = vec![0u8; size];
-        thread_rng().fill_bytes(&mut bytes);
+        make_rng(seed).fill_bytes(&mut bytes);
         Ok(bytes.into())
     }
 
     /// Generate a random signed 64-bit integer
-    /// rand::i64() -> Int
+    /// rand::i64([Bytes seed]) -> Int
     pub fn rand_i64(args: Array, _: &ScopeRef) -> Result<Value> {
-        args.no_args()?;
-        Ok(random::<i64>().into())
+        let seed = args.arg_into()?;
+        Ok(make_rng(seed).gen::<i64>().into())
     }
 
     /// Generate a random 64-bit float in the [0, 1) range
-    /// rand::f64() -> Float
+    /// rand::f64([Bytes seed]) -> Float
     pub fn rand_f64(args: Array, _: &ScopeRef) -> Result<Value> {
-        args.no_args()?;
-        Ok(random::<f64>().into())
+        let seed = args.arg_into()?;
+        Ok(make_rng(seed).gen::<f64>().into())
+    }
+
+    fn make_rng(seed: Option<Vec<u8>>) -> ChaCha12Rng {
+        // Uses ChaCha12 (rand's current default StdRng) directly for reproducibility
+        // From https://docs.rs/rand/latest/rand/rngs/struct.StdRng.html: "The algorithm is deterministic but should not be
+        // considered reproducible due to dependence on configuration and possible replacement in future library versions.
+        // For a secure reproducible generator, we recommend use of the rand_chacha crate directly."
+        if let Some(seed) = seed {
+            ChaCha12Rng::from_seed(sha256::Hash::hash(&seed).to_byte_array())
+        } else {
+            ChaCha12Rng::from_rng(thread_rng()).unwrap()
+        }
     }
 }
 

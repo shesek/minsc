@@ -487,6 +487,7 @@ dependencies = [
  "lalrpop-util",
  "lazy_static",
  "miniscript",
+ "rand_chacha",
  "serde",
  "serde-wasm-bindgen",
  "thiserror",

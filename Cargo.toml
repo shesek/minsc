@@ -23,6 +23,7 @@ base64 = "0.22"
 thiserror = "1.0.20"
 chrono = "0.4.13"
 lazy_static = "1.4.0"
+rand_chacha = "0.3"
 
 # Optional
 serde = { version = "1", features=["derive"], optional = true }
