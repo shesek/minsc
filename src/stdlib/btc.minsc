@@ -62,11 +62,14 @@ fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::si
 
 // TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
 
-fn psbt::finalize_witness($psbt, $input_witnesses) = psbt::update($psbt, [
-  "inputs": map($input_witnesses, |[ $input_index, $witness ]|
-    $input_index: [ "final_script_witness": $witness ]
-  )
-]);
+fn psbt::finalize_witness($psbt, $input_witnesses, $extract_tx=true) {
+  $finalized = psbt::update($psbt, [
+    "inputs": map($input_witnesses, |[ $input_index, $witness ]|
+      $input_index: [ "final_script_witness": $witness ]
+    )
+  ]);
+  if $extract_tx then psbt::extract_raw($finalized) else $finalized
+}
 
 fn psbt::finalize_extract($psbt) = psbt::extract(psbt::finalize($psbt));
 fn psbt::sign_extract($psbt, $keys) = psbt::extract(psbt::finalize(psbt::sign($psbt, $keys)));

@@ -114,11 +114,10 @@ $redeem = if $outcome == 1 {
 };
 
 // Finalize the input witness with the 2 preimages and the winner's signature
-$redeem_final = psbt::finalize_witness($redeem, [
+$redeem_tx = psbt::finalize_witness($redeem, [
   0: [ $redeem->inputs.0->partial_sigs.0.1, $preimage2, $preimage1, $script ]
 ]);
 
-$redeem_tx = psbt::extract_raw($redeem_final);
 // $redeem_tx_hex = hex($redeem_tx);
 
 // Redeem script with witness stack elements (excluding the P2WSH witnessScript),
@@ -190,7 +189,7 @@ $p2_wins_p1_sig = schnorr::sign($sk1, psbt::sighash($p2_wins_psbt, 0, $p2_wins_l
 $p2_wins_p2_sig = schnorr::sign($sk2, psbt::sighash($p2_wins_psbt, 0, $p2_wins_leaf));
 $p2_wins_tx = psbt::finalize_witness($p2_wins_psbt, [
   0: tr::script_witness($tap, $p2_wins_leaf, [ $p2_wins_p2_sig, $p2_wins_p1_sig, $preimage2, $preimage1 ])
-]) | psbt::extract_raw();
+]);
 // $p2_wins_hex = hex($p2_wins_tx);
 
 // To debug script execution with witness elements:

@@ -109,8 +109,6 @@ fn finalize_trigger($trigger_psbt) {
     0: [ $hot_signature, $trigger_script, $trigger_ctrl ]
   ])
 }
-// Finalize and extract the trigger transaction. psbt::extract_raw() needed for non-Miniscript-compatible Script
-fn finalize_extract_trigger($trigger_psbt) = psbt::extract_raw(finalize_trigger($trigger_psbt));
 
 // Setup Vault
 $cold_sk = xprv9s21ZrQH143K3Xuq83mkj7qByus7JPgT81E8SohtKAcdPUPXRmNg5tVoT2ek5XfMjvpyh1oPvAqfGJee4jnrTzyH4R49QiKWJoNGNYuPbq1;
@@ -133,7 +131,7 @@ $complete_psbt = $wd->complete[
 
 $trigger_signed = psbt::sign($wd->trigger, $hot_sk);
 $complete_signed = psbt::sign($complete_psbt, $hot_sk);
-$trigger_tx = finalize_extract_trigger($trigger_signed);
+$trigger_tx = finalize_trigger($trigger_signed);
 $complete_tx = psbt::finalize_extract($complete_signed);
 
 // Abort the hot withdrawal using the cold key
