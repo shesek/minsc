@@ -451,8 +451,13 @@ impl PrettyDisplay for TaprootSpendInfo {
         write!(f, "tr({}", self.internal_key())?;
         let scripts = self.script_map();
         if !scripts.is_empty() {
-            write!(f, ", ",)?;
-            let max_depth = scripts.values().map(|bs| bs.len()).max().unwrap_or(0);
+            write!(f, ", ")?;
+            let max_depth = scripts
+                .values()
+                .flat_map(|branches| branches.iter())
+                .map(|branch| branch.len())
+                .max()
+                .unwrap_or(0);
 
             // If the tree's depth is below 2 (meaning only 1 or 2 leaves), its easy -  we can treat it as a flat list, with no tree
             // structure information that needs to be preserved (siblings are ordered, making trees of 2 is deterministic).
@@ -526,7 +531,7 @@ impl PrettyDisplay for TapNode<'_> {
         match self {
             TapNode::Leaf((script, _)) => {
                 // TODO leaf version not encoded
-                write!(f, "{}", script.pretty(inner_indent))
+                write!(f, "{}", script.pretty(indent))
             }
             TapNode::Branch(first, second) => {
                 let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
