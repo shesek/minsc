@@ -16,9 +16,10 @@ fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
 fn range($start, $end) = fillArray(($end-$start)+1, |$n| $start+$n);
 fn keys($arr) = range(0, len($arr) - 1);
-fn slice($arr, $start, $len) = fillArray($len, |$n| $arr.($start+$n));
+fn slice($arr, $start, $len=(len($arr)-$start)) = fillArray($len, |$n| $arr.($start+$n));
 fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
+fn enumerated($arr) = fillArray(len($arr), |$i| [ $i, $arr.$i ]);
 fn isEmpty($arr) = len($arr) == 0;
 
 fn map($arr, $fn)     = fold($arr, [], |$acc, $el| $acc + [ $fn($el) ]);
@@ -41,6 +42,11 @@ fn startsWith($arr, $prefix) = (len($arr) >= len($prefix)) && every(keys($prefix
 fn concat($xs) = reduce($xs, |$acc, $x| $acc + $x); // works for arrays, bytes, strings and numbers
 fn sum($nums) = if !isEmpty($nums) then concat($nums) else 0;
 fn flatten($arrays) = if !isEmpty($arrays) then concat($arrays) else [];
+
+// Numeric
+fn max($a, $b) = if $a>$b then $a else $b;
+fn min($a, $b) = if $a<$b then $a else $b;
+fn abs($n) = if $n < 0 then -$n else $n;
 
 // Null handling utilities
 fn mapNullable($value, $fn) = if $value != null then $fn($value) else null;
