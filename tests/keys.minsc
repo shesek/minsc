@@ -23,7 +23,10 @@ test("Keys", |T| {
       it("Is deterministic (RFC 6979)", |T|
         t::eq(ecdsa::sign($sk, $H1), ecdsa::sign($sk, $H1)));
 
-      it("Uses DER by default", len(ecdsa::sign($sk, $H1)) >= 70); // 70-73
+      it("Uses DER by default", |T| {
+        $sig = ecdsa::sign($sk, $H1);
+        t::assert(len(ecdsa::sign($sk, $H1)) >= 67)
+      }); // typically 70-73, sometimes shorter by chance
 
       it("Supports compact encoding", |T|
         t::eq(len(ecdsa::sign($sk, $H1, true)), 64));
@@ -63,4 +66,28 @@ test("Keys", |T| {
         t::eq($pk, xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB);
       });
   });
-})
+});
+
+test("Key Derivation", |T| {
+  test("with Xprivx", |T| {
+    $sk = [00112233/4'/5]xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi;
+    $sk_child = $sk/10'/90;
+    assert::eq($sk_child, [00112233/4'/5]xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi/10'/90);
+    assert::eq(xderived($sk_child), [00112233/4'/5/10'/90]xprv9wGStYmEDBnRnqJyYwkMktb9JZTJTh7EvfbcvY6HPDuSMZtcpMRXfU43JYqK7dCkZKEtacimBiVkrvhEXeR6i1iFuwPTdMWk3go7gebX9ir);
+    assert::eq(str(derived($sk_child)), "seckey([00112233/4'/5/10'/90]cTsvns7tYeKnrzgJxzV4ea16GisYHtCBvA3rcdnRVSYYeAU4GCVc)");
+    // Must assert by stringifying $sk_child due to https://github.com/rust-bitcoin/rust-miniscript/pull/753
+    // assert::eq(derived($sk_child), [00112233/4'/5/10'/90]cTsvns7tYeKnrzgJxzV4ea16GisYHtCBvA3rcdnRVSYYeAU4GCVc);
+  });
+  test("with Xpubs", |T| {
+    $pk = [66778899/0'/1]xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8;
+    $pk_child = $pk/20/70;
+    assert::eq($pk_child, [66778899/0'/1]xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8/20/70);
+    assert::eq(xderived($pk_child), [66778899/0'/1/20/70]xpub6ANvqejmnBqUV1bNqXmLYNAAGtPCRSVGkYTysAVCzSmXxY1oSn211VYxEqvM2QJ48RV4LdJPBXh2gvBGR6sdAtEmbPXWKQoXkcp7h1mn9Xi);
+    assert::eq(derived($pk_child), [66778899/0'/1/20/70]03224c5284fb722a254a5f0119dfa6b0b2dc1214e7a8c9244428be73e824edb283);
+  });
+  test("Xpriv matches Xpub", |T| {
+    $sk = [00112233/4'/5]xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi;
+    $pk = pubkey($sk);
+    assert::eq(pubkey($sk/1/2), $pk/1/2);
+  });
+});

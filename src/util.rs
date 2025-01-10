@@ -313,12 +313,52 @@ impl DescriptorPubKeyExt for DescriptorPublicKey {
 }
 
 pub trait DescriptorSecretKeyExt {
-    /// Like `DescriptorPublicKey::full_derivation_paths()`, which isn't available for secret keys
+    // Mimicking the methods available on `DescriptorPublicKey`, which are not natively available for secret keys
+    fn full_derivation_path(&self) -> Option<DerivationPath>;
     fn full_derivation_paths(&self) -> Vec<DerivationPath>;
+    fn master_fingerprint(&self) -> bip32::Fingerprint;
 
+    // Pending https://github.com/rust-bitcoin/rust-miniscript/pull/757
     fn to_public_(&self) -> Result<DescriptorPublicKey>;
 }
 impl DescriptorSecretKeyExt for DescriptorSecretKey {
+    fn master_fingerprint(&self) -> bip32::Fingerprint {
+        match *self {
+            DescriptorSecretKey::XPrv(ref xpub) => match xpub.origin {
+                Some((fingerprint, _)) => fingerprint,
+                None => xpub.xkey.fingerprint(&EC),
+            },
+            DescriptorSecretKey::MultiXPrv(ref xpub) => match xpub.origin {
+                Some((fingerprint, _)) => fingerprint,
+                None => xpub.xkey.fingerprint(&EC),
+            },
+            DescriptorSecretKey::Single(_) => self
+                .to_public(&EC)
+                .expect("cannot fail")
+                .master_fingerprint(),
+        }
+    }
+    fn full_derivation_path(&self) -> Option<DerivationPath> {
+        match self {
+            DescriptorSecretKey::XPrv(ref xpub) => {
+                let origin_path = if let Some((_, ref path)) = xpub.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                };
+                Some(origin_path.extend(&xpub.derivation_path))
+            }
+            DescriptorSecretKey::Single(ref single) => {
+                Some(if let Some((_, ref path)) = single.origin {
+                    path.clone()
+                } else {
+                    DerivationPath::from(vec![])
+                })
+            }
+            DescriptorSecretKey::MultiXPrv(_) => None,
+        }
+    }
+
     fn full_derivation_paths(&self) -> Vec<DerivationPath> {
         match self {
             DescriptorSecretKey::MultiXPrv(xprv) => {
@@ -351,7 +391,6 @@ impl DescriptorSecretKeyExt for DescriptorSecretKey {
         }
     }
 
-    // Pending https://github.com/rust-bitcoin/rust-miniscript/pull/757
     fn to_public_(&self) -> Result<DescriptorPublicKey> {
         Ok(match self {
             DescriptorSecretKey::Single(_) | DescriptorSecretKey::XPrv(_) => self.to_public(&EC)?,

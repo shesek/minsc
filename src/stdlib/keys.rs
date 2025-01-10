@@ -27,9 +27,11 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         .set_fn("xpriv::from_seed", fns::xpriv_from_seed)
         .unwrap();
 
-    scope.set_fn("xonly", fns::xonly).unwrap();
-
     scope.set_fn("singles", fns::singles).unwrap();
+
+    scope.set_fn("xonly", fns::xonly).unwrap(); // xonly is always derived  single
+    scope.set_fn("derived", fns::derived).unwrap();
+    scope.set_fn("xderived", fns::xderived).unwrap();
 }
 
 /// BIP32 key derivation using the Slash operator
@@ -116,29 +118,6 @@ pub mod fns {
         Ok(Xpriv::new_master(network, &seed)?.into())
     }
 
-    /// Convert the pubkey into an x-only pubkey.
-    /// Always returned as a single (non-xpub) pubkey (x-only xpubs cannot be represented as an Xpub/DescriptorPublicKey).
-    ///
-    /// xonly(PubKey) -> PubKey
-    pub fn xonly(args: Array, _: &ScopeRef) -> Result<Value> {
-        let pk: DescriptorPublicKey = args.arg_into()?;
-
-        Ok(if pk.is_x_only_key() {
-            pk
-        } else {
-            // Convert into an x-only single pubkey with BIP32 origin information
-            let pk = pk.definite()?;
-            let derived_single_pk = pk.derive_public_key(&EC)?;
-            let derived_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
-
-            DescriptorPublicKey::Single(SinglePub {
-                key: SinglePubKey::XOnly(derived_single_pk.into()),
-                origin: Some((pk.master_fingerprint(), derived_path)),
-            })
-        }
-        .into())
-    }
-
     /// Convert a multi-path PubKey/SecKey/Descriptor into an array of singles
     ///
     /// singles(PubKey<Multi>|SecKey<Multi>|Descriptor<Multi>) -> Array<PubKey|SecKey|Descriptor>
@@ -147,6 +126,107 @@ pub mod fns {
             Value::PubKey(pk) => pk.into_single_keys().into(),
             Value::SecKey(sk) => sk.into_single_keys().into(),
             Value::Descriptor(desc) => desc.into_single_descriptors()?.into(),
+            other => bail!(Error::InvalidValue(other.into())),
+        })
+    }
+
+    /// Convert the pubkey into an x-only pubkey.
+    /// Always returned as a single (non-Xpub) pubkey (x-only keys cannot be represented as a DescriptorPublicKey::XPub).
+    ///
+    /// xonly(PubKey<Xpub|Single>) -> PubKey<Single>
+    pub fn xonly(args: Array, _: &ScopeRef) -> Result<Value> {
+        let pk: DescriptorPublicKey = args.arg_into()?;
+
+        Ok(if pk.is_x_only_key() {
+            pk
+        } else {
+            let full_path = pk.full_derivation_path().ok_or(Error::InvalidMultiXpub)?;
+            let master_fp = pk.master_fingerprint();
+            let derived_pk = pk.derive_definite()?;
+
+            DescriptorPublicKey::Single(SinglePub {
+                key: SinglePubKey::XOnly(derived_pk.into()),
+                origin: Some((master_fp, full_path)),
+            })
+        }
+        .into())
+    }
+
+    /// Apply Xpub/Xpriv derivation steps to arrive at the final child as a single key
+    ///
+    /// derived(PubKey<Xpub>) -> PubKey<Single>
+    /// derived(SecKey<Xpriv>) -> SecKey<Single>
+    pub fn derived(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(match args.arg_into()? {
+            // Derive Xpubs
+            Value::PubKey(ref pk @ DescriptorPublicKey::XPub(ref xpub)) => {
+                let derived_pk = xpub.xkey.derive_pub(&EC, &xpub.derivation_path)?.public_key;
+                let full_path = pk
+                    .full_derivation_path()
+                    .expect("must exists for DPK::Xpub");
+                DescriptorPublicKey::Single(SinglePub {
+                    key: SinglePubKey::FullKey(derived_pk.into()),
+                    origin: Some((pk.master_fingerprint(), full_path)),
+                })
+                .into()
+            }
+            // Derive Xprivs
+            Value::SecKey(ref sk @ DescriptorSecretKey::XPrv(ref xpriv)) => {
+                let derived_sk = xpriv
+                    .xkey
+                    .derive_priv(&EC, &xpriv.derivation_path)?
+                    .private_key;
+                let full_path = sk
+                    .full_derivation_path()
+                    .expect("must exists for DPK::Xprv");
+                DescriptorSecretKey::Single(SinglePriv {
+                    key: bitcoin::PrivateKey::new(derived_sk, Network::Testnet), // XXX always uses Testnet
+                    origin: Some((sk.master_fingerprint(), full_path)),
+                })
+                .into()
+            }
+            // Return Single keys as-is
+            single @ Value::PubKey(DescriptorPublicKey::Single(_))
+            | single @ Value::SecKey(DescriptorSecretKey::Single(_)) => single,
+
+            other => bail!(Error::InvalidValue(other.into())),
+        })
+    }
+
+    /// Apply Xpub/Xpriv derivation steps to arrive at the final child Xpub/Xpriv
+    ///
+    /// xderived(PubKey<Xpub>) -> PubKey<Xpub>
+    /// xderived(SecKey<Xpriv>) -> SecKey<Xpriv>
+    pub fn xderived(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(match args.arg_into()? {
+            // Derive Xpubs
+            Value::PubKey(ref pk @ DescriptorPublicKey::XPub(ref xpub)) => {
+                let derived_xpub = xpub.xkey.derive_pub(&EC, &xpub.derivation_path)?;
+                let full_path = pk
+                    .full_derivation_path()
+                    .expect("must exists for DPK::Xpub");
+                DescriptorPublicKey::XPub(DescriptorXKey {
+                    xkey: derived_xpub,
+                    derivation_path: DerivationPath::master(),
+                    wildcard: xpub.wildcard,
+                    origin: Some((pk.master_fingerprint(), full_path)),
+                })
+                .into()
+            }
+            // Derive Xprivs
+            Value::SecKey(ref sk @ DescriptorSecretKey::XPrv(ref xprv)) => {
+                let derived_xpriv = xprv.xkey.derive_priv(&EC, &xprv.derivation_path)?;
+                let full_path = sk
+                    .full_derivation_path()
+                    .expect("must exists for DPK::Xprv");
+                DescriptorSecretKey::XPrv(DescriptorXKey {
+                    xkey: derived_xpriv,
+                    derivation_path: DerivationPath::master(),
+                    wildcard: xprv.wildcard,
+                    origin: Some((sk.master_fingerprint(), full_path)),
+                })
+                .into()
+            }
             other => bail!(Error::InvalidValue(other.into())),
         })
     }
