@@ -1,12 +1,13 @@
+use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::sync::Arc;
 
 use bitcoin::hashes::Hash;
 use bitcoin::hex::DisplayHex;
-use bitcoin::taproot::{LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 use bitcoin::{taproot, ScriptBuf, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey};
+use taproot::{ControlBlock, LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 
 use super::miniscript::{multi_andor, AndOr};
 use crate::display::{fmt_list, indentation_params, PrettyDisplay};
@@ -51,11 +52,11 @@ pub mod fns {
         super::tr(a, b, &scope.borrow())
     }
 
-    /// tr::ctrl(TapInfo|Descriptor, Script|Policy, Byte version=TapScript) -> Array<Script>
+    /// tr::ctrl(TapInfo|Descriptor|PsbtInput, Script|Policy, Byte version=TapScript) -> Array<Script>
     ///
     /// Construct the witness control block for the given Script/Policy
     pub fn ctrl(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (tapinfo, script_or_policy, leaf_ver): (TaprootSpendInfo, Value, Option<LeafVersion>) =
+        let (tr_or_input, script_or_policy, leaf_ver): (_, _, Option<LeafVersion>) =
             args.args_into()?;
         let script = match script_or_policy {
             Value::Script(script) => script,
@@ -63,9 +64,28 @@ pub mod fns {
             other => bail!(Error::InvalidValue(other.into())),
         };
         let leaf_ver = leaf_ver.unwrap_or(LeafVersion::TapScript);
-        let ctrl = tapinfo
-            .control_block(&(script, leaf_ver))
-            .ok_or(Error::TaprootScriptNotFound)?;
+        let script_ver = &(script, leaf_ver);
+        let ctrl = match tr_or_input {
+            // Extract control block from a TaprootSpendInfo
+            Value::TapInfo(tapinfo) => tapinfo.control_block(script_ver),
+            // Extract control block from a tr() Descriptor
+            Value::Descriptor(desc) => desc
+                .tap_info()?
+                .ok_or(Error::InvalidArguments)?
+                .control_block(&script_ver),
+            // Extract control block from the PSBT input tap_scripts data
+            Value::Array(psbt_input) => {
+                let tap_scripts: BTreeMap<ControlBlock, (ScriptBuf, LeafVersion)> = psbt_input
+                    .get_field_fallible(&"tap_scripts".into())?
+                    .ok_or(Error::InvalidArguments)?
+                    .try_into()?;
+                tap_scripts.into_iter().find_map(|(ctrl, ts_script_ver)| {
+                    (ts_script_ver == *script_ver).then_some(ctrl)
+                })
+            }
+            other => bail!(Error::InvalidValue(other.into())),
+        }
+        .ok_or(Error::TaprootScriptNotFound)?;
         Ok(ctrl.into())
     }
 
@@ -416,7 +436,7 @@ impl TryFrom<Value> for taproot::LeafVersion {
         })
     }
 }
-impl TryFrom<Value> for taproot::ControlBlock {
+impl TryFrom<Value> for ControlBlock {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(Self::decode(&val.into_bytes()?)?)
@@ -424,7 +444,7 @@ impl TryFrom<Value> for taproot::ControlBlock {
 }
 
 impl_simple_to_value!(taproot::Signature, sig, sig.to_vec());
-impl_simple_to_value!(taproot::ControlBlock, ctrl, ctrl.serialize());
+impl_simple_to_value!(ControlBlock, ctrl, ctrl.serialize());
 impl_simple_to_value!(LeafVersion, ver, Value::Bytes(vec![ver.to_consensus()]));
 impl_simple_to_value!(
     TapNode<'_>,
