@@ -523,6 +523,11 @@ impl_simple_to_value!(Txid, txid, {
     txid.reverse();
     txid
 });
+impl_simple_to_value!(bitcoin::Wtxid, wtxid, {
+    let mut wtxid = wtxid.to_byte_array().to_vec();
+    wtxid.reverse();
+    wtxid
+});
 // Panics for out-of-range `Weight`s, which should be impossible to construct
 impl_simple_to_value!(
     bitcoin::Weight,
@@ -541,6 +546,7 @@ impl FieldAccess for Transaction {
             "output" | "outputs" => self.output.into(),
 
             "txid" => self.compute_txid().into(),
+            "wtxid" => self.compute_wtxid().into(),
             "weight" => self.weight().into(),
             "vsize" => self.vsize().into(),
             "size" => self.total_size().into(),
