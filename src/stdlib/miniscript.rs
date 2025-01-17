@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 
 use bitcoin::ScriptBuf;
 use miniscript::descriptor::{DescriptorType, ShInner, WshInner};
-use miniscript::{ForEachKey, MiniscriptKey, ScriptContext, Threshold};
+use miniscript::{DescriptorPublicKey, ForEachKey, MiniscriptKey, ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, Result, Value};
@@ -302,7 +302,8 @@ impl FieldAccess for Policy {
             "is_safe" => self.is_safe_nonmalleable().0.into(),
             "is_nonmalleable" => self.is_safe_nonmalleable().1.into(),
             "is_wildcard" => self.has_wildcards().into(),
-            "is_definite" => (!self.has_wildcards()).into(),
+            "is_multipath" => policy_is_multiptah(&self).into(),
+            "is_definite" => (!self.has_wildcards() && !policy_is_multiptah(&self)).into(),
 
             // Script compilation fields are only available for Policies that are `$p->is_valid && $p->is_safe && $p->is_nonmalleable && $p->is_definite`
             // You can use the tapscript()/segwitv0() functions to get a more useful exception instead of a 'field not found'
@@ -313,6 +314,10 @@ impl FieldAccess for Policy {
             }
         })
     }
+}
+
+fn policy_is_multiptah(policy: &Policy) -> bool {
+    policy.for_any_key(DescriptorPublicKey::is_multipath)
 }
 
 fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
