@@ -13,7 +13,7 @@ use miniscript::descriptor::{
 
 use crate::ast::SlashRhs;
 use crate::display::PrettyDisplay;
-use crate::runtime::{Array, Error, Evaluate, Mutable, Result, ScopeRef, Value};
+use crate::runtime::{Array, Error, Evaluate, FieldAccess, Mutable, Result, ScopeRef, Value};
 use crate::util::{DeriveExt, DescriptorPubKeyExt, DescriptorSecretKeyExt, EC};
 use crate::PolicyDpk as Policy;
 
@@ -232,6 +232,64 @@ pub mod fns {
     }
 }
 
+// Field getters
+
+impl FieldAccess for DescriptorPublicKey {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        use {DescriptorPublicKey::*, SinglePubKey::XOnly};
+
+        Some(match field.as_str()? {
+            "master_fingerprint" => self.master_fingerprint().into(),
+
+            // Only available for definite keys
+            "fingerprint" => self.fingerprint().ok()?.into(),
+            // Not available for multi-path keys
+            "full_derivation_path" => self.full_derivation_path()?.into(),
+            // Available for all keys
+            "full_derivation_paths" => self.full_derivation_paths().into(),
+
+            "is_xpub" => matches!(self, XPub(_) | MultiXPub(_)).into(),
+            "is_single_key" => matches!(self, Single(_)).into(),
+            "is_xonly" => matches!(self, Single(SinglePub { key: XOnly(_), .. })).into(),
+
+            "is_wildcard" => self.has_wildcard().into(),
+            "is_multipath" => self.is_multipath().into(),
+            "is_definite" => (!self.has_wildcard() && !self.is_multipath()).into(),
+            _ => {
+                return None;
+            }
+        })
+    }
+}
+
+impl FieldAccess for DescriptorSecretKey {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        use DescriptorSecretKey::*;
+
+        Some(match field.as_str()? {
+            "master_fingerprint" => self.master_fingerprint().into(),
+            "pubkey" => self.to_public_().ok()?.into(),
+
+            // only available for definite keys
+            "fingerprint" => self.to_public_().ok()?.fingerprint().ok()?.into(),
+            // not available for multi-path keys
+            "full_derivation_path" => self.full_derivation_path()?.into(),
+            // available for all keys
+            "full_derivation_paths" => self.full_derivation_paths().into(),
+
+            "is_xpriv" => matches!(self, XPrv(_) | MultiXPrv(_)).into(),
+            "is_single_key" => matches!(self, Single(_)).into(),
+
+            "is_wildcard" => self.has_wildcards().into(),
+            "is_multipath" => self.is_multipath().into(),
+            "is_definite" => (!self.has_wildcards() && !self.is_multipath()).into(),
+            _ => {
+                return None;
+            }
+        })
+    }
+}
+
 // Convert from bitcoin/secp256k1 keys to Value
 
 impl_simple_to_value!(
@@ -438,15 +496,9 @@ impl TryFrom<Value> for bip32::Fingerprint {
                 32 | 33 | 78 => Value::PubKey(val.try_into()?).try_into()?,
                 _ => bail!(Error::NotFingerprintLike(val.into())),
             },
-            Value::PubKey(ref dpk) => match dpk {
-                // For xpubs, get the fingerprint of the final derivation key (not the master_fingerprint()'s)
-                DescriptorPublicKey::XPub(_) => Xpub::try_from(val)?.fingerprint(),
-                // For single keys the master_fingerprint() is the same as the final fingerprint
-                DescriptorPublicKey::Single(_) => dpk.master_fingerprint(),
-                DescriptorPublicKey::MultiXPub(_) => bail!(Error::InvalidMultiXpub),
-            },
+            Value::PubKey(ref dpk) => dpk.fingerprint()?,
             // Convert SecKey to PubKey, then get its Fingerprint
-            Value::SecKey(sk) => Value::PubKey(sk.to_public_()?).try_into()?,
+            Value::SecKey(sk) => sk.to_public_()?.fingerprint()?,
             other => bail!(Error::NotFingerprintLike(other.into())),
         })
     }

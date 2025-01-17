@@ -475,6 +475,8 @@ impl FieldAccess for Value {
             Value::TapInfo(x) => x.get_field_fallible(field),
             Value::Address(x) => x.get_field_fallible(field),
             Value::WshScript(x) => x.get_field_fallible(field),
+            Value::PubKey(x) => x.get_field_fallible(field),
+            Value::SecKey(x) => x.get_field_fallible(field),
             _ => Ok(None),
         }
     }

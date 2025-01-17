@@ -284,6 +284,9 @@ pub trait DescriptorPubKeyExt: Sized {
 
     /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
     fn derivation_paths(&self) -> Vec<DerivationPath>;
+
+    /// Get the key fingerprint
+    fn fingerprint(&self) -> Result<bip32::Fingerprint>;
 }
 impl DescriptorPubKeyExt for DescriptorPublicKey {
     fn definite(self) -> Result<DefiniteDescriptorKey> {
@@ -309,6 +312,19 @@ impl DescriptorPubKeyExt for DescriptorPublicKey {
                     .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
             }
         }
+    }
+
+    fn fingerprint(&self) -> Result<bip32::Fingerprint> {
+        Ok(match self {
+            // For xpubs, get the fingerprint of the final derivation key (not the master_fingerprint()'s)
+            DescriptorPublicKey::XPub(dxpub) => dxpub
+                .xkey
+                .derive_pub(&EC, &dxpub.derivation_path)?
+                .fingerprint(),
+            // For single keys the master_fingerprint() is the same as the final fingerprint
+            DescriptorPublicKey::Single(_) => self.master_fingerprint(),
+            DescriptorPublicKey::MultiXPub(_) => bail!(Error::InvalidMultiXpub),
+        })
     }
 }
 
