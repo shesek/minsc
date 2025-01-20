@@ -465,30 +465,30 @@ impl ExprRepr for Value {
 }
 
 impl FieldAccess for Value {
-    fn get_field_fallible(self, field: &Value) -> Result<Option<Value>> {
+    fn get_field(self, field: &Value) -> Option<Value> {
         match self {
-            Value::Array(x) => x.get_field_fallible(field),
-            Value::Psbt(x) => x.get_field_fallible(field),
-            Value::Transaction(x) => x.get_field_fallible(field),
-            Value::Policy(x) => x.get_field_fallible(field),
-            Value::Descriptor(x) => x.get_field_fallible(field),
-            Value::TapInfo(x) => x.get_field_fallible(field),
-            Value::Address(x) => x.get_field_fallible(field),
-            Value::WshScript(x) => x.get_field_fallible(field),
-            Value::PubKey(x) => x.get_field_fallible(field),
-            Value::SecKey(x) => x.get_field_fallible(field),
-            _ => Ok(None),
+            Value::Array(x) => x.get_field(field),
+            Value::Psbt(x) => x.get_field(field),
+            Value::Transaction(x) => x.get_field(field),
+            Value::Policy(x) => x.get_field(field),
+            Value::Descriptor(x) => x.get_field(field),
+            Value::TapInfo(x) => x.get_field(field),
+            Value::Address(x) => x.get_field(field),
+            Value::WshScript(x) => x.get_field(field),
+            Value::PubKey(x) => x.get_field(field),
+            Value::SecKey(x) => x.get_field(field),
+            _ => None,
         }
     }
 }
 
 // Symbol
 //
-// A Value type guaranteed to be unique. Symbols don't have any special meaning on the Rust side, but are used in
-// Minsc code for various purposes (like `null` and `default`). Symbols can be created at runtime using Symbol().
+// A Value type guaranteed to be unique. Used for sentinel values like `null` and `default`.
+// Symbols can be created at runtime using symbol().
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-static SYMBOL_COUNTER: AtomicUsize = AtomicUsize::new(1);
+static SYMBOL_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 impl Symbol {
     pub fn new(name: Option<String>) -> Self {

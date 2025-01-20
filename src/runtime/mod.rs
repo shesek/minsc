@@ -247,7 +247,7 @@ impl Evaluate for ast::FieldAccess {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let target = self.target.eval(scope)?;
         let field = self.field.eval(scope)?;
-        let result = target.get_field_fallible(&field)?;
+        let result = target.get_field(&field);
         if self.check_exists {
             Ok(result.is_some().into())
         } else {
@@ -256,12 +256,7 @@ impl Evaluate for ast::FieldAccess {
     }
 }
 pub trait FieldAccess: Sized {
-    fn get_field_fallible(self, field: &Value) -> Result<Option<Value>> {
-        Ok(self.get_field(field))
-    }
-    fn get_field(self, _field: &Value) -> Option<Value> {
-        unimplemented!("Must implement either get_field_fallible() or get_field()")
-    }
+    fn get_field(self, _field: &Value) -> Option<Value>;
 }
 
 impl Evaluate for ast::FnExpr {

@@ -76,7 +76,7 @@ pub mod fns {
             // Extract control block from the PSBT input tap_scripts data
             Value::Array(psbt_input) => {
                 let tap_scripts: BTreeMap<ControlBlock, (ScriptBuf, LeafVersion)> = psbt_input
-                    .get_field_fallible(&"tap_scripts".into())?
+                    .get_field(&"tap_scripts".into())
                     .ok_or(Error::InvalidArguments)?
                     .try_into()?;
                 tap_scripts.into_iter().find_map(|(ctrl, ts_script_ver)| {

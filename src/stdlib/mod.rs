@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, Error, Execute, Number, Result, Symbol, Value};
+use crate::runtime::{array, Array, Error, Execute, Number, Result, Symbol, Value};
 use crate::util::DescriptorSecretKeyExt;
 use crate::Library;
 
@@ -62,6 +62,11 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         // Constants
         scope.set("MAX_INTEGER", i64::MAX).unwrap();
         scope.set("MIN_INTEGER", i64::MIN).unwrap();
+
+        // Built-in Symbols
+        scope
+            .set("ARRAY_MULTIVAL_FIELD", array::SYM_MULTIVAL.clone())
+            .unwrap();
     }
 
     // Standard library functions implemented in Minsc

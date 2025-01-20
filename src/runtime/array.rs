@@ -4,9 +4,9 @@ use std::iter::FromIterator;
 use std::{fmt, mem, ops, vec};
 
 use crate::display::{fmt_list, PrettyDisplay};
-use crate::runtime::{Error, FieldAccess, FromValue, Result, Value};
+use crate::runtime::{Error, FieldAccess, FromValue, Result, Symbol, Value};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Array(pub Vec<Value>);
 
 impl ops::Deref for Array {
@@ -109,22 +109,27 @@ impl Array {
     }
 }
 
+lazy_static! {
+    pub static ref SYM_MULTIVAL: Symbol = Symbol::new(Some("ARRAY_MULTIVAL_FIELD".into()));
+}
+
 // Tagged array field access
 impl FieldAccess for Array {
-    fn get_field_fallible(self, field: &Value) -> Result<Option<Value>> {
+    fn get_field(self, field: &Value) -> Option<Value> {
         let mut field_value = None;
         for el in self.into_inner() {
             if let Value::Array(mut el_arr) = el {
                 if el_arr.len() == 2 && el_arr[0] == *field {
-                    ensure!(
-                        field_value.is_none(),
-                        Error::FieldArrayTagDuplicated(field.clone().into())
-                    );
+                    if !field_value.is_none() {
+                        // Return the sentinel ARRAY_MULTIVAL symbol to indicate there are multiple matching fields.
+                        // The values may be extracted with t::multi($arr, $key) instead.
+                        return Some(SYM_MULTIVAL.clone().into());
+                    }
                     field_value = Some(el_arr.remove(1));
                 }
             }
         }
-        Ok(field_value)
+        field_value
     }
 }
 
