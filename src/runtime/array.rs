@@ -57,6 +57,9 @@ impl Array {
         self,
         expected_all_length: usize,
     ) -> Result<Vec<(usize, T)>> {
+        if self.is_empty() {
+            return Ok(vec![]);
+        }
         if let Some(Value::Array(first_el)) = self.first() {
             if first_el.len() == 2 {
                 // Differentiating the two cases assumes that the value type *is not a number*
