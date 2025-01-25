@@ -63,7 +63,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     //{regex: /\b([$a-zA-Z_][$a-zA-Z_0-9]*)\s*(=)/, token: ["variable-3", null]},
 
     // Function calls
-    {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\(|\[)/, token: ["atom", null], indent: true},
+    {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\(|\[)/, token: ["atom", null]},
 
     // BIP32 derivation
     {regex: /(\d+)(h)\b/, token: ["number", "operator"]}, // hardened derivation step with number literal

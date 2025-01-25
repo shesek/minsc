@@ -69,6 +69,7 @@ worker.addEventListener('message', ({ data }) => {
   } else if (data.result) {
     const r = data.result
     outputs_el.style.display = 'block'
+    error_el.style.display = 'none'
 
     output_el_policy.style.display = r.policy ? 'block' : 'none'
     output_el_desc.style.display = r.descriptor ? 'block' : 'none'
