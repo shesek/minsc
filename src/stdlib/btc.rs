@@ -2,6 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use bitcoin::hashes::Hash;
+use bitcoin::opcodes::{Class, ClassifyContext};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
@@ -45,11 +46,14 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("tx::id", fns::txid).unwrap(); // alias
         scope
             .set_fn("tx::with_witness", fns::tx_with_witness)
-            .unwrap(); // alias
+            .unwrap();
         scope.set_fn("script", fns::script).unwrap();
         scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
         scope.set_fn("explicitScript", fns::explicitScript).unwrap();
         scope.set_fn("script::spk", fns::scriptPubKey).unwrap(); // alias
+        scope
+            .set_fn("script::explicit", fns::explicitScript)
+            .unwrap(); // alias
         scope.set_fn("script::strip", fns::script_strip).unwrap();
         scope.set_fn("script::wiz", fns::script_wiz).unwrap();
         scope.set_fn("script::bitide", fns::script_bitide).unwrap();
@@ -492,6 +496,7 @@ impl_simple_to_value!(bitcoin::WitnessVersion, ver, ver.to_num() as i64);
 impl_simple_to_value!(bitcoin::AddressType, t, t.to_string());
 impl_simple_to_value!(bitcoin::WitnessProgram, w, (w.version(), w.program()));
 impl_simple_to_value!(&bitcoin::script::PushBytes, p, p.as_bytes().to_vec());
+impl_simple_to_value!(Opcode, op, ScriptBuf::from_bytes(vec![op.to_u8()]));
 impl_simple_to_value!(SignedAmount, amt, amt.to_sat());
 // Panics for out-of-range `Amount`s (i64 can represent up to ~92 billion BTC, ~4400x more than can exists),
 // which should be impossible to construct within Minsc (but can be passed from Rust code).
@@ -534,6 +539,20 @@ impl_simple_to_value!(
     w,
     i64::try_from(w.to_wu()).expect("out of range weight")
 );
+#[rustfmt::skip]
+impl_simple_to_value!( bitcoin::script::Instructions<'_>, insts, insts
+    .map(|inst| match inst {
+        Err(err) => err.to_string().into(),
+        // XXX always uses TapScript
+        Ok(Instruction::Op(op)) => match op.classify(ClassifyContext::TapScript) {
+            Class::PushNum(num) => num.into(),
+            _ => op.into(),
+        },
+        Ok(Instruction::PushBytes(push)) if push.is_empty() => 0.into(),
+        Ok(Instruction::PushBytes(push)) => push.into(),
+    })
+    .collect::<Vec<Value>>()
+);
 
 // Field accessors
 
@@ -564,6 +583,37 @@ impl FieldAccess for Address {
             "address_type" => self.address_type()?.into(),
             "witness_program" => self.witness_program()?.into(),
             "qr_uri" => self.to_qr_uri().into(),
+            _ => {
+                return None;
+            }
+        })
+    }
+}
+
+impl FieldAccess for ScriptBuf {
+    fn get_field(self, field: &Value) -> Option<Value> {
+        Some(match field.as_str()? {
+            // Returns an array of opcodes (as Script), 0-16 number pushes (as Int), data pushes (as Bytes), and errors (as String)
+            // TODO script marker support
+            "instructions" => self.instructions().into(),
+            "instructions_minimal" => self.instructions_minimal().into(),
+
+            "is_multisig" => self.is_multisig().into(),
+            "is_op_return" => self.is_op_return().into(),
+            "is_p2pk" => self.is_p2pk().into(),
+            "is_p2pkh" => self.is_p2pkh().into(),
+            "is_p2sh" => self.is_p2pkh().into(),
+            "is_p2tr" => self.is_p2tr().into(),
+            "is_p2wpkh" => self.is_p2wpkh().into(),
+            "is_p2wsh" => self.is_p2wsh().into(),
+            "is_push_only" => self.is_push_only().into(),
+            "is_witness_program" => self.is_witness_program().into(),
+
+            "dust_value" | "minimal_non_dust" => self.minimal_non_dust().into(),
+            "count_sigops" => self.count_sigops().into(),
+            "count_sigops_legacy" => self.count_sigops_legacy().into(),
+
+            "witness_version" => self.witness_version()?.into(),
             _ => {
                 return None;
             }
@@ -767,7 +817,7 @@ fn is_valid_ident(s: &str) -> bool {
 }
 impl PrettyDisplay for Transaction {
     const AUTOFMT_ENABLED: bool = true;
-    const MAX_ONELINER_LENGTH: usize = 200;
+    const MAX_ONELINER_LENGTH: usize = 180;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         let (newline_or_space, inner_indent, indent_w, inner_indent_w) = indentation_params(indent);
@@ -913,7 +963,7 @@ impl PrettyDisplay for Opcode {
     const AUTOFMT_ENABLED: bool = false;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
-        use bitcoin::opcodes::{all as ops, Class, ClassifyContext};
+        use bitcoin::opcodes::all as ops;
         // XXX always uses TapScript as the ClassifyContext
         match (*self, self.classify(ClassifyContext::TapScript)) {
             (_, Class::PushNum(num)) => write!(f, "<{}>", num),
