@@ -39,7 +39,7 @@ export function loadFile(hash) {
 async function loadRepoFile(path) {
   if (/^(examples|tests|src)\//.test(path)) path=`shesek/minsc/master/${path.replace(/\.minsc$/, '')}.minsc`
   else if (/^(master|dev|20\d{4}-\w+)\//.test(path)) path=`shesek/minsc/${path.replace(/\.minsc$/, '')}.minsc`
-  else if (path.startsWith('https://github.com/')) path=path.slice(18)
+  else if (path.startsWith('https://github.com/')) path=path.slice(19)
 
   const parts = path.split('/')
   if (parts[2] == 'blob') parts.splice(2,1) // drop '/blob/' to support github.com web ui urls
