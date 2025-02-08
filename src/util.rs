@@ -334,6 +334,9 @@ pub trait DescriptorSecretKeyExt {
     fn full_derivation_paths(&self) -> Vec<DerivationPath>;
     fn master_fingerprint(&self) -> bip32::Fingerprint;
 
+    /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
+    fn derivation_paths(&self) -> Vec<DerivationPath>;
+
     // Pending https://github.com/rust-bitcoin/rust-miniscript/pull/757
     fn to_public_(&self) -> Result<DescriptorPublicKey>;
 }
@@ -403,6 +406,19 @@ impl DescriptorSecretKeyExt for DescriptorSecretKey {
                 } else {
                     DerivationPath::from(vec![])
                 }]
+            }
+        }
+    }
+
+    fn derivation_paths(&self) -> Vec<DerivationPath> {
+        match self {
+            DescriptorSecretKey::MultiXPrv(mxprv) => mxprv.derivation_paths.paths().clone(),
+            DescriptorSecretKey::XPrv(xprv) => vec![xprv.derivation_path.clone()],
+            DescriptorSecretKey::Single(single) => {
+                vec![single
+                    .origin
+                    .as_ref()
+                    .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
             }
         }
     }
@@ -645,7 +661,7 @@ impl DeriveExt for DescriptorSecretKey {
             .map(|p| Ok(p.clone().into_derivation_path()?))
             .collect::<Result<Vec<DerivationPath>>>()?;
 
-        let parent_paths = self.full_derivation_paths();
+        let parent_paths = self.derivation_paths();
 
         let derived_paths = parent_paths
             .into_iter()
