@@ -1,0 +1,154 @@
+fn PairCommit($a, $b) = hash::sha256(PAIRCOMMIT_TAG + compactsize(len($a)) + $a + compactsize(len($b)) + $b);
+PAIRCOMMIT_TAG = {$h=hash::sha256("PairCommit"); $h+$h};
+
+// CAT-based PAIRCOMMIT, so scripts can be tested on https://ide.scriptwiz.app/
+// This isn't entirely equivalent to PAIRCOMMIT since it uses CScriptNum-encoded numbers, rather than
+// the CompactSize encoding used by PAIRCOMMIT. However both encodings are equivalent for numbers 1-127.
+//OP_PAIRCOMMIT = `
+//  OP_SIZE OP_SWAP OP_CAT // <a> <blen+b>
+//  OP_SWAP OP_SIZE OP_SWAP OP_CAT // <blen+b> <alen+a>
+//  OP_SWAP OP_CAT // <alen+a+blen+a>
+//  PAIRCOMMIT_TAG OP_SWAP OP_CAT OP_SHA256
+//`;
+
+// Note this is currently re-encoded as Elements' OP_PUSHCURRENTINPUTINDEX, which uses the same opcode byte
+OP_PAIRCOMMIT = script(0xcd);
+
+// Example tx: https://mutinynet.com/tx/4833dee2a5fc6c01884510f1fa69af3bd80811b29d0ddea838919cfceb2b0bf7
+
+
+// Make a Merkle tree
+fn merklize($elements) {
+  if len($elements) == 1 {
+    $leaf_hash = hash::sha256(bytes($elements.0));
+    [ "hash": $leaf_hash, "depth": 0, "value": $elements.0 ]
+  } else {
+    $left_size = len($elements) / 2;
+    $left = merklize(slice($elements, 0, $left_size));
+    $right = merklize(slice($elements, $left_size));
+    $depth = max($left->depth, $right->depth)+1;
+    $branch_hash = PairCommit($left->hash, $right->hash);
+    [ "hash": $branch_hash, "depth": $depth, "left": $left, "right": $right ]
+  }
+}
+
+// Left/right encoding in proofs
+LEFT = 0, RIGHT = 1;
+
+// Make a merkle path inclusion proof
+// e.g. [ [ hash0, side0 ], [ hash1, side1 ] ]
+fn merkleProof($root, $value) {
+  $paths = merkleValuePaths($root); // xxx could reuse the map
+  $path = $paths->{$value}; // an array of left/right
+  fold($path, [ $root, [] ], |[ $node, $proof ], $side| {
+    $other_side = if $side == "left" then "right" else "left";
+    $this_side_int = if $side == "left" then LEFT else RIGHT;
+    $merkle_step = [ $node->{$other_side}->hash, $this_side_int ];
+    [ $node->{$side}, $proof+[ $merkle_step ] ]
+  }).1
+}
+
+// Get a flat map of each leaf value and the left/right path leading to it
+fn merkleValuePaths($node, $curr_path=[]) {
+  if $node->value? {
+    [ $node->value: $curr_path ]
+  } else {
+    $left_flat = merkleValuePaths($node->left, $curr_path+["left"]);
+    $right_flat = merkleValuePaths($node->right, $curr_path+["right"]);
+    $left_flat + $right_flat
+  }
+}
+
+// Verify merkle path inclusion proof
+fn merkleVerify($root_hash, $value, $proof) {
+  fold(reverse($proof), hash::sha256($value), |$curr_hash, $merkle_step| {
+    [ $step_hash, $step_side ] = $merkle_step;
+    if $step_side == LEFT then PairCommit($curr_hash, $step_hash)
+    else PairCommit($step_hash, $curr_hash)
+  }) == $root_hash
+}
+
+// Merkle proof formatted as Script witness stack elements, appended with the length
+// e.g. [ hash0, side0, hash1, side1, 2 ]
+fn merkleProofWitness($root, $value) {
+  $proof = merkleProof($root, $value);
+  flatten($proof) + [ len($proof) ]
+}
+
+// Verify merkle path inclusion proof
+// stack in: <hash0> <side0> .. <hashN> <sideN> <total N> <value> <merkle root>
+fn OP::MERKLE_VERIFY($max_tree_depth) = `
+  OP_TOALTSTACK // put <merkle root> aside
+  OP_SHA256 // compute <value>'s leaf hash
+  OP_SWAP // stack:  .. <hashN> <sideN> <value's leaf hash> <total N>
+  unrollFor($max_tree_depth, ` // loop <total N> times, up to $max_tree_depth
+    // stack:  .. <hashN> <sideN> <current hash> <counter N>
+    OP_TOALTSTACK // put counter aside
+    OP_SWAP OP_NOTIF OP_SWAP OP_ENDIF // bring <side>, order nodes based on it
+    OP_PAIRCOMMIT // compute the branch hash
+    OP_FROMALTSTACK // get counter back
+  `) // stack: <final hash>
+   OP_FROMALTSTACK OP_EQUALVERIFY // verify the path leads to the <merkle root>
+`;
+
+//
+// Example use
+//
+
+$merkle_root = merklize([100,101,102,103,104,105,106,107,108,109]);
+
+$proof = merkleProof($merkle_root, 108);
+assert(merkleVerify($merkle_root->hash, 108, $proof));
+
+// Fully executable Script, with both verification code and input data
+// Runnable on https://ide.scriptwiz.app/ (with the CAT-based PAIRCOMMIT)
+$script = `$proof len($proof) 108 $merkle_root->hash OP::MERKLE_VERIFY($merkle_root->depth)`;
+
+// A locking script that verifies a merkle proof against the $merkle_root
+// witness: <merkle proof...> <value>
+$locking_script = `
+	$merkle_root->hash OP::MERKLE_VERIFY($merkle_root->depth)
+  OP_TRUE
+`;
+$tr = tr($locking_script);
+$address = address($tr);
+
+// Spending tx with the merkle proof in its witness
+$spend_tx = tx[
+  "input": [
+    "prevout": 1a9f5fe129f1b6aaec9e852254b0ef4f23f95a65d7ef77f64067e68f040f2b57:1, // an output funding $address
+    "witness": tr::script_witness($tr, $locking_script, merkleProofWitness($merkle_root, 105) + [ 105 ]),
+  ],
+  "output": `OP_RETURN "OP_PAIRCOMMIT merkle proof \\o/"`:0,
+];
+$spend_tx_hex = hex($spend_tx);
+
+
+//
+// Key-value Lookup Table
+//
+
+// Each element is kept in the tree as the hash of its key+value
+fn hashElement([ $key, $val ]) = PairCommit(bytes($key), bytes($val));
+
+// Merkle tree of exp2() results for 4-bit numbers
+$exp2_values = fillArray(16, |$n| [$n, 2**$n]);
+$exp2_merkle = merklize(map($exp2_values, hashElement));
+
+// Produce a witness proving the result of exp2($n)
+fn exp2::witness($n) {
+  $exp2_result = 2**$n;
+	$proof = merkleProofWitness($exp2_merkle, hashElement([ $n, $exp2_result ]));
+  $proof + [ $exp2_result ]
+}
+
+// stack in: <merkle proof...> <exp2 result> <exp2 input>
+// stack out: <exp2 result> (or fail)
+OP::EXP2 = `
+  OP_SWAP OP_DUP OP_TOALTSTACK // keep a copy of the <exp2 result> aside
+  OP_PAIRCOMMIT // compute the hashElement for the <exp2 input> + <exp2 result>
+  $exp2_merkle->hash OP::MERKLE_VERIFY($exp2_merkle->depth) // verify merkle proof for hashElement
+  OP_FROMALTSTACK // leave the <exp2 result> on stack
+`;
+
+$script_exp2 = `exp2::witness(10) 10 OP::EXP2`; // -> 1024

@@ -10,7 +10,7 @@
 
 Minsc is a high-level, domain-specific, embeddable language for Bitcoin scripting that simplifies the creation and fulfillment of complex spending conditions using an expressive pseudo-code-like syntax.
 
-It features built-in support for Descriptors, Miniscript, Script, Transactions, PSBT, Taproot, Xpubs/Xprvs, CTV and more.
+It features built-in support for Descriptors, Miniscript, Script, Transactions, PSBT, Taproot, BIP32, CTV and more.
 
 The language is dynamically typed, functional and immutable.
 
@@ -28,6 +28,9 @@ The language is dynamically typed, functional and immutable.
 > - [Recovery after a delay period](https://min.sc/v0.3/#github=examples/recovery-after-delay.minsc) (simple CSV-based, delay period since the coins last moved)
 > - [Inheritance after a contest period](https://min.sc/v0.3/#github=examples/inheritance-after-contest-presigned.minsc) (2-stage using pre-signed txs, contest delay period following the 'trigger')
 >
+> #### One Liners
+> - [Simple one/few-liners](https://gist.github.com/shesek/fe1ca13232720d10a6ea3c9ea313cb15) for inpsecting and manipulating bitcoin data types
+>
 > #### Manual Scripting
 > ##### *Without* Descriptors, Miniscript or PSBT
 > - [Manual Signing](https://min.sc/v0.3/#github=examples/manual-signing-p2wpkh.minsc) (P2WPKH)
@@ -41,6 +44,7 @@ The language is dynamically typed, functional and immutable.
 > - [Payment Pool](https://min.sc/v0.3/#github=examples/payment-pool.minsc) (shared UTXO ownership with pre-signed unilateral exit)
 > - [Fair Coin-Flip Bet](https://min.sc/v0.3/#github=examples/script-coin-flip.minsc) (commit-reveal scheme with a security deposit)
 > - [Lookup Tables](https://min.sc/v0.3/#github=examples/script-lookup.minsc) (one-time & reusable tables, 4-bit OP_MUL)
+> - [PAIRCOMMIT Merkle Trees](https://min.sc/v0.3/#github=examples/paircommit-merkle-tree.minsc)
 > - More scripting examples are available in [the playground's default code](https://min.sc/v0.3/)
 >
 > #### Elements/Liquid Introspection
