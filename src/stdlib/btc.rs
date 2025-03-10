@@ -6,8 +6,9 @@ use bitcoin::opcodes::{Class, ClassifyContext};
 use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Script, ScriptBuf};
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
-    absolute::LockTime as AbsLockTime, address, hex::DisplayHex, relative::LockTime as RelLockTime,
-    Address, Amount, Network, Opcode, Sequence, SignedAmount, Txid, Witness,
+    absolute::LockTime as AbsLockTime, address, consensus, hex::DisplayHex,
+    relative::LockTime as RelLockTime, Address, Amount, Network, Opcode, Sequence, SignedAmount,
+    Txid, Witness,
 };
 use miniscript::psbt::PsbtExt;
 
@@ -57,6 +58,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("script::strip", fns::script_strip).unwrap();
         scope.set_fn("script::wiz", fns::script_wiz).unwrap();
         scope.set_fn("script::bitide", fns::script_bitide).unwrap();
+        scope.set_fn("scriptnum", fns::scriptnum).unwrap();
+        scope.set_fn("compactsize", fns::compactsize).unwrap();
+        scope.set_fn("varint", fns::compactsize).unwrap(); // alias
 
         // Script Opcodes
         for op in 0x00..=0xff {
@@ -272,6 +276,18 @@ pub mod fns {
         .into())
     }
 
+    /// compactsize(Number) -> Bytes
+    /// Aliased as varint()
+    pub fn compactsize(args: Array, _: &ScopeRef) -> Result<Value> {
+        let varint = bitcoin::VarInt(args.arg_into()?);
+        Ok(consensus::serialize(&varint).into())
+    }
+
+    /// scriptnum(Number) -> Bytes
+    pub fn scriptnum(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(scriptnum_enc(args.arg_into()?).into())
+    }
+
     /// script::strip(Script) -> Script
     /// Strip debug markers from the given Script
     pub fn script_strip(args: Array, _: &ScopeRef) -> Result<Value> {
@@ -358,7 +374,7 @@ impl TryFrom<Value> for Transaction {
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value {
             Value::Transaction(tx) => tx,
-            Value::Bytes(bytes) => bitcoin::consensus::deserialize(&bytes)?,
+            Value::Bytes(bytes) => consensus::deserialize(&bytes)?,
             Value::Psbt(psbt) => psbt.extract(&EC)?,
 
             // From tagged [ "version": $version, "locktime": $locktime, "inputs": [ .. ], "outputs": [ .. ] ]
