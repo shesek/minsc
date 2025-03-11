@@ -25,12 +25,12 @@ head
 
   meta(charset='utf-8')
   meta(name='viewport', content='width=device-width, initial-scale=1')
-  meta(name='description', content='A Miniscript-based scripting language for Bitcoin contracts')
+  meta(name='description', content=' A mini scripting language for all things Bitcoin')
 
   meta(property='og:title', content='Minsc')
-  meta(property='og:description', content='A Miniscript-based scripting language for Bitcoin contracts')
-  meta(property='og:image', content='https://min.sc/img/social.png')
-  meta(name='twitter:card', content='summary_large_image')
+  meta(property='og:description', content=' A mini scripting language for all things Bitcoin')
+  //-meta(property='og:image', content='https://min.sc/img/social.png')
+  //-meta(name='twitter:card', content='summary_large_image')
 
   link(rel='stylesheet', href='bootstrap.min.css')
   link(rel='stylesheet', href='style.css')
@@ -74,11 +74,11 @@ body
             p.m-0.p-2 #[span]
           +box('Result', false, false)#output-other: .codeview
 
-    script.
+    //-script.
       (function(u, _paq) {
         _paq.push(['trackPageView']);_paq.push(['enableLinkTracking']);_paq.push(['setTrackerUrl', u+'t']);_paq.push(['setSiteId', '1']);
         var d=document, g=d.createElement('script'), s=d.getElementsByTagName('script')[0];g.type='text/javascript'; g.async=true; g.src=u+'j'; s.parentNode.insertBefore(g,s);
       })("//s.min.sc/", window._paq=[]);
-    noscript: img(src='//s.min.sc/t?idsite=1&rec=1', style='border:0;', alt='')
+    //-noscript: img(src='//s.min.sc/t?idsite=1&rec=1', style='border:0;', alt='')
 
   script(src='index.js')

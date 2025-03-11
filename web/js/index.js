@@ -225,7 +225,7 @@ update('init')
 // Suggest autocomplete hints
 editor.on('inputRead', debounce((cm, changes) => {
   if (!cm.state.completionActive)
-    cm.showHint({ completeSingle: false, wordEndOnly: true, minSearchLen: 3, displayIfLess: 25 })
+    cm.showHint({ completeSingle: false, wordEndOnly: true, minSearchLen: 2, displayIfLess: 25 })
 }, 250))
 
 // Setup read-only CodeMirror editors to display outputs

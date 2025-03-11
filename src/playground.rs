@@ -63,6 +63,11 @@ pub fn run_playground(code: &str, network: &str) -> Result<JsValue, JsValue> {
                 tapinfo = Some(tapinfo_);
             }
 
+            Value::WshScript(wsh) => {
+                script = Some(wsh.explicit_script());
+                addr = Some(Address::from_script(&wsh.script_pubkey(), network).unwrap());
+            }
+
             Value::Address(addr_) => addr = Some(addr_),
             other_ => other = Some(other_),
         };
