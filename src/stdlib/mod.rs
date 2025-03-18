@@ -90,7 +90,8 @@ pub mod fns {
     use crate::{ExprRepr, PrettyDisplay};
 
     /// Get the argument type as a string
-    /// One of: pubkey, number, bool, bytes, policy, withprob, descriptor, address, script, function, network, tapinfo, array, symbol
+    /// One of: pubkey, seckey, int, float, bool, bytes, string, policy, withprob, descriptor,
+    /// address, script, transaction, function, network, tapinfo, wsh-script, psbt, array, symbol
     /// typeof(Value) -> String
     pub fn r#typeof(args: Array, _: &ScopeRef) -> Result<Value> {
         let type_of = args.arg_into::<Value>()?.type_of();
@@ -295,7 +296,7 @@ pub mod fns {
 
     /// [LOG] to STDOUT or console.log
     pub fn log(mut args: Array, scope: &ScopeRef) -> Result<Value> {
-        // XXX this and warn() should be implemented in Minsc once it has support for varidaric functions
+        // XXX this and warn() should be implemented in Minsc once it has support for variadic functions
         args.insert(0, "[LOG]".into());
         fns::print(args, scope)
     }

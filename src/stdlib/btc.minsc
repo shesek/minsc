@@ -43,7 +43,7 @@ fn tr::script_witness($tr, $script, $stack=[]) = $stack + [ $script, tr::ctrl($t
 //
 
 // Simplified SigHash API given a Transaction and its UTXOs
-fn tx::sighash($tx, $vin, $utxos, $sighash_ty) = psbt::sighash([
+fn tx::sighash($tx, $vin, $utxos, $sighash_ty=SIGHASH_ALL) = psbt::sighash([
   "unsigned_tx": $tx,
   "inputs": map($utxos, |$utxo| [
     "utxo": $utxo,
@@ -52,7 +52,7 @@ fn tx::sighash($tx, $vin, $utxos, $sighash_ty) = psbt::sighash([
 ], $vin);
 
 // SigHash for Taproot spending through a script-path leaf
-fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::sighash([
+fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty=SIGHASH_ALL) = psbt::sighash([
   "unsigned_tx": $tx,
   "inputs": map($utxos, |$utxo| [
     "utxo": $utxo,
@@ -61,6 +61,8 @@ fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty) = psbt::si
 ], $vin, $script_leaf);
 
 // TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
+
+fn tx::strip_witness($tx) = tx::with_witness($tx, fillArray(len(tx($tx)->input), |$vin| $vin: []));
 
 fn psbt::finalize_witness($psbt, $input_witnesses, $extract_tx=true) {
   $finalized = psbt::update($psbt, [
@@ -97,6 +99,14 @@ OP::MINIMAL_BOOL = `OP_DUP OP_SIZE OP_EQUALVERIFY`;
 // Sort the top 2 stack elements (higher placed at the top)
 OP::2SORT = `OP_2DUP OP_GREATERTHAN OP_IF OP_SWAP OP_ENDIF`;
 
+// Left-inclusive only range check
+fn verifyWithin($min, $max) = `OP_DUP $min $max OP_WITHIN OP_VERIFY`;
+// Right-inclusive too
+fn verifyRange($min, $max) = verifyWithin($min, $max+1);
+
+// Drop $num elements from the stack/altstack
+fn dropStack($num) = `OP_2DROP*($num/2) OP_DROP*($num%2)`;
+fn dropAlt($num) = `OP_FROMALTSTACK*$num dropStack($num)`;
 
 // MUL for small constant numbers
 OP::2MUL = `OP_DUP OP_ADD`;

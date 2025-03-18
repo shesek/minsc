@@ -801,7 +801,7 @@ impl FieldAccess for Psbt {
 
             "txid" => self.unsigned_tx.compute_txid().into(),
             "fee" => {
-                // Returns -1 if the fee cannot be calcuated or if it overflows i64 (~92 billion BTC, ~4400x more than can exists)
+                // Returns -1 if the fee cannot be calculated or if it overflows i64 (~92 billion BTC, ~4400x more than can exists)
                 // Use psbt::fee() if you prefer an exception to be raised instead.
                 let fee = self.fee().ok();
                 let fee = fee.and_then(|f| f.to_sat().try_into().ok());
