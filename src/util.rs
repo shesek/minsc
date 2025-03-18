@@ -305,12 +305,7 @@ impl DescriptorPubKeyExt for DescriptorPublicKey {
         match self {
             DescriptorPublicKey::MultiXPub(mxpub) => mxpub.derivation_paths.paths().clone(),
             DescriptorPublicKey::XPub(xpub) => vec![xpub.derivation_path.clone()],
-            DescriptorPublicKey::Single(single) => {
-                vec![single
-                    .origin
-                    .as_ref()
-                    .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
-            }
+            DescriptorPublicKey::Single(_) => vec![DerivationPath::master()],
         }
     }
 
@@ -392,21 +387,9 @@ impl DescriptorSecretKeyExt for DescriptorSecretKey {
                     .map(|p| origin_path.extend(p))
                     .collect()
             }
-            DescriptorSecretKey::XPrv(ref xpub) => {
-                let origin_path = if let Some((_, ref path)) = xpub.origin {
-                    path.clone()
-                } else {
-                    DerivationPath::from(vec![])
-                };
-                vec![origin_path.extend(&xpub.derivation_path)]
-            }
-            DescriptorSecretKey::Single(ref single) => {
-                vec![if let Some((_, ref path)) = single.origin {
-                    path.clone()
-                } else {
-                    DerivationPath::from(vec![])
-                }]
-            }
+            DescriptorSecretKey::XPrv(_) | DescriptorSecretKey::Single(_) => vec![self
+                .full_derivation_path()
+                .expect("Must be Some for non-multipath keys")],
         }
     }
 
@@ -414,12 +397,7 @@ impl DescriptorSecretKeyExt for DescriptorSecretKey {
         match self {
             DescriptorSecretKey::MultiXPrv(mxprv) => mxprv.derivation_paths.paths().clone(),
             DescriptorSecretKey::XPrv(xprv) => vec![xprv.derivation_path.clone()],
-            DescriptorSecretKey::Single(single) => {
-                vec![single
-                    .origin
-                    .as_ref()
-                    .map_or_else(DerivationPath::master, |(_, path)| path.clone())]
-            }
+            DescriptorSecretKey::Single(_) => vec![DerivationPath::master()],
         }
     }
 
