@@ -44,7 +44,7 @@ fn tr::script_witness($tr, $script, $stack=[]) = $stack + [ $script, tr::ctrl($t
 
 // Simplified SigHash API given a Transaction and its UTXOs
 fn tx::sighash($tx, $vin, $utxos, $sighash_ty=SIGHASH_ALL) = psbt::sighash([
-  "unsigned_tx": $tx,
+  "unsigned_tx": tx::strip_witness($tx),
   "inputs": map($utxos, |$utxo| [
     "utxo": $utxo,
     "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
@@ -53,7 +53,7 @@ fn tx::sighash($tx, $vin, $utxos, $sighash_ty=SIGHASH_ALL) = psbt::sighash([
 
 // SigHash for Taproot spending through a script-path leaf
 fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty=SIGHASH_ALL) = psbt::sighash([
-  "unsigned_tx": $tx,
+  "unsigned_tx": tx::strip_witness($tx),
   "inputs": map($utxos, |$utxo| [
     "utxo": $utxo,
     "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
