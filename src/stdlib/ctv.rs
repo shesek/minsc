@@ -56,13 +56,26 @@ pub mod fns {
     }
 }
 
-// Copied from https://github.com/sapio-lang/sapio/blob/master/sapio-base/src/util.rs
+// Based on https://github.com/sapio-lang/sapio/blob/master/sapio-base/src/util.rs,
+// with support for scriptSigs
 fn get_ctv_hash(tx: &Transaction, input_index: u32) -> sha256::Hash {
     use bitcoin::consensus::encode::Encodable;
 
     let mut ctv_hash = sha256::Hash::engine();
     tx.version.consensus_encode(&mut ctv_hash).unwrap();
     tx.lock_time.consensus_encode(&mut ctv_hash).unwrap();
+    // If any of the inputs scriptSigs are non-empty, all of them are hashed - including empty ones
+    // If no scriptSigs are set, this hash is skipped entirely
+    if tx.input.iter().any(|i| !i.script_sig.is_empty()) {
+        let mut enc = sha256::Hash::engine();
+        for i in &tx.input {
+            i.script_sig.consensus_encode(&mut enc).unwrap();
+        }
+        sha256::Hash::from_engine(enc)
+            .to_byte_array()
+            .consensus_encode(&mut ctv_hash)
+            .unwrap();
+    }
     (tx.input.len() as u32)
         .consensus_encode(&mut ctv_hash)
         .unwrap();
