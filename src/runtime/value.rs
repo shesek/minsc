@@ -184,8 +184,10 @@ impl TryFrom<Value> for Vec<u8> {
             Value::Script(script) => script.into_bytes(),
             Value::Psbt(psbt) => psbt.serialize(),
             Value::Transaction(tx) => bitcoin::consensus::serialize(&tx),
-            // Encode integers as CScriptNum
+            // Use Script encoding for integers/booleans
             Value::Number(Number::Int(num)) => stdlib::btc::scriptnum_enc(num),
+            Value::Bool(true) => vec![0x01],
+            Value::Bool(false) => vec![],
             // XXX PubKey/SecKey not fully round-trip-able - only the key is encoded, without the bip32 `origin` field associated with it
             Value::PubKey(dpk) => match dpk {
                 Dpk::XPub(xpub) => xpub
