@@ -257,7 +257,19 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
                     update_output(psbt_output, out_tags)?;
                 }
             }
+
             "combine" => psbt.combine(val.try_into()?)?,
+
+            "utxos" => {
+                let utxos = val.into_array()?;
+                for (vin, utxo) in utxos.mapped_or_all::<Value>(psbt.inputs.len())? {
+                    let psbt_input = psbt
+                        .inputs
+                        .get_mut(vin)
+                        .ok_or(Error::PsbtInputNotFound(vin))?;
+                    update_input(psbt_input, (("utxo", utxo),).into())?;
+                }
+            }
 
             // Expected to be provided as the first tag, which is handled and stripped by psbt_from_tags()
             "unsigned_tx" => bail!(Error::PsbtTxTagInvalidPosition),
@@ -800,6 +812,12 @@ impl FieldAccess for Psbt {
             "proprietary" => self.proprietary.into(),
 
             "txid" => self.unsigned_tx.compute_txid().into(),
+            "utxos" => self
+                .iter_funding_utxos()
+                .map(|rtxo| Ok(rtxo?.clone()))
+                .collect::<Result<Vec<_>>>()
+                .ok()?
+                .into(),
             "fee" => {
                 // Returns -1 if the fee cannot be calculated or if it overflows i64 (~92 billion BTC, ~4400x more than can exists)
                 // Use psbt::fee() if you prefer an exception to be raised instead.
