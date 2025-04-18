@@ -84,6 +84,9 @@ pub enum RuntimeError {
     #[error("Expected a WshScript, not {}", ValErrFmt(.0))]
     NotWshScript(Box<Value>),
 
+    #[error("Expected a Symvol, not {}", ValErrFmt(.0))]
+    NotSymbol(Box<Value>),
+
     #[error("Expected a single Xpub, not {0}")]
     NotSingleXpub(Box<miniscript::descriptor::DescriptorPublicKey>),
 

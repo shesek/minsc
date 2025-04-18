@@ -111,6 +111,7 @@ impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
 impl_simple_into_variant!(WshScript, WshScript, into_wsh_script, NotWshScript);
+impl_simple_into_variant!(Symbol, Symbol, into_symbol, NotSymbol);
 
 // From Value to f64 primitive, with auto-coercion for integers
 impl TryFrom<Value> for f64 {
