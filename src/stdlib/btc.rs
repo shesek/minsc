@@ -556,7 +556,7 @@ impl_simple_to_value!(
     i64::try_from(w.to_wu()).expect("out of range weight")
 );
 #[rustfmt::skip]
-impl_simple_to_value!( bitcoin::script::Instructions<'_>, insts, insts
+impl_simple_to_value!(bitcoin::script::Instructions<'_>, insts, insts
     .map(|inst| match inst {
         Err(err) => err.to_string().into(),
         // XXX always uses TapScript
@@ -568,6 +568,7 @@ impl_simple_to_value!( bitcoin::script::Instructions<'_>, insts, insts
         Ok(Instruction::PushBytes(push)) => push.into(),
     })
     .collect::<Vec<Value>>()
+    // Returns an array of opcodes (as Script), 0-16 number pushes (as Int), data pushes (as Bytes), and errors (as String)
 );
 
 // Field accessors
@@ -688,6 +689,14 @@ pub fn fmt_script<W: fmt::Write>(
     use crate::display::{quote_str as quote, INDENT_WIDTH as INDENT};
     use bitcoin::opcodes::all::{OP_ELSE, OP_ENDIF, OP_IF, OP_NOTIF};
 
+    // Encode single-opcode scripts as just the opcode name, without parsing it as scripts instructions
+    // (which would fail with 'unexpected end of script' for PUSHBYTE opcodes with no trailing bytes).
+    // This also avoids the `` wrappers, which are unnecessary (all opcodes are available as vars).
+    if script.len() == 1 {
+        let opcode = script.first_opcode().expect("checked size");
+        return write!(f, "{}", opcode.pretty(None));
+    }
+
     let mut indent_w = indent.map_or(0, |n| n * INDENT);
     let mut if_indent_w: usize = 0;
 
@@ -724,13 +733,17 @@ pub fn fmt_script<W: fmt::Write>(
             Ok(MarkerItem::Instruction(inst)) => match inst {
                 Instruction::PushBytes(push) if push.is_empty() => write!(f, "<0>")?,
                 Instruction::PushBytes(push) => write!(f, "<0x{}>", push.as_bytes().as_hex())?,
-                Instruction::Op(opcode) => {
-                    write!(f, "{}", opcode.pretty(None))?;
+                // XXX always uses TapScript as the ClassifyContext
+                Instruction::Op(opcode) => match opcode.classify(ClassifyContext::TapScript) {
+                    Class::PushNum(num) => write!(f, "<{}>", num)?,
+                    _ => {
+                        write!(f, "{}", opcode.pretty(None))?;
 
-                    if let (OP_IF | OP_NOTIF | OP_ELSE, Some(_)) = (opcode, indent) {
-                        if_indent_w += INDENT;
+                        if let (OP_IF | OP_NOTIF | OP_ELSE, Some(_)) = (opcode, indent) {
+                            if_indent_w += INDENT;
+                        }
                     }
-                }
+                },
             },
             // Format debug markers encoded within the Script
             Ok(MarkerItem::Marker(Marker { kind, body })) => {
@@ -980,47 +993,46 @@ impl PrettyDisplay for Opcode {
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
         use bitcoin::opcodes::all as ops;
-        // XXX always uses TapScript as the ClassifyContext
-        match (*self, self.classify(ClassifyContext::TapScript)) {
-            (_, Class::PushNum(num)) => write!(f, "<{}>", num),
+        match *self {
             // special-case for unofficial opcodes
-            (ops::OP_NOP4, _) => write!(f, "OP_CHECKTEMPLATEVERIFY"),
-            (ops::OP_RETURN_215, _) => write!(f, "OP_ADD64"),
-            (ops::OP_RETURN_218, _) => write!(f, "OP_DIV64"),
-            (ops::OP_RETURN_227, _) => write!(f, "OP_ECMULSCALARVERIFY"),
-            (ops::OP_RETURN_222, _) => write!(f, "OP_GREATERTHAN64"),
-            (ops::OP_RETURN_223, _) => write!(f, "OP_GREATERTHANOREQUAL64"),
-            (ops::OP_RETURN_200, _) => write!(f, "OP_INSPECTINPUTASSET"),
-            (ops::OP_RETURN_204, _) => write!(f, "OP_INSPECTINPUTISSUANCE"),
-            (ops::OP_RETURN_199, _) => write!(f, "OP_INSPECTINPUTOUTPOINT"),
-            (ops::OP_RETURN_202, _) => write!(f, "OP_INSPECTINPUTSCRIPTPUBKEY"),
-            (ops::OP_RETURN_203, _) => write!(f, "OP_INSPECTINPUTSEQUENCE"),
-            (ops::OP_RETURN_201, _) => write!(f, "OP_INSPECTINPUTVALUE"),
-            (ops::OP_RETURN_211, _) => write!(f, "OP_INSPECTLOCKTIME"),
-            (ops::OP_RETURN_212, _) => write!(f, "OP_INSPECTNUMINPUTS"),
-            (ops::OP_RETURN_213, _) => write!(f, "OP_INSPECTNUMOUTPUTS"),
-            (ops::OP_RETURN_206, _) => write!(f, "OP_INSPECTOUTPUTASSET"),
-            (ops::OP_RETURN_208, _) => write!(f, "OP_INSPECTOUTPUTNONCE"),
-            (ops::OP_RETURN_209, _) => write!(f, "OP_INSPECTOUTPUTSCRIPTPUBKEY"),
-            (ops::OP_RETURN_207, _) => write!(f, "OP_INSPECTOUTPUTVALUE"),
-            (ops::OP_RETURN_210, _) => write!(f, "OP_INSPECTVERSION"),
-            (ops::OP_RETURN_226, _) => write!(f, "OP_LE32TOLE64"),
-            (ops::OP_RETURN_225, _) => write!(f, "OP_LE64TOSCRIPTNUM"),
-            (ops::OP_RETURN_220, _) => write!(f, "OP_LESSTHAN64"),
-            (ops::OP_RETURN_221, _) => write!(f, "OP_LESSTHANOREQUAL64"),
-            (ops::OP_RETURN_217, _) => write!(f, "OP_MUL64"),
-            (ops::OP_RETURN_219, _) => write!(f, "OP_NEG64"),
-            (ops::OP_RETURN_205, _) => write!(f, "OP_PUSHCURRENTINPUTINDEX"),
-            (ops::OP_RETURN_224, _) => write!(f, "OP_SCRIPTNUMTOLE64"),
-            (ops::OP_RETURN_198, _) => write!(f, "OP_SHA256FINALIZE"),
-            (ops::OP_RETURN_196, _) => write!(f, "OP_SHA256INITIALIZE"),
-            (ops::OP_RETURN_197, _) => write!(f, "OP_SHA256UPDATE"),
-            (ops::OP_RETURN_216, _) => write!(f, "OP_SUB64"),
-            (ops::OP_RETURN_228, _) => write!(f, "OP_TWEAKVERIFY"),
-            (ops::OP_RETURN_214, _) => write!(f, "OP_TXWEIGHT"),
+            ops::OP_NOP4 => write!(f, "OP_CHECKTEMPLATEVERIFY"),
+            // Elements opcodes
+            ops::OP_RETURN_215 => write!(f, "OP_ADD64"),
+            ops::OP_RETURN_218 => write!(f, "OP_DIV64"),
+            ops::OP_RETURN_227 => write!(f, "OP_ECMULSCALARVERIFY"),
+            ops::OP_RETURN_222 => write!(f, "OP_GREATERTHAN64"),
+            ops::OP_RETURN_223 => write!(f, "OP_GREATERTHANOREQUAL64"),
+            ops::OP_RETURN_200 => write!(f, "OP_INSPECTINPUTASSET"),
+            ops::OP_RETURN_204 => write!(f, "OP_INSPECTINPUTISSUANCE"),
+            ops::OP_RETURN_199 => write!(f, "OP_INSPECTINPUTOUTPOINT"),
+            ops::OP_RETURN_202 => write!(f, "OP_INSPECTINPUTSCRIPTPUBKEY"),
+            ops::OP_RETURN_203 => write!(f, "OP_INSPECTINPUTSEQUENCE"),
+            ops::OP_RETURN_201 => write!(f, "OP_INSPECTINPUTVALUE"),
+            ops::OP_RETURN_211 => write!(f, "OP_INSPECTLOCKTIME"),
+            ops::OP_RETURN_212 => write!(f, "OP_INSPECTNUMINPUTS"),
+            ops::OP_RETURN_213 => write!(f, "OP_INSPECTNUMOUTPUTS"),
+            ops::OP_RETURN_206 => write!(f, "OP_INSPECTOUTPUTASSET"),
+            ops::OP_RETURN_208 => write!(f, "OP_INSPECTOUTPUTNONCE"),
+            ops::OP_RETURN_209 => write!(f, "OP_INSPECTOUTPUTSCRIPTPUBKEY"),
+            ops::OP_RETURN_207 => write!(f, "OP_INSPECTOUTPUTVALUE"),
+            ops::OP_RETURN_210 => write!(f, "OP_INSPECTVERSION"),
+            ops::OP_RETURN_226 => write!(f, "OP_LE32TOLE64"),
+            ops::OP_RETURN_225 => write!(f, "OP_LE64TOSCRIPTNUM"),
+            ops::OP_RETURN_220 => write!(f, "OP_LESSTHAN64"),
+            ops::OP_RETURN_221 => write!(f, "OP_LESSTHANOREQUAL64"),
+            ops::OP_RETURN_217 => write!(f, "OP_MUL64"),
+            ops::OP_RETURN_219 => write!(f, "OP_NEG64"),
+            ops::OP_RETURN_205 => write!(f, "OP_PUSHCURRENTINPUTINDEX"),
+            ops::OP_RETURN_224 => write!(f, "OP_SCRIPTNUMTOLE64"),
+            ops::OP_RETURN_198 => write!(f, "OP_SHA256FINALIZE"),
+            ops::OP_RETURN_196 => write!(f, "OP_SHA256INITIALIZE"),
+            ops::OP_RETURN_197 => write!(f, "OP_SHA256UPDATE"),
+            ops::OP_RETURN_216 => write!(f, "OP_SUB64"),
+            ops::OP_RETURN_228 => write!(f, "OP_TWEAKVERIFY"),
+            ops::OP_RETURN_214 => write!(f, "OP_TXWEIGHT"),
             // use full 'OP_CHECKSEQUENCEVERIFY' rather than 'OP_CSV' so that its recognized by scriptwiz
-            (ops::OP_CSV, _) => write!(f, "OP_CHECKSEQUENCEVERIFY"),
-            (opcode, _) => write!(f, "{}", opcode),
+            ops::OP_CSV => write!(f, "OP_CHECKSEQUENCEVERIFY"),
+            opcode => write!(f, "{}", opcode),
         }
     }
 }
