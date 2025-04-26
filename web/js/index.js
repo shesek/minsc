@@ -105,7 +105,6 @@ worker.addEventListener('message', ({ data }) => {
 // Send code to WebWorker for evaluation
 function update(source) {
   clearErrorMark()
-  error_el.style.display = 'none'
 
   const code = editor.getValue()
       , network = 'testnet'
