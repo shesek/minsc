@@ -320,6 +320,9 @@ fn should_use_colon_syntax(elements: &[Value]) -> bool {
             // Never if the LHS is one of these (not typically used with colon tuple construction syntax)
             (Array(_) | Function(_) | Transaction(_) | Psbt(_), _) => false,
 
+            // Always if the LHS is a Symbol
+            (Symbol(_), _) => true,
+
             // If the LHS is a String or Script, only if they're short (used as tagged list keys and predicates)
             (String(lhs), _) => lhs.len() < 43,
             (Script(lhs), _) => lhs.len() < 40,
@@ -328,7 +331,7 @@ fn should_use_colon_syntax(elements: &[Value]) -> bool {
             (
                 lhs @ (Bool(_) | Number(_) | Bytes(_) | Address(_) | PubKey(_) | SecKey(_)
                 | Policy(_) | Descriptor(_) | TapInfo(_) | WshScript(_) | WithProb(..)
-                | Network(_) | Symbol(_)),
+                | Network(_)),
                 rhs,
             ) => mem::discriminant(lhs) != mem::discriminant(rhs),
         }
@@ -336,6 +339,7 @@ fn should_use_colon_syntax(elements: &[Value]) -> bool {
         false
     }
 }
+
 // Heuristic to pick whether space should be used for the colon separator
 // (no space for tuple values like $txid:$vout, with it for key-value-like structures)
 fn colon_separator(elements: &[Value]) -> &str {
@@ -344,7 +348,7 @@ fn colon_separator(elements: &[Value]) -> &str {
     match (&elements[0], &elements[1]) {
         (
             String(_) | PubKey(_) | SecKey(_) | Policy(_) | Script(_) | Descriptor(_) | TapInfo(_)
-            | WshScript(_) | Psbt(_),
+            | WshScript(_) | Psbt(_) | Symbol(_),
             _,
         ) => ": ",
         (_, Array(_)) => ": ",

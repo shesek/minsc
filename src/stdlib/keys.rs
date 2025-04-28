@@ -555,9 +555,12 @@ impl PrettyDisplay for DescriptorPublicKey {
         use DescriptorPublicKey::{MultiXPub, Single, XPub};
         match self {
             XPub(_) | MultiXPub(_) => write!(f, "{}", self),
-            // Wrap hex-encoded single pubkeys with a pubkey() call, so that the resulting string
-            // may be used as an expression that produces a PubKey rather than Bytes.
-            Single(_) => write!(f, "pubkey({})", self),
+            // Wrap origin-less single pubkeys with a pubkey() call, so that the resulting string
+            // may be used as an expression that produces a PubKey rather than Bytes
+            Single(s) if s.origin.is_none() => write!(f, "pubkey({})", self),
+            // When there is an origin, it can be detected as a PubKey at the parse stage
+            // without an explicit pubkey()
+            Single(_) => write!(f, "{}", self), // [aa00bb44/7/1'/0]0308f5d3c1...
         }
     }
 }

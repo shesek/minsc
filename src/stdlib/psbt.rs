@@ -934,7 +934,7 @@ impl PrettyDisplay for psbt::Input {
         fmt_map_field!(self, tap_script_sigs, f, sep, is_first, inner_indent,
             |f, ((pk, leaf_hash), sig), _| write!(f, "[{}, {}]: 0x{}", pk, leaf_hash, sig.to_vec().as_hex()));
         fmt_map_field!(self, tap_scripts, f, sep, is_first, inner_indent, // TODO leaf version not encoded
-            |f, (ctrl, (script, _ver)), el_indent| write!(f, "0x{}: {}", ctrl.serialize().as_hex(), script.pretty(el_indent)));
+            |f, (ctrl, (script, _ver)), _| write!(f, "0x{}: {}", ctrl.serialize().as_hex(), script.pretty(None)));
         fmt_map_field!(self, tap_key_origins, f, sep, is_first, inner_indent, fmt_tap_key_origin);
         fmt_opt_field!(self, tap_internal_key, f, sep, is_first);
         fmt_opt_field!(self, tap_merkle_root, f, sep, is_first);

@@ -551,7 +551,7 @@ impl PrettyDisplay for TapNode<'_> {
         match self {
             TapNode::Leaf((script, _)) => {
                 // TODO leaf version not encoded
-                write!(f, "{}", script.pretty(indent))
+                write!(f, "{}", script.pretty(None))
             }
             TapNode::Branch(first, second) => {
                 let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
