@@ -13,7 +13,9 @@ use super::miniscript::{multi_andor, AndOr};
 use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Array, Error, FieldAccess, Result, Value};
-use crate::util::{DescriptorExt, DescriptorPubKeyExt, TapInfoExt, TapNode, TapTreeExt, EC};
+use crate::util::{
+    DescriptorExt, DescriptorPubKeyExt, MiniscriptExt, TapInfoExt, TapNode, TapTreeExt, EC,
+};
 use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
@@ -318,6 +320,10 @@ impl TryFrom<Value> for TapLeafHash {
         Ok(match value {
             Value::Bytes(bytes) if bytes.len() == 32 => Self::from_slice(&bytes)?,
             Value::Script(script) => TapLeafHash::from_script(&script, LeafVersion::TapScript),
+            Value::Policy(policy) => {
+                let miniscript = policy.compile::<miniscript::Tap>()?.derive_keys()?;
+                TapLeafHash::from_script(&miniscript.encode(), LeafVersion::TapScript)
+            }
             v => bail!(Error::TaprootInvalidLeaf(v.into())),
         })
     }

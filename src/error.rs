@@ -280,16 +280,16 @@ pub enum RuntimeError {
     #[error("No viable taproot internal key found, provide one explicitly")]
     TaprootNoViableKey,
 
-    #[error("Invalid taproot binary script tree structure. Expecting a nested array where elements are leaf nodes (with no weights) or a tuple of nodes.")]
+    #[error("Invalid taproot binary script tree structure. Expected a nested array where elements are leaf nodes (with no weights) or a tuple of nodes.")]
     TaprootInvalidScriptBinaryTree,
 
-    #[error("Invalid taproot tree node, expecting Policy/Script or an array of them")]
+    #[error("Invalid taproot tree node, expected Policy/Script or an array of them")]
     TaprootInvalidScript,
 
     #[error("Script does not exists in Taproot tree")]
     TaprootScriptNotFound,
 
-    #[error("Invalid Taproot leaf, expected a 32 bytes TapLeaf hash or a Script to compute the TapLeaf hash for, not {}", ValErrFmt(.0))]
+    #[error("Invalid Taproot leaf. Expected a 32 bytes TapLeaf hash or a Policy/Script to compute the TapLeaf hash for, not {}", ValErrFmt(.0))]
     TaprootInvalidLeaf(Box<Value>),
 
     #[error["Miniscript hash pre-images must be exactly 32 bytes long"]]
