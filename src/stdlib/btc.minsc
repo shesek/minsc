@@ -39,30 +39,26 @@ TR_UNSPENDABLE = NUMS;
 fn tr::script_witness($tr, $script, $stack=[]) = $stack + [ $script, tr::ctrl($tr, $script) ];
 
 //
-// Transactions/PSBT
+// Transactions
 //
 
 // Simplified SigHash API given a Transaction and its UTXOs
-fn tx::sighash($tx, $vin, $utxos, $sighash_ty=SIGHASH_ALL) = psbt::sighash([
-  "unsigned_tx": tx::strip_witness($tx),
-  "inputs": map($utxos, |$utxo| [
-    "utxo": $utxo,
-    "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
-  ])
-], $vin);
-
-// SigHash for Taproot spending through a script-path leaf
-fn tx::sighash::tr_leaf($tx, $vin, $script_leaf, $utxos, $sighash_ty=SIGHASH_ALL) = psbt::sighash([
-  "unsigned_tx": tx::strip_witness($tx),
-  "inputs": map($utxos, |$utxo| [
-    "utxo": $utxo,
-    "sighash_type": $sighash_ty, // set for all inputs but only matters for the $vin
-  ])
-], $vin, $script_leaf);
-
-// TOOD tx::sighash::sw0() with just the signed utxo & tx::sighash::presw() with just the utxo's script
+fn tx::sighash($tx, $vin, $utxos, $sighash_ty=SIGHASH_ALL, $tr_script_leaf=null) {
+  $psbt = psbt[
+    "unsigned_tx": tx::strip_witness($tx),
+    "utxos": $utxos,
+    "inputs": [ $vin: [ "sighash_type": $sighash_ty ] ],
+  ];
+  if $tr_script_leaf == null then psbt::sighash($psbt, $vin)
+  else psbt::sighash($psbt, $vin, $tr_script_leaf)
+}
+// XXX support segwit v0 with only the spent utxo & pre-segwit with only the spent utxo's scriptPubKey
 
 fn tx::strip_witness($tx) = tx::with_witness($tx, fillArray(len(tx($tx)->input), |$vin| $vin: []));
+
+//
+// PSBT
+//
 
 fn psbt::finalize_witness($psbt, $input_witnesses, $extract_tx=true) {
   $finalized = psbt::update($psbt, [
