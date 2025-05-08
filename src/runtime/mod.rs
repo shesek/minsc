@@ -317,7 +317,7 @@ impl ast::InfixOp {
             (Subtract, Num(Int(a)), Num(Int(b))) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
             (Multiply, Num(Int(a)), Num(Int(b))) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
             (Divide, Num(Int(a)), Num(Int(b))) => a.checked_div(b).ok_or(Error::Overflow)?.into(),
-            (Mod, Num(Int(a)), Num(Int(b))) => (a % b).into(),
+            (Mod, Num(Int(a)), Num(Int(b))) => a.checked_rem(b).ok_or(Error::Overflow)?.into(),
             (Power, Num(Int(a)), Num(Int(b))) => {
                 a.checked_pow(b.try_into()?).ok_or(Error::Overflow)?.into()
             }
