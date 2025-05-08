@@ -62,6 +62,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         // Constants
         scope.set("MAX_INTEGER", i64::MAX).unwrap();
         scope.set("MIN_INTEGER", i64::MIN).unwrap();
+        scope.set("inf", f64::INFINITY).unwrap();
+        scope.set("NaN", f64::NAN).unwrap();
 
         // Built-in Symbols
         scope
