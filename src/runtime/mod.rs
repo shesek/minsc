@@ -431,11 +431,15 @@ impl ast::AssignTarget {
             AssignTarget::Ident(ident) if ident.0 == "_" => Ok(()),
             AssignTarget::Ident(ident) => scope.set(ident.clone(), value),
             AssignTarget::List(targets) => {
-                let Value::Array(array) = value else {
-                    bail!(Error::UnpackArrayExpected(
+                let array = match value {
+                    Value::Array(array) => array,
+                    Value::Descriptor(d) if d.is_multipath() => d.into_single_descriptors()?.into(),
+                    Value::PubKey(pk) if pk.is_multipath() => pk.into_single_keys().into(),
+                    Value::SecKey(sk) if sk.is_multipath() => sk.into_single_keys().into(),
+                    other => bail!(Error::UnpackArrayExpected(
                         self.clone().into(),
-                        value.into()
-                    ));
+                        other.into()
+                    )),
                 };
                 ensure!(
                     targets.len() == array.len(),
