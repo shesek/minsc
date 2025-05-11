@@ -6,13 +6,15 @@ use std::result::Result as StdResult;
 use std::sync::Arc;
 
 use bitcoin::bip32::{self, DerivationPath, IntoDerivationPath};
+use bitcoin::hashes::Hash;
 use bitcoin::taproot::{self, ControlBlock, LeafVersion, NodeInfo, TapNodeHash, TaprootSpendInfo};
 use bitcoin::{key::TapTweak, psbt, secp256k1, PublicKey, ScriptBuf, Transaction};
 use miniscript::descriptor::{
-    self, DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, Wildcard,
+    self, DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, SinglePubKey,
+    Wildcard,
 };
 use miniscript::{
-    bitcoin, DefiniteDescriptorKey, Descriptor, ForEachKey, MiniscriptKey, TranslatePk, Translator,
+    DefiniteDescriptorKey, Descriptor, ForEachKey, MiniscriptKey, TranslatePk, Translator,
 };
 
 use crate::runtime::{Array, Error, Result, Value};
@@ -285,8 +287,11 @@ pub trait DescriptorPubKeyExt: Sized {
     /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
     fn derivation_paths(&self) -> Vec<DerivationPath>;
 
-    /// Get the key fingerprint
+    /// Get the key 4-byte fingerprint
     fn fingerprint(&self) -> Result<bip32::Fingerprint>;
+
+    /// Get the key HASH160 identifier
+    fn identifier(&self) -> Result<bip32::XKeyIdentifier>;
 }
 impl DescriptorPubKeyExt for DescriptorPublicKey {
     fn definite(self) -> Result<DefiniteDescriptorKey> {
@@ -310,14 +315,24 @@ impl DescriptorPubKeyExt for DescriptorPublicKey {
     }
 
     fn fingerprint(&self) -> Result<bip32::Fingerprint> {
+        Ok(self.identifier()?[0..4].try_into().expect("valid length"))
+    }
+
+    fn identifier(&self) -> Result<bip32::XKeyIdentifier> {
         Ok(match self {
             // For xpubs, get the fingerprint of the final derivation key (not the master_fingerprint()'s)
             DescriptorPublicKey::XPub(dxpub) => dxpub
                 .xkey
                 .derive_pub(&EC, &dxpub.derivation_path)?
-                .fingerprint(),
-            // For single keys the master_fingerprint() is the same as the final fingerprint
-            DescriptorPublicKey::Single(_) => self.master_fingerprint(),
+                .identifier(),
+            // For single keys, use bitcoin's traditional PubkeyHash, which use the same HASH160 as BIP32 Key Identifiers,
+            // and convert into an XKeyIdentifier
+            DescriptorPublicKey::Single(single) => match single.key {
+                SinglePubKey::FullKey(pk) => pk.pubkey_hash(),
+                SinglePubKey::XOnly(pk) => bitcoin::PubkeyHash::hash(&pk.serialize()),
+            }
+            .to_raw_hash()
+            .into(),
             DescriptorPublicKey::MultiXPub(_) => bail!(Error::InvalidMultiXpub),
         })
     }

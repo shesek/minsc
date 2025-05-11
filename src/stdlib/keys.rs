@@ -245,6 +245,7 @@ impl FieldAccess for DescriptorPublicKey {
 
             // Only available for definite keys
             "fingerprint" => self.fingerprint().ok()?.into(),
+            "identifier" => self.identifier().ok()?.into(),
             // Not available for multi-path keys
             "full_derivation_path" => self.full_derivation_path()?.into(),
             // Available for all keys
@@ -257,6 +258,9 @@ impl FieldAccess for DescriptorPublicKey {
             "is_wildcard" => self.has_wildcard().into(),
             "is_multipath" => self.is_multipath().into(),
             "is_definite" => (!self.has_wildcard() && !self.is_multipath()).into(),
+
+            // Only available for definite Xpubs
+            "chain_code" => Xpub::try_from(Value::PubKey(self)).ok()?.chain_code.into(),
             _ => {
                 return None;
             }
@@ -274,6 +278,7 @@ impl FieldAccess for DescriptorSecretKey {
 
             // only available for definite keys
             "fingerprint" => self.to_public_().ok()?.fingerprint().ok()?.into(),
+            "identifier" => self.to_public_().ok()?.identifier().ok()?.into(),
             // not available for multi-path keys
             "full_derivation_path" => self.full_derivation_path()?.into(),
             // available for all keys
@@ -285,6 +290,9 @@ impl FieldAccess for DescriptorSecretKey {
             "is_wildcard" => self.has_wildcards().into(),
             "is_multipath" => self.is_multipath().into(),
             "is_definite" => (!self.has_wildcards() && !self.is_multipath()).into(),
+
+            // Only available for definite Xprivs
+            "chain_code" => Xpriv::try_from(Value::SecKey(self)).ok()?.chain_code.into(),
             _ => {
                 return None;
             }
@@ -348,6 +356,8 @@ impl_simple_to_value!(
 );
 impl_simple_to_value!(bip32::Fingerprint, fp, fp.to_bytes().to_vec());
 impl_simple_to_value!(bip32::ChildNumber, cn, u32::from(cn));
+impl_simple_to_value!(bip32::ChainCode, cc, cc.to_bytes().to_vec());
+impl_simple_to_value!(bip32::XKeyIdentifier, id, id.to_raw_hash());
 impl_simple_to_value!(
     bip32::DerivationPath,
     path,
