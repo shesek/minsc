@@ -247,11 +247,11 @@ impl FieldAccess for DescriptorPublicKey {
             "fingerprint" => self.fingerprint().ok()?.into(),
             "identifier" => self.identifier().ok()?.into(),
             // Not available for multi-path keys
-            "full_derivation_path" => self.full_derivation_path()?.into(),
+            "derivation_path" => self.full_derivation_path()?.into(),
             // Available for all keys
-            "full_derivation_paths" => self.full_derivation_paths().into(),
+            "derivation_paths" => self.full_derivation_paths().into(),
 
-            "is_xpub" => matches!(self, XPub(_) | MultiXPub(_)).into(),
+            "is_xpub" | "is_xkey" => matches!(self, XPub(_) | MultiXPub(_)).into(),
             "is_single_key" => matches!(self, Single(_)).into(),
             "is_xonly" => matches!(self, Single(SinglePub { key: XOnly(_), .. })).into(),
 
@@ -280,11 +280,11 @@ impl FieldAccess for DescriptorSecretKey {
             "fingerprint" => self.to_public_().ok()?.fingerprint().ok()?.into(),
             "identifier" => self.to_public_().ok()?.identifier().ok()?.into(),
             // not available for multi-path keys
-            "full_derivation_path" => self.full_derivation_path()?.into(),
+            "derivation_path" => self.full_derivation_path()?.into(),
             // available for all keys
-            "full_derivation_paths" => self.full_derivation_paths().into(),
+            "derivation_paths" => self.full_derivation_paths().into(),
 
-            "is_xpriv" => matches!(self, XPrv(_) | MultiXPrv(_)).into(),
+            "is_xpriv" | "is_xkey" => matches!(self, XPrv(_) | MultiXPrv(_)).into(),
             "is_single_key" => matches!(self, Single(_)).into(),
 
             "is_wildcard" => self.has_wildcards().into(),
