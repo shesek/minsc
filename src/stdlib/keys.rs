@@ -21,14 +21,12 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
     scope.set_fn("pubkey", fns::pubkey).unwrap();
     scope.set_fn("seckey", fns::seckey).unwrap();
-
+    scope.set_fn("seckey::rand", fns::seckey_rand).unwrap();
     scope.set_fn("xpriv::rand", fns::xpriv_rand).unwrap();
     scope
         .set_fn("xpriv::from_seed", fns::xpriv_from_seed)
         .unwrap();
-
     scope.set_fn("singles", fns::singles).unwrap();
-
     scope.set_fn("xonly", fns::xonly).unwrap(); // xonly is always derived  single
     scope.set_fn("derived", fns::derived).unwrap();
     scope.set_fn("xderived", fns::xderived).unwrap();
@@ -99,14 +97,18 @@ pub mod fns {
         Ok(Value::SecKey(args.arg_into()?))
     }
 
-    /// Generate a new random Xpriv from a 256-bit seed
-    /// xpriv::rand(Network = testnet) -> SecKey
-    pub fn xpriv_rand(args: Array, _: &ScopeRef) -> Result<Value> {
-        let network = args
-            .arg_into::<Option<Network>>()?
-            .unwrap_or(Network::Testnet);
-        let seed: [u8; 32] = thread_rng().gen();
+    /// Generate a new random single SecKey
+    /// seckey::rand(Network = testnet) -> SecKey<SingleKey>
+    pub fn seckey_rand(args: Array, _: &ScopeRef) -> Result<Value> {
+        let network = args.arg_into::<Option<_>>()?.unwrap_or(Network::Testnet);
+        Ok(bitcoin::PrivateKey::generate(network).into())
+    }
 
+    /// Generate a new random Xpriv from a 256-bit seed
+    /// xpriv::rand(Network = testnet) -> SecKey<Xpriv>
+    pub fn xpriv_rand(args: Array, _: &ScopeRef) -> Result<Value> {
+        let network = args.arg_into::<Option<_>>()?.unwrap_or(Network::Testnet);
+        let seed: [u8; 32] = thread_rng().gen();
         Ok(Xpriv::new_master(network, &seed).unwrap().into())
     }
 
@@ -324,6 +326,11 @@ impl_simple_to_value!(
             None
         },
     })
+);
+impl_simple_to_value!(
+    bitcoin::PrivateKey,
+    key,
+    DescriptorSecretKey::Single(SinglePriv { key, origin: None })
 );
 impl_simple_to_value!(
     Xpriv,
