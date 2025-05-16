@@ -855,7 +855,6 @@ impl_simple_to_value!(psbt::PsbtSighashType, ty, ty.to_u32());
 impl_simple_to_value!(raw::Key, k, (k.type_value as i64, k.key));
 impl_simple_to_value!(raw::ProprietaryKey, k, (k.prefix, k.subtype as i64, k.key));
 impl_simple_to_value!(psbt::SignError, e, e.to_string());
-impl_simple_to_value!(miniscript::psbt::Error, e, e.to_string());
 impl_simple_to_value!(miniscript::psbt::PsbtSighashMsg, msg, msg.to_secp_msg());
 impl_simple_to_value!(
     SigningKeys,
@@ -865,6 +864,11 @@ impl_simple_to_value!(
         SigningKeys::Schnorr(pks) => Value::from(pks),
     }
 );
+#[rustfmt::skip]
+impl_simple_to_value!(miniscript::psbt::Error, e, match e {
+    miniscript::psbt::Error::InputError(err, inv) => (inv as i64, err.to_string()),
+    non_input_err => (-1, non_input_err.to_string()),
+});
 
 impl PrettyDisplay for Psbt {
     const AUTOFMT_ENABLED: bool = false;
