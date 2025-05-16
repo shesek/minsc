@@ -39,8 +39,12 @@ ENABLE_RBF = 0xFFFFFFFD;
 // The default unspendable key for tr(), can be overridden in user-land code
 TR_UNSPENDABLE = NUMS;
 
+TR_ANNEX_BYTE = 0x50;
+
 // Create the witness stack for a Taproot script-path spend
-fn tr::script_witness($tr, $script, $stack=[]) = $stack + [ $script, tr::ctrl($tr, $script) ];
+fn tr::script_witness($tr, $script, $stack=[], $annex=null) =
+  $stack + [ $script, tr::ctrl($tr, $script) ]
+  + (if $annex != null then [ TR_ANNEX_BYTE + $annex ] else []);
 
 //
 // Transactions
