@@ -18,9 +18,13 @@ P2A = `1 0x4e73`;
 // assert::eq(NUMS, pubkey(hash::sha256(0x0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)));
 NUMS = pubkey(0x50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0);
 
-// A unique NUMS as a derivable Xpub, using the SHA256 of $seed as the chain code (mainnet/testnet)
-fn xNUMS($seed) = pubkey(0x0488b21e000000000000000000 + hash::sha256($seed) + 0x02 + bytes(NUMS))/0;
-fn tNUMS($seed) = pubkey(0x043587cf000000000000000000 + hash::sha256($seed) + 0x02 + bytes(NUMS))/0;
+// A unique NUMS as a derivable Xpub, using the SHA256 of $seed as the chain code
+// version(4) + depth(1) + fingerprint(4) + childnum(4) + chaincode(32) + pubkey_with_parity(1+32)
+fn xNUMS($seed, $ver=BIP32_MAIN) = pubkey($ver + 0x000000000000000000 + hash::sha256($seed) + 0x02 + bytes(NUMS))/0;
+
+// BIP32 version magic bytes
+BIP32_MAIN = 0x0488b21e;
+BIP32_TEST = 0x043587cf;
 
 // Useful as a default with CTV
 PREVOUT_NONE = 0000000000000000000000000000000000000000000000000000000000000000:0;
