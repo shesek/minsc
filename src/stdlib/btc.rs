@@ -645,6 +645,7 @@ impl FieldAccess for WshScript {
             "explicit_script" => self.0.into(),
             "address_type" => bitcoin::AddressType::P2wsh.into(),
             "witness_program" => bitcoin::WitnessProgram::p2wsh(&self.0).into(),
+            "is_definite" => true.into(), // Always definite
             _ => {
                 return None;
             }

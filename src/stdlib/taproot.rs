@@ -134,6 +134,8 @@ impl FieldAccess for TaprootSpendInfo {
             // Only available when there are script paths
             "merkle_root" => self.merkle_root()?.into(),
             "script_tree" => self.script_tree()?.into(),
+
+            "is_definite" => true.into(), // Always definite
             _ => {
                 return None;
             }
