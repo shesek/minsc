@@ -159,7 +159,8 @@ pub mod fns {
 
     /// psbt::fee(Psbt) -> Int
     pub fn fee(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(args.arg_into::<Psbt>()?.fee()?.into())
+        let fee = args.arg_into::<Psbt>()?.fee()?;
+        Ok(fee.to_signed().map_err(|_| Error::Overflow)?.into())
     }
 
     /// psbt::sighash(Psbt, Int input_index, Bytes tapleaf_hash=None) -> Bytes
