@@ -333,8 +333,10 @@ impl ast::InfixOp {
             (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             (Add, String(a), String(b)) => [a, b].concat().into(),
-            // + for LHS string and any RHS
+            // + for LHS String and any RHS
             (Add, String(a), b) => [a, b.to_string()].concat().into(),
+            // + for LHS Bytes and any Bytes-coercible RHS
+            (Add, Bytes(a), b) => [a, b.into_bytes()?].concat().into(),
 
             // A:B array tuple construction
             (Colon, a, b) => vec![a, b].into(),
