@@ -1,0 +1,236 @@
+@import "node_modules/typeface-lato/index.css"
+@import "node_modules/codemirror/lib/codemirror.css"
+@import "node_modules/codemirror/theme/darcula.css"
+// @import "node_modules/codemirror/addon/lint/lint.css"
+@import "node_modules/codemirror/addon/display/fullscreen.css"
+@import "node_modules/codemirror/addon/hint/show-hint.css"
+@import "node_modules/codemirror/addon/dialog/dialog.css"
+@import "node_modules/codemirror/addon/scroll/simplescrollbars.css"
+@import "node_modules/codemirror/addon/search/matchesonscrollbar.css"
+
+.card-header
+  padding 0.5rem 1rem
+
+code
+  font-size 95%
+  color inherit
+
+.bi
+  width 1em
+  height 1em
+
+h1[id], h2[id], h3[id], h4[id]
+  .anchor
+    font-size 0.85em
+    margin-left -1em
+    color #ccc
+
+    .bi
+      margin-top -0.1em
+  
+  @media (max-width: 575.98px)
+    &:after
+      display block
+      content ""
+      clear both
+    .ttl
+      float left
+    .anchor
+      margin-left 0.2em
+
+  &:not(:hover) .anchor .bi
+    visibility hidden
+
+.card.collapsible
+  &:not(.collapsed) .card-text
+    display none
+  .card-header
+    cursor pointer
+    &:hover
+      color #00bc8c
+    .bi
+      display inline-flex
+      align-self center
+
+  // Switch between collapse and expand icons
+  &.collapsed .icon-arrows-expand
+    display none
+  &:not(.collapsed) .icon-arrows-collapse
+    display none
+
+#content > .row > div
+  @media (max-width: 767.98px)
+    margin-bottom 1.5rem
+
+.CodeMirror
+  height auto
+
+@media (min-width: 768px)
+  #editor-wrap
+    height calc(100vh - 2rem)
+
+    #editor
+      flex 1
+      overflow auto
+    .CodeMirror
+      height 100%
+
+  #outputs
+    max-height calc(100vh - 2rem)
+    overflow auto
+
+.CodeMirror-wrap pre.CodeMirror-line, .CodeMirror-wrap pre.CodeMirror-line-like
+  word-break break-all
+
+.CodeMirror-hint
+  color #fff
+
+.CodeMirror-focused
+  .cm-matchhighlight
+    background-image url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVQI12NgYGBgkKzc8x9CMDAwAAAmhwSbidEoSQAAAABJRU5ErkJggg==")
+    background-position bottom
+    background-repeat repeat-x
+
+.CodeMirror-fullscreen
+  // Add some padding to full-screen read-only views
+  padding 1em
+  // But not to the main editor
+  #editor &
+    padding 0
+
+.cm-s-darcula .cm-variable-2
+  color #a689b6 !important
+
+#outputs
+  .CodeMirror-cursor
+    display none
+
+  .card:not(:last-child)
+    margin-bottom 1rem
+
+h1
+  font-weight 300
+  font-size 3.5rem
+  margin-bottom 1rem
+
+#intro
+  p
+    font-weight 300
+    font-size 1.171875rem
+
+  @media (min-width: 576px)
+    p:last-child
+      font-size inherit
+
+#error
+  display none
+  z-index 5 // needed to be above codemirror
+  max-height 10em
+  overflow auto
+  font-family monospace
+  white-space break-spaces
+  word-wrap break-word
+  border-radius 0rem 0 0.25rem 0.25rem
+  margin-bottom 0
+
+#outputs
+  display none
+
+#output-address .card-text span
+  font-family monospace
+  white-space break-spaces
+  word-wrap break-word
+  color #6897bb
+
+
+#editor-wrap
+  position relative
+
+#editor-bar *
+  font-size 0.7rem
+#editor-bar > *
+  padding 0.15rem 0.4rem
+#share-box
+  width 13em
+  margin-right 0.2rem
+
+// Use the state of #help-popover to display #help-contents
+// This is necessary until the 'overlay' CSS property is commonly available
+// https://stackoverflow.com/a/78098540/865693
+#help-contents
+  display none
+  position absolute
+  z-index 9
+  right 0px
+  top 35px
+  font-size 0.85rem
+  padding 0.4em 0.6em
+
+#help-popover:popover-open + #help-contents
+  display: block
+
+#ref
+  h2
+    margin-bottom 0.5em
+  h3
+    margin 1.3em 0 0.5em 0
+    font-weight 300
+  .lead blockquote
+    font-size 1rem
+  .card
+    background #2B2B2B
+  .card-body
+    padding 0.5rem
+  .row p
+    margin-bottom 0.2rem
+    font-weight 300
+    font-size 1.05rem
+  blockquote
+    border-left 0.25em solid #444
+    padding 0 1em
+    color #888
+  pre
+    padding 4px
+    word-wrap break-word
+    white-space pre-wrap
+    word-break break-all
+    font-size inherit
+  button
+    position relative
+    float right
+    margin-top -32px
+    margin-right 4px
+    font-size 0.8em
+    padding 0.2em 0.4em
+    z-index 3
+
+footer
+  p
+    margin-bottom 0
+  a
+    word-wrap break-word
+  a em
+    font-style normal
+    font-family apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla, twemoji mozilla, segoe ui symbo
+
+  @media (min-width: 768px)
+    display flex
+    justify-content space-between
+
+
+// CodeMirror scrollbar styling
+
+.cm-s-darcula
+  div.CodeMirror-overlayscroll-horizontal div
+    background-color: #606366
+    border-radius: 3px
+
+  div.CodeMirror-overlayscroll-vertical div
+    background-color: #606366
+    border-radius: 3px
+
+  div.CodeMirror-overlayscroll-horizontal div:hover
+    background-color: #A9B7C6
+
+  div.CodeMirror-overlayscroll-vertical div:hover
+    background-color: #A9B7C6
