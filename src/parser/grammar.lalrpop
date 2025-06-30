@@ -43,7 +43,7 @@ match {
 
 // Top-level program
 // Can have a final return value or use the main() function instead
-pub Program: Expr = <stmts:Stmt*> <ret:Expr?> =>
+pub Program: Expr = <stmts:Stmt*> <ret:Either2<Expr, (";;;" <Program>)>?> =>
   ast::Block { stmts, return_value: ret.map(Into::into), use_main: true }.into();
 
 // A collection of statements with no return value
@@ -156,7 +156,9 @@ Thresh: Expr = <thresh:SExpr> "of" <policies:SimpleExpr> =>
 
 // A { .. } block expression with a final return value
 
-BlockExpr: Expr = "{" <stmts:Stmt*> <ret:Expr> "}" =>
+BlockExpr = "{" <BlockExprBody> "}";
+
+BlockExprBody: Expr = <stmts:Stmt*> <ret:Either2<Expr, (";;;" <BlockExprBody>)>> =>
   ast::Block { stmts, return_value: Some(ret.into()), use_main: false }.into();
 
 Array = { ArraySquare, ArrayCurly }
