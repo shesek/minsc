@@ -13,8 +13,12 @@ lazy_static! {
         OP_CHECKTEMPLATEVERIFY = OP_NOP4;
         OP_CTV = OP_CHECKTEMPLATEVERIFY;
 
-        fn ctv($tx, $vin=0) = `ctv::hash($tx, $vin) OP_CHECKTEMPLATEVERIFY OP_DROP`;
-        fn ctv::verify($tx, $vin=0) = `ctv::hash($tx, $vin) OP_CHECKTEMPLATEVERIFY`;
+        // Check the CTV hash, leaving it on the stack
+        fn ctv::check($tx, $vin=0) = `ctv::hash($tx, $vin) OP_CHECKTEMPLATEVERIFY`;
+
+        // Verify the CTV hash, then clear it from the stack
+        fn ctv::verify($tx, $vin=0) = `ctv::hash($tx, $vin) OP_CHECKTEMPLATEVERIFY OP_DROP`;
+        ctv = ctv::verify;
     "#
     .parse()
     .unwrap();
@@ -46,8 +50,8 @@ pub mod fns {
 
         ensure!(!tx.output.is_empty(), Error::InvalidArguments);
 
-        // Add a default input if none exists. The only input field that matters for
-        // the CTV hash is the nSequence.
+        // Add a default input if none exists, with the default maximum nSequence (0xFFFFFFFF)
+        // and an empty scriptSig.
         if tx.input.is_empty() {
             tx.input.push(TxIn::default());
         }
