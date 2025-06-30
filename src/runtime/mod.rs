@@ -476,8 +476,8 @@ impl Evaluate for Expr {
             Expr::SlashOp(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
             Expr::Negate(x) => x.eval(scope)?,
-            Expr::BtcAmount(x) => x.eval(scope).ctx("BTC amount")?, // eval'd into a Number
-            Expr::Duration(x) => x.eval(scope).ctx("time duration")?, // eval'd into a Number
+            Expr::BtcAmount(x) => x.eval(scope)?, // eval'd into a Number
+            Expr::Duration(x) => x.eval(scope)?,  // eval'd into a Number
 
             Expr::Address(x) => Value::Address(x.clone().assume_checked()),
             Expr::PubKey(x) => Value::PubKey(x.clone()),

@@ -587,9 +587,10 @@ impl PrettyDisplay for DescriptorSecretKey {
         use DescriptorSecretKey::{MultiXPrv, Single, XPrv};
         match self {
             XPrv(_) | MultiXPrv(_) => write!(f, "{}", self),
-            // Wrap WIF-encoded single secret keys with a seckey() call, for improved readability.
-            // (the WIF string alone would also produce a SecKey, but is not easily recognizable.)
-            Single(_) => write!(f, "seckey({})", self),
+            // Wrap WIF-encoded origin-less single secret keys with a seckey() call, for improved readability.
+            Single(s) if s.origin.is_none() => write!(f, "seckey({})", self),
+            // (the WIF string alone would produce a SecKey even with no origin, but is not easily recognizable.)
+            Single(_) => write!(f, "{}", self),
         }
     }
 }

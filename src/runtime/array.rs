@@ -323,15 +323,14 @@ fn should_use_colon_syntax(elements: &[Value]) -> bool {
             // Always if the LHS is a Symbol
             (Symbol(_), _) => true,
 
-            // If the LHS is a String or Script, only if they're short (used as tagged list keys and predicates)
+            // If the LHS is a String, only if its short (used as tagged array keys)
             (String(lhs), _) => lhs.len() < 43,
-            (Script(lhs), _) => lhs.len() < 40,
 
             // Otherwise, only if the LHS and RHS are of different types
             (
                 lhs @ (Bool(_) | Number(_) | Bytes(_) | Address(_) | PubKey(_) | SecKey(_)
                 | Policy(_) | Descriptor(_) | TapInfo(_) | WshScript(_) | WithProb(..)
-                | Network(_)),
+                | Network(_) | Script(_)),
                 rhs,
             ) => mem::discriminant(lhs) != mem::discriminant(rhs),
         }
@@ -352,6 +351,8 @@ fn colon_separator(elements: &[Value]) -> &str {
             _,
         ) => ": ",
         (_, Array(_)) => ": ",
+        (Number(_), Number(_)) => ":",
+        (Number(_), _) => ": ",
         _ => ":",
     }
 }
