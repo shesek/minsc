@@ -6,7 +6,7 @@ use miniscript::descriptor::{DescriptorType, ShInner, WshInner};
 use miniscript::{DescriptorPublicKey, ForEachKey, MiniscriptKey, ScriptContext, Threshold};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, Result, Value};
+use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, PrettyDisplay, Result, Value};
 use crate::stdlib::{btc::WshScript, taproot::tap_scripts_to_val};
 use crate::util::{DeriveExt, DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt, TapInfoExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
@@ -38,6 +38,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("wpkh", fns::wpkh).unwrap();
     scope.set_fn("wsh", fns::wsh).unwrap();
     scope.set_fn("sh", fns::sh).unwrap();
+    scope.set_fn("pkh", fns::pkh).unwrap();
+    scope.set_fn("bare", fns::r#bare).unwrap();
     scope.set_fn("sortedmulti", fns::sortedmulti).unwrap();
     // tr() is also available, defined in taproot.rs
 
@@ -176,13 +178,7 @@ pub mod fns {
     pub fn wsh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Policy(policy) => {
-                // Temporary workaround to avoid panicking (https://github.com/rust-bitcoin/rust-miniscript/pull/761)
-                ensure!(
-                    policy.for_each_key(|pk| !pk.is_x_only_key()),
-                    Error::InvalidWshXonly
-                );
-                let miniscript = policy.compile()?;
-                Descriptor::new_wsh(miniscript)?.into()
+                Descriptor::new_wsh(verify_no_xonly(policy)?.compile()?)?.into()
             }
             Value::Array(arr) if arr.is_tagged_with("sortedmulti") => {
                 let (_tag, thresh_k, pks): (String, _, _) = arr.try_into()?;
@@ -191,26 +187,42 @@ pub mod fns {
             // miniscript::Descriptor::Wsh cannot represent raw (non-Miniscript) Script,
             // return a WshScript representation instead.
             Value::Script(script) => WshScript(script).into(),
-            _ => bail!(Error::InvalidArguments),
+            other => bail!(Error::InvalidValue(other.into())),
         })
     }
 
     /// sh(Descriptor::W{sh,pkh}) -> Descriptor::ShW{sh,pkh}
-    /// Can only be used to wrap over wsh()/wpkh(). Minsc does not support pre-segwit descriptors.
+    /// sh(Policy|Array<tagged:sortedmulti>) -> Descriptor::Sh
     pub fn sh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
-            Descriptor::Wsh(wsh) => Descriptor::new_sh_with_wsh(wsh),
-            Descriptor::Wpkh(wpkh) => Descriptor::new_sh_with_wpkh(wpkh),
-            _ => bail!(Error::InvalidShUse),
+            Value::Descriptor(Descriptor::Wsh(wsh)) => Descriptor::new_sh_with_wsh(wsh),
+            Value::Descriptor(Descriptor::Wpkh(wpkh)) => Descriptor::new_sh_with_wpkh(wpkh),
+            Value::Policy(policy) => Descriptor::new_sh(verify_no_xonly(policy)?.compile()?)?,
+            Value::Array(arr) if arr.is_tagged_with("sortedmulti") => {
+                let (_tag, thresh_k, pks): (String, _, _) = arr.try_into()?;
+                Descriptor::new_sh_sortedmulti(thresh_k, pks)?
+            }
+            // XXX Script in sh() is currently not supported (no WshScript-like structure)
+            other => bail!(Error::InvalidValue(other.into())),
         }
         .into())
+    }
+
+    /// pkh(PubKey) -> Descriptor::Pkh
+    pub fn pkh(args: Array, _: &ScopeRef) -> Result<Value> {
+        Ok(Descriptor::new_pkh(args.arg_into()?)?.into())
+    }
+
+    /// bare(Policy) -> Descriptor::Bare
+    pub fn r#bare(args: Array, _: &ScopeRef) -> Result<Value> {
+        let policy = verify_no_xonly(args.arg_into()?)?;
+        Ok(Descriptor::new_bare(policy.compile()?)?.into())
     }
 
     /// sortedmulti(Int thresh_k, ...PubKey) -> Array<tagged:sortedmulti>
     /// sortedmulti(Int thresh_k, Array<PubKey>) -> Array<tagged:sortedmulti>
     ///
-    /// Can be used within wsh() only - sortedmulti() within tr() is currently unsupported by rust-miniscript
-    /// and intentionally unsupported in sh() by minsc.
+    /// Can be used within wsh()/sh() only - sortedmulti() within tr()/bare is currently unsupported by rust-miniscript
     pub fn sortedmulti(args: Array, _: &ScopeRef) -> Result<Value> {
         let mut args = args.check_varlen(2, usize::MAX)?;
         let thresh_k: usize = args.remove(0).try_into()?;
@@ -252,6 +264,16 @@ pub mod fns {
             Value::String(desc_str) => desc_str.parse()?,
             other => other.try_into()?,
         }))
+    }
+
+    fn verify_no_xonly(policy: Policy) -> Result<Policy> {
+        // Temporary workaround to avoid panicking. Can be removed once
+        // https://github.com/rust-bitcoin/rust-miniscript/pull/761 is merged.
+        ensure!(
+            policy.for_each_key(|pk| !pk.is_x_only_key()),
+            Error::InvalidPreTapXonly
+        );
+        Ok(policy)
     }
 }
 
@@ -419,6 +441,16 @@ impl ExprRepr for Descriptor {
             // Descriptors with inner Miniscripts for script-based paths must be encoded as string.
             // (while the Policy syntax can be used as a Minsc expression, Miniscript's cannot.)
             _ => write!(f, "descriptor(\"{}\")", self),
+        }
+    }
+}
+
+impl PrettyDisplay for Descriptor {
+    const AUTOFMT_ENABLED: bool = false;
+    fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
+        match self {
+            Descriptor::Bare(_) => write!(f, "bare({:#})", self),
+            _ => write!(f, "{:#}", self),
         }
     }
 }

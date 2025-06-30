@@ -460,7 +460,6 @@ impl TryFrom<Value> for Txid {
             }
             Value::Transaction(tx) => tx.compute_txid(),
             // The psbt unsigned_tx's txid is useless if there are any non-segwit inputs. Use with care. Should probably check :>
-            // (Note however that Minsc itself does not support pre-segwit descriptors construction)
             Value::Psbt(psbt) => psbt.unsigned_tx.compute_txid(),
             other => bail!(Error::NotTxidLike(other.into())),
         })

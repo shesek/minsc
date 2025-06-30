@@ -14,10 +14,10 @@ impl fmt::Display for Value {
             Value::String(x) => fmt_quoted_str(f, x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Descriptor(x) => write!(f, "{:#}", x), // not round-trip-able (ExprRepr is)
             Value::Function(x) => write!(f, "{}", x),     // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
+            Value::Descriptor(x) => write!(f, "{}", x.pretty(None)), // not round-trip-able (ExprRepr is)
             Value::Psbt(x) => write!(f, "{}", x.pretty(None)),
             Value::SecKey(x) => write!(f, "{}", x.pretty(None)),
             Value::PubKey(x) => write!(f, "{}", x.pretty(None)),
@@ -45,6 +45,7 @@ impl PrettyDisplay for Value {
             Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
             Value::Psbt(x) => write!(f, "{}", x.pretty(indent)),
             Value::WshScript(x) => write!(f, "{}", x.pretty(indent)),
+            Value::Descriptor(x) => write!(f, "{}", x.pretty(indent)),
 
             // Use Display for other types that don't implement PrettyDisplay
             other => write!(f, "{}", other),

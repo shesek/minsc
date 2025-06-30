@@ -15,6 +15,7 @@ pub mod scope;
 pub mod value;
 
 pub use array::Array;
+pub use display::PrettyDisplay;
 pub use function::{Call, Function};
 pub use scope::{Mutable, ReadOnly, Scope, ScopeRef};
 pub use value::{ExprRepr, FromValue, Number, Number::*, Symbol, Value};

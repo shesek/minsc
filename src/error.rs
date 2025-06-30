@@ -216,12 +216,9 @@ pub enum RuntimeError {
     #[error("Script probabilities are not supported in explicit tree structure")]
     InvalidScriptProb,
 
-    #[error("sh() can only wrap wsh() or wpkh()")]
-    InvalidShUse,
-
     // Can be removed once this is handled as an Err by rust-miniscript (https://github.com/rust-bitcoin/rust-miniscript/pull/761)
-    #[error("x-only keys not allowed in Segwitv0 wsh()")]
-    InvalidWshXonly,
+    #[error("x-only keys not allowed under Segwitv0 wsh() or legacy sh()")]
+    InvalidPreTapXonly,
 
     #[error("Transaction input #{0} does not exists")]
     TxInputNotFound(usize),
