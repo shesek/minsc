@@ -125,7 +125,7 @@ impl FieldAccess for Array {
                 if el_arr.len() == 2 && el_arr[0] == *field {
                     if !field_value.is_none() {
                         // Return the sentinel ARRAY_MULTIVAL symbol to indicate there are multiple matching fields.
-                        // The values may be extracted with t::multi($arr, $key) instead.
+                        // The values may be extracted with mget($arr, $key) instead.
                         return Some(SYM_MULTIVAL.clone().into());
                     }
                     field_value = Some(el_arr.remove(1));

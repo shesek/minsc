@@ -12,19 +12,19 @@ fn isFunction($x) = typeof($x) == "function";
 //
 // len(), fillArray(), fold() & foldUntil() are Rust-provided builtins, everything else is built on top of them.
 
-fn first($arr) = $arr.0;
 fn last($arr) = $arr.(len($arr) - 1);
 fn range($start, $end) = fillArray(($end-$start)+1, |$n| $start+$n);
-fn keys($arr) = range(0, len($arr) - 1);
+fn indices($arr) = range(0, len($arr) - 1);
 fn slice($arr, $start, $len=(len($arr)-$start)) = fillArray($len, |$n| $arr.($start+$n));
-fn tail($arr) = slice($arr, 1, len($arr) - 1); // get all but first element
+fn tail($arr) = slice($arr, 1); // get all but first element
 fn initial($arr) = slice($arr, 0, len($arr) - 1); // get all but last element
 fn enumerated($arr) = fillArray(len($arr), |$i| [ $i, $arr.$i ]);
 fn isEmpty($arr) = len($arr) == 0;
 
-fn map($arr, $fn)     = fold($arr, [], |$acc, $el| $acc + [ $fn($el) ]);
+fn map($arr, $fn) = fillArray(len($arr), |$i| $fn($arr.$i));
 fn filter($arr, $fn)  = fold($arr, [], |$acc, $el| $acc + (if $fn($el) then [ $el ] else [ ]));
 fn flatMap($arr, $fn) = fold($arr, [], |$acc, $el| $acc + $fn($el));
+each = map; // XXX could be made more efficient by not collecting return values
 
 fn reduce($arr, $fn) = if !isEmpty($arr) then fold(tail($arr), $arr.0, $fn) else null;
 
@@ -36,37 +36,56 @@ fn some($arr, $fn) = foldUntil($arr, false, |$acc, $el| if $fn($el) then true:tr
 fn every($arr, $fn) = !some($arr, |$el| !$fn($el));
 
 fn contains($arr, $needle) = some($arr, |$el| $el == $needle);
-fn reverse($arr) = map(keys($arr), |$i| $arr.(len($arr)-$i-1));
-fn startsWith($arr, $prefix) = (len($arr) >= len($prefix)) && every(keys($prefix), |$i| $arr.$i == $prefix.$i);
+fn reverse($arr) = fillArray(len($arr), |$i| $arr.(len($arr)-$i-1));
+fn startsWith($arr, $prefix) = (len($arr) >= len($prefix)) && every(indices($prefix), |$i| $arr.$i == $prefix.$i);
 
 fn concat($xs) = reduce($xs, |$acc, $x| $acc + $x); // works for arrays, bytes, strings and numbers
-fn sum($nums) = if !isEmpty($nums) then concat($nums) else 0;
 fn flatten($arrays) = if !isEmpty($arrays) then concat($arrays) else [];
+
+//
+// Tagged Array utilities
+//
+
+fn get($tagged, $tag, $default=null) = $tagged | find(|[$k, _]| $k == $tag) | mapNullable(|[_, $v]| $v, $default);
+fn mget($tagged, $tag) = $tagged | filter(|[$k, _]| $k == $tag) | map(|[_, $v]| $v);
+
+fn keys($tagged) = map($tagged, |[$k, _]| $k);
+fn values($tagged) = map($tagged, |[_, $v]| $v);
+
+fn set($tagged, $fields) {
+  filter($fields, |[_, $v]| $v != set::UNSET)
+  + unset($tagged, keys($fields))
+}
+set::UNSET = symbol("set::UNSET");
+
+fn unset($tagged, $keys) = filter($tagged, |[$k, _]| !contains($keys, $k));
+
+// previous names for backwards compatibility, to be deprecated
+update = set, remove = unset;
 
 // Numeric
 fn max($a, $b) = if $a>$b then $a else $b;
 fn min($a, $b) = if $a<$b then $a else $b;
 fn abs($n) = if $n < 0 then -$n else $n;
+fn sum($nums) = concat([0]+$nums);
 
 // Null handling utilities
-fn mapNullable($value, $fn) = if $value != null then $fn($value) else null;
+fn mapNullable($value, $fn, $default=null) = if $value != null then $fn($value) else $default;
 fn coalesce($values) = find($values, |$v| $v != null);
 
-// Immutably update the given fields, returning a new updated array
-fn update($original, $updated_fields) {
-  $updated_keys = map($updated_fields, |[$k, _]| $k);
-  $updated_fields + remove($original, $updated_keys)
-}
-fn remove($original, $keys) = filter($original, |[$k, _]| !contains($keys, $k));
-
 // String utilities
-fn join($strs, $sep) =
+fn join($strs, $sep="") =
   if isEmpty($strs) then ""
-  else if len($strs) == 1 then $strs.0
-  else concat([ $strs.0 ] + map(tail($strs), |$str| $sep + $str));
+  else if len($strs) == 1 then str($strs.0)
+  else concat([ str($strs.0) ] + map(tail($strs), |$str| $sep + $str));
 
-// Array tag extraction with multiple values (`$tagged->tag` can be used for a single value)
-fn t::multi($tagged, $tag) = $tagged | filter(|[$k, _]| $k == $tag) | map(|[_, $v]| $v);
+// Rand utilities
+// TODO `seed` parameter support
+fn rand::u32() = abs(rand::i64() % (2**32));
+fn rand::i32() = rand::u32() - (2**31);
+fn rand::range($min, $max) = $min + abs(rand::i64() % ($max-$min+1)); // [$min, $max]
+fn rand::frange($min, $max) = $min + (rand::f64() * ($max-$min)); // [$min, $max)
+
 
 //
 // Dev utilities
@@ -77,9 +96,10 @@ fn assert($bool, $msg="Assertion failed") = $bool || throw($msg);
 fn assert::eq($a, $b) = ($a == $b) || throw("Not equal: "+$a+" != "+$b+"");
 
 // Scope inspection
-dyn fn env::pretty() = env() | map(|[$k:$v]| $k+" = "+pretty($v)+" // "+typeof($v)) | join("\n\n") | symbol();
-dyn fn env::repr() = env() | filter(|[$k:$v]| !isFunction($v)) | map(|[$k:$v]| $k+" = "+repr($v)+"; // "+typeof($v)) | join("\n\n") | symbol();
-dyn fn env::debug() = env() | map(|[$k:$v]| $k+" = "+_debug_nonfn($v)) | join("\n\n") | symbol();
+dyn fn env::pretty($$depth=(-1)) = _env($$depth) | map(|[$k:$v]| $k+" = "+pretty($v)+" // "+typeof($v)) | join("\n\n") | symbol();
+dyn fn env::repr($$depth=(-1)) = _env($$depth) | filter(|[$k:$v]| !isFunction($v)) | map(|[$k:$v]| $k+" = "+repr($v)+"; // "+typeof($v)) | join("\n\n") | symbol();
+dyn fn env::debug($$depth=(-1)) = _env($$depth) | map(|[$k:$v]| $k+" = "+_debug_nonfn($v)) | join("\n\n") | symbol();
+dyn fn _env($$depth) = env(if $$depth <= 0 then $$depth else $$depth+2) | tail();
 fn _debug_nonfn($v) = if !isFunction($v) then debug($v) else $v;
 
 dyn fn log::env($label="") = log("variables:\n----\n" + env::pretty() + "\n----");
