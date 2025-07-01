@@ -9,7 +9,7 @@ node -p '
       env(0) | filter(|$kv| isFunction($kv.1))  | map(|$kv| $kv.0: str($kv.1)),
     ]
   `));
-  const excluded = k => /^(_|OP_RETURN_|OP_PUSHBYTES_|OP_PUSHNUM_)|^(main|T)$/.test(k);
+  const excluded = k => /^(_|OP_RETURN_|OP_PUSHBYTES_)|^(main|T|BOO)$/.test(k);
   JSON.stringify({
     vars: vars.filter(([k, _]) => !excluded(k)),
     funcs: funcs.filter(([k, _]) => !excluded(k)).map(([ k, def ]) => [
