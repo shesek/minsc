@@ -542,26 +542,29 @@ impl TryFrom<Value> for ChildNumber {
 /// This is because the ChildNumber is a enum u31 where the top bit is used to
 /// indicate hardened or not, so we can't just do the simple thing.
 ///
-/// Copied from https://github.com/sapio-lang/sapio/blob/072b8835dcf4ba6f8f00f3a5d9034ef8e021e0a7/ctv_emulators/src/lib.rs
+/// Based on the implementation in https://github.com/sapio-lang/sapio/blob/072b8835dcf4ba6f8f00f3a5d9034ef8e021e0a7/ctv_emulators/src/lib.rs,
+/// rewritten without unsafe code.
 fn hash_to_child_vec(h: sha256::Hash) -> Vec<ChildNumber> {
-    let a: [u8; 32] = h.to_byte_array();
-    let b: [[u8; 4]; 8] = unsafe { std::mem::transmute(a) };
-    let mut c: Vec<ChildNumber> = b
-        .iter()
-        // Note: We mask off the top bit. This removes 8 bits of entropy from the hash,
-        // but we add it back in later.
-        .map(|x| (u32::from_be_bytes(*x) << 1) >> 1)
-        .map(ChildNumber::from)
+    let bytes = h.to_byte_array();
+
+    // Split into 8 chunks of 4 bytes, then map into 8 ChildNumbers with the top bit masked off.
+    // This removes 8 bits of entropy from the hash, but we add it back in later.
+    let mut path: Vec<ChildNumber> = bytes
+        .chunks_exact(4)
+        .map(|chunk| ((u32::from_be_bytes(chunk.try_into().unwrap()) << 1) >> 1).into())
         .collect();
-    // Add a unique 9th path for the MSB's
-    c.push(
-        b.iter()
+
+    // Compute the 9th ChildNumber using the top bits from each chunk
+    path.push(
+        bytes
+            .chunks_exact(4)
             .enumerate()
-            .map(|(i, x)| (u32::from_be_bytes(*x) >> 31) << i)
+            .map(|(i, chunk)| (u32::from_be_bytes(chunk.try_into().unwrap()) >> 31) << i)
             .sum::<u32>()
             .into(),
     );
-    c
+
+    path
 }
 
 // Display
