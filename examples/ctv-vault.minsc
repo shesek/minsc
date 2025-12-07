@@ -11,14 +11,13 @@ fn Vault($cold_mpk, $hot_mpk, $hot_delay, $trigger_fee) {
 
   // Script for the time-delayed hot spend path, using CTV to only allow spending through the trigger tx
   fn _hot_path_script($cold_pk, $hot_pk, $txo_amount) = `
-    // PREVOUT_NONE (0000..:0) as an input placeholder (does not affect the CTV hash)
-    ctv::hash(_trigger_psbt($cold_pk, $hot_pk, $txo_amount, PREVOUT_NONE)) OP_CTV OP_DROP
+    ctv::hash(_trigger_psbt($cold_pk, $hot_pk, $txo_amount)) OP_CTV OP_DROP
     xonly($hot_pk) OP_CHECKSIG // not strictly necessary to also require a signature, but safer in case of address reuse
   `;
 
   // Create the withdrawal stage-1 trigger transaction
-  fn _trigger_psbt($cold_pk, $hot_pk, $txo_amount, $input) = psbt [
-    "input": $input,
+  fn _trigger_psbt($cold_pk, $hot_pk, $txo_amount, $input=PREVOUT_NULL) = psbt [
+    "input": $input, // PREVOUT_NULL can be used for computing the CTV hash, which does not depend on the prevout
     "outputs": [
       tr(pk($cold_pk) || (pk($hot_pk) && older($hot_delay))): $txo_amount - $trigger_fee - DUST_AMOUNT,
       tr(pk($cold_pk) || pk($hot_pk)): DUST_AMOUNT, // anchor output for fee bumping
