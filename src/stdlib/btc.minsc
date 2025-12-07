@@ -62,6 +62,13 @@ fn tx::sighash($tx, $vin, $utxos, $sighash_ty=SIGHASH_ALL, $tr_script_leaf=null)
 }
 // XXX support segwit v0 with only the spent utxo & pre-segwit with only the spent utxo's scriptPubKey
 
+fn tx::sign($tx, $utxos, $sk, $inputs=[]) = psbt::sign_extract([
+  "unsigned_tx": $tx,
+  "utxos": $utxos,
+  "inputs": $inputs, // optionally set additional psbt input fields (typically populated automatically from the utxo)
+], $sk);
+// XXX return which inputs was signed?
+
 fn tx::fee($tx, $utxos) = psbt::fee[
   "unsigned_tx": tx::strip_witness($tx),
   "utxos": $utxos,
