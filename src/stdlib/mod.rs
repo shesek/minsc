@@ -12,6 +12,8 @@ pub mod keys;
 pub mod miniscript;
 pub mod psbt;
 pub mod script_marker;
+#[cfg(feature = "scriptexec")]
+pub mod scriptexec;
 pub mod tagged;
 pub mod taproot;
 
@@ -82,7 +84,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     self::miniscript::attach_stdlib(scope);
     self::psbt::attach_stdlib(scope);
     self::taproot::attach_stdlib(scope);
-    ELEMENTS_STDLIB.exec(scope).unwrap();
+    ELEMENTS_STDLIB.exec(scope).unwrap(); // requires the 'btc' stdlib
+    #[cfg(feature = "scriptexec")]
+    self::scriptexec::attach_stdlib(scope);
 }
 
 #[allow(non_snake_case)]
