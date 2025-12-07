@@ -1,0 +1,32 @@
+// simple execution/evaluation/verification
+$exec = script::exec(`1 2 OP_ADD`); // struct with `success`, `error` and `stack`
+$eval = script::eval(`0xaa 0xbb OP_CAT`); // just the stack, throws on errors
+$verify = script::verify(`1 1 OP_EQUAL`); // true if the final stack is truthy
+
+// with hex script
+$hex_eval = script::eval(0x515253);
+
+// with an initial stack
+$stack_exec = script::exec(`3 OP_ADD*2`, [ 4, 5 ]);
+
+// step-by-step trace
+$trace = script::ptrace(`2 2 OP_ADD 3 OP_SUB`);
+
+// with transaction context
+$sk = xpriv::rand();
+$script = `pubkey($sk) OP_CHECKSIGVERIFY 11 OP_EQUAL`;
+$utxo = wsh($script):1 BTC;
+
+$tx_unsigned = tx[
+  "input": f45363eb3eb17863d3f0a9b2963df61fb8c775538def56bd801234dd7b1e8b49:1,
+  "output": wpkh($sk/1):0.5 BTC,
+];
+$sig = ecdsa::sign($sk, tx::sighash($tx_unsigned, 0, [ $utxo ])) + SIGHASH_ALL;
+
+$tx_final = tx::with_witness($tx_unsigned, [
+  0: [ 11, $sig, $script ]
+]);
+
+$tx_exec = tx::exec($tx_final, 0, [$utxo]);
+$tx_trace = tx::ptrace($tx_final, 0, [$utxo]);
+$tx_verify = tx::verify($tx_final, 0, [$utxo]);

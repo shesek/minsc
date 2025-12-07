@@ -462,11 +462,24 @@ pub enum RuntimeError {
 
     #[error("PSBT update error: {0}")]
     PsbtUtxoUpdate(#[from] miniscript::psbt::UtxoUpdateError),
+
+    #[cfg(feature = "scriptexec")]
+    #[error("ScriptExec: {0:?}")]
+    ScriptExec(bitcoin_scriptexec::Error),
 }
 
 impl From<TranslateErr<RuntimeError>> for RuntimeError {
     fn from(e: TranslateErr<RuntimeError>) -> Self {
         RuntimeError::TranslateError(Box::new(e))
+    }
+}
+
+// Cannot be implemented using thiserror's #[from] because scriptexec::Error
+// does not implement the necessary traits to be used as a thiserror source
+#[cfg(feature = "scriptexec")]
+impl From<bitcoin_scriptexec::Error> for RuntimeError {
+    fn from(err: bitcoin_scriptexec::Error) -> Self {
+        Self::ScriptExec(err)
     }
 }
 

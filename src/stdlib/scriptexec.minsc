@@ -1,0 +1,90 @@
+fn script::eval($script, $opt=[], $ctx=ctx::tapscript) {
+  $res = script::exec($script, $opt, $ctx);
+  if $res->error? then throw("Script failed: "+$res->error)
+  else if len($res->stack) == 1 then $res->stack.0
+  else $res->stack
+}
+
+fn script::verify($script, $opt=[], $ctx=ctx::tapscript) =
+  script::exec($script, $opt, $ctx)->success;
+
+fn script::ptrace($script, $opt=[], $ctx=ctx::tapscript) {
+  $trace = script::trace($script, $opt, $ctx);
+  (if !isEmpty($trace->init_stack) then [ "init_stack": $trace->init_stack ] else [])
+  + map($trace->steps, |[_pos, $step]| {
+      $step_val = if $step->unexecuted? then "(unexecuted branch)"
+        else if $step->altstack? then [ "stack": $step->stack, "altstack": $step->altstack ]
+        else $step->stack;
+      $step->opcode: if $step->push? then $step->push: $step_val else $step_val
+  }) + unset($trace->result, ["stack"])
+}
+
+fn tx::exec($tx, $input_index, $utxos, $opt=[]) {
+  [ $script, $opt ] = _tx_exec_opt($tx, $input_index, $utxos, $opt);
+  script::exec($script, $opt)
+}
+fn tx::verify($tx, $input_index, $utxos, $opt=[]) {
+  [ $script, $opt ] = _tx_exec_opt($tx, $input_index, $utxos, $opt);
+  script::verify($script, $opt)
+}
+fn tx::trace($tx, $input_index, $utxos, $opt=[]) {
+  [ $script, $opt ] = _tx_exec_opt($tx, $input_index, $utxos, $opt);
+  script::trace($script, $opt)
+}
+fn tx::ptrace($tx, $input_index, $utxos, $opt=[]) {
+  [ $script, $opt ] = _tx_exec_opt($tx, $input_index, $utxos, $opt);
+  script::ptrace($script, $opt)
+}
+
+fn _tx_exec_opt($tx, $input_index, $utxos, $opt=[]) {
+  $tx = tx($tx);
+  $input = $tx->inputs.$input_index;
+  $witness = $input->witness;
+  $scriptsig = $input->script_sig->instructions;
+  assert(every($scriptsig, |$i| typeof($i) == "int" || typeof($i) == "bytes"), "invalid non-push instruction in scriptSig: "+$input->script_sig);
+
+  $utxo = $utxos.$input_index;
+  $utxo_spk = if $utxo->script_pubkey? then $utxo->script_pubkey else scriptPubKey($utxo.0);
+
+  $ctx = if $opt->ctx? then $opt->ctx
+    else if $utxo_spk->is_p2tr then ctx::tapscript
+    else if $utxo_spk->is_p2wsh then ctx::segwitv0
+    else if $utxo_spk->is_p2sh && !isEmpty($witness) then ctx::sgewitv0
+    else if !$utxo_spk->is_witness_program then ctx::legacy
+    else throw("Cannot detect ExecCtx for "+$utxo_spk);
+
+  $script = if $opt->script? then $opt->script
+    else if $utxo_spk->is_p2tr && len($witness) > 1 then $witness.(len($witness)-2) // FIXME could be keypath with annex
+    else if $utxo_spk->is_p2wsh && !isEmpty($witness) then last($witness)
+    else if !$utxo_spk->is_p2sh && !$utxo_spk->is_witness_program then $utxo_spk
+    else if $utxo_spk->is_p2sh && !isEmpty($scriptsig) {
+      $redeemScript = script(last($scriptsig));
+      if $redeemScript->is_p2wsh then last($witness) else $p2sh_redeemScript
+    }
+    else throw("Cannot extract Script");
+    // XXX this does not currently verify that the Script revealed in the witness/scriptSig matches the spent txo
+
+  $stack = if $opt->stack? then $opt->stack
+    else if $utxo_spk->is_p2tr && len($witness) > 1 then slice($witness, 0, len($witness)-2) // FIXME annex
+    else if $utxo_spk->is_p2wsh && !isEmpty($witness) then initial($witness)
+    else if !$utxo_spk->is_p2sh && !$utxo_spk->is_witness_program then $scriptsig
+    else if $utxo_spk->is_p2sh && !isEmpty($scriptsig) {
+      $redeemScript = script(last($scriptsig));
+      if $redeemScript->is_p2wsh then initial($witness) else initial($scriptsig)
+    }
+    else throw("Cannot extract stack");
+
+  $opt = set($opt, [
+    "tx": $tx,
+    "input_index": $input_index,
+    "utxos": $utxos,
+    "ctx": $ctx,
+    "stack": $stack,
+    "script": set::UNSET,
+  ]);
+
+  [ $script, $opt ]
+}
+// TODO support non-Script verification for P2(W)PKH and keypath P2TR?
+// TODO script Options
+// TODO annex support
