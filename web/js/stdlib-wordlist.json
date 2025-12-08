@@ -5,32 +5,48 @@
       "pubkey"
     ],
     [
-      "$bob",
-      "pubkey"
-    ],
-    [
-      "$charlie",
-      "pubkey"
-    ],
-    [
       "$alice_sk",
       "seckey"
+    ],
+    [
+      "$bob",
+      "pubkey"
     ],
     [
       "$bob_sk",
       "seckey"
     ],
     [
+      "$charlie",
+      "pubkey"
+    ],
+    [
       "$charlie_sk",
       "seckey"
     ],
     [
-      "$H256",
-      "bytes"
+      "$david",
+      "pubkey"
     ],
     [
-      "$H160",
-      "bytes"
+      "$david_sk",
+      "seckey"
+    ],
+    [
+      "$eve",
+      "pubkey"
+    ],
+    [
+      "$eve_sk",
+      "seckey"
+    ],
+    [
+      "$frank",
+      "pubkey"
+    ],
+    [
+      "$frank_sk",
+      "seckey"
     ],
     [
       "true",
@@ -49,11 +65,39 @@
       "int"
     ],
     [
+      "MAX_FLOAT",
+      "float"
+    ],
+    [
+      "MIN_FLOAT",
+      "float"
+    ],
+    [
+      "inf",
+      "float"
+    ],
+    [
+      "NaN",
+      "float"
+    ],
+    [
+      "ARRAY_MULTIVAL_FIELD",
+      "symbol"
+    ],
+    [
       "null",
       "symbol"
     ],
     [
       "default",
+      "symbol"
+    ],
+    [
+      "filterMap::skip",
+      "symbol"
+    ],
+    [
+      "set::UNSET",
       "symbol"
     ],
     [
@@ -81,7 +125,75 @@
       "script"
     ],
     [
+      "OP_PUSHNUM_NEG1",
+      "script"
+    ],
+    [
       "OP_RESERVED",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_1",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_2",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_3",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_4",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_5",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_6",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_7",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_8",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_9",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_10",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_11",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_12",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_13",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_14",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_15",
+      "script"
+    ],
+    [
+      "OP_PUSHNUM_16",
       "script"
     ],
     [
@@ -525,11 +637,23 @@
       "int"
     ],
     [
+      "P2A",
+      "script"
+    ],
+    [
       "NUMS",
       "pubkey"
     ],
     [
-      "PREVOUT_NONE",
+      "BIP32_MAIN",
+      "bytes"
+    ],
+    [
+      "BIP32_TEST",
+      "bytes"
+    ],
+    [
+      "PREVOUT_NULL",
       "array"
     ],
     [
@@ -539,6 +663,66 @@
     [
       "TR_UNSPENDABLE",
       "pubkey"
+    ],
+    [
+      "TR_ANNEX_BYTE",
+      "bytes"
+    ],
+    [
+      "OP::NOT_EQ_VERIFY",
+      "script"
+    ],
+    [
+      "OP::PICK_BOTTOM",
+      "script"
+    ],
+    [
+      "OP::ROLL_BOTTOM",
+      "script"
+    ],
+    [
+      "OP::SHIFT",
+      "script"
+    ],
+    [
+      "OP::MINIMAL_BOOL",
+      "script"
+    ],
+    [
+      "OP::2SORT",
+      "script"
+    ],
+    [
+      "OP::2MUL",
+      "script"
+    ],
+    [
+      "OP::3MUL",
+      "script"
+    ],
+    [
+      "OP::4MUL",
+      "script"
+    ],
+    [
+      "OP::5MUL",
+      "script"
+    ],
+    [
+      "OP::6MUL",
+      "script"
+    ],
+    [
+      "OP::7MUL",
+      "script"
+    ],
+    [
+      "OP::8MUL",
+      "script"
+    ],
+    [
+      "OP::9MUL",
+      "script"
     ],
     [
       "MARK_SCRIPT",
@@ -557,16 +741,16 @@
       "script"
     ],
     [
-      "likely",
-      "int"
-    ],
-    [
       "TRIVIAL",
       "policy"
     ],
     [
       "UNSATISFIABLE",
       "policy"
+    ],
+    [
+      "likely",
+      "int"
     ],
     [
       "LBTC",
@@ -821,6 +1005,10 @@
       "script"
     ],
     [
+      "OP::2SORT64",
+      "script"
+    ],
+    [
       "OP::ENCODE_COMPACT_SIZE",
       "script"
     ],
@@ -847,6 +1035,18 @@
     [
       "OP::HASH_TAPTWEAK",
       "script"
+    ],
+    [
+      "ctx::legacy",
+      "symbol"
+    ],
+    [
+      "ctx::segwitv0",
+      "symbol"
+    ],
+    [
+      "ctx::tapscript",
+      "symbol"
     ]
   ],
   "funcs": [
@@ -951,10 +1151,6 @@
       "$x"
     ],
     [
-      "first",
-      "$arr"
-    ],
-    [
       "last",
       "$arr"
     ],
@@ -963,12 +1159,12 @@
       "$start, $end"
     ],
     [
-      "keys",
+      "indices",
       "$arr"
     ],
     [
       "slice",
-      "$arr, $start, $len"
+      "$arr, $start, $len?"
     ],
     [
       "tail",
@@ -976,6 +1172,10 @@
     ],
     [
       "initial",
+      "$arr"
+    ],
+    [
+      "enumerated",
       "$arr"
     ],
     [
@@ -995,7 +1195,15 @@
       "$arr, $fn"
     ],
     [
+      "each",
+      "$arr, $fn"
+    ],
+    [
       "reduce",
+      "$arr, $fn"
+    ],
+    [
+      "filterMap",
       "$arr, $fn"
     ],
     [
@@ -1015,16 +1223,72 @@
       "$arr, $needle"
     ],
     [
+      "reverse",
+      "$arr"
+    ],
+    [
+      "startsWith",
+      "$arr, $prefix"
+    ],
+    [
       "concat",
       "$xs"
     ],
     [
+      "flatten",
+      "$arrays"
+    ],
+    [
+      "get",
+      "$tagged, $tag, $default?"
+    ],
+    [
+      "mget",
+      "$tagged, $tag"
+    ],
+    [
+      "keys",
+      "$tagged"
+    ],
+    [
+      "values",
+      "$tagged"
+    ],
+    [
+      "set",
+      "$tagged, $fields"
+    ],
+    [
+      "unset",
+      "$tagged, $keys"
+    ],
+    [
+      "update",
+      "$tagged, $fields"
+    ],
+    [
+      "remove",
+      "$tagged, $keys"
+    ],
+    [
+      "max",
+      "$a, $b"
+    ],
+    [
+      "min",
+      "$a, $b"
+    ],
+    [
+      "abs",
+      "$n"
+    ],
+    [
       "sum",
-      "$xs"
+      "$nums"
     ],
     [
       "mapNullable",
-      "$value, $fn"
+      "$value, $fn, $default?"
     ],
     [
       "coalesce",
@@ -1032,43 +1296,51 @@
     ],
     [
       "join",
-      "$strs, $sep"
+      "$strs, $sep?"
     ],
     [
-      "t",
-      "$tagged, $tag"
+      "rand::u32",
+      ""
     ],
     [
-      "ts",
-      "$tagged, $tag"
+      "rand::i32",
+      ""
+    ],
+    [
+      "rand::range",
+      "$min, $max"
+    ],
+    [
+      "rand::frange",
+      "$min, $max"
     ],
     [
       "assert",
-      "$bool"
+      "$bool, $msg?"
     ],
     [
       "assert::eq",
       "$a, $b"
     ],
     [
-      "assert::msg",
-      "$bool, $msg"
+      "env::pretty",
+      "$$depth?"
     ],
     [
-      "env::pretty",
-      ""
+      "env::repr",
+      "$$depth?"
     ],
     [
       "env::debug",
-      ""
+      "$$depth?"
     ],
     [
       "log::env",
-      "$label"
+      "$label?"
     ],
     [
       "log::debug_env",
-      "$label"
+      "$label?"
     ],
     [
       "test",
@@ -1139,6 +1411,10 @@
       null
     ],
     [
+      "seckey::rand",
+      null
+    ],
+    [
       "xpriv::rand",
       null
     ],
@@ -1147,11 +1423,19 @@
       null
     ],
     [
+      "singles",
+      null
+    ],
+    [
       "xonly",
       null
     ],
     [
-      "singles",
+      "derived",
+      null
+    ],
+    [
+      "xderived",
       null
     ],
     [
@@ -1191,24 +1475,88 @@
       null
     ],
     [
+      "outputScript",
+      null
+    ],
+    [
+      "script::explicit",
+      null
+    ],
+    [
       "script::strip",
       null
     ],
     [
+      "scriptnum",
+      null
+    ],
+    [
+      "compactsize",
+      null
+    ],
+    [
+      "varint",
+      null
+    ],
+    [
       "xNUMS",
-      "$seed"
+      "$seed, $ver?"
     ],
     [
       "tr::script_witness",
-      "$tr, $script, $stack"
+      "$tr, $script, $stack?, $annex?"
     ],
     [
       "tx::sighash",
-      "$tx, $vin, $utxos, $sighash_ty"
+      "$tx, $vin, $utxos, $sighash_ty?, $tr_script_leaf?"
     ],
     [
-      "tx::sighash::tr_leaf",
-      "$tx, $vin, $script_leaf, $utxos, $sighash_ty"
+      "tx::sign",
+      "$tx, $utxos, $sk, $inputs?"
+    ],
+    [
+      "tx::fee",
+      "$tx, $utxos"
+    ],
+    [
+      "tx::strip_witness",
+      "$tx"
+    ],
+    [
+      "psbt::finalize_witness",
+      "$psbt, $input_witnesses, $extract_tx?"
+    ],
+    [
+      "psbt::finalize_extract",
+      "$psbt"
+    ],
+    [
+      "psbt::sign_extract",
+      "$psbt, $keys"
+    ],
+    [
+      "rollBottom",
+      "$n"
+    ],
+    [
+      "pickBottom",
+      "$n"
+    ],
+    [
+      "verifyWithin",
+      "$min, $max"
+    ],
+    [
+      "verifyRange",
+      "$min, $max"
+    ],
+    [
+      "dropStack",
+      "$num"
+    ],
+    [
+      "dropAlt",
+      "$num"
     ],
     [
       "unrollLoop",
@@ -1272,27 +1620,71 @@
     ],
     [
       "mark::ctx",
-      "$$context, $$fn"
+      "$context, $fn"
+    ],
+    [
+      "dummy::sk",
+      "$seed?"
+    ],
+    [
+      "dummy::pk",
+      "$seed?"
+    ],
+    [
+      "dummy::kpair",
+      "$seed?"
+    ],
+    [
+      "dummy::sks",
+      "$num, $seed?"
+    ],
+    [
+      "dummy::pks",
+      "$num, $seed?"
+    ],
+    [
+      "dummy::kpairs",
+      "$num, $seed?"
+    ],
+    [
+      "dummy::xpriv",
+      "$seed?"
+    ],
+    [
+      "dummy::xpub",
+      "$seed?"
+    ],
+    [
+      "dummy::xpair",
+      "$seed?"
+    ],
+    [
+      "dummy::xprivs",
+      "$num, $seed?"
+    ],
+    [
+      "dummy::xpubs",
+      "$num, $seed?"
+    ],
+    [
+      "dummy::xpairs",
+      "$num, $seed?"
     ],
     [
       "ctv::hash",
       null
     ],
     [
-      "ctv",
-      "$tx"
+      "ctv::check",
+      "$tx, $vin?"
     ],
     [
       "ctv::verify",
-      "$tx"
+      "$tx, $vin?"
     ],
     [
-      "any",
-      "$policies"
-    ],
-    [
-      "all",
-      "$policies"
+      "ctv",
+      "$tx, $vin?"
     ],
     [
       "or",
@@ -1335,6 +1727,14 @@
       null
     ],
     [
+      "any",
+      null
+    ],
+    [
+      "all",
+      null
+    ],
+    [
       "wpkh",
       null
     ],
@@ -1344,6 +1744,14 @@
     ],
     [
       "sh",
+      null
+    ],
+    [
+      "pkh",
+      null
+    ],
+    [
+      "bare",
       null
     ],
     [
@@ -1403,11 +1811,7 @@
       null
     ],
     [
-      "psbt::extract_non_ms",
-      null
-    ],
-    [
-      "psbt::unsigned_tx",
+      "psbt::extract_raw",
       null
     ],
     [
@@ -1420,22 +1824,6 @@
     ],
     [
       "tr",
-      null
-    ],
-    [
-      "tr::internalKey",
-      null
-    ],
-    [
-      "tr::outputKey",
-      null
-    ],
-    [
-      "tr::merkleRoot",
-      null
-    ],
-    [
-      "tr::scripts",
       null
     ],
     [
@@ -1468,7 +1856,7 @@
     ],
     [
       "checkOutputSpk",
-      "$vout, $spk_tup"
+      "$vout, [ $witness_version, $witness_prog ]"
     ],
     [
       "checkSameAsset",
@@ -1481,6 +1869,42 @@
     [
       "checkSameSpk",
       "$vin, $vout"
+    ],
+    [
+      "script::exec",
+      null
+    ],
+    [
+      "script::trace",
+      null
+    ],
+    [
+      "script::eval",
+      "$script, $opt?, $ctx?"
+    ],
+    [
+      "script::verify",
+      "$script, $opt?, $ctx?"
+    ],
+    [
+      "script::ptrace",
+      "$script, $opt?, $ctx?"
+    ],
+    [
+      "tx::exec",
+      "$tx, $input_index, $utxos, $opt?"
+    ],
+    [
+      "tx::verify",
+      "$tx, $input_index, $utxos, $opt?"
+    ],
+    [
+      "tx::trace",
+      "$tx, $input_index, $utxos, $opt?"
+    ],
+    [
+      "tx::ptrace",
+      "$tx, $input_index, $utxos, $opt?"
     ]
   ]
 }
