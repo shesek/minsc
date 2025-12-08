@@ -7,9 +7,15 @@ use crate::{eval, ExprRepr};
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
-pub fn run(code: &str) -> Result<JsValue, JsValue> {
+pub fn evaluate(code: &str) -> Result<String, String> {
     let result = eval(code).map_err(|e| e.to_string())?;
-    Ok(JsValue::from_str(&result.repr_str()))
+    Ok(result.repr_str())
+}
+
+#[wasm_bindgen]
+pub fn evaluate_with_type(code: &str) -> Result<Vec<String>, String> {
+    let result = eval(code).map_err(|e| e.to_string())?;
+    Ok(vec![result.type_of().to_string(), result.repr_str()])
 }
 
 #[wasm_bindgen]
