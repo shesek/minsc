@@ -32,7 +32,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     {regex: /[xt](?:pub|prv)[0-9a-zA-Z]{100,120}\b(?![_$]|::)/, token: "number"},
 
     // BIP32 key origin fingerprint
-    {regex: /(\[)([a-fA-F0-9]{8})\b/, token: [null,"number"]},
+    {regex: /(\[)([a-fA-F0-9]{8})\b/, token: ["operator","number"]},
 
     // Bytes sequences, including keys and hashes in hex
     {regex: /0x[a-fA-F0-9]*\b/, token: "number"}, // with 0x prefix, any length
@@ -57,13 +57,13 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
 
     // Keywords
     {regex: /(of|return|let|if|then|else|dyn(?: fn)?|_)(?![a-zA-Z0-9$_])/, token: "keyword"},
-    {regex: /(true|false|null|default|likely)\b/, token: "builtin"},
+    {regex: /(true|false|null|default|likely|None)\b/, token: "builtin"},
 
     // Assignment
     //{regex: /\b([$a-zA-Z_][$a-zA-Z_0-9]*)\s*(=)/, token: ["variable-3", null]},
 
     // Function calls
-    {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)\s*(\(|\[)/, token: ["atom", null]},
+    {regex: /([$a-zA-Z_][$a-zA-Z_0-9]*(?:::[a-zA-Z0-9_$]+)*)(\s*)(\(|\[)/, token: ["atom", null, "operator"], indent: true},
 
     // BIP32 derivation
     {regex: /(\d+)(h)\b/, token: ["number", "operator"]}, // hardened derivation step with number literal
@@ -90,9 +90,9 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
     // Infix operators
     {regex: /[-+\/*<>!;@]|[=!<>]=|&&|\|\||\||->/, token: "operator"},
 
-    // Indentation for { [ (
-    {regex: /[\{\[\(]/, indent: true},
-    {regex: /[\}\]\)]/, dedent: true}
+    // { [ ( Brackets (tokenization as 'operator' needed for the 'matchbrackets' addon)
+    {regex: /[\{\[\(]/, indent: true, token: "operator"},
+    {regex: /[\}\]\)]/, dedent: true, token: "operator"}
   ],
   comment: [
     {regex: /.*?\*\//, token: "comment", next: "start"},
@@ -101,7 +101,7 @@ CodeMirror.defineSimpleMode("minsc", minsc_rules = {
   meta: {
     lineComment: "//",
     blockCommentStart: "/**", // yes, two *'s
-    blockCommentStart: "*/",
+    blockCommentEnd: "*/",
     dontIndentStates: ["comment"],
     fold: "brace"
   }
