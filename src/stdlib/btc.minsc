@@ -288,3 +288,24 @@ dyn fn mark::ctx($context, $fn) = `
   $fn(MARK_CTX + [ str($context) ])
   #("END "+$context)
 `;
+
+
+//
+// Dummy key generation
+//
+
+// Single keys
+fn dummy::sk($seed=0) = seckey(rand::bytes(32, $seed));
+fn dummy::pk($seed=0) = pubkey(dummy::sk($seed));
+fn dummy::kpair($seed=0) { $sk=dummy::sk($seed); pubkey($sk):$sk }
+fn dummy::sks($num, $seed=0) = fillArray($num, |$i| dummy::sk($seed+$i));
+fn dummy::pks($num, $seed=0) = map(dummy::sks($num, $seed), pubkey);
+fn dummy::kpairs($num, $seed=0) = flatten(fillArray($num, |$i| dummy::kpair($seed+$i)));
+
+// BIP 32 Xpubs/Xprivs
+fn dummy::xpriv($seed=0) = xpriv::from_seed(rand::bytes(32, $seed), _$$_RECKLESSLY_RISK_MY_BITCOINS_$$_); // use the more familiar mainnet 'xpub'/'xprv' prefix for examples
+fn dummy::xpub($seed=0) = pubkey(dummy::xpriv($seed));
+fn dummy::xpair($seed=0) { $sk=dummy::xpriv($seed); pubkey($sk):$sk }
+fn dummy::xprivs($num, $seed=0) = fillArray($num, |$i| dummy::xpriv($seed+$i));
+fn dummy::xpubs($num, $seed=0) = map(dummy::xprivs($num, $seed), pubkey);
+fn dummy::xpairs($num, $seed=0) = flatten(fillArray($num, |$i| dummy::xpair($seed+$i)));

@@ -135,15 +135,9 @@ lazy_static! {
         _symbolify = |$fn| |$arg| symbol($fn($arg));
         debug = _symbolify(debug), script::wiz=_symbolify(script::wiz), script::bitide=_symbolify(script::bitide);
 
-        // Provide some built-in example pubkeys and hashes for the demo env
-        $alice = tpubD6NzVbkrYhZ4Y1jchg1nEfquYkdrh9oY5WXwxweo1zYevL9PHMVY9DzJWU5dxhr4v9E2Vp4XKSnztCRkv87LJJZekwYPofCBVh25bnuMsza;
-        $bob = tpubD6NzVbkrYhZ4XJ4wfKpkuKAe6t5151uF1Hq4cvivWNbuRai6XsSCHfUo8FWPMnpj9etDWJmGrGqFhExmyVUfogq87vfi6R1PjP5eF8TTPef;
-        $charlie = tpubD6NzVbkrYhZ4WgopbX4W8gekmVedWGcN6LbbPyHTUh2SsUYosMKxyh5jag4ipYpKhYyrxKENeBDsC3WtzSoayt8xjBps5sAvCTtnq74WWAh;
-        $alice_sk = tprv8ZgxMBicQKsPeYhpp2MBqGBnyj7vXpcdWCwAgRcVbikG5qtcexfwxjNSLKjWGJMCyxBdznejsBgcxMsvKkX7HKJHN25vUPN2szNSc9v7dEp;
-        $bob_sk = tprv8ZgxMBicQKsPdq39mgAAVuWXXrZ4ugiLRzEHLQgd66oWb6TKuUcc7ArvxA8R29Cp65WwChKFq1ELbjCTucZvoe3qn1VjBmGWkiHFq3Fmfiu;
-        $charlie_sk = tprv8ZgxMBicQKsPdDn2hsPujGzeCU8hLwRTX2zp7TFA4RE42zJ3ExWNoCTsQXC2BHVGgEfCdZP9YoV3XHDuDhzCPuw29i74osGgYRxLZ6jfUuh;
-        $H256 = 0x01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b;
-        $H160 = 0x4355a46b19d348dc2f57c046f8ef63d4538ebb93;
+        // Provide some built-in example BIP32 Xpubs/Xprivs and single-key keypairs for playground use
+        [$alice, $alice_sk, $bob, $bob_sk, $charlie, $charlie_sk] = dummy::xpairs(3, "playground");
+        [$david, $david_sk, $eve, $eve_sk, $frank, $frank_sk] = dummy::kpairs(3, "playground");
     "#
     .parse()
     .unwrap();
