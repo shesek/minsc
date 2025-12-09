@@ -141,7 +141,7 @@ OP::9MUL = OP::3MUL*2;
 // Loop unrolling: run $loop_body as long as $condition is met, up to $max_iterations times.
 // $loop_body can be a Script or a Function that accepts the iteration count and returns a Script.
 // For example: `<num> unrollLoop(50, `OP_DUP 0 OP_GREATERTHANOREQUAL`, `OP_1SUB`)` to count down from <num> to 0, for <num>s of up to 50
-// more advanced example with some comments: https://min.sc/v0.3/#gist=758c25489869d77d4ef624ea43f18c49
+// more advanced example with some comments: https://min.sc/v1/#gist=758c25489869d77d4ef624ea43f18c49
 fn unrollLoop($max_iterations, $condition, $loop_body) {
   $body_fn = if isFunction($loop_body) then $loop_body else |_| $loop_body;
 
@@ -180,13 +180,13 @@ fn pickAlt($n) = `
 // ROLL/PICK from the altstack, using the number at the top of the stack as the depth
 fn nRollAlt($max_n) = `
   OP_DUP
-  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT OP_ROT`)
+  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT*2`)
   OP_1SUB
   unrollFor($max_n, `OP_ROT OP_TOALTSTACK`)
 `;
 fn nPickAlt($max_n) = `
   OP_DUP
-  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT OP_ROT`)
+  unrollFor($max_n, `OP_FROMALTSTACK OP_ROT*2`)
   OP_SWAP OP_DUP OP_ROT
   unrollFor($max_n, `OP_ROT OP_TOALTSTACK`)
 `;
@@ -265,10 +265,9 @@ fn switch($clauses) = match(map($clauses, |[ $condition, $body ]| {
 // Does not support a `default` branch.
 // For example: select[ `$alice_pk OP_CHECKSIG`, `<6 months> OP_CSV OP_DROP` ]
 fn select($scripts) =
-  if len($scripts) == 2 then
-    // special-case optimization for 2 branches (MINIMALIF enforces 0/1 only)
-    `OP_IF $scripts.1 OP_ELSE $scripts.0 OP_ENDIF`
-  else switch(map(keys($scripts), |$index| $index: $scripts.$index))
+  // special-case optimization for 2 branches (MINIMALIF enforces 0/1 only)
+  if len($scripts) == 2 then `OP_IF $scripts.1 OP_ELSE $scripts.0 OP_ENDIF`
+  else switch(enumerated($scripts))
 ;
 
 //

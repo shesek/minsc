@@ -14,7 +14,7 @@ impl fmt::Display for Value {
             Value::String(x) => fmt_quoted_str(f, x),
             Value::Policy(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
-            Value::Function(x) => write!(f, "{}", x),     // not round-trip-able (cannot be)
+            Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),
             Value::Symbol(x) => write!(f, "{}", x),
             Value::Descriptor(x) => write!(f, "{}", x.pretty(None)), // not round-trip-able (ExprRepr is)
@@ -86,13 +86,13 @@ pub trait PrettyDisplay: Sized {
     }
 
     /// Get back a Display-able struct with pretty-formatting
-    fn pretty(&self, indent: Option<usize>) -> PrettyDisplayer<Self> {
+    fn pretty(&self, indent: Option<usize>) -> PrettyDisplayer<'_, Self> {
         PrettyDisplayer {
             inner: self,
             indent,
         }
     }
-    fn pretty_multiline(&self) -> PrettyDisplayer<Self> {
+    fn pretty_multiline(&self) -> PrettyDisplayer<'_, Self> {
         self.pretty(Some(0))
     }
 

@@ -440,7 +440,7 @@ pub enum RuntimeError {
     Ecdsa(#[from] bitcoin::ecdsa::Error),
 
     #[error("Failed extracting PSBT tx: {0}")]
-    PsbtExtractTx(#[from] bitcoin::psbt::ExtractTxError),
+    PsbtExtractTx(#[from] Box<bitcoin::psbt::ExtractTxError>),
 
     #[error("Invalid sighash: {0}")]
     SighashTypeParse(#[from] bitcoin::sighash::SighashTypeParseError),

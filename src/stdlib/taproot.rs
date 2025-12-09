@@ -27,12 +27,12 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     // Construct the witness control block
     scope.set_fn("tr::ctrl", fns::ctrl).unwrap();
 
-    // Convert a tr() descriptor into a TaprootSpendInfo
-    scope.set_fn("tr::tapinfo", fns::tapinfo).unwrap();
-
     // Low-level leaf/branch hash calculation. Shouldn't be used directly typically.
     scope.set_fn("tr::tapLeaf", fns::tapLeaf).unwrap();
     scope.set_fn("tr::tapBranch", fns::tapBranch).unwrap();
+
+    // Convert a tr() descriptor into a TaprootSpendInfo
+    scope.set_fn("tapinfo", fns::tapinfo).unwrap();
 }
 
 #[allow(non_snake_case)]
@@ -74,7 +74,7 @@ pub mod fns {
             Value::Descriptor(desc) => desc
                 .tap_info()?
                 .ok_or(Error::InvalidArguments)?
-                .control_block(&script_ver),
+                .control_block(script_ver),
             // Extract control block from the PSBT input tap_scripts data
             Value::Array(psbt_input) => {
                 let tap_scripts: BTreeMap<ControlBlock, (ScriptBuf, LeafVersion)> = psbt_input
@@ -91,7 +91,7 @@ pub mod fns {
         Ok(ctrl.into())
     }
 
-    /// tr::tapinfo(Descriptor|TapInfo) -> TapInfo
+    /// tapinfo(Descriptor|TapInfo) -> TapInfo
     ///
     /// Convert Tr Descriptor into a TapInfo (or return TapInfo as-is)
     pub fn tapinfo(args: Array, _: &ScopeRef) -> Result<Value> {
@@ -247,7 +247,7 @@ fn tr_from_array(
             _ if node.is_policy_coercible() => NodeType::Policy,
             Value::WithProb(_, inner) if inner.is_script() => NodeType::Script,
             Value::WithProb(_, inner) if inner.is_policy_coercible() => NodeType::Policy,
-            Value::Array(array) if array.len() > 0 => peek_node_type(&array[0])?,
+            Value::Array(array) if !array.is_empty() => peek_node_type(&array[0])?,
             _ => bail!(Error::TaprootInvalidScript),
         })
     }

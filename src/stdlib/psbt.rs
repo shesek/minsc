@@ -113,7 +113,7 @@ pub mod fns {
 
     // psbt::sign(Psbt, Xpriv|Array<Xpriv>|Array<SinglePk:SingleSk> sign_keys) -> Psbt
     //
-    // Attempt to sign all transaction inputs, raising an error if any fail.
+    // Attempt to sign all transaction inputs for which we have keys, raising an error if any fail.
     pub fn sign(args: Array, _: &ScopeRef) -> Result<Value> {
         let (mut psbt, keys) = args.args_into()?;
 
@@ -758,6 +758,7 @@ struct XprivSet(Vec<Xpriv>);
 // Unlike the the standard TryInto<Xpriv> conversion which derives the final child Xpriv after applying all derivation
 // steps, this instead uses the top-most known Xpriv without deriving. The PSBT bip32_derivation/tap_key_origins fields
 // are expected to point to the fingerprint of the top-most key, and not to that of the child.
+// XXX could collect both the derived Xpriv and MasterXpriv
 impl TryFrom<Array> for XprivSet {
     type Error = Error;
     fn try_from(arr: Array) -> Result<Self> {
@@ -799,6 +800,7 @@ fn single_seckeys_to_map(keys: Array) -> Result<BTreeMap<PublicKey, PrivateKey>>
         })
         .collect()
 }
+// TODO support BTreeMap<XOnlyPublicKey, PrivateKey>
 
 // PSBT fields accessors
 impl FieldAccess for Psbt {
@@ -881,7 +883,7 @@ impl PrettyDisplay for Psbt {
         let sep = format!("{newline_or_space}{:inner_indent_w$}", "");
         let mut is_first = true;
 
-        write!(f, "psbt [")?;
+        write!(f, "psbt[")?;
         fmt_field!(self, unsigned_tx, f, sep, is_first, "{}", self.unsigned_tx.pretty(inner_indent));
         fmt_field!(self, version, f, sep, is_first);
         fmt_map_field!(self, xpub, f, sep, is_first, inner_indent,

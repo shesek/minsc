@@ -854,7 +854,7 @@ impl PrettyDisplay for Transaction {
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         let (newline_or_space, inner_indent, indent_w, inner_indent_w) = indentation_params(indent);
         let field_sep = format!("{newline_or_space}{:inner_indent_w$}", "");
-        write!(f, r#"tx [{field_sep}"version": {}"#, self.version.0)?;
+        write!(f, r#"tx[{field_sep}"version": {}"#, self.version.0)?;
         if self.lock_time != AbsLockTime::ZERO {
             write!(
                 f,

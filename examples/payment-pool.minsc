@@ -36,7 +36,7 @@ fn Pool($users, $outpoint) {
   // An on-chain payment deducted from the $sender_pk balance
   fn send($sender_pk, $to_address, $amount) {
     assert($users->{$sender_pk} >= $amount);
-    $new_balances = update($users, [
+    $new_balances = set($users, [
       $sender_pk: $users->{$sender_pk} - $amount
     ]) | filter(|[_, $balance]| $balance > 0);
 
@@ -153,7 +153,7 @@ fn Pool($users, $outpoint) {
 
   // Receive an incoming payment, merged into the shared pool UTXO
   fn receive($receiver_pk, $amount, $payer_inputs, $payer_change_outputs) {
-    $new_balances = update($users, [
+    $new_balances = set($users, [
       $receiver_pk: $users->{$receiver_pk} + $amount
     ]);
 
@@ -309,8 +309,8 @@ fn main() = [
 ];
 
 // Receiving not fully demonstrated here, but the process is:
-// 1. The payer first shares the inputs and change outputs they intend to use for the payment (without signing them).
-// 2. `receive()` creates the incoming payment PSBT, spending the pool UTXO alongside the payer's inputs to create a new pool UTXO with updated balances.
+// 1. The payer starts by sharing the inputs and change outputs they intend to use for the payment with the payee (without signing).
+// 2. The payee (pool member) uses `receive()` to create the incoming payment PSBT, spending the pool UTXO alongside the payer's inputs to create a new pool UTXO with updated balances.
 // 3. The members exchange their exit signatures, then sign the incoming payment PSBT.
-// 4. The PSBT is returned to the payer, who adds their signatures and broadcasts the transaction.
+// 4. The PSBT is returned to the payer, who adds their signatures and broadcasts the finalized transaction.
 // 5. The members wait for the transaction to confirm and transition into the new state.
