@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{array, Array, Error, Execute, Number, Result, Symbol, Value};
+use crate::stdlib;
 use crate::util::DescriptorSecretKeyExt;
 use crate::Library;
 
@@ -176,6 +177,7 @@ pub mod fns {
                 Number::Float(_) => bail!(Error::Overflow),
             },
             Value::String(str) => str.parse()?,
+            Value::Bytes(bytes) => stdlib::btc::scriptnum_decode(&bytes)?,
             _ => bail!(Error::InvalidArguments),
         };
         Ok(num.into())
