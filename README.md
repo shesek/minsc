@@ -10,52 +10,53 @@
 
 Minsc is a high-level, domain-specific, embeddable language for Bitcoin scripting that simplifies the creation and fulfillment of complex spending conditions using an expressive pseudo-code-like syntax.
 
-It features built-in support for Descriptors, Miniscript, Script, Transactions, PSBT, Taproot, BIP32, CTV and more.
+It features built-in support for Descriptors, Miniscript, Script, Transactions, PSBT, Taproot, BIP32, CTV, and more.
 
 The language is dynamically typed, functional and immutable.
 
 > [!NOTE]
 > The documentation and playground on the [`min.sc`](https://min.sc/) website are currently outdated.
 >
-> To explore some of Minsc's new abilities, check out the [`min.sc/v0.3`](https://min.sc/v0.3/) playground and the following examples:
+> To explore some of Minsc's new abilities, check out the [`min.sc/v1`](https://min.sc/v1/) playground and the following examples:
 >
 > #### Descriptors, Miniscript & PSBT
-> - [Simple Taproot](https://min.sc/v0.3/#github=examples/taproot-psbt-simple.minsc) (P2TR key-path)
-> - [Simple Multisig](https://min.sc/v0.3/#github=examples/multisig-simple.minsc) (P2WSH 2-of-2)
-> - [Co-signer with expiry](https://min.sc/v0.3/#github=examples/cosigner-with-expiry.minsc) (P2TR with Miniscript, Green-like)
-> - [Multisig 3-of-3 into 2-of-3](https://min.sc/v0.3/#github=examples/3of3-into-2of3.minsc) (decays after a timeout)
-> - [Hashed Timelock Contract](https://min.sc/v0.3/#github=examples/htlc.minsc) (traditional HTLC)
-> - [Recovery after a delay period](https://min.sc/v0.3/#github=examples/recovery-after-delay.minsc) (simple CSV-based, delay period since the coins last moved)
-> - [Inheritance after a contest period](https://min.sc/v0.3/#github=examples/inheritance-after-contest-presigned.minsc) (2-stage using pre-signed txs, contest delay period following the 'trigger')
+> - [Simple Taproot](https://min.sc/v1/#github=examples/taproot-psbt-simple.minsc) (P2TR key-path)
+> - [Simple Multisig](https://min.sc/v1/#github=examples/multisig-simple.minsc) (P2WSH 2-of-2)
+> - [Co-signer with expiry](https://min.sc/v1/#github=examples/cosigner-with-expiry.minsc) (P2TR with Miniscript, Green-like)
+> - [Multisig 3-of-3 into 2-of-3](https://min.sc/v1/#github=examples/3of3-into-2of3.minsc) (decays after a timeout)
+> - [Hashed Timelock Contract](https://min.sc/v1/#github=examples/htlc.minsc) (traditional HTLC)
+> - [Recovery after a delay period](https://min.sc/v1/#github=examples/recovery-after-delay.minsc) (simple CSV-based, delay period since the coins last moved)
+> - [Inheritance after a contest period](https://min.sc/v1/#github=examples/inheritance-after-contest-presigned.minsc) (2-stage using pre-signed txs, contest delay period following the 'trigger')
 >
 > #### One Liners
 > - [Simple one/few-liners](https://gist.github.com/shesek/fe1ca13232720d10a6ea3c9ea313cb15) for inpsecting and manipulating bitcoin data types
 >
 > #### Manual Scripting
 > ##### *Without* Descriptors, Miniscript or PSBT
-> - [Manual Signing](https://min.sc/v0.3/#github=examples/manual-signing-p2wpkh.minsc) (P2WPKH)
-> - [Manual Scripting & Signing](https://min.sc/v0.3/#github=examples/manual-scripting-signing-p2wsh.minsc) (P2WSH with raw Script)
-> - [Simple CTV Whitelist](https://min.sc/v0.3/#github=examples/ctv-simple.minsc) (P2TR with raw Script)
-> - [CTV Congestion Control](https://min.sc/v0.3/#github=examples/ctv-congestion-control.minsc) (payment tree expansion)
-> - [Simplest CAT](https://min.sc/v0.3/#github=examples/cat-simplest.minsc)
+> - [Manual Signing](https://min.sc/v1/#github=examples/manual-signing-p2wpkh.minsc) (P2WPKH)
+> - [Manual Scripting & Signing](https://min.sc/v1/#github=examples/manual-scripting-signing-p2wsh.minsc) (P2WSH with raw Script)
+> - [Simple CTV Whitelist](https://min.sc/v1/#github=examples/ctv-simple.minsc) (P2TR with raw Script)
+> - [CTV Congestion Control](https://min.sc/v1/#github=examples/ctv-congestion-control.minsc) (payment tree expansion)
+> - [Simplest CAT](https://min.sc/v1/#github=examples/cat-simplest.minsc)
+> - [Script Exec](https://min.sc/v1/#github=examples/scriptexec.minsc)
 >
 > #### Advanced Scripting
-> - [CTV Vault](https://min.sc/v0.3/#github=examples/ctv-vault.minsc) (covenant-enforced delayed withdrawal for hot/cold key security)
-> - [Payment Pool](https://min.sc/v0.3/#github=examples/payment-pool.minsc) (shared UTXO ownership with pre-signed unilateral exit)
-> - [Fair Coin-Flip Bet](https://min.sc/v0.3/#github=examples/script-coin-flip.minsc) (commit-reveal scheme with a security deposit)
-> - [Lookup Tables](https://min.sc/v0.3/#github=examples/script-lookup.minsc) (one-time & reusable tables, 4-bit OP_MUL)
-> - [PAIRCOMMIT Merkle Trees](https://min.sc/v0.3/#github=examples/paircommit-merkle-tree.minsc)
-> - More scripting examples are available in [the playground's default code](https://min.sc/v0.3/)
+> - [CTV Vault](https://min.sc/v1/#github=examples/ctv-vault.minsc) (covenant-enforced delayed withdrawal for hot/cold key security)
+> - [Payment Pool](https://min.sc/v1/#github=examples/payment-pool.minsc) (shared UTXO ownership with pre-signed unilateral exit)
+> - [Fair Coin-Flip Bet](https://min.sc/v1/#github=examples/script-coin-flip.minsc) (commit-reveal scheme with a security deposit)
+> - [Lookup Tables](https://min.sc/v1/#github=examples/script-lookup.minsc) (one-time & reusable tables, 4-bit OP_MUL)
+> - [PAIRCOMMIT Merkle Trees](https://min.sc/v1/#github=examples/paircommit-merkle-tree.minsc)
+> - More scripting examples are available in [the playground's default code](https://min.sc/v1/)
 >
 > #### Elements/Liquid Introspection
-> - [Dutch Auction](https://min.sc/v0.3/#github=examples/elements-dutch-auction.minsc)
-> - [Token Sale with Royalty](https://min.sc/v0.3/#github=examples/elements-sale-royalty.minsc) (recursive stateful contract, WIP code)
+> - [Dutch Auction](https://min.sc/v1/#github=examples/elements-dutch-auction.minsc)
+> - [Token Sale with Royalty](https://min.sc/v1/#github=examples/elements-sale-royalty.minsc) (recursive stateful contract, WIP code)
 >
 > To learn more about the language internals, you can also check out the Minsc standard library parts implemented in Minsc:
 >
-> - [`src/stdlib/stdlib.minsc`](https://min.sc/v0.3/#github=src/stdlib/stdlib.minsc) (utilities for arrays, strings, testing and more)
-> - [`src/stdlib/btc.minsc`](https://min.sc/v0.3/#github=src/stdlib/btc.minsc) (transaction utilities, script opcodes, loop unrolling, control structures and more)
-> - [`src/stdlib/elements.minsc`](https://min.sc/v0.3/#github=src/stdlib/elements.minsc) (Elements introspection, 64-bit arithmetic and more)
+> - [`src/stdlib/stdlib.minsc`](https://min.sc/v1/#github=src/stdlib/stdlib.minsc) (utilities for arrays, strings, testing and more)
+> - [`src/stdlib/btc.minsc`](https://min.sc/v1/#github=src/stdlib/btc.minsc) (transaction utilities, script opcodes, loop unrolling, control structures and more)
+> - [`src/stdlib/elements.minsc`](https://min.sc/v1/#github=src/stdlib/elements.minsc) (Elements introspection, 64-bit arithmetic and more)
 
 <!-- Minsc is a high-level scripting language for expressing Bitcoin Script spending conditions.
 It is based on the [Miniscript](http://bitcoin.sipa.be/miniscript/) Policy language,

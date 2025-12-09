@@ -74,7 +74,7 @@ pub mod fns {
             Value::Descriptor(desc) => desc
                 .tap_info()?
                 .ok_or(Error::InvalidArguments)?
-                .control_block(&script_ver),
+                .control_block(script_ver),
             // Extract control block from the PSBT input tap_scripts data
             Value::Array(psbt_input) => {
                 let tap_scripts: BTreeMap<ControlBlock, (ScriptBuf, LeafVersion)> = psbt_input
@@ -247,7 +247,7 @@ fn tr_from_array(
             _ if node.is_policy_coercible() => NodeType::Policy,
             Value::WithProb(_, inner) if inner.is_script() => NodeType::Script,
             Value::WithProb(_, inner) if inner.is_policy_coercible() => NodeType::Policy,
-            Value::Array(array) if array.len() > 0 => peek_node_type(&array[0])?,
+            Value::Array(array) if !array.is_empty() => peek_node_type(&array[0])?,
             _ => bail!(Error::TaprootInvalidScript),
         })
     }

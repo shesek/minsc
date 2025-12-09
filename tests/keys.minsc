@@ -74,7 +74,7 @@ test("Key Derivation", |T| {
     $sk_child = $sk/10'/90;
     assert::eq($sk_child, [00112233/4'/5]xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi/10'/90);
     assert::eq(xderived($sk_child), [00112233/4'/5/10'/90]xprv9wGStYmEDBnRnqJyYwkMktb9JZTJTh7EvfbcvY6HPDuSMZtcpMRXfU43JYqK7dCkZKEtacimBiVkrvhEXeR6i1iFuwPTdMWk3go7gebX9ir);
-    assert::eq(str(derived($sk_child)), "seckey([00112233/4'/5/10'/90]cTsvns7tYeKnrzgJxzV4ea16GisYHtCBvA3rcdnRVSYYeAU4GCVc)");
+    assert::eq(str(derived($sk_child)), "[00112233/4'/5/10'/90]cTsvns7tYeKnrzgJxzV4ea16GisYHtCBvA3rcdnRVSYYeAU4GCVc");
     // Must assert by stringifying $sk_child due to https://github.com/rust-bitcoin/rust-miniscript/pull/753
     // assert::eq(derived($sk_child), [00112233/4'/5/10'/90]cTsvns7tYeKnrzgJxzV4ea16GisYHtCBvA3rcdnRVSYYeAU4GCVc);
   });

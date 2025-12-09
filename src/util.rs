@@ -180,7 +180,7 @@ impl PsbtInExt for psbt::Input {
         self.tap_merkle_root = tapinfo.merkle_root();
         self.tap_internal_key = Some(tapinfo.internal_key());
         self.tap_scripts
-            .extend(tapinfo.script_map().iter().map(|(script_ver, _)| {
+            .extend(tapinfo.script_map().keys().map(|script_ver| {
                 let ctrl = tapinfo.control_block(script_ver).expect("must exists");
                 (ctrl, script_ver.clone())
             }));

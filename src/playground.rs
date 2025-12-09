@@ -136,8 +136,8 @@ lazy_static! {
         debug = _symbolify(debug), script::wiz=_symbolify(script::wiz), script::bitide=_symbolify(script::bitide);
 
         // Provide some built-in example BIP32 Xpubs/Xprivs and single-key keypairs for playground use
-        [$alice, $alice_sk, $bob, $bob_sk, $charlie, $charlie_sk] = dummy::xpairs(3, "playground");
-        [$david, $david_sk, $eve, $eve_sk, $frank, $frank_sk] = dummy::kpairs(3, "playground");
+        [$alice, $alice_sk, $bob, $bob_sk, $charlie, $charlie_sk] = dummy::xpairs(3);
+        [$david, $david_sk, $eve, $eve_sk, $frank, $frank_sk] = dummy::kpairs(3);
     "#
     .parse()
     .unwrap();

@@ -144,7 +144,7 @@ impl ScopeAccess for Mutable {}
 // Methods available on ReadOnly and Mutable scopes
 impl<A: ScopeAccess> ScopeRef<A> {
     /// Borrow the inner Scope as read-only
-    pub fn borrow(&self) -> Ref<Scope> {
+    pub fn borrow(&self) -> Ref<'_, Scope> {
         self.0.borrow()
     }
 
@@ -170,7 +170,7 @@ impl<A: ScopeAccess> ScopeRef<A> {
 
 // Methods available on Mutable scopes only
 impl ScopeRef<Mutable> {
-    pub fn borrow_mut(&self) -> RefMut<Scope> {
+    pub fn borrow_mut(&self) -> RefMut<'_, Scope> {
         self.0.borrow_mut()
     }
     pub fn into_readonly(self) -> ScopeRef<ReadOnly> {

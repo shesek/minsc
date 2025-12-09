@@ -72,7 +72,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
         // Built-in Symbols
         scope
-            .set("ARRAY_MULTIVAL_FIELD", array::SYM_MULTIVAL.clone())
+            .set("MULTIVAL_TAG", array::SYM_MULTIVAL.clone())
             .unwrap();
     }
 

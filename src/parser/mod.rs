@@ -74,7 +74,7 @@ impl TryFrom<Vec<(AssignTarget, Option<Expr>)>> for FnParams {
         let optional = params
             .by_ref()
             .peeking_take_while(|(_, default)| default.is_some())
-            .map(|(target, default)| (target.clone(), default.unwrap()))
+            .map(|(target, default)| (target, default.unwrap()))
             .collect();
         ensure!(
             params.next().is_none(),

@@ -130,7 +130,7 @@ fn sumInputs($max_inputs) = `
 // Ensure the total inputs sum is at least 2 BTC (for up to 3 inputs)
 $minimum_2btc = `sumInputs(3) le64(2 BTC) OP_GREATERTHANOREQUAL64`;
 
-// More script built-ins at https://min.sc/v0.3/#github=src/stdlib/btc.minsc
+// More script built-ins at https://min.sc/v1/#github=src/stdlib/btc.minsc
 
 
 // Example keys for Simple CTV Vault
@@ -181,7 +181,7 @@ $multi_vault = MultiKeyVault($cold_pk, 500 sats, [
 $multi_2_tap = $multi_vault(2, 0.9 BTC);
 $multi_2_addr = address($multi_2_tap);
 
-// See https://min.sc/v0.3/#github=examples/ctv-vault.minsc for a (WIP) example that includes spending from the vault
+// See https://min.sc/v1/#github=examples/ctv-vault.minsc for a (WIP) example that includes spending from the vault
 
 
 //

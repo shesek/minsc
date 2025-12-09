@@ -20,7 +20,7 @@ OP_PAIRCOMMIT = script(0xcd);
 // Make a Merkle tree
 fn merklize($elements) {
   if len($elements) == 1 {
-    $leaf_hash = hash::sha256(bytes($elements.0));
+    $leaf_hash = hash::sha256($elements.0);
     [ "hash": $leaf_hash, "depth": 0, "value": $elements.0 ]
   } else {
     $left_size = len($elements) / 2;

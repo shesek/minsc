@@ -113,7 +113,7 @@ impl Array {
 }
 
 lazy_static! {
-    pub static ref SYM_MULTIVAL: Symbol = Symbol::new(Some("ARRAY_MULTIVAL_FIELD".into()));
+    pub static ref SYM_MULTIVAL: Symbol = Symbol::new(Some("MULTIVAL_TAG".into()));
 }
 
 // Tagged array field access
@@ -123,7 +123,7 @@ impl FieldAccess for Array {
         for el in self.into_inner() {
             if let Value::Array(mut el_arr) = el {
                 if el_arr.len() == 2 && el_arr[0] == *field {
-                    if !field_value.is_none() {
+                    if field_value.is_some() {
                         // Return the sentinel ARRAY_MULTIVAL symbol to indicate there are multiple matching fields.
                         // The values may be extracted with mget($arr, $key) instead.
                         return Some(SYM_MULTIVAL.clone().into());

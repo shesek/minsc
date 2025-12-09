@@ -75,10 +75,10 @@ fn finalizeNodes($node, $outpoint, $path=[]) {
   if $node->tx? {
     // Update the transaction input to spend the $outpoint, keeping other transactions fields as they were
     $tx = tx [ "input": $outpoint, "outputs": $node->tx->outputs, "version": $node->tx->version, "locktime": $node->tx->locktime ];
-    $node = update($node, [ "tx": $tx ]);
+    $node = set($node, [ "tx": $tx ]);
     $left_flat = finalizeNodes($node->left, txid($tx):0, $path+[0]);
     $right_flat = finalizeNodes($node->right, txid($tx):1, $path+[1]);
-    [ remove($node, [ "left", "right" ]) ] + $left_flat + $right_flat
+    [ unset($node, [ "left", "right" ]) ] + $left_flat + $right_flat
   } else {
     [ $node ]
   }
