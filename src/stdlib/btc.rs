@@ -7,8 +7,8 @@ use bitcoin::script::{Builder as ScriptBuilder, Instruction, PushBytesBuf, Scrip
 use bitcoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Version};
 use bitcoin::{
     absolute::LockTime as AbsLockTime, address, consensus, hex::DisplayHex,
-    relative::LockTime as RelLockTime, Address, Amount, Network, Opcode, Sequence, SignedAmount,
-    Txid, Witness,
+    relative::LockTime as RelLockTime, script, Address, Amount, Network, Opcode, Sequence,
+    SignedAmount, Txid, Witness,
 };
 use miniscript::psbt::PsbtExt;
 
@@ -152,10 +152,13 @@ pub fn repeat_script(script: ScriptBuf, times: usize) -> ScriptBuf {
     ScriptBuf::from(bytes_n)
 }
 
-pub fn scriptnum_enc(num: i64) -> Vec<u8> {
+pub fn scriptnum_encode(num: i64) -> Vec<u8> {
     let mut buf = [0u8; 8];
-    let len = bitcoin::script::write_scriptint(&mut buf, num);
+    let len = script::write_scriptint(&mut buf, num);
     buf[..len].to_vec()
+}
+pub fn scriptnum_decode(bytes: &[u8]) -> Result<i64> {
+    Ok(script::read_scriptint_non_minimal(bytes)?)
 }
 
 impl Evaluate for ast::Duration {
@@ -285,7 +288,7 @@ pub mod fns {
 
     /// scriptnum(Number) -> Bytes
     pub fn scriptnum(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(scriptnum_enc(args.arg_into()?).into())
+        Ok(scriptnum_encode(args.arg_into()?).into())
     }
 
     /// script::strip(Script) -> Script
@@ -510,7 +513,7 @@ impl_simple_to_value!(Witness, wit, wit.to_vec());
 impl_simple_to_value!(bitcoin::WitnessVersion, ver, ver.to_num() as i64);
 impl_simple_to_value!(bitcoin::AddressType, t, t.to_string());
 impl_simple_to_value!(bitcoin::WitnessProgram, w, (w.version(), w.program()));
-impl_simple_to_value!(&bitcoin::script::PushBytes, p, p.as_bytes().to_vec());
+impl_simple_to_value!(&script::PushBytes, p, p.as_bytes().to_vec());
 impl_simple_to_value!(Opcode, op, ScriptBuf::from_bytes(vec![op.to_u8()]));
 impl_simple_to_value!(SignedAmount, amt, amt.to_sat());
 // Panics for out-of-range `Amount`s (i64 can represent up to ~92 billion BTC, ~4400x more than can exists),
@@ -555,7 +558,7 @@ impl_simple_to_value!(
     i64::try_from(w.to_wu()).expect("out of range weight")
 );
 #[rustfmt::skip]
-impl_simple_to_value!(bitcoin::script::Instructions<'_>, insts, insts
+impl_simple_to_value!(script::Instructions<'_>, insts, insts
     .map(|inst| match inst {
         Err(err) => err.to_string().into(),
         // XXX always uses TapScript
