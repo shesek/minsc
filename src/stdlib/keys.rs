@@ -318,7 +318,7 @@ impl_simple_to_value!(
         origin: None,
     })
 );
-impl_simple_to_value!(TweakedPublicKey, pk, pk.to_inner());
+impl_simple_to_value!(TweakedPublicKey, pk, pk.to_x_only_public_key());
 impl_simple_to_value!(secp256k1::PublicKey, pk, bitcoin::PublicKey::from(pk));
 impl_simple_to_value!(secp256k1::Parity, p, p.to_u8() as i64);
 impl_simple_to_value!(
