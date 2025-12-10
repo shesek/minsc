@@ -18,7 +18,7 @@ use crate::runtime::{
     eval_exprs, Array, Error, Evaluate, Execute, FieldAccess, Float, Int, Mutable, Result,
     ScopeRef, Value,
 };
-use crate::util::{DescriptorExt, TapInfoExt, EC};
+use crate::util::{DescriptorExt, ScriptBuilderExt, TapInfoExt, EC};
 use crate::{ast, time, Library};
 
 lazy_static! {
@@ -103,7 +103,7 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
     let push_int = |num| ScriptBuilder::new().push_int(num).into_script();
     let push_slice = |slice| -> Result<_> {
         Ok(ScriptBuilder::new()
-            .push_slice(PushBytesBuf::try_from(slice)?)
+            .push_slice_minimal(PushBytesBuf::try_from(slice)?)
             .into_script())
     };
     Ok(match value {
