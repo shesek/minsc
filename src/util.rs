@@ -8,7 +8,7 @@ use std::sync::Arc;
 use bitcoin::bip32::{self, DerivationPath, IntoDerivationPath};
 use bitcoin::hashes::Hash;
 use bitcoin::taproot::{self, ControlBlock, LeafVersion, NodeInfo, TapNodeHash, TaprootSpendInfo};
-use bitcoin::{key::TapTweak, psbt, secp256k1, PublicKey, ScriptBuf, Transaction};
+use bitcoin::{key::TapTweak, psbt, script, secp256k1, PublicKey, ScriptBuf, Transaction};
 use miniscript::descriptor::{
     self, DerivPaths, DescriptorMultiXKey, DescriptorPublicKey, DescriptorSecretKey, SinglePubKey,
     Wildcard,
@@ -918,5 +918,27 @@ impl<I: Iterator> PeekableExt for iter::Peekable<I> {
     {
         // h/t https://www.reddit.com/r/rust/comments/f8ae6q/comment/jwuyzgo/
         iter::from_fn(move || self.next_if(accept))
+    }
+}
+
+// Push slices using the minimal encoding.
+// This was made the default for push_slice() in rust-bitcoin v0.33,
+// however it is buggy (pending https://github.com/rust-bitcoin/rust-bitcoin/pull/5385)
+// and minsc is still using v0.32. TODO remove once minsc upgrades to a release with the fix.
+pub trait ScriptBuilderExt {
+    fn push_slice_minimal<T: AsRef<script::PushBytes>>(self, push: T) -> script::Builder;
+}
+impl ScriptBuilderExt for script::Builder {
+    fn push_slice_minimal<T: AsRef<script::PushBytes>>(self, push: T) -> script::Builder {
+        let bytes = push.as_ref().as_bytes();
+        if bytes.len() == 1 {
+            match bytes[0] {
+                0x81 => self.push_int(-1),
+                1..=16 => self.push_int(bytes[0] as i64),
+                _ => self.push_slice(push),
+            }
+        } else {
+            self.push_slice(push)
+        }
     }
 }
