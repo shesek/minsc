@@ -9,7 +9,7 @@ pub mod ast;
 pub use ast::{AssignTarget, Expr, FnParams, Ident, Library, Stmt};
 
 lalrpop_mod!(
-    #[allow(clippy::all)]
+    #[allow(clippy::all, non_fmt_panics)]
     pub grammar,
     "/parser/grammar.rs"
 );
