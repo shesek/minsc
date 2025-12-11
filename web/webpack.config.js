@@ -12,6 +12,7 @@ module.exports = {
   output: {
     path: dist,
     filename: "[name].js",
+    clean: true,
   },
   experiments: {
     asyncWebAssembly: true,
@@ -30,7 +31,7 @@ module.exports = {
       crateDirectory: path.resolve(__dirname, '..'),
       outDir: path.resolve(__dirname, 'pkg'),
       outName: 'index',
-      extraArgs: '--no-typescript -- --features playground',
+      extraArgs: `--no-typescript ${process.env.NO_WASM_OPT ? '--no-opt' : ''} -- --features playground`,
     }),
   ],
   module: {
