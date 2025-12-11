@@ -567,7 +567,17 @@ impl<T: IntoDerivationPath + Clone> DerivePath for T {}
 
 impl DeriveExt for DescriptorPublicKey {
     fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self> {
+        ensure!(
+            !matches!(self, DescriptorPublicKey::Single(_)),
+            Error::NonDeriveableSingle
+        );
+
         let path = path.into_derivation_path()?;
+        ensure!(
+            path.into_iter().all(|c| c.is_normal()) && wildcard != Wildcard::Hardened,
+            Error::XpubHardenedDerivation
+        );
+
         match self {
             DescriptorPublicKey::XPub(mut xpub) => {
                 xpub.derivation_path = xpub.derivation_path.extend(path);
@@ -587,7 +597,7 @@ impl DeriveExt for DescriptorPublicKey {
                 mxpub.wildcard = wildcard;
                 Ok(DescriptorPublicKey::MultiXPub(mxpub))
             }
-            DescriptorPublicKey::Single(_) => bail!(Error::NonDeriveableSingle),
+            DescriptorPublicKey::Single(_) => unreachable!("already checked"),
         }
     }
 

@@ -196,6 +196,9 @@ pub enum RuntimeError {
     #[error("Standalone keys cannot be derived")]
     NonDeriveableSingle,
 
+    #[error("Cannot derive Xpubs with a hardened BIP32 child key, must use the Xpriv")]
+    XpubHardenedDerivation,
+
     #[error(
         "Invalid derivation index. Only child numbers, hashes and multi-path arrays are supported."
     )]
