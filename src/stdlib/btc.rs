@@ -457,7 +457,7 @@ impl TryFrom<Value> for Txid {
         Ok(match val {
             Value::Bytes(mut bytes) => {
                 // Reverse back from the reversed order used for txid display.
-                // fns::txid() (above) does the opposite.
+                // impl_simple_to_value!(Txid) (below) does the opposite
                 bytes.reverse();
                 Txid::from_slice(&bytes)?
             }
@@ -508,7 +508,6 @@ impl TryFrom<Value> for Witness {
 impl_simple_to_value!(Version, ver, ver.0);
 impl_simple_to_value!(Sequence, seq, seq.to_consensus_u32());
 impl_simple_to_value!(AbsLockTime, time, time.to_consensus_u32());
-impl_simple_to_value!(OutPoint, outpoint, (outpoint.txid, outpoint.vout));
 impl_simple_to_value!(Witness, wit, wit.to_vec());
 impl_simple_to_value!(bitcoin::WitnessVersion, ver, ver.to_num() as i64);
 impl_simple_to_value!(bitcoin::AddressType, t, t.to_string());
@@ -521,24 +520,27 @@ impl_simple_to_value!(SignedAmount, amt, amt.to_sat());
 // Uses to_signed() to convert from u64 to i64 with a useful OutOfRangeError message.
 impl_simple_to_value!(Amount, amt, amt.to_signed().unwrap());
 
-impl_simple_to_value!(
-    bitcoin::transaction::TxOut,
-    txout,
-    (
-        ("script_pubkey", txout.script_pubkey),
-        ("amount", txout.value),
-    )
-);
-impl_simple_to_value!(
-    bitcoin::transaction::TxIn,
-    txin,
-    (
-        ("prevout", txin.previous_output),
-        ("sequence", txin.sequence),
-        ("witness", txin.witness),
-        ("script_sig", txin.script_sig),
-    )
-);
+
+#[rustfmt::skip]
+impl_simple_to_value!(OutPoint, outpoint, (
+    ("txid", outpoint.txid),
+    ("vout", outpoint.vout),
+));
+
+#[rustfmt::skip]
+impl_simple_to_value!(bitcoin::transaction::TxOut, txout, (
+    ("script_pubkey", txout.script_pubkey),
+    ("amount", txout.value),
+));
+
+#[rustfmt::skip]
+impl_simple_to_value!(bitcoin::transaction::TxIn, txin, (
+    ("prevout", txin.previous_output),
+    ("sequence", txin.sequence),
+    ("witness", txin.witness),
+    ("script_sig", txin.script_sig),
+));
+
 impl_simple_to_value!(Txid, txid, {
     let mut txid = txid.to_byte_array().to_vec();
     // Reverse when converted to Bytes to match the standard display order,
