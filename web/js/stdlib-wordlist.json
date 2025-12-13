@@ -1905,6 +1905,34 @@
     [
       "tx::ptrace",
       "$tx, $input_index, $utxos, $opt?"
+    ],
+    [
+      "bip39::rand",
+      null
+    ],
+    [
+      "bip39::to_seed",
+      null
+    ],
+    [
+      "bip39::to_entropy",
+      null
+    ],
+    [
+      "bip39::from_entropy",
+      null
+    ],
+    [
+      "bip39",
+      "$a?, $b?, $c?"
+    ],
+    [
+      "bip39::to_xpriv",
+      "$mnemonic, $network?, $passphrase?, $lang?"
+    ],
+    [
+      "xpriv::from_mnemonic",
+      "$mnemonic, $network?, $passphrase?, $lang?"
     ]
   ]
 }

@@ -466,6 +466,18 @@ pub enum RuntimeError {
     #[error("PSBT update error: {0}")]
     PsbtUtxoUpdate(#[from] miniscript::psbt::UtxoUpdateError),
 
+    #[cfg(feature = "bip39")]
+    #[error("BIP39 error: {0}")]
+    Bip39(#[from] bip39::Error),
+
+    #[cfg(all(feature = "bip39", feature = "bip39-all-languages"))]
+    #[error("Invalid BIP39 language \"{0}\"")]
+    Bip39InvalidLanguage(String),
+
+    #[cfg(all(feature = "bip39", not(feature = "bip39-all-languages")))]
+    #[error("Invalid BIP39 language \"{0}\" (only English enabled by default, the \"bip39-all-languages\" feature is required for other languages)")]
+    Bip39InvalidLanguage(String),
+
     #[cfg(feature = "scriptexec")]
     #[error("ScriptExec: {0:?}")]
     ScriptExec(bitcoin_scriptexec::Error),

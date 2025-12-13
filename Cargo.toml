@@ -34,13 +34,15 @@ console_error_panic_hook = { version = "0.1", optional = true }
 # not used directly, needed to enable 'getrandom/js' for the 'wasm' feature
 getrandom = { version = "0.2", optional = true }
 
+bip39 = { version = "2.2", optional = true, features = [ "rand" ] }
 bitcoin-scriptexec = { git = "https://github.com/shesek/rust-bitcoin-scriptexec", rev = "ead5bfe4281b0d3f914bfdc2e45b0048e8feabad", optional = true }
 
 [features]
-default = ["scriptexec"]
+default = [ "scriptexec", "bip39" ]
 wasm = [ "wasm-bindgen", "getrandom", "getrandom/js" ] # wee_alloc? seems to result in larger files
 playground = [ "wasm", "serde", "wasm-bindgen/serde-serialize", "serde-wasm-bindgen", "console_error_panic_hook" ]
 scriptexec = [ "bitcoin-scriptexec" ]
+bip39-all-languages = [ "bip39", "bip39/all-languages" ]
 
 [lib]
 crate-type = ["cdylib", "lib"]

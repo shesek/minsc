@@ -6,6 +6,8 @@ use crate::stdlib;
 use crate::util::DescriptorSecretKeyExt;
 use crate::Library;
 
+#[cfg(feature = "bip39")]
+pub mod bip39;
 pub mod btc;
 pub mod crypto;
 pub mod ctv;
@@ -90,6 +92,8 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     ELEMENTS_STDLIB.exec(scope).unwrap(); // requires the 'btc' stdlib
     #[cfg(feature = "scriptexec")]
     self::scriptexec::attach_stdlib(scope);
+    #[cfg(feature = "bip39")]
+    self::bip39::attach_stdlib(scope);
 }
 
 #[allow(non_snake_case)]

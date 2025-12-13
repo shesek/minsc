@@ -1,0 +1,11 @@
+// Shorthand to either generate a random mnemonic or convert one to an Xpriv
+fn bip39($a=12, $b=testnet, $c="") {
+    if typeof($a) == "int" then bip39::rand($a)
+    else if typeof($a) == "string" then bip39::to_xpriv($a, $b, $c)
+    else throw("bip39() invalid arg: "+$a)
+}
+
+fn bip39::to_xpriv($mnemonic, $network=testnet, $passphrase="", $lang="english") =
+    xpriv::from_seed(bip39::to_seed($mnemonic, $passphrase, $lang), $network);
+
+xpriv::from_mnemonic = bip39::to_xpriv;
