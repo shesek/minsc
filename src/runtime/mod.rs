@@ -224,6 +224,10 @@ impl Evaluate for ast::ArrayAccess {
                 ensure!(index < bytes.len(), Error::ArrayIndexOutOfRange);
                 (bytes.remove(index) as i64).into()
             }
+            Value::String(string) => {
+                ensure!(index < string.len(), Error::ArrayIndexOutOfRange);
+                string[index..=index].into()
+            }
             Value::Descriptor(desc) if desc.is_multipath() => {
                 let mut single_descs = desc.into_single_descriptors()?;
                 ensure!(index < single_descs.len(), Error::ArrayIndexOutOfRange);

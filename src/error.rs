@@ -47,7 +47,7 @@ pub enum RuntimeError {
     NotArray(Box<Value>),
 
     #[error(
-        "Accessing by index is possible on Array, Bytes and multi-path Descriptors, not {}", ValErrFmt(.0)
+        "Accessing by index is possible on Array, Bytes, String and multi-path Descriptors/Policies/Keys, not {}", ValErrFmt(.0)
     )]
     NoArrayAccess(Box<Value>),
 
@@ -128,14 +128,11 @@ pub enum RuntimeError {
     #[error("Only integers can be interpolated as script fragments, received a float: {0:?}")]
     InvalidScriptFragIntOnly(f64),
 
-    #[error("Array index out of range")]
+    #[error("Array access index out of range")]
     ArrayIndexOutOfRange,
 
     #[error("Field does not exists: {}", ValErrFmt(.0))]
     FieldNotFound(Box<Value>),
-
-    #[error("Attempted to access an array field with multiple values: {} (can use `t::multi($arr, $field)` to get them as an array)", ValErrFmt(.0))]
-    FieldArrayTagDuplicated(Box<Value>),
 
     #[error("Required value missing")]
     MissingValue,
