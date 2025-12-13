@@ -381,6 +381,9 @@ pub enum RuntimeError {
     #[error("Hash error: {0}")]
     HashError(#[from] hashes::FromSliceError),
 
+    #[error("Hex error: {0}")]
+    HexToArrayError(#[from] hex::HexToArrayError),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

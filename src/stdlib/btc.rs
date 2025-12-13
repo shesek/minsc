@@ -227,6 +227,7 @@ pub mod fns {
         Ok(match args.arg_into()? {
             Value::Psbt(psbt) => psbt.unsigned_tx.compute_txid(),
             Value::Transaction(tx) => tx.compute_txid(),
+            Value::String(s) => s.parse()?,
             tx_like => Transaction::try_from(tx_like)?.compute_txid(),
         }
         .into())
@@ -464,6 +465,7 @@ impl TryFrom<Value> for Txid {
             Value::Transaction(tx) => tx.compute_txid(),
             // The psbt unsigned_tx's txid is useless if there are any non-segwit inputs. Use with care. Should probably check :>
             Value::Psbt(psbt) => psbt.unsigned_tx.compute_txid(),
+            Value::String(s) => s.parse()?,
             other => bail!(Error::NotTxidLike(other.into())),
         })
     }
@@ -519,7 +521,6 @@ impl_simple_to_value!(SignedAmount, amt, amt.to_sat());
 // which should be impossible to construct within Minsc (but can be passed from Rust code).
 // Uses to_signed() to convert from u64 to i64 with a useful OutOfRangeError message.
 impl_simple_to_value!(Amount, amt, amt.to_signed().unwrap());
-
 
 #[rustfmt::skip]
 impl_simple_to_value!(OutPoint, outpoint, (
@@ -922,12 +923,12 @@ impl PrettyDisplay for bitcoin::TxOut {
     const AUTOFMT_ENABLED: bool = false;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
-        match Address::from_script(&self.script_pubkey, Network::Testnet) {
-            // XXX always uses the Testnet version bytes
-            Ok(address) if address.address_type().is_some() => write!(f, "{}", address)?,
-            _ => write!(f, "{}", self.script_pubkey.pretty(None))?,
-        }
-        write!(f, ":{} BTC", self.value.to_btc())
+        write!(
+            f,
+            "{}:{} BTC",
+            self.script_pubkey.pretty(None),
+            self.value.to_btc()
+        )
     }
 }
 
@@ -940,6 +941,7 @@ impl PrettyDisplay for Address {
             write!(f, "{}", self)
         } else {
             // Otherwise, encode as a `address(scriptPubKey)` call
+            // FIXME does not include the network, not easily extractable from bitcoin::Address
             write!(f, "address({})", self.script_pubkey().pretty(None))
         }
     }
