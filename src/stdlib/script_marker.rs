@@ -1,12 +1,11 @@
 use std::{iter, str};
 
-use bitcoin::opcodes::all as ops;
+use bitcoin::opcodes::all::{OP_ENDIF, OP_NOTIF};
 use bitcoin::script::{Instruction, Instructions, Script, ScriptBuf};
-use miniscript::bitcoin;
 
 pub trait ScriptMarker {
     /// Iterate over Script, detecting and extracting script markers encoded
-    /// as PUSH(magic_bytes) OP_DROP PUSH(kind) OP_DROP PUSH(body) OP_DROP
+    /// as PUSH(magic_bytes) OP_NOTIF PUSH(kind) PUSH(body) OP_ENDIF
     fn iter_with_markers<'a, 'b>(&'a self, magic_bytes: &'b [u8]) -> MarkerIterator<'a, 'b>;
 
     /// Strip out script markers
@@ -58,108 +57,59 @@ impl<'a, 'b> Iterator for MarkerIterator<'a, 'b> {
     type Item = Result<MarkerItem<'a>, MarkerError>;
 
     fn next(&mut self) -> Option<Result<MarkerItem<'a>, MarkerError>> {
+        use Instruction as I;
+
         Some(match self.inner.next()? {
-            Err(e) => Err(MarkerError::InvalidScript(e)),
-            Ok(Instruction::PushBytes(push))
-                if push.as_bytes() == self.magic_bytes && next_is_drop(&mut self.inner) =>
+            // Look for a PUSH for the MAGIC_BYTES, followed by an OP_NOTIF
+            Ok(I::PushBytes(push))
+                if push.as_bytes() == self.magic_bytes
+                    && self.inner.next_if_eq(&Ok(I::Op(OP_NOTIF))).is_some() =>
             {
-                self.inner.next(); // consume the OP_DROP following the marker magic bytes
-                read_marker(&mut self.inner).map(MarkerItem::Marker)
+                // Extract the `kind` and optional `body` PUSH instructions
+                // Must be valid UTF-8 strings
+                let mut pushes = iter::from_fn(|| {
+                    let push_instruction =
+                        self.inner.next_if(|i| matches!(i, Ok(I::PushBytes(_))))?;
+                    let Ok(I::PushBytes(push)) = push_instruction else {
+                        unreachable!("checked by next_if()");
+                    };
+                    Some(str::from_utf8(push.as_bytes()).map_err(Into::into))
+                });
+                let kind = match pushes.next() {
+                    Some(Ok(kind)) => kind,
+                    Some(Err(err)) => return Some(Err(err)),
+                    None => return Some(Err(MarkerError::MissingPush)),
+                };
+                let body = match pushes.next() {
+                    Some(Ok(body)) => body,
+                    Some(Err(err)) => return Some(Err(err)),
+                    None => "",
+                };
+
+                // Verify the next opcode is an OP_ENDIF
+                if self.inner.next_if_eq(&Ok(I::Op(OP_ENDIF))).is_none() {
+                    return Some(Err(MarkerError::MissingEndIf));
+                }
+
+                Ok(MarkerItem::Marker(Marker { kind, body }))
             }
             Ok(instruction) => Ok(MarkerItem::Instruction(instruction)),
+            Err(e) => Err(MarkerError::InvalidScript(e)),
         })
-    }
-}
-
-fn next_is_drop(iter: &mut iter::Peekable<Instructions>) -> bool {
-    matches!(iter.peek(), Some(Ok(Instruction::Op(ops::OP_DROP))))
-}
-
-// Try to read the marker's contents following the marker magic PUSH-then-DROP (already read by now).
-// Instructions will be consumed from the iterator as long as they match the expected format.
-// The first non-matching instruction will result in an error, but remain available in the iterator
-// so that they can be included when encoding Script to a string.
-fn read_marker<'a>(
-    instructions: &mut iter::Peekable<Instructions<'a>>,
-) -> Result<Marker<'a>, MarkerError> {
-    let res = (|| {
-        let kind = str::from_utf8(read_pushdrop(instructions)?)?;
-        let body = str::from_utf8(read_pushdrop(instructions)?)?;
-        Ok(Marker { kind, body })
-    })();
-
-    // Consume errors emitted by the underlying Instructions iterator during marker parsing.
-    // Without this, MarkerIterator would emit these errors twice.
-    if let Err(MarkerError::InvalidMarkScript(_)) = res {
-        // I was not able to satisfy the borrow checker to handle this inside peek_next_instruction(),
-        // so this is done here instead.
-        let _ = instructions
-            .next()
-            .expect("was peeked at")
-            .expect_err("was an error");
-    }
-    res
-}
-
-// Look for PUSH followed by a DROP and consume them from the Instructions iterator.
-// Non-matching instructions will result in an error, but remain in the iterator.
-// Note: a PUSH followed by a non-DROP will leave the non-DROP but consume the PUSH.
-fn read_pushdrop<'a>(
-    instructions: &mut iter::Peekable<Instructions<'a>>,
-) -> Result<&'a [u8], MarkerError> {
-    match peek_next_instruction(instructions)? {
-        Instruction::PushBytes(push) => {
-            let push_data = push.as_bytes();
-            let _ = instructions.next().expect("just peeked at");
-            verify_drop(instructions)?;
-            Ok(push_data)
-        }
-        _ => Err(MarkerError::MissingPush),
-    }
-}
-
-// Verify that the next instruction is an OP_DROP and consume it
-fn verify_drop(instructions: &mut iter::Peekable<Instructions>) -> Result<(), MarkerError> {
-    match peek_next_instruction(instructions)? {
-        Instruction::Op(opcode) if *opcode == ops::OP_DROP => {
-            let _ = instructions.next().expect("just peeked at");
-            Ok(())
-        }
-        _ => Err(MarkerError::MissingDrop),
-    }
-}
-
-// Peek at the next instruction first, so that non-matching script instructions
-// are not prematurely consumed from the inner Instructions iterator.
-fn peek_next_instruction<'a, 'b>(
-    instructions: &'b mut iter::Peekable<Instructions<'a>>,
-) -> Result<&'b Instruction<'a>, MarkerError> {
-    match instructions.peek() {
-        Some(Ok(inst)) => Ok(inst),
-        Some(Err(e)) => Err(MarkerError::InvalidMarkScript(e.clone())),
-        None => Err(MarkerError::EarlyEos),
     }
 }
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum MarkerError {
-    #[error("ScriptMarker: Missing expected PUSH")]
+    #[error("ScriptMarker: Missing expected PUSH in NOTIF block")]
     MissingPush,
 
-    #[error("ScriptMarker: Missing expected DROP following PUSH")]
-    MissingDrop,
-
-    #[error("ScriptMarker: Unexpected end of script")]
-    EarlyEos,
+    #[error("ScriptMarker: Expected ENDIF after 1 or 2 pushes")]
+    MissingEndIf,
 
     #[error("ScriptMarker: UTF-8 Error: {0}")]
     Utf8Error(#[from] std::str::Utf8Error),
 
-    /// An invalid Script (e.g. out-of-bound PUSH) was detected following the magic marker
-    #[error("ScriptMarker: {0}")]
-    InvalidMarkScript(bitcoin::script::Error),
-
-    /// An invalid Script was detected, unrelated to the magic marker
     #[error(transparent)]
     InvalidScript(bitcoin::script::Error),
 }
