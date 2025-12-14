@@ -65,8 +65,8 @@ impl Array {
                 // Differentiating the two cases assumes that the value type *is not a number*
                 #[allow(clippy::get_first)]
                 match (first_el.get(0), first_el.get(1)) {
-                    (Some(Value::Number(_)), Some(Value::Number(_))) => (),
-                    (Some(Value::Number(_)), Some(_non_number)) => {
+                    (Some(Value::Int(_)), Some(Value::Int(_))) => (),
+                    (Some(Value::Int(_)), Some(_non_int)) => {
                         // Provided as [ 0: $val0, 1: $val1, ... ]
                         return self.try_into();
                     }
@@ -328,7 +328,7 @@ fn should_use_colon_syntax(elements: &[Value]) -> bool {
 
             // Otherwise, only if the LHS and RHS are of different types
             (
-                lhs @ (Bool(_) | Number(_) | Bytes(_) | Address(_) | PubKey(_) | SecKey(_)
+                lhs @ (Bool(_) | Int(_) | Float(_) | Bytes(_) | Address(_) | PubKey(_) | SecKey(_)
                 | Policy(_) | Descriptor(_) | TapInfo(_) | WshScript(_) | WithProb(..)
                 | Network(_) | Script(_)),
                 rhs,
@@ -351,8 +351,8 @@ fn colon_separator(elements: &[Value]) -> &str {
             _,
         ) => ": ",
         (_, Array(_)) => ": ",
-        (Number(_), Number(_)) => ":",
-        (Number(_), _) => ": ",
+        (Int(_), Int(_)) => ":",
+        (Int(_), _) => ": ",
         _ => ":",
     }
 }

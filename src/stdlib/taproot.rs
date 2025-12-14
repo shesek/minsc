@@ -438,7 +438,7 @@ impl TryFrom<Value> for taproot::LeafVersion {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
-            Value::Number(num) => Self::from_consensus(num.into_i64()?.try_into()?)?,
+            Value::Int(num) => Self::from_consensus(num.try_into()?)?,
             Value::Bytes(bytes) if bytes.len() == 1 => Self::from_consensus(bytes[0])?,
             other => bail!(Error::InvalidValue(other.into())),
         })

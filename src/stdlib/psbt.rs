@@ -11,9 +11,7 @@ use miniscript::descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
 use crate::display::{fmt_list, indentation_params, PrettyDisplay};
-use crate::runtime::{
-    Array, Error, FieldAccess, FromValue, Mutable, Number::Int, Result, ScopeRef, Value,
-};
+use crate::runtime::{Array, Error, FieldAccess, FromValue, Mutable, Result, ScopeRef, Value};
 use crate::util::{DescriptorExt, DescriptorPubKeyExt, PsbtInExt, PsbtOutExt, TapInfoExt, EC};
 
 use super::{btc::WshScript, keys::MasterXpriv};
@@ -450,7 +448,7 @@ impl TryFrom<Value> for PsbtTxIn {
         let mut prevout = None;
 
         let arr = value.into_array()?;
-        if arr.len() == 2 && arr[1].is_number() {
+        if arr.len() == 2 && arr[1].is_int() {
             // Tx input provided as a tuple of the tx:vout prevout
             prevout = Some(Value::Array(arr));
         } else {
@@ -474,10 +472,10 @@ impl TryFrom<Value> for PsbtTxIn {
         if let Value::Array(prevout_arr) = &prevout {
             if prevout_arr.len() == 2 {
                 match (&prevout_arr[0], &prevout_arr[1]) {
-                    (Value::Psbt(prev_psbt), Value::Number(vout)) => {
+                    (Value::Psbt(prev_psbt), Value::Int(vout)) => {
                         psbt_input.update_with_prevout_psbt(prev_psbt, (*vout).try_into()?)?;
                     }
-                    (Value::Transaction(prev_tx), Value::Number(vout)) => {
+                    (Value::Transaction(prev_tx), Value::Int(vout)) => {
                         psbt_input.update_with_prevout_tx(prev_tx, (*vout).try_into()?)?;
                     }
                     _ => {}
@@ -499,7 +497,7 @@ impl TryFrom<Value> for PsbtTxOut {
         let mut psbt_output_tags = Array(vec![]);
 
         let arr = value.into_array()?;
-        if arr.len() == 2 && arr.get(1).is_some_and(Value::is_number) {
+        if arr.len() == 2 && arr.get(1).is_some_and(Value::is_int) {
             // Tx output provided as a $scriptPubKeyLike:$amount tuple
             let (spk_like, amount): (Value, _) = arr.try_into()?;
 
@@ -722,7 +720,7 @@ impl TryFrom<Value> for psbt::PsbtSighashType {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
-            Value::Number(Int(num)) => Self::from_u32(num.try_into()?),
+            Value::Int(num) => Self::from_u32(num.try_into()?),
             Value::Bytes(bytes) if bytes.len() == 1 => Self::from_u32(bytes[0] as u32),
             Value::String(str) => str.parse()?,
             other => bail!(Error::PsbtInvalidSighashType(Box::new(other))),

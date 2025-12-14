@@ -51,8 +51,8 @@ pub fn eval_slash_bip32_derive(lhs: Value, rhs: &SlashRhs, scope: &ScopeRef) -> 
 
             match rhs_expr.eval(scope)? {
                 // Derive with a BIP 32 child code index number
-                Value::Number(child_num) => {
-                    lhs.derive_path(derivation_path(child_num.into_u32()?)?, Wildcard::None)
+                Value::Int(child_num) => {
+                    lhs.derive_path(derivation_path(child_num.try_into()?)?, Wildcard::None)
                 }
 
                 // Derive with a hash converted into a series of BIP32 non-hardened derivations using Sapio's hash_to_child_vec()

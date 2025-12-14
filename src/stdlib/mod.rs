@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{array, Array, Error, Execute, Number, Result, Symbol, Value};
+use crate::runtime::{array, value, Array, Error, Execute, Result, Symbol, Value};
 use crate::stdlib;
 use crate::util::DescriptorSecretKeyExt;
 use crate::Library;
@@ -111,7 +111,7 @@ pub mod fns {
         Ok(type_of.into())
     }
 
-    /// len(Array|Bytes|Script|String) -> Number
+    /// len(Array|Bytes|Script|String) -> Int
     pub fn len(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Array(array) => array.len(),
@@ -156,10 +156,10 @@ pub mod fns {
         Ok(accumlator)
     }
 
-    /// fillArray(Number, Value) -> Array
+    /// fillArray(Int, Value) -> Array
     /// Return an array of the specified size filled with copies of Value
     ///
-    /// fillArray(Number, Function) -> Array
+    /// fillArray(Int, Function) -> Array
     /// Return an array of the specified size, using the callback function to produce values
     pub fn fillArray(args: Array, scope: &ScopeRef) -> Result<Value> {
         let (num, producer): (usize, Value) = args.args_into()?;
@@ -175,26 +175,20 @@ pub mod fns {
 
     pub fn int(args: Array, _: &ScopeRef) -> Result<Value> {
         let num = match args.arg_into()? {
-            Value::Number(num) => match num {
-                Number::Int(n) => n,
-                Number::Float(f) if safe_f64_to_i64(f) => f as i64, // rounded down
-                Number::Float(_) => bail!(Error::Overflow),
-            },
+            Value::Int(n) => n,
+            Value::Float(f) => value::safe_f64_to_i64(f)?, // rounded down
             Value::String(str) => str.parse()?,
             Value::Bytes(bytes) => stdlib::btc::scriptnum_decode(&bytes)?,
             _ => bail!(Error::InvalidArguments),
         };
         Ok(num.into())
     }
-    fn safe_f64_to_i64(f: f64) -> bool {
-        f.is_finite() && f >= i64::MIN as f64 && f <= i64::MAX as f64
-    }
 
     pub fn float(args: Array, _: &ScopeRef) -> Result<Value> {
         let num: f64 = match args.arg_into()? {
-            // TryInto coerces ints into floats
-            Value::Number(num) => num.try_into()?,
-            Value::String(str) => str.parse()?,
+            Value::Float(f) => f,
+            Value::Int(i) => value::safe_i64_to_f64(i)?,
+            Value::String(s) => s.parse()?,
             _ => bail!(Error::InvalidArguments),
         };
         Ok(num.into())
@@ -225,7 +219,7 @@ pub mod fns {
         Ok(Value::Bytes(args.arg_into()?))
     }
 
-    /// le64(Number) -> Bytes
+    /// le64(Int) -> Bytes
     /// Encode 64-bit signed integers as little-endian bytes
     /// Matches the format used by Elements Script
     pub fn le64(args: Array, _: &ScopeRef) -> Result<Value> {

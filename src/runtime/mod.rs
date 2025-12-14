@@ -18,7 +18,7 @@ pub use array::Array;
 pub use display::PrettyDisplay;
 pub use function::{Call, Function};
 pub use scope::{Mutable, ReadOnly, Scope, ScopeRef};
-pub use value::{ExprRepr, FromValue, Number, Number::*, Symbol, Value};
+pub use value::{ExprRepr, FromValue, Symbol, Value};
 
 /// Evaluate an expression. Expressions have no side-effects and return a value.
 pub trait Evaluate {
@@ -279,9 +279,10 @@ impl Evaluate for ast::Not {
 
 impl Evaluate for ast::Negate {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        Ok(match self.0.eval(scope)?.try_into()? {
-            Number::Int(n) => (-n).into(),
-            Number::Float(n) => (-n).into(),
+        Ok(match self.0.eval(scope)? {
+            Value::Int(n) => (-n).into(),
+            Value::Float(n) => (-n).into(),
+            other => bail!(Error::NotNumber(other.into())),
         })
     }
 }
@@ -298,7 +299,7 @@ impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value, scope: &ScopeRef) -> Result<Value> {
         use ast::InfixOp::*;
         use Value::{
-            Array, Bytes, Number as Num, Policy, Psbt, PubKey, Script, SecKey, String, WithProb,
+            Array, Bytes, Float, Int, Policy, Psbt, PubKey, Script, SecKey, String, WithProb,
         };
 
         Ok(match (self, lhs, rhs) {
@@ -307,32 +308,30 @@ impl ast::InfixOp {
             (NotEq, a, b) => (a != b).into(),
 
             // < > <= >= for numbers (integers and floats cannot be mixed)
-            (Gt, Num(Int(a)), Num(Int(b))) => (a > b).into(),
-            (Lt, Num(Int(a)), Num(Int(b))) => (a < b).into(),
-            (Gte, Num(Int(a)), Num(Int(b))) => (a >= b).into(),
-            (Lte, Num(Int(a)), Num(Int(b))) => (a <= b).into(),
+            (Gt, Int(a), Int(b)) => (a > b).into(),
+            (Lt, Int(a), Int(b)) => (a < b).into(),
+            (Gte, Int(a), Int(b)) => (a >= b).into(),
+            (Lte, Int(a), Int(b)) => (a <= b).into(),
 
-            (Gt, Num(Float(a)), Num(Float(b))) => (a > b).into(),
-            (Lt, Num(Float(a)), Num(Float(b))) => (a < b).into(),
-            (Gte, Num(Float(a)), Num(Float(b))) => (a >= b).into(),
-            (Lte, Num(Float(a)), Num(Float(b))) => (a <= b).into(),
+            (Gt, Float(a), Float(b)) => (a > b).into(),
+            (Lt, Float(a), Float(b)) => (a < b).into(),
+            (Gte, Float(a), Float(b)) => (a >= b).into(),
+            (Lte, Float(a), Float(b)) => (a <= b).into(),
 
             // + - * / % ** for numbers (integers and floats cannot be mixed)
-            (Add, Num(Int(a)), Num(Int(b))) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
-            (Subtract, Num(Int(a)), Num(Int(b))) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
-            (Multiply, Num(Int(a)), Num(Int(b))) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
-            (Divide, Num(Int(a)), Num(Int(b))) => a.checked_div(b).ok_or(Error::Overflow)?.into(),
-            (Mod, Num(Int(a)), Num(Int(b))) => a.checked_rem(b).ok_or(Error::Overflow)?.into(),
-            (Power, Num(Int(a)), Num(Int(b))) => {
-                a.checked_pow(b.try_into()?).ok_or(Error::Overflow)?.into()
-            }
+            (Add, Int(a), Int(b)) => a.checked_add(b).ok_or(Error::Overflow)?.into(),
+            (Subtract, Int(a), Int(b)) => a.checked_sub(b).ok_or(Error::Overflow)?.into(),
+            (Multiply, Int(a), Int(b)) => a.checked_mul(b).ok_or(Error::Overflow)?.into(),
+            (Divide, Int(a), Int(b)) => a.checked_div(b).ok_or(Error::Overflow)?.into(),
+            (Mod, Int(a), Int(b)) => a.checked_rem(b).ok_or(Error::Overflow)?.into(),
+            (Power, Int(a), Int(b)) => a.checked_pow(b.try_into()?).ok_or(Error::Overflow)?.into(),
 
-            (Add, Num(Float(a)), Num(Float(b))) => (a + b).into(),
-            (Subtract, Num(Float(a)), Num(Float(b))) => (a - b).into(),
-            (Multiply, Num(Float(a)), Num(Float(b))) => (a * b).into(),
-            (Divide, Num(Float(a)), Num(Float(b))) => (a / b).into(),
-            (Mod, Num(Float(a)), Num(Float(b))) => (a % b).into(),
-            (Power, Num(Float(a)), Num(Float(b))) => a.powf(b).into(),
+            (Add, Float(a), Float(b)) => (a + b).into(),
+            (Subtract, Float(a), Float(b)) => (a - b).into(),
+            (Multiply, Float(a), Float(b)) => (a * b).into(),
+            (Divide, Float(a), Float(b)) => (a / b).into(),
+            (Mod, Float(a), Float(b)) => (a % b).into(),
+            (Power, Float(a), Float(b)) => a.powf(b).into(),
 
             // + for arrays, bytes and strings
             (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
@@ -358,18 +357,17 @@ impl ast::InfixOp {
             }
 
             // * to repeat script fragments
-            (Multiply, Script(s), Num(Int(n))) | (Multiply, Num(Int(n)), Script(s)) => {
+            (Multiply, Script(s), Int(n)) | (Multiply, Int(n), Script(s)) => {
                 stdlib::btc::repeat_script(s, n.try_into()?).into()
             }
 
             // @ to assign execution probabilities (Script/Policy, or a PubKey/SecKey coerced into a pk() Policy)
-            (Prob, Num(prob), v @ Policy(_) | v @ Script(_) | v @ PubKey(_) | v @ SecKey(_)) => {
-                WithProb(prob.into_usize()?, v.into())
+            (Prob, Int(prob), v @ Policy(_) | v @ Script(_) | v @ PubKey(_) | v @ SecKey(_)) => {
+                WithProb(prob.try_into()?, v.into())
             }
 
             // Specialized error for mixed-up number types
-            (_, lhs @ Num(Int(_)), rhs @ Num(Float(_)))
-            | (_, lhs @ Num(Float(_)), rhs @ Num(Int(_))) => {
+            (_, lhs @ Int(_), rhs @ Float(_)) | (_, lhs @ Float(_), rhs @ Int(_)) => {
                 bail!(Error::InfixOpMixedNum(lhs.into(), rhs.into()))
             }
 
@@ -385,13 +383,13 @@ impl Evaluate for ast::SlashOp {
 
         // Overloaded for number division and BIP32 derivation, depending on the LHS
         match self.lhs.eval(scope)? {
-            Value::Number(lhs) => {
+            lhs @ Value::Int(_) | lhs @ Value::Float(_) => {
                 let rhs = match &self.rhs {
                     SlashRhs::Expr(expr) => expr.eval(scope)?,
                     _ => bail!(Error::SlashUnexpectedBip32Mod), // BIP32 modifiers (', h and *) cannot be used with number division
                 };
                 InfixOp::Divide
-                    .apply(lhs.into(), rhs, scope)
+                    .apply(lhs, rhs, scope)
                     .map_err(|e| Error::InfixOpError(InfixOp::Divide, e.into()))
             }
             lhs => {
@@ -480,17 +478,17 @@ impl Evaluate for Expr {
             Expr::SlashOp(x) => x.eval(scope)?,
             Expr::Not(x) => x.eval(scope)?,
             Expr::Negate(x) => x.eval(scope)?,
-            Expr::BtcAmount(x) => x.eval(scope)?, // eval'd into a Number
-            Expr::Duration(x) => x.eval(scope)?,  // eval'd into a Number
+            Expr::BtcAmount(x) => x.eval(scope)?, // eval'd into an Int
+            Expr::Duration(x) => x.eval(scope)?,  // eval'd into an Int
 
             Expr::Address(x) => Value::Address(x.clone().assume_checked()),
             Expr::PubKey(x) => Value::PubKey(x.clone()),
             Expr::SecKey(x) => Value::SecKey(x.clone()),
             Expr::Bytes(x) => Value::Bytes(x.clone()),
             Expr::String(x) => Value::String(x.clone()),
-            Expr::Int(x) => Value::Number(Number::Int(*x)),
-            Expr::Float(x) => Value::Number(Number::Float(*x)),
-            Expr::DateTime(x) => Value::Number(x.timestamp().into()), // eval's as number
+            Expr::Int(x) => Value::Int(*x),
+            Expr::Float(x) => Value::Float(*x),
+            Expr::DateTime(x) => Value::Int(x.timestamp()),
         })
     }
 }

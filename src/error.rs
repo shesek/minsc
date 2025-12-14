@@ -55,7 +55,10 @@ pub enum RuntimeError {
     NotNumber(Box<Value>),
 
     #[error("Expected an integer, not {0:?}")]
-    NotInt(f64),
+    NotInt(Box<Value>),
+
+    #[error("Expected an float, not {0:?}")]
+    NotFloat(Box<Value>),
 
     #[error("Expected a boolean, not {}", ValErrFmt(.0))]
     NotBool(Box<Value>),

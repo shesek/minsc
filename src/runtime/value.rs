@@ -21,7 +21,8 @@ use stdlib::btc::WshScript;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Bool(bool),
-    Number(Number),
+    Int(i64),
+    Float(f64),
     String(String),
     Bytes(Vec<u8>),
     Array(Array),
@@ -45,14 +46,6 @@ pub enum Value {
     Symbol(Symbol),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Number {
-    Int(i64),
-    Float(f64),
-}
-impl_from_variant!(i64, Number, Int);
-impl_from_variant!(f64, Number, Float);
-
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Symbol {
     id: usize,
@@ -63,18 +56,10 @@ pub struct Symbol {
 // Value conversions
 //
 
-// From primitive types to Value
-impl_simple_to_value!(i64, n, Number::Int(n));
-impl_simple_to_value!(f64, n, Number::Float(n));
-impl_simple_to_value!(u32, n, n as i64);
-impl_simple_to_value!(i32, n, n as i64);
-impl_simple_to_value!(usize, n, i64::try_from(n).unwrap()); // XXX should not panic
-impl_simple_to_value!(&str, s, s.to_string());
-
 impl TryFrom<u64> for Value {
     type Error = Error;
     fn try_from(num: u64) -> Result<Self> {
-        Ok(Value::Number(Number::Int(num.try_into()?)))
+        Ok(Value::Int(num.try_into()?))
     }
 }
 
@@ -87,7 +72,8 @@ impl<T: Into<Array>> From<T> for Value {
 
 // From the underlying enum inner type to Value
 impl_from_variant!(bool, Value, Bool);
-impl_from_variant!(Number, Value);
+impl_from_variant!(i64, Value, Int);
+impl_from_variant!(f64, Value, Float);
 impl_from_variant!(String, Value);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(Symbol, Value);
@@ -103,59 +89,30 @@ impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
 impl_from_variant!(WshScript, Value);
 impl_from_variant!(Psbt, Value);
 
+// From primitive types to Value, with some conversion logic
+impl_simple_to_value!(u32, n, n as i64);
+impl_simple_to_value!(i32, n, n as i64);
+impl_simple_to_value!(usize, n, i64::try_from(n).unwrap()); // XXX should not panic
+impl_simple_to_value!(&str, s, s.to_string());
+
 // From Value to the underlying enum inner type
 // Simple extraction of the enum variant, with no specialized type coercion logic
 impl_simple_into_variant!(bool, Bool, into_bool, NotBool);
-impl_simple_into_variant!(Number, Number, into_number, NotNumber);
+impl_simple_into_variant!(i64, Int, into_i64, NotInt);
+impl_simple_into_variant!(f64, Float, into_f64, NotFloat);
 impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
 impl_simple_into_variant!(WshScript, WshScript, into_wsh_script, NotWshScript);
 impl_simple_into_variant!(Symbol, Symbol, into_symbol, NotSymbol);
 
-// From Value to f64 primitive, with auto-coercion for integers
-impl TryFrom<Value> for f64 {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<f64> {
-        value.into_number()?.try_into()
-    }
-}
-impl TryFrom<Number> for f64 {
-    type Error = Error;
-    fn try_from(value: Number) -> Result<f64> {
-        Ok(match value {
-            Number::Float(f) => f,
-            Number::Int(n) => {
-                let f = n as f64;
-                ensure!(f as i64 == n, Error::Overflow); // ensure it is within the representable f64 range (-2^53 to 2^53)
-                f
-            }
-        })
-    }
-}
-
 // From Value to primitive integer types, with no auto-coercion for floats
 macro_rules! impl_int_num_conv {
     ($type:ident, $fn_name:ident) => {
-        impl TryFrom<Number> for $type {
-            type Error = Error;
-            fn try_from(number: Number) -> Result<Self> {
-                Ok(match number {
-                    Number::Int(n) => n.try_into()?,
-                    Number::Float(f) => bail!(Error::NotInt(f)),
-                })
-            }
-        }
         impl TryFrom<Value> for $type {
             type Error = Error;
             fn try_from(value: Value) -> Result<Self> {
-                // Extract the Value::Number, then delegate to TryFrom<Number> above
-                value.into_number()?.try_into()
-            }
-        }
-        impl Number {
-            pub fn $fn_name(self) -> Result<$type> {
-                self.try_into()
+                Ok(value.into_i64()?.try_into()?)
             }
         }
         impl Value {
@@ -169,8 +126,8 @@ impl_int_num_conv!(u32, into_u32);
 impl_int_num_conv!(u64, into_u64);
 impl_int_num_conv!(usize, into_usize);
 impl_int_num_conv!(i32, into_i32);
-impl_int_num_conv!(i64, into_i64);
 impl_int_num_conv!(isize, into_isize);
+// i64 implemented above using impl_simple_into_variant()
 
 // From Value to Vec<u8>
 impl TryFrom<Value> for Vec<u8> {
@@ -185,7 +142,7 @@ impl TryFrom<Value> for Vec<u8> {
             Value::Psbt(psbt) => psbt.serialize(),
             Value::Transaction(tx) => bitcoin::consensus::serialize(&tx),
             // Use Script encoding for integers/booleans
-            Value::Number(Number::Int(num)) => stdlib::btc::scriptnum_encode(num),
+            Value::Int(num) => stdlib::btc::scriptnum_encode(num),
             Value::Bool(true) => vec![0x01],
             Value::Bool(false) => vec![],
             // XXX PubKey/SecKey not fully round-trip-able - only the key is encoded, without the bip32 `origin` field associated with it
@@ -312,8 +269,8 @@ impl Value {
             Value::Psbt(_) => "psbt",
             Value::Array(_) => "array",
             Value::Symbol(_) => "symbol",
-            Value::Number(Number::Int(_)) => "int",
-            Value::Number(Number::Float(_)) => "float",
+            Value::Int(_) => "int",
+            Value::Float(_) => "float",
         }
     }
 
@@ -327,8 +284,8 @@ impl Value {
     pub fn is_bool(&self) -> bool {
         matches!(self, Value::Bool(_))
     }
-    pub fn is_number(&self) -> bool {
-        matches!(self, Value::Number(_))
+    pub fn is_int(&self) -> bool {
+        matches!(self, Value::Int(_))
     }
     pub fn is_string(&self) -> bool {
         matches!(self, Value::String(_))
@@ -348,8 +305,24 @@ impl Value {
         Ok(self.into_u32()?.try_into()?)
     }
 
-    pub fn into_f64(self) -> Result<f64> {
-        self.try_into()
+    /// Get the inner Float, or convert Int to Float.
+    /// Ensures the conversion is safe.
+    pub fn cast_into_f64(self) -> Result<f64> {
+        Ok(match self {
+            Value::Float(f) => f,
+            Value::Int(i) => safe_i64_to_f64(i)?,
+            other => bail!(Error::NotNumber(other.into())),
+        })
+    }
+
+    /// Get the inner Int, or convert Float to Int (rounded down).
+    /// Ensures the conversion is safe.
+    pub fn cast_into_i64(self) -> Result<i64> {
+        Ok(match self {
+            Value::Int(i) => i,
+            Value::Float(f) => safe_f64_to_i64(f)?,
+            other => bail!(Error::NotNumber(other.into())),
+        })
     }
 
     pub fn into_bytes(self) -> Result<Vec<u8>> {
@@ -361,7 +334,7 @@ impl Value {
     }
 
     pub fn into_vec(self) -> Result<Vec<Value>> {
-        Ok(self.into_array()?.0)
+        Ok(self.into_array()?.into_inner())
     }
 
     /// Transform Array elements into a Vec<T> of any FromValue type
@@ -401,18 +374,6 @@ impl FromStr for Value {
     }
 }
 
-impl fmt::Display for Number {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Number::Int(n) => write!(f, "{}", n),
-            // Force decimal precision for round floats
-            // {:#} can do this too, but it also enables scientific notation which we want to avoid
-            Number::Float(n) if n.fract() == 0.0 => write!(f, "{:.1}", n),
-            Number::Float(n) => write!(f, "{}", n),
-        }
-    }
-}
-
 /// Round-trip-able string encoding as a Minsc expression that can be evaluated to reproduce the original Value.
 /// Used as the encoding format to pass around Values between the Minsc runtime and other runtimes (currently WASM/JS).
 pub trait ExprRepr {
@@ -431,8 +392,8 @@ impl ExprRepr for Value {
         match self {
             // For most types we can delegate to Display, which already is round-trip-able
             // (Symbols are encoded as their name, which is expected to be made round-trip-able)
-            Number(_) | Bool(_) | Bytes(_) | String(_) | Network(_) | Address(_) | Symbol(_)
-            | SecKey(_) | PubKey(_) | Policy(_) => write!(f, "{}", self),
+            Int(_) | Float(_) | Bool(_) | Bytes(_) | String(_) | Network(_) | Address(_)
+            | Symbol(_) | SecKey(_) | PubKey(_) | Policy(_) => write!(f, "{}", self),
 
             // These also have round-trip-able Display, but can be expressed more compactly/precisely for ExprRepr
             Transaction(tx) => write!(f, "tx(0x{})", bitcoin::consensus::serialize(tx).as_hex()),
@@ -484,6 +445,21 @@ impl FieldAccess for Value {
             _ => None,
         }
     }
+}
+
+pub fn safe_f64_to_i64(f: f64) -> Result<i64> {
+    ensure!(
+        f.is_finite() && f >= i64::MIN as f64 && f <= i64::MAX as f64,
+        Error::Overflow
+    );
+    // rounded down
+    Ok(f as i64)
+}
+
+pub fn safe_i64_to_f64(i: i64) -> Result<f64> {
+    let f = i as f64;
+    ensure!(f as i64 == i, Error::Overflow);
+    Ok(f)
 }
 
 // Symbol

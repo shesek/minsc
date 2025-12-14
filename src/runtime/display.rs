@@ -8,7 +8,8 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Mostly round-trip-able, see ExprRepr for a string representation that always is
         match self {
-            Value::Number(x) => write!(f, "{}", x),
+            Value::Int(x) => write!(f, "{}", x),
+            Value::Float(x) => fmt_float(f, *x),
             Value::Bool(x) => write!(f, "{}", x),
             Value::Bytes(x) => write!(f, "0x{}", x.as_hex()),
             Value::String(x) => fmt_quoted_str(f, x),
@@ -140,6 +141,16 @@ pub fn fmt_quoted_str<W: fmt::Write>(f: &mut W, str: &str) -> fmt::Result {
         };
     }
     write!(f, "\"")
+}
+
+fn fmt_float<W: fmt::Write>(f: &mut W, num: f64) -> fmt::Result {
+    // Force decimal precision for round floats
+    // {:#} can do this too, but it also enables scientific notation which we want to avoid
+    if num.fract() == 0.0 {
+        write!(f, "{:.1}", num)
+    } else {
+        write!(f, "{}", num)
+    }
 }
 
 pub fn quote_str(s: &str) -> String {

@@ -15,8 +15,7 @@ use miniscript::psbt::PsbtExt;
 use super::script_marker::{Marker, MarkerItem, ScriptMarker};
 use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::{
-    eval_exprs, Array, Error, Evaluate, Execute, FieldAccess, Float, Int, Mutable, Result,
-    ScopeRef, Value,
+    eval_exprs, Array, Error, Evaluate, Execute, FieldAccess, Mutable, Result, ScopeRef, Value,
 };
 use crate::util::{DescriptorExt, ScriptBuilderExt, TapInfoExt, EC};
 use crate::{ast, time, Library};
@@ -84,8 +83,8 @@ pub struct WshScript(pub ScriptBuf);
 
 impl Evaluate for ast::BtcAmount {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        let amount_n = self.0.eval(scope)?.into_f64()?;
-        Ok(SignedAmount::from_float_in(amount_n, self.1)?.into())
+        let amount = self.0.eval(scope)?.cast_into_f64()?;
+        Ok(SignedAmount::from_float_in(amount, self.1)?.into())
     }
 }
 
@@ -111,7 +110,7 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
         Value::Script(script) => script,
 
         // As data pushes
-        Value::Number(Int(n)) => push_int(n),
+        Value::Int(n) => push_int(n),
         Value::Bool(val) => push_int(val as i64),
         Value::Bytes(bytes) => push_slice(bytes)?,
         Value::String(string) => push_slice(string.into_bytes())?,
@@ -140,7 +139,7 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
             ScriptBuf::from(scriptbytes)
         }
 
-        Value::Number(Float(n)) => bail!(Error::InvalidScriptFragIntOnly(n)),
+        Value::Float(n) => bail!(Error::InvalidScriptFragIntOnly(n)),
         v => bail!(Error::InvalidScriptFrag(v.into())),
     })
     // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible
@@ -173,7 +172,7 @@ impl Evaluate for ast::Duration {
 
                 let time_parts = parts
                     .iter()
-                    .map(|(num, unit)| Ok((num.eval(scope)?.into_f64()?, *unit)))
+                    .map(|(num, unit)| Ok((num.eval(scope)?.cast_into_f64()?, *unit)))
                     .collect::<Result<Vec<_>>>()?;
 
                 time::relative_time_to_seq(&time_parts[..], *heightwise, block_interval)?
@@ -280,14 +279,14 @@ pub mod fns {
         .into())
     }
 
-    /// compactsize(Number) -> Bytes
+    /// compactsize(Int) -> Bytes
     /// Aliased as varint()
     pub fn compactsize(args: Array, _: &ScopeRef) -> Result<Value> {
         let varint = bitcoin::VarInt(args.arg_into()?);
         Ok(consensus::serialize(&varint).into())
     }
 
-    /// scriptnum(Number) -> Bytes
+    /// scriptnum(Int) -> Bytes
     pub fn scriptnum(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(scriptnum_encode(args.arg_into()?).into())
     }
@@ -493,7 +492,7 @@ impl TryFrom<Value> for Sequence {
     fn try_from(val: Value) -> Result<Self> {
         Ok(Sequence(match val {
             Value::Bytes(bytes) => u32::from_be_bytes(bytes.as_slice().try_into()?),
-            Value::Number(num) => num.into_u32()?,
+            Value::Int(num) => num.try_into()?,
             other => bail!(Error::InvalidValue(other.into())),
         }))
     }
