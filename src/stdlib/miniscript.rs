@@ -7,7 +7,7 @@ use miniscript::{DescriptorPublicKey, ForEachKey, MiniscriptKey, ScriptContext, 
 
 use crate::runtime::scope::{Mutable, ScopeRef};
 use crate::runtime::{Array, Error, Evaluate, ExprRepr, FieldAccess, PrettyDisplay, Result, Value};
-use crate::stdlib::{btc::WshScript, taproot::tap_scripts_to_val};
+use crate::stdlib::{btc::WshInfo, taproot::tap_scripts_to_val};
 use crate::util::{DeriveExt, DescriptorExt, DescriptorSecretKeyExt, MiniscriptExt, TapInfoExt};
 use crate::{ast, DescriptorDpk as Descriptor, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
 
@@ -174,7 +174,7 @@ pub mod fns {
 
     /// `wsh(Policy) -> Descriptor`
     /// `wsh(Array<tagged:sortedmulti>) -> Descriptor` (see `sortedmulti()`)
-    /// `wsh(Script witnessScript) -> WshScript`
+    /// `wsh(Script witnessScript) -> WshInfo`
     pub fn wsh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Policy(policy) => {
@@ -185,8 +185,8 @@ pub mod fns {
                 Descriptor::new_wsh_sortedmulti(thresh_k, pks)?.into()
             }
             // miniscript::Descriptor::Wsh cannot represent raw (non-Miniscript) Script,
-            // return a WshScript representation instead.
-            Value::Script(script) => WshScript(script).into(),
+            // return a WshInfo representation instead.
+            Value::Script(script) => WshInfo(script).into(),
             other => bail!(Error::InvalidValue(other.into())),
         })
     }
@@ -202,7 +202,7 @@ pub mod fns {
                 let (_tag, thresh_k, pks): (String, _, _) = arr.try_into()?;
                 Descriptor::new_sh_sortedmulti(thresh_k, pks)?
             }
-            // XXX Script in sh() is currently not supported (no WshScript-like structure)
+            // XXX Script in sh() is currently not supported (no WshInfo-like structure)
             other => bail!(Error::InvalidValue(other.into())),
         }
         .into())

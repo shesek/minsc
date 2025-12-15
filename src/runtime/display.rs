@@ -27,7 +27,7 @@ impl fmt::Display for Value {
             Value::Script(x) => write!(f, "{}", x.pretty(None)),
             Value::Address(x) => write!(f, "{}", x.pretty(None)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(None)),
-            Value::WshScript(x) => write!(f, "{}", x.pretty(None)),
+            Value::WshInfo(x) => write!(f, "{}", x.pretty(None)),
         }
     }
 }
@@ -45,7 +45,7 @@ impl PrettyDisplay for Value {
             Value::Transaction(x) => write!(f, "{}", x.pretty(indent)),
             Value::TapInfo(x) => write!(f, "{}", x.pretty(indent)),
             Value::Psbt(x) => write!(f, "{}", x.pretty(indent)),
-            Value::WshScript(x) => write!(f, "{}", x.pretty(indent)),
+            Value::WshInfo(x) => write!(f, "{}", x.pretty(indent)),
             Value::Descriptor(x) => write!(f, "{}", x.pretty(indent)),
 
             // Use Display for other types that don't implement PrettyDisplay

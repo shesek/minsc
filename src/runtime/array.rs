@@ -329,7 +329,7 @@ fn should_use_colon_syntax(elements: &[Value]) -> bool {
             // Otherwise, only if the LHS and RHS are of different types
             (
                 lhs @ (Bool(_) | Int(_) | Float(_) | Bytes(_) | Address(_) | PubKey(_) | SecKey(_)
-                | Policy(_) | Descriptor(_) | TapInfo(_) | WshScript(_) | WithProb(..)
+                | Policy(_) | Descriptor(_) | TapInfo(_) | WshInfo(_) | WithProb(..)
                 | Network(_) | Script(_)),
                 rhs,
             ) => mem::discriminant(lhs) != mem::discriminant(rhs),
@@ -347,7 +347,7 @@ fn colon_separator(elements: &[Value]) -> &str {
     match (&elements[0], &elements[1]) {
         (
             String(_) | PubKey(_) | SecKey(_) | Policy(_) | Script(_) | Descriptor(_) | TapInfo(_)
-            | WshScript(_) | Psbt(_) | Symbol(_),
+            | WshInfo(_) | Psbt(_) | Symbol(_),
             _,
         ) => ": ",
         (_, Array(_)) => ": ",

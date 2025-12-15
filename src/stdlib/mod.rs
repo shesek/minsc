@@ -104,7 +104,7 @@ pub mod fns {
 
     /// Get the argument type as a string
     /// One of: pubkey, seckey, int, float, bool, bytes, string, policy, withprob, descriptor,
-    /// address, script, transaction, function, network, tapinfo, wsh-script, psbt, array, symbol
+    /// address, script, transaction, function, network, tapinfo, wshinfo, psbt, array, symbol
     /// typeof(Value) -> String
     pub fn r#typeof(args: Array, _: &ScopeRef) -> Result<Value> {
         let type_of = args.arg_into::<Value>()?.type_of();

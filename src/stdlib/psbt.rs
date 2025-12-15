@@ -14,7 +14,7 @@ use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::{Array, Error, FieldAccess, FromValue, Mutable, Result, ScopeRef, Value};
 use crate::util::{DescriptorExt, DescriptorPubKeyExt, PsbtInExt, PsbtOutExt, TapInfoExt, EC};
 
-use super::{btc::WshScript, keys::MasterXpriv};
+use super::{btc::WshInfo, keys::MasterXpriv};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -282,7 +282,7 @@ fn update_psbt(psbt: &mut Psbt, tags: Array) -> Result<()> {
 fn update_input(input: &mut psbt::Input, tags: Array) -> Result<()> {
     let mut descriptor = None;
     let mut tapinfo = None;
-    let mut wshscript: Option<WshScript> = None;
+    let mut wshinfo: Option<WshInfo> = None;
     let mut utxo_amount = None;
     tags.for_each_unique_tag(|tag, val| {
         match tag {
@@ -309,7 +309,7 @@ fn update_input(input: &mut psbt::Input, tags: Array) -> Result<()> {
             "unknown" => input.unknown.append(&mut val.try_into()?),
             "non_witness_utxo" => input.non_witness_utxo = Some(val.try_into()?),
             "witness_utxo" | "utxo" => {
-                // If the UTXO was specified using a DescriptorTaprootSpendInfo/WshScript,
+                // If the UTXO was specified using a DescriptorTaprootSpendInfo/WshInfo,
                 // keep them to later also use them to populate the PSBT fields.
                 if let Value::Array(arr) = &val {
                     match arr.first() {
@@ -319,8 +319,8 @@ fn update_input(input: &mut psbt::Input, tags: Array) -> Result<()> {
                         Some(Value::TapInfo(tap)) if tapinfo.is_none() => {
                             tapinfo = Some(tap.clone())
                         }
-                        Some(Value::WshScript(wsh)) if wshscript.is_none() => {
-                            wshscript = Some(wsh.clone());
+                        Some(Value::WshInfo(wsh)) if wshinfo.is_none() => {
+                            wshinfo = Some(wsh.clone());
                         }
                         _ => {}
                     }
@@ -328,10 +328,10 @@ fn update_input(input: &mut psbt::Input, tags: Array) -> Result<()> {
                 input.witness_utxo = Some(val.try_into()?);
             }
 
-            // Keep the descriptor/tapinfo/wsh_script and amount fields to later construct the utxo and populate the PSBT fields
+            // Keep the descriptor/tapinfo/wshinfo and amount fields to later construct the utxo and populate the PSBT fields
             "descriptor" => descriptor = Some(val.try_into()?),
             "tap_info" => tapinfo = Some(val.try_into()?),
-            "wsh_script" => wshscript = Some(val.try_into()?),
+            "wshinfo" => wshinfo = Some(val.try_into()?),
             "amount" | "utxo_amount" => utxo_amount = Some(val.try_into()?),
 
             _ => bail!(Error::TagUnknown),
@@ -347,7 +347,7 @@ fn update_input(input: &mut psbt::Input, tags: Array) -> Result<()> {
     } else if let Some(tapinfo) = tapinfo {
         input.update_with_taproot(&tapinfo)?;
         utxo_spk = Some(tapinfo.script_pubkey());
-    } else if let Some(wsh) = wshscript {
+    } else if let Some(wsh) = wshinfo {
         utxo_spk = Some(wsh.script_pubkey());
         input.witness_script = Some(wsh.0);
     }
@@ -501,7 +501,7 @@ impl TryFrom<Value> for PsbtTxOut {
             // Tx output provided as a $scriptPubKeyLike:$amount tuple
             let (spk_like, amount): (Value, _) = arr.try_into()?;
 
-            // If the scriptPubKey was specified using a Descriptor/TaprootSpendInfo/WshScript, also use them to populate the PSBT fields
+            // If the scriptPubKey was specified using a Descriptor/TaprootSpendInfo/WshInfo, also use them to populate the PSBT fields
             match &spk_like {
                 Value::Descriptor(descriptor) => {
                     psbt_output.update_with_descriptor_unchecked(&descriptor.definite()?)?;
@@ -509,7 +509,7 @@ impl TryFrom<Value> for PsbtTxOut {
                 Value::TapInfo(tapinfo) => {
                     psbt_output.update_with_taproot(tapinfo)?;
                 }
-                Value::WshScript(wsh) => {
+                Value::WshInfo(wsh) => {
                     psbt_output.witness_script = Some(wsh.explicit_script());
                 }
                 _ => {}
@@ -528,7 +528,7 @@ impl TryFrom<Value> for PsbtTxOut {
                     "amount" => amount = Some(val.try_into()?),
                     "script_pubkey" => spk = Some(val.try_into()?),
 
-                    // Use the Descriptor/TaprootSpendInfo/WshScript to populate the PSBT fields and to construct the scriptPubKey
+                    // Use the Descriptor/TaprootSpendInfo/WshInfo to populate the PSBT fields and to construct the scriptPubKey
                     "descriptor" => {
                         let descriptor = val.try_into()?;
                         psbt_output.update_with_descriptor_unchecked(&descriptor)?;
@@ -539,8 +539,8 @@ impl TryFrom<Value> for PsbtTxOut {
                         psbt_output.update_with_taproot(&tapinfo)?;
                         spk.get_or_insert_with(|| tapinfo.script_pubkey());
                     }
-                    "wsh_script" => {
-                        let wsh: WshScript = val.try_into()?;
+                    "wshinfo" => {
+                        let wsh: WshInfo = val.try_into()?;
                         psbt_output.witness_script = Some(wsh.explicit_script());
                         spk.get_or_insert_with(|| wsh.script_pubkey());
                     }

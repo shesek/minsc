@@ -14,7 +14,7 @@ use crate::parser::Expr;
 use crate::runtime::{Array, Error, Evaluate, FieldAccess, Function, Result, Scope};
 use crate::util::EC;
 use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
-use stdlib::btc::WshScript;
+use stdlib::btc::WshInfo;
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -38,7 +38,7 @@ pub enum Value {
     Policy(Policy),
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
-    WshScript(WshScript),
+    WshInfo(WshInfo),
     Psbt(Psbt),
     WithProb(usize, Box<Value>), // Policy/Script with an associated execution probability (the `@` operator)
 
@@ -86,7 +86,7 @@ impl_from_variant!(Address, Value);
 impl_from_variant!(Network, Value);
 impl_from_variant!(Transaction, Value);
 impl_from_variant!(TaprootSpendInfo, Value, TapInfo);
-impl_from_variant!(WshScript, Value);
+impl_from_variant!(WshInfo, Value);
 impl_from_variant!(Psbt, Value);
 
 // From primitive types to Value, with some conversion logic
@@ -103,7 +103,7 @@ impl_simple_into_variant!(f64, Float, into_f64, NotFloat);
 impl_simple_into_variant!(Array, Array, into_array, NotArray);
 impl_simple_into_variant!(Function, Function, into_fn, NotFn);
 impl_simple_into_variant!(String, String, into_string, NotString);
-impl_simple_into_variant!(WshScript, WshScript, into_wsh_script, NotWshScript);
+impl_simple_into_variant!(WshInfo, WshInfo, into_wshinfo, NotWshInfo);
 impl_simple_into_variant!(Symbol, Symbol, into_symbol, NotSymbol);
 
 // From Value to primitive integer types, with no auto-coercion for floats
@@ -265,7 +265,7 @@ impl Value {
             Value::Function(_) => "function",
             Value::Network(_) => "network",
             Value::TapInfo(_) => "tapinfo",
-            Value::WshScript(_) => "wsh-script",
+            Value::WshInfo(_) => "wshinfo",
             Value::Psbt(_) => "psbt",
             Value::Array(_) => "array",
             Value::Symbol(_) => "symbol",
@@ -399,7 +399,7 @@ impl ExprRepr for Value {
             Transaction(tx) => write!(f, "tx(0x{})", bitcoin::consensus::serialize(tx).as_hex()),
             Script(script) => write!(f, "script(0x{})", script.as_bytes().as_hex()),
             Psbt(psbt) => write!(f, "psbt(0z{})", psbt),
-            WshScript(wsh) => write!(f, "wsh(script(0x{}))", wsh.0.as_bytes().as_hex()),
+            WshInfo(wsh) => write!(f, "wsh(script(0x{}))", wsh.0.as_bytes().as_hex()),
             TapInfo(tapinfo) => tapinfo.repr_fmt(f),
 
             // Descriptors require special handling when they have script paths (i.e. not (W)Pkh or script-less Tr)
@@ -439,7 +439,7 @@ impl FieldAccess for Value {
             Value::Descriptor(x) => x.get_field(field),
             Value::TapInfo(x) => x.get_field(field),
             Value::Address(x) => x.get_field(field),
-            Value::WshScript(x) => x.get_field(field),
+            Value::WshInfo(x) => x.get_field(field),
             Value::PubKey(x) => x.get_field(field),
             Value::SecKey(x) => x.get_field(field),
             _ => None,

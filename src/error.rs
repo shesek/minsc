@@ -84,8 +84,8 @@ pub enum RuntimeError {
     #[error("Expected a string, not {}", ValErrFmt(.0))]
     NotString(Box<Value>),
 
-    #[error("Expected a WshScript, not {}", ValErrFmt(.0))]
-    NotWshScript(Box<Value>),
+    #[error("Expected a WshInfo, not {}", ValErrFmt(.0))]
+    NotWshInfo(Box<Value>),
 
     #[error("Expected a Symvol, not {}", ValErrFmt(.0))]
     NotSymbol(Box<Value>),

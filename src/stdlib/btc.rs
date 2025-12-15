@@ -79,7 +79,7 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 
 /// A 'descriptor-like' for raw (non-Miniscript) Script in wsh() (cannot be represented as a miniscript::Descriptor)
 #[derive(Clone, Debug, PartialEq)]
-pub struct WshScript(pub ScriptBuf);
+pub struct WshInfo(pub ScriptBuf);
 
 impl Evaluate for ast::BtcAmount {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
@@ -266,14 +266,14 @@ pub mod fns {
         Ok(spk.into())
     }
 
-    /// explicitScript(Descriptor|WshScript) -> Script
+    /// explicitScript(Descriptor|WshInfo) -> Script
     /// Get the underlying Script before any hashing is done - AKA the witnessScript for Wsh,
     /// scriptPubKey for Wpkh, or the redeemScript for ShWpkh. Tr descriptors don't have an explicitScript.
     /// To get the scriptPubKey of descriptors, use scriptPubKey().
     pub fn explicitScript(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Descriptor(desc) => desc.to_explicit_script()?,
-            Value::WshScript(wsh) => wsh.0,
+            Value::WshInfo(wsh) => wsh.0,
             other => bail!(Error::InvalidValue(other.into())),
         }
         .into())
@@ -325,10 +325,10 @@ impl Value {
         Ok(match self {
             // Raw scripts are returned as-is
             Value::Script(script) => script,
-            // Descriptors/Addresses/WshScript are converted into their scriptPubKey
+            // Descriptors/Addresses/WshInfo are converted into their scriptPubKey
             Value::Descriptor(descriptor) => descriptor.to_script_pubkey()?,
             Value::Address(address) => address.script_pubkey(),
-            Value::WshScript(wsh) => wsh.0.to_p2wsh(),
+            Value::WshInfo(wsh) => wsh.0.to_p2wsh(),
             // TapInfo returns the V1 witness program of the output key
             Value::TapInfo(tapinfo) => tapinfo.script_pubkey(),
             other => bail!(Error::NoSpkRepr(other.into())),
@@ -642,7 +642,7 @@ impl FieldAccess for ScriptBuf {
     }
 }
 
-impl FieldAccess for WshScript {
+impl FieldAccess for WshInfo {
     fn get_field(self, field: &Value) -> Option<Value> {
         Some(match field.as_str()? {
             "script_pubkey" => self.script_pubkey().into(),
@@ -657,7 +657,7 @@ impl FieldAccess for WshScript {
     }
 }
 
-impl WshScript {
+impl WshInfo {
     pub fn script_pubkey(&self) -> ScriptBuf {
         self.0.to_p2wsh()
     }
@@ -987,7 +987,7 @@ impl PrettyDisplay for AbsLockTime {
     }
 }
 
-impl PrettyDisplay for WshScript {
+impl PrettyDisplay for WshInfo {
     const AUTOFMT_ENABLED: bool = false;
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, indent: Option<usize>) -> fmt::Result {
         write!(f, "wsh({})", self.0.pretty(indent))
