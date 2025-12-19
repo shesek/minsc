@@ -10,7 +10,7 @@ use bitcoin::{hashes, secp256k1, PrivateKey, PublicKey, TxIn, TxOut, XOnlyPublic
 use miniscript::descriptor::{DescriptorPublicKey, DescriptorSecretKey};
 use miniscript::psbt::{PsbtExt, PsbtInputExt, PsbtOutputExt};
 
-use crate::display::{fmt_list, indentation_params, PrettyDisplay};
+use crate::display::{fmt_list, indentation_params, quote_str, PrettyDisplay};
 use crate::runtime::{Array, Error, FieldAccess, FromValue, Mutable, Result, ScopeRef, Value};
 use crate::util::{DescriptorExt, DescriptorPubKeyExt, PsbtInExt, PsbtOutExt, TapInfoExt, EC};
 
@@ -854,12 +854,13 @@ impl From<psbt::Output> for Value {
 
 impl_simple_to_value!(psbt::PsbtSighashType, ty, ty.to_u32());
 impl_simple_to_value!(raw::Key, k, (k.type_value as i64, k.key));
-impl_simple_to_value!(raw::ProprietaryKey, k, (k.prefix, k.subtype as i64, k.key));
+#[rustfmt::skip]
+impl_simple_to_value!(raw::ProprietaryKey, k,
+    (String::from_utf8_lossy(&k.prefix).into_owned(), k.subtype as i64, k.key));
 impl_simple_to_value!(psbt::SignError, e, e.to_string());
 impl_simple_to_value!(miniscript::psbt::PsbtSighashMsg, msg, msg.to_secp_msg());
-impl_simple_to_value!(
-    SigningKeys,
-    pks,
+#[rustfmt::skip]
+impl_simple_to_value!(SigningKeys, pks,
     match pks {
         SigningKeys::Ecdsa(pks) => Value::from(pks),
         SigningKeys::Schnorr(pks) => Value::from(pks),
@@ -991,13 +992,13 @@ impl_simple_pretty!(raw::Key, k, "[{}, 0x{}]", k.type_value, k.key.as_hex());
 impl_simple_pretty!(
     raw::ProprietaryKey,
     k,
-    "[0x{}, {}, 0x{}]",
-    k.prefix.as_hex(),
+    "[{}, {}, 0x{}]",
+    quote_str(&String::from_utf8_lossy(&k.prefix)),
     k.subtype,
     k.key.as_hex()
 );
 impl_simple_pretty!(
-    &bip32::KeySource,
+    bip32::KeySource,
     (fp, path),
     "{}{}{}",
     fp,
