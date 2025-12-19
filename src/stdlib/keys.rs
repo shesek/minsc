@@ -168,7 +168,7 @@ pub mod fns {
                     .expect("must exists for DPK::Xpub");
                 DescriptorPublicKey::Single(SinglePub {
                     key: SinglePubKey::FullKey(derived_pk.into()),
-                    origin: Some((pk.master_fingerprint(), full_path)),
+                    origin: (!full_path.is_empty()).then(|| (pk.master_fingerprint(), full_path)),
                 })
                 .into()
             }
@@ -183,7 +183,7 @@ pub mod fns {
                     .expect("must exists for DPK::Xprv");
                 DescriptorSecretKey::Single(SinglePriv {
                     key: bitcoin::PrivateKey::new(derived_sk, xpriv.xkey.network),
-                    origin: Some((sk.master_fingerprint(), full_path)),
+                    origin: (!full_path.is_empty()).then(|| (sk.master_fingerprint(), full_path)),
                 })
                 .into()
             }
@@ -208,10 +208,10 @@ pub mod fns {
                     .full_derivation_path()
                     .expect("must exists for DPK::Xpub");
                 DescriptorPublicKey::XPub(DescriptorXKey {
+                    origin: (!full_path.is_empty()).then(|| (pk.master_fingerprint(), full_path)),
                     xkey: derived_xpub,
                     derivation_path: DerivationPath::master(),
                     wildcard: xpub.wildcard,
-                    origin: Some((pk.master_fingerprint(), full_path)),
                 })
                 .into()
             }
@@ -222,10 +222,10 @@ pub mod fns {
                     .full_derivation_path()
                     .expect("must exists for DPK::Xprv");
                 DescriptorSecretKey::XPrv(DescriptorXKey {
+                    origin: (!full_path.is_empty()).then(|| (sk.master_fingerprint(), full_path)),
                     xkey: derived_xpriv,
                     derivation_path: DerivationPath::master(),
                     wildcard: xprv.wildcard,
-                    origin: Some((sk.master_fingerprint(), full_path)),
                 })
                 .into()
             }
