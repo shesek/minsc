@@ -182,7 +182,7 @@ pub mod fns {
                     .full_derivation_path()
                     .expect("must exists for DPK::Xprv");
                 DescriptorSecretKey::Single(SinglePriv {
-                    key: bitcoin::PrivateKey::new(derived_sk, Network::Testnet), // XXX always uses Testnet
+                    key: bitcoin::PrivateKey::new(derived_sk, xpriv.xkey.network),
                     origin: Some((sk.master_fingerprint(), full_path)),
                 })
                 .into()
