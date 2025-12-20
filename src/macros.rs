@@ -122,20 +122,29 @@ macro_rules! fmt_field {
 }
 
 macro_rules! fmt_opt_field {
-    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident, $($arg:tt)*) => {
+    // Explicit name + explicit format
+    ($self:ident, $field:ident as $name:expr, $f:ident, $sep:expr, $is_first:ident, $($arg:tt)+) => {
         if let Some($field) = &$self.$field {
             if $is_first {
                 $is_first = false;
             } else {
                 write!($f, ",")?;
             }
-            write!($f, "{}\"{}\": ", $sep, stringify!($field))?;
-            write!($f, $($arg)*)?;
+            write!($f, "{}\"{}\": ", $sep, $name)?;
+            write!($f, $($arg)+)?;
         }
     };
-    // Format using the field's Display by default
+    // Explicit name, default Display format
+    ($self:ident, $field:ident as $name:expr, $f:ident, $sep:expr, $is_first:ident) => {
+        fmt_opt_field!($self, $field as $name, $f, $sep, $is_first, "{}", $field);
+    };
+    // Default name, explicit format
+    ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident, $($arg:tt)+) => {
+        fmt_opt_field!($self, $field as stringify!($field), $f, $sep, $is_first, $($arg)+);
+    };
+    // Default name and default Display format
     ($self:ident, $field:ident, $f:ident, $sep:expr, $is_first:ident) => {
-        fmt_opt_field!($self, $field, $f, $sep, $is_first, "{}", $field)
+        fmt_opt_field!($self, $field, $f, $sep, $is_first, "{}", $field);
     };
 }
 

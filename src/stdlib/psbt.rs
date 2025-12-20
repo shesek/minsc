@@ -308,7 +308,7 @@ fn update_input(input: &mut psbt::Input, tags: Array) -> Result<()> {
             "proprietary" => input.proprietary.append(&mut val.try_into()?),
             "unknown" => input.unknown.append(&mut val.try_into()?),
             "non_witness_utxo" => input.non_witness_utxo = Some(val.try_into()?),
-            "witness_utxo" | "utxo" => {
+            "utxo" | "witness_utxo" => {
                 // If the UTXO was specified using a DescriptorTaprootSpendInfo/WshInfo,
                 // keep them to later also use them to populate the PSBT fields.
                 if let Value::Array(arr) = &val {
@@ -837,7 +837,10 @@ impl From<psbt::Input> for Value {
     #[rustfmt::skip]
     fn from(input: psbt::Input) -> Self {
         let mut tags = Vec::with_capacity(21);
-        add_opt_tags!(input, tags, witness_utxo, non_witness_utxo, sighash_type, redeem_script, witness_script, tap_key_sig, tap_internal_key, tap_merkle_root, final_script_sig, final_script_witness);
+        add_opt_tags!(input, tags, non_witness_utxo, sighash_type, redeem_script, witness_script, tap_key_sig, tap_internal_key, tap_merkle_root, final_script_sig, final_script_witness);
+        if let Some(utxo) = input.witness_utxo {
+            tags.push(("utxo", utxo).into());
+        }
         add_tags!(input, tags, partial_sigs, tap_scripts, tap_script_sigs, tap_key_origins, ripemd160_preimages, sha256_preimages, hash160_preimages, hash256_preimages, bip32_derivation, unknown, proprietary);
         Value::array(tags)
     }
@@ -913,8 +916,8 @@ impl PrettyDisplay for psbt::Input {
         let mut is_first = true;
 
         write!(f, "[")?;
+        fmt_opt_field!(self, witness_utxo as "utxo", f, sep, is_first, "{}", witness_utxo.pretty(None));
         fmt_opt_field!(self, non_witness_utxo, f, sep, is_first, "{}", non_witness_utxo.pretty(None));
-        fmt_opt_field!(self, witness_utxo, f, sep, is_first, "{}", witness_utxo.pretty(None));
 
         fmt_map_field!(self, partial_sigs, f, sep, is_first, inner_indent,
             |f, (pk, sig), _| write!(f, "{}: 0x{}", pk, sig));
