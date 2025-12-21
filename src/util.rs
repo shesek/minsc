@@ -488,6 +488,8 @@ pub trait DescriptorExt {
     /// Returna an Ok(None) for non-Taproot descriptors, or an Err for Taproot
     /// descriptors that are not definite (contain underived wildcards).
     fn tap_info(&self) -> Result<Option<Arc<TaprootSpendInfo>>>;
+
+    fn address_type(&self) -> Option<bitcoin::AddressType>;
 }
 
 impl DescriptorExt for Descriptor<DescriptorPublicKey> {
@@ -519,6 +521,20 @@ impl DescriptorExt for Descriptor<DescriptorPublicKey> {
         } else {
             Ok(None)
         }
+    }
+
+    fn address_type(&self) -> Option<bitcoin::AddressType> {
+        use {bitcoin::AddressType::*, descriptor::DescriptorType::*};
+        Some(match self.desc_type() {
+            Tr => P2tr,
+            Wpkh => P2wpkh,
+            Wsh | WshSortedMulti => P2wsh,
+            Pkh => P2pkh,
+            Sh | ShWpkh | ShWsh | ShSortedMulti | ShWshSortedMulti => P2sh,
+            Bare => {
+                return None;
+            }
+        })
     }
 }
 

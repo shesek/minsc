@@ -283,6 +283,7 @@ impl FieldAccess for Descriptor {
     fn get_field(self, field: &Value) -> Option<Value> {
         Some(match field.as_str()? {
             "descriptor_type" => self.desc_type().into(),
+            "address_type" => self.address_type()?.into(), // not available for Bare
             "max_weight" => self.max_weight_to_satisfy().ok()?.into(),
             "singles" => self.into_single_descriptors().ok()?.into(),
             "is_safe" => self.sanity_check().is_ok().into(),
@@ -308,7 +309,7 @@ impl FieldAccess for Descriptor {
             "script_tree" => self.tap_info().ok()??.script_tree()?.into(),
             _ => {
                 return None;
-            } // TODO address_type
+            }
         })
     }
 }
