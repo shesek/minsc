@@ -64,10 +64,12 @@ fn unset($tagged, $keys) = filter($tagged, |[$k, _]| !contains($keys, $k));
 update = set, remove = unset;
 
 // Numeric
+_ZEROS = [ "int": 0, "float": 0.0 ];
 fn max($a, $b) = if $a>$b then $a else $b;
 fn min($a, $b) = if $a<$b then $a else $b;
-fn abs($n) = if $n < 0 then -$n else $n;
-fn sum($nums) = concat([0]+$nums);
+fn abs($n) = if $n < _ZEROS->{typeof($n)} then -$n else $n;
+fn sum($ints) = concat([0]+$ints);
+fn fsum($floats) = concat([0.0]+$floats);
 
 // Null handling utilities
 fn mapNullable($value, $fn, $default=null) = if $value != null then $fn($value) else $default;
