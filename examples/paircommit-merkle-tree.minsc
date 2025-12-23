@@ -26,7 +26,7 @@ fn merklize($elements) {
     $left_size = len($elements) / 2;
     $left = merklize(slice($elements, 0, $left_size));
     $right = merklize(slice($elements, $left_size));
-    $depth = max($left->depth, $right->depth)+1;
+    $depth = max[$left->depth, $right->depth]+1;
     $branch_hash = PairCommit($left->hash, $right->hash);
     [ "hash": $branch_hash, "depth": $depth, "left": $left, "right": $right ]
   }

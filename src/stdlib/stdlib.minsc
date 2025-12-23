@@ -65,9 +65,9 @@ update = set, remove = unset;
 
 // Numeric
 _ZEROS = [ "int": 0, "float": 0.0 ];
-fn max($a, $b) = if $a>$b then $a else $b;
-fn min($a, $b) = if $a<$b then $a else $b;
 fn abs($n) = if $n < _ZEROS->{typeof($n)} then -$n else $n;
+fn max($nums) = reduce($nums, |$a, $b| if $a>$b then $a else $b);
+fn min($nums) = reduce($nums, |$a, $b| if $a<$b then $a else $b);
 fn sum($ints) = concat([0]+$ints);
 fn fsum($floats) = concat([0.0]+$floats);
 
