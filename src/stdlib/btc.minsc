@@ -42,9 +42,11 @@ TR_UNSPENDABLE = NUMS;
 TR_ANNEX_BYTE = 0x50;
 
 // Create the witness stack for a Taproot script-path spend
-fn tr::script_witness($tr, $script, $stack=[], $annex=null) =
+fn tr::script_witness($tr, $script_or_policy, $stack=[], $annex=null) {
+  $script = if typeof($script_or_policy) == "policy" then tapscript($script_or_policy) else $script_or_policy;
   $stack + [ $script, tr::ctrl($tr, $script) ]
-  + (if $annex != null then [ TR_ANNEX_BYTE + $annex ] else []);
+  + (if $annex != null then [ TR_ANNEX_BYTE + $annex ] else [])
+}
 
 //
 // Transactions
