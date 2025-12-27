@@ -9,7 +9,7 @@ use bitcoin::{taproot, ScriptBuf, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey};
 use taproot::{ControlBlock, LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 
-use super::miniscript::{multi_andor, AndOr};
+use super::policy::{multi_andor, AndOr};
 use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Array, Error, FieldAccess, Result, Value};

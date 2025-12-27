@@ -11,8 +11,9 @@ pub mod bip39;
 pub mod btc;
 pub mod crypto;
 pub mod ctv;
+pub mod descriptors;
 pub mod keys;
-pub mod miniscript;
+pub mod policy;
 pub mod psbt;
 pub mod script_marker;
 #[cfg(feature = "scriptexec")]
@@ -85,10 +86,11 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     self::crypto::attach_stdlib(scope);
     self::keys::attach_stdlib(scope);
     self::btc::attach_stdlib(scope); // requires the 'keys' stdlib
-    self::ctv::attach_stdlib(scope); // requires the 'btc' stdlib
-    self::miniscript::attach_stdlib(scope);
+    self::descriptors::attach_stdlib(scope);
+    self::policy::attach_stdlib(scope);
     self::psbt::attach_stdlib(scope);
     self::taproot::attach_stdlib(scope);
+    self::ctv::attach_stdlib(scope); // requires the 'btc' stdlib
     ELEMENTS_STDLIB.exec(scope).unwrap(); // requires the 'btc' stdlib
     #[cfg(feature = "scriptexec")]
     self::scriptexec::attach_stdlib(scope);
