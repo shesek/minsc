@@ -28,7 +28,7 @@ impl_from_variant!(ParseError, Error, Parse);
 
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeError {
-    #[error("Variables are immutable, cannot assign over {0}")]
+    #[error("Variables are immutable, cannot reassign over {0}")]
     AssignedVariableExists(Ident),
 
     #[error("Undefined variable: {0}")]
@@ -47,7 +47,7 @@ pub enum RuntimeError {
     NotArray(Box<Value>),
 
     #[error(
-        "Accessing by index is possible on Array, Bytes, String and multi-path Descriptors/Policies/Keys, not {}", ValErrFmt(.0)
+        "Accessing by index is possible on Array, Bytes, String and multi-path Descriptors/Keys, not {}", ValErrFmt(.0)
     )]
     NoArrayAccess(Box<Value>),
 
@@ -213,10 +213,13 @@ pub enum RuntimeError {
     #[error("Unexpected multi-path Xpub, only single-path Xpubs or single keys are accepted")]
     InvalidMultiXpub,
 
+    #[error("Invalid multi-path derivation with empty paths array")]
+    EmptyMultiPathPaths,
+
     #[error("Policy probabilities are only supported for OR with 2 branches")]
     InvalidPolicyProb,
 
-    #[error("Script probabilities are not supported in explicit tree structure")]
+    #[error("Script probabilities cannot be used with an explicit Taproot tree structure")]
     InvalidScriptProb,
 
     // Can be removed once this is handled as an Err by rust-miniscript (https://github.com/rust-bitcoin/rust-miniscript/pull/761)

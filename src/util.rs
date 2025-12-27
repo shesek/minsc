@@ -618,9 +618,22 @@ impl DeriveExt for DescriptorPublicKey {
     }
 
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
+        ensure!(!paths.is_empty(), Error::EmptyMultiPathPaths);
+        ensure!(
+            wildcard != Wildcard::Hardened,
+            Error::XpubHardenedDerivation
+        );
+
         let paths = paths
             .iter()
-            .map(|p| Ok(p.clone().into_derivation_path()?))
+            .map(|p| {
+                let p = p.clone().into_derivation_path()?;
+                ensure!(
+                    p.into_iter().all(|c| c.is_normal()),
+                    Error::XpubHardenedDerivation
+                );
+                Ok(p)
+            })
             .collect::<Result<Vec<_>>>()?;
 
         let parent_paths = self.derivation_paths();
@@ -675,6 +688,7 @@ impl DeriveExt for DescriptorSecretKey {
     }
 
     fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
+        ensure!(!paths.is_empty(), Error::EmptyMultiPathPaths);
         let paths = paths
             .iter()
             .map(|p| Ok(p.clone().into_derivation_path()?))
