@@ -86,5 +86,4 @@ fn _tx_exec_opt($tx, $input_index, $utxos, $opt=[]) {
   [ $script, $opt ]
 }
 // TODO support non-Script verification for P2(W)PKH and keypath P2TR?
-// TODO script Options
 // TODO annex support

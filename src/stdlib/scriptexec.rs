@@ -60,6 +60,7 @@ fn init_exec(args: Array) -> Result<Exec> {
         TapLeafHash::from_script(&script, LeafVersion::TapScript), // XXX can skip for non-tapscript ctx
         None,
     );
+    let mut exec_opt = Options::default();
 
     match opt {
         // Provided as a tagged array with named fields
@@ -71,6 +72,7 @@ fn init_exec(args: Array) -> Result<Exec> {
                     "tx" => tx = Some(val.try_into()?),
                     "utxos" => prevouts = val.try_into()?,
                     "input_index" => input_idx = val.try_into()?,
+
                     "psbt" => {
                         let psbt = Psbt::try_from(val)?;
                         prevouts = psbt
@@ -79,8 +81,17 @@ fn init_exec(args: Array) -> Result<Exec> {
                             .collect::<Result<_>>()?;
                         tx = Some(psbt.unsigned_tx);
                     }
+
                     "script_leaf" => scriptleaf_annex.0 = val.try_into()?,
                     "annex" => scriptleaf_annex.1 = Some(val.try_into()?),
+
+                    "verify_minimal_push" => exec_opt.require_minimal = val.try_into()?,
+                    "verify_minimal_if" => exec_opt.verify_minimal_if = val.try_into()?,
+                    "verify_csv" => exec_opt.verify_csv = val.try_into()?,
+                    "verify_cltv" => exec_opt.verify_cltv = val.try_into()?,
+                    "enforce_stack_limit" => exec_opt.enforce_stack_limit = val.try_into()?,
+                    "enable_op_cat" => exec_opt.experimental.op_cat = val.try_into()?,
+
                     _ => bail!(Error::TagUnknown),
                 }
                 Ok(())
@@ -99,7 +110,7 @@ fn init_exec(args: Array) -> Result<Exec> {
 
     Ok(Exec::new(
         ctx,
-        Options::default(), // TODO make Options configurable
+        exec_opt,
         TxTemplate {
             tx: tx.unwrap_or_else(|| Transaction {
                 version: bitcoin::transaction::Version::TWO,
