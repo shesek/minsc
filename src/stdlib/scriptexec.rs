@@ -51,7 +51,7 @@ pub mod fns {
 fn init_exec(args: Array) -> Result<Exec> {
     let (script, opt, ctx): (ScriptBuf, _, Option<_>) = args.args_into()?;
 
-    let mut ctx = ctx.unwrap_or(ExecCtx::Tapscript); // TODO auto-detect `ctx` based on prevout/input
+    let mut ctx = ctx.unwrap_or(ExecCtx::Tapscript);
     let mut tx = None;
     let mut stack = vec![];
     let mut prevouts = vec![];
@@ -232,7 +232,14 @@ impl_simple_to_value!(ExecutionResult, res, {
 });
 
 impl_simple_to_value!(ExecError, e, format!("{:?}", e));
-impl_simple_to_value!(Stack, s, s.iter_str().collect::<Vec<_>>());
+
+#[rustfmt::skip]
+impl_simple_to_value!(Stack, s, s.iter_str().map(|e| match e.len() {
+    0 => 0.into(), // empty byte array is 0, return as integer
+    1 if e[0] == 0 => e.into(), // 0x00 is a NOT a 0, return as bytes
+    1 if e[0] <= 16 => (e[0] as i64).into(),  // return 1-16 as integer
+    _ => e.into(), // otherwise return as bytes
+}).collect::<Vec<Value>>());
 
 #[rustfmt::skip]
 impl_simple_to_value!(ExecStats, s, (
