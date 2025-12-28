@@ -215,21 +215,14 @@ pub mod fns {
         Ok(Value::Transaction(args.arg_into()?))
     }
 
-    /// Get the TXID of the Transaction or PSBT
+    /// Get txid from Bytes, String, Transaction or PSBT
     ///
-    /// For PSBTs the TXID of the unsigned_tx is returned, which is *only safe to
+    /// For PSBTs the txid of the unsigned_tx is returned, which is *only safe to
     /// use when all inputs are segwit inputs*.
     ///
-    /// `txid(Transaction|Bytes|Array<Tagged>) -> Bytes`
-    /// `txid(Psbt) -> Bytes`
+    /// `txid(Transaction|Psbt|Bytes|String) -> Bytes`
     pub fn txid(args: Array, _: &ScopeRef) -> Result<Value> {
-        Ok(match args.arg_into()? {
-            Value::Psbt(psbt) => psbt.unsigned_tx.compute_txid(),
-            Value::Transaction(tx) => tx.compute_txid(),
-            Value::String(s) => s.parse()?,
-            tx_like => Transaction::try_from(tx_like)?.compute_txid(),
-        }
-        .into())
+        Ok(args.arg_into::<Txid>()?.into())
     }
 
     /// Attach input witnesses, returning a new modified Transaction with them
@@ -255,11 +248,11 @@ pub mod fns {
         Ok(Value::Script(args.arg_into()?))
     }
 
-    /// scriptPubKey(Descriptor|TapInfo|PubKey|Address|Script) -> Script
+    /// scriptPubKey(Descriptor|TapInfo|WshInfo|Address|Script) -> Script
     ///
     /// Descriptors are compiled into their scriptPubKey
     /// TapInfo are returned as their V1 witness program
-    /// PubKeys are converted into a wpkh() script
+    /// WshInfo are converted into a P2WSH script
     /// Scripts are returned as-is
     pub fn scriptPubKey(args: Array, _: &ScopeRef) -> Result<Value> {
         let spk = args.arg_into::<Value>()?.into_spk()?;
@@ -455,7 +448,7 @@ impl TryFrom<Value> for Txid {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
         Ok(match val {
-            Value::Bytes(mut bytes) => {
+            Value::Bytes(mut bytes) if bytes.len() == 32 => {
                 // Reverse back from the reversed order used for txid display.
                 // impl_simple_to_value!(Txid) (below) does the opposite
                 bytes.reverse();
