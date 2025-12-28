@@ -211,7 +211,7 @@ pub mod fns {
                     origin: (!full_path.is_empty()).then(|| (pk.master_fingerprint(), full_path)),
                     xkey: derived_xpub,
                     derivation_path: DerivationPath::master(),
-                    wildcard: xpub.wildcard,
+                    wildcard: Wildcard::None,
                 })
                 .into()
             }
@@ -225,7 +225,7 @@ pub mod fns {
                     origin: (!full_path.is_empty()).then(|| (sk.master_fingerprint(), full_path)),
                     xkey: derived_xpriv,
                     derivation_path: DerivationPath::master(),
-                    wildcard: xprv.wildcard,
+                    wildcard: Wildcard::None,
                 })
                 .into()
             }
