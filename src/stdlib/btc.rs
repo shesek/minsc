@@ -54,6 +54,9 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope
             .set_fn("script::explicit", fns::explicitScript)
             .unwrap(); // alias
+        scope
+            .set_fn("script::instructions", fns::script_instructions)
+            .unwrap();
         scope.set_fn("script::strip", fns::script_strip).unwrap();
         scope.set_fn("script::wiz", fns::script_wiz).unwrap();
         scope.set_fn("script::bitide", fns::script_bitide).unwrap();
@@ -270,6 +273,26 @@ pub mod fns {
             other => bail!(Error::InvalidValue(other.into())),
         }
         .into())
+    }
+
+    /// script::instructions(Script, enforce_minimal: Bool = false, include_errors: Bool = false) -> Array<Script|Int|Bytes|String>
+    pub fn script_instructions(args: Array, _: &ScopeRef) -> Result<Value> {
+        let (script, enforce_minimal, include_errors): (ScriptBuf, Option<bool>, Option<bool>) =
+            args.args_into()?;
+        let enforce_minimal = enforce_minimal.unwrap_or(false);
+        let include_errors = include_errors.unwrap_or(false);
+
+        if enforce_minimal {
+            script.instructions_minimal()
+        } else {
+            script.instructions()
+        }
+        .map(|i| match i {
+            Ok(instruction) => Ok(Value::from(instruction)),
+            Err(err) if include_errors => Ok(err.into()),
+            Err(err) => bail!(err),
+        })
+        .collect()
     }
 
     /// compactsize(Int) -> Bytes
@@ -552,21 +575,27 @@ impl_simple_to_value!(
     w,
     i64::try_from(w.to_wu()).expect("out of range weight")
 );
+
+impl_simple_to_value!(script::Error, e, e.to_string());
+
 #[rustfmt::skip]
-impl_simple_to_value!(script::Instructions<'_>, insts, insts
-    .map(|inst| match inst {
-        Err(err) => err.to_string().into(),
-        // XXX always uses TapScript
-        Ok(Instruction::Op(op)) => match op.classify(ClassifyContext::TapScript) {
-            Class::PushNum(num) => num.into(),
-            _ => op.into(),
-        },
-        Ok(Instruction::PushBytes(push)) if push.is_empty() => 0.into(),
-        Ok(Instruction::PushBytes(push)) => push.into(),
-    })
-    .collect::<Vec<Value>>()
-    // Returns an array of opcodes (as Script), 0-16 number pushes (as Int), data pushes (as Bytes), and errors (as String)
-);
+impl_simple_to_value!(script::Instruction<'_>, i, match i {
+    // Ok to always classify with TapScript since we're only identifying push opcodes
+    Instruction::Op(op) => match op.classify(ClassifyContext::TapScript) {
+        Class::PushNum(num) => num.into(), // -1 to 16
+        _ => Value::from(op),
+    },
+    Instruction::PushBytes(push) if push.is_empty() => 0.into(),
+    Instruction::PushBytes(push) => push.into(),
+});
+
+// Fails with an Err if the Instructions iterator includes an Err
+impl TryFrom<script::Instructions<'_>> for Value {
+    type Error = Error;
+    fn try_from(instructions: script::Instructions<'_>) -> Result<Self> {
+        instructions.map(|i| Ok(Value::from(i?))).collect()
+    }
+}
 
 // Field accessors
 
@@ -607,10 +636,14 @@ impl FieldAccess for Address {
 impl FieldAccess for ScriptBuf {
     fn get_field(self, field: &Value) -> Option<Value> {
         Some(match field.as_str()? {
-            // Returns an array of opcodes (as Script), 0-16 number pushes (as Int), data pushes (as Bytes), and errors (as String)
+            // Returns an array of opcodes as Script, number pushes (-1 to 16) as Int, and data pushes as Bytes
+            // Only available for scripts that can be parsed in full
+            "instructions" => self.instructions().try_into().ok()?,
+            "minimal_instructions" => self.instructions_minimal().try_into().ok()?,
             // TODO script marker support
-            "instructions" => self.instructions().into(),
-            "instructions_minimal" => self.instructions_minimal().into(),
+            "is_parsable" => self.instructions().all(|i| i.is_ok()).into(),
+            "is_minimal" => self.instructions_minimal().all(|i| i.is_ok()).into(),
+            "parse_error" => self.instructions().find_map(|i| i.err())?.into(),
 
             "is_multisig" => self.is_multisig().into(),
             "is_op_return" => self.is_op_return().into(),
