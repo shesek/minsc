@@ -93,11 +93,14 @@ worker.addEventListener('message', ({ data }) => {
     output_other.setValue(r.other || '')
     output_el_address.querySelector('span').innerText = r.address || ''
 
-    if (r.other) {
+    if (r.other || r.key) {
       // Clear matchingBracket highlights, they show up automatically when the result display
       // is updated to a text beginning with a bracket, even when the editor is not focused.
-      output_other.getAllMarks().filter(m => m.className=='CodeMirror-matchingbracket')
-        .forEach(m => m.clear())
+      for (const output of [ output_other, output_key ]) {
+        debugger;
+        output.getAllMarks().filter(m => m.className=='CodeMirror-matchingbracket')
+          .forEach(m => m.clear())
+      }
     }
   }
 })
