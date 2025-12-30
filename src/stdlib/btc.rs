@@ -961,13 +961,13 @@ impl PrettyDisplay for Address {
     const AUTOFMT_ENABLED: bool = false;
 
     fn pretty_fmt<W: fmt::Write>(&self, f: &mut W, _indent: Option<usize>) -> fmt::Result {
-        if self.address_type().is_some() {
-            // Use the base58/bech32 encoded string if its a standard address type (known witness program/length),
-            write!(f, "{}", self)
-        } else {
-            // Otherwise, encode as a `address(scriptPubKey)` call
-            // FIXME does not include the network, not easily extractable from bitcoin::Address
-            write!(f, "address({})", self.script_pubkey().pretty(None))
+        use bitcoin::AddressType::*;
+        match self.address_type() {
+            // Use the base58/bech32 string directly as an expression for standard address types that are recognized by the Minsc parser.
+            // This currently includes everything but P2A, enumrated in full to account for future address types.
+            Some(P2pkh | P2sh | P2wpkh | P2wsh | P2tr) => write!(f, "{}", self),
+            // Otherwise, encode as an `address(String)` call
+            _ => write!(f, "address(\"{}\")", self),
         }
     }
 }
