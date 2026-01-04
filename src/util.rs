@@ -533,6 +533,8 @@ pub trait DescriptorExt {
     fn tap_info(&self) -> Result<Option<Arc<TaprootSpendInfo>>>;
 
     fn address_type(&self) -> Option<bitcoin::AddressType>;
+
+    fn inner_miniscript(&self) -> Option<AnyMiniscript>;
 }
 
 impl DescriptorExt for Descriptor<DescriptorPublicKey> {
@@ -574,10 +576,30 @@ impl DescriptorExt for Descriptor<DescriptorPublicKey> {
             Wsh | WshSortedMulti => P2wsh,
             Pkh => P2pkh,
             Sh | ShWpkh | ShWsh | ShSortedMulti | ShWshSortedMulti => P2sh,
-            Bare => {
-                return None;
-            }
+            Bare => return None,
         })
+    }
+
+    fn inner_miniscript(&self) -> Option<AnyMiniscript> {
+        use miniscript::descriptor::{ShInner, Wsh, WshInner};
+
+        fn from_wsh(wsh: &Wsh<DescriptorPublicKey>) -> Option<AnyMiniscript> {
+            match wsh.as_inner() {
+                WshInner::Ms(ms) => Some(AnyMiniscript::Segwitv0(ms.clone())),
+                WshInner::SortedMulti(_) => None,
+            }
+        }
+        match self {
+            Descriptor::Bare(bare) => Some(AnyMiniscript::Bare(bare.as_inner().clone())),
+            Descriptor::Wsh(wsh) => from_wsh(wsh),
+            Descriptor::Sh(sh) => match sh.as_inner() {
+                ShInner::Ms(ms) => Some(AnyMiniscript::Legacy(ms.clone())),
+                ShInner::Wsh(wsh) => from_wsh(wsh),
+                ShInner::Wpkh(_) | ShInner::SortedMulti(_) => None,
+            },
+            Descriptor::Wpkh(_) | Descriptor::Pkh(_) | Descriptor::Tr(_) => None,
+            // XXX return Wpkh/Pkh's scriptPubKey as Miniscript?
+        }
     }
 }
 

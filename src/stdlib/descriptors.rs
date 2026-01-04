@@ -131,9 +131,14 @@ impl FieldAccess for Descriptor {
             "explicit_script" => self.to_explicit_script().ok()?.into(),
             // Only available for definite segwit descriptors
             "witness_program" => self.witness_program().ok()??.into(),
+            // Only available for Wsh, Sh, ShWsh and Bare
+            "miniscript" => self.inner_miniscript()?.into(),
 
             // Only available for taproot descriptors (similar fields mirrored on TaprootSpendInfo)
             "internal_key" => self.tr()?.internal_key().clone().into(),
+            "miniscripts" => self.tr()?.iter_scripts().map(|m| m.1.clone()).collect(),
+            // Only available for taproot descriptors with script paths
+            "miniscript_tree" => self.tr()?.tap_tree().as_ref()?.into(),
             // Only available for definite taproot descriptors
             "output_key" => self.tap_info().ok()??.output_key().into(),
             "output_key_parity" => self.tap_info().ok()??.output_key_parity().into(),

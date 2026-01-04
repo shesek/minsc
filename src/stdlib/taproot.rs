@@ -465,22 +465,36 @@ impl TryFrom<Value> for ControlBlock {
 impl_simple_to_value!(taproot::Signature, sig, sig.to_vec());
 impl_simple_to_value!(ControlBlock, ctrl, ctrl.serialize());
 impl_simple_to_value!(LeafVersion, ver, Value::Bytes(vec![ver.to_consensus()]));
-impl_simple_to_value!(
-    TapNode<'_>,
-    node,
-    match node {
-        TapNode::Branch(a, b) => (*a, *b).into(),
-        TapNode::Leaf((script, _ver)) => script.clone().into(), // XXX leaf version not included
-        TapNode::Hidden(hash) => Value::from(hash),
-    }
-);
-// Encode TapTree as a nested TapNode tree structure
-impl_simple_to_value!(taproot::TapTree, tap_tree, {
-    let script_map = tap_tree.script_map();
-    let script_tree = TapNode::from_script_map(&script_map, tap_tree.root_hash())
-        .expect("valid TapTree merkle proofs");
-    Value::from(script_tree)
+
+// Represent minsc::TapTree as an Array binary tree structure of raw Script/LeafHash
+#[rustfmt::skip]
+impl_simple_to_value_is!(TapNode<'_>, node, match node {
+    TapNode::Branch(a, b) => (*a, *b).into(),
+    TapNode::Leaf((script, _ver)) => script.clone().into(), // XXX leaf version not included
+    TapNode::Hidden(hash) => hash.into(),
 });
+
+// Represent rust-bitcoin's TapTree as an Array binary tree structure of raw Script
+impl_simple_to_value_is!(taproot::TapTree, tap_tree, {
+    // bitcoin::taproot::TapTree doesn't actually contain a tree structure,
+    // convert it into a minsc::TapNode which does first, then convert that
+    let script_map = tap_tree.script_map();
+    TapNode::from_script_map(&script_map, tap_tree.root_hash())
+        .expect("valid TapTree merkle proofs")
+        .into()
+});
+
+// Represent rust-miniscript's TapTree as an Array binary tree structure of Miniscript
+#[rustfmt::skip]
+impl_simple_to_value_is!(&descriptor::TapTree<DescriptorPublicKey>, tap_tree, {
+    use descriptor::TapTree;
+    match tap_tree {
+        TapTree::Leaf(ms) => (**ms).clone().into(),
+        TapTree::Tree { left, right, .. } => (&**left, &**right).into(),
+    }
+});
+#[rustfmt::skip]
+impl_simple_to_value!(miniscript::descriptor::TapTree<DescriptorPublicKey>, tap_tree, &tap_tree);
 
 impl PrettyDisplay for TaprootSpendInfo {
     const AUTOFMT_ENABLED: bool = true;

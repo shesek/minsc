@@ -79,9 +79,14 @@ macro_rules! iif {
 
 macro_rules! impl_simple_to_value {
     ($src:ty, $var:tt, $expr:expr) => {
+        impl_simple_to_value_is!($src, $var, $expr.into());
+    };
+}
+macro_rules! impl_simple_to_value_is {
+    ($src:ty, $var:tt, $expr:expr) => {
         impl From<$src> for Value {
             fn from($var: $src) -> Self {
-                $expr.into()
+                $expr
             }
         }
     };
