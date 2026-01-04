@@ -303,6 +303,9 @@ impl Value {
     pub fn is_bytes(&self) -> bool {
         matches!(self, Value::Bytes(_))
     }
+    pub fn is_prob(&self) -> bool {
+        matches!(self, Value::WithProb(_, _))
+    }
     pub fn is_empty_array(&self) -> bool {
         matches!(self, Value::Array(arr) if arr.is_empty())
     }

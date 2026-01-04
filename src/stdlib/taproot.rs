@@ -191,6 +191,12 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
             descriptor_from_policy(None, tr_unspendable(scope)?, policy)?.into()
         }
 
+        // tr(Miniscript) -> Descriptor
+        // Single miniscript used as a single leaf, with an unspendable internal key
+        (ms, None) if ms.is_miniscript_like() => {
+            descriptor_from_miniscript(None, tr_unspendable(scope)?, ms.try_into()?)?.into()
+        }
+
         // tr(PubKey) -> Descriptor
         // Key-path spend only using the given internal key
         (Value::PubKey(pk), None) => Descriptor::new_tr(pk, None)?.into(),
@@ -201,14 +207,20 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
             descriptor_from_policy(Some(pk), None, b.into_policy()?)?.into()
         }
 
+        // tr(PubKey, Miniscript) -> Descriptor
+        // Single miniscript used as a single leaf, with an explicitly internal key
+        (Value::PubKey(pk), Some(ms)) if ms.is_miniscript_like() => {
+            descriptor_from_miniscript(Some(pk), None, ms.try_into()?)?.into()
+        }
+
         // tr(PubKey, Script) -> TaprootSpendInfo
-        // Single Script used as the tree root, with an explicit internal key
+        // Single script used as a single leaf, with an explicit internal key
         (Value::PubKey(pk), Some(Value::Script(script))) => {
             tapinfo_from_tree_node(pk.derive_xonly()?, Value::Script(script))?.into()
         }
 
         // tr(Script) -> TaprootSpendInfo
-        // Single Script used as the tree root, with an unspendable internal key
+        // Single script used as a single leaf, with an unspendable internal key
         (Value::Script(script), None) => {
             let unspendable = tr_unspendable(scope)?.ok_or(Error::TaprootNoViableKey)?;
             tapinfo_from_tree_node(unspendable.derive_xonly()?, Value::Script(script))?.into()
@@ -222,7 +234,7 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
             TaprootSpendInfo::new_key_spend(&EC, pk.derive_xonly()?, Some(merkle_root)).into()
         }
 
-        // tr(PubKey, Array<Policy>) -> Descriptor
+        // tr(PubKey, Array<Policy|Miniscript>) -> Descriptor
         // tr(PubKey, Array<Script>) -> TaprootSpendInfo
         // Create a Taproot structure for the given Policies/Scripts and internal key. Policies and Scripts cannot be mixed.
         //
@@ -231,7 +243,7 @@ pub fn tr(a: Value, b: Option<Value>, scope: &Scope) -> Result<Value> {
         // tree using rust-miniscript. Scripts can have probability weights associated with them to construct a huffman tree.
         (Value::PubKey(pk), Some(Value::Array(nodes))) => tr_from_array(Some(pk), None, nodes.0)?,
 
-        // tr(Array<Policy>) -> Descriptor
+        // tr(Array<Policy|Miniscript>) -> Descriptor
         // Create a Taproot descriptor for the given Policies, extracting the internal key or using TR_UNSPENDABLE
         // tr(Array<Script>) -> TaprootSpendInfo
         // Create a TaprootSpendInfo for the given Scripts, using TR_UNSPEDABLE as the internal key
@@ -252,16 +264,20 @@ fn tr_from_array(
         Ok(match node {
             Value::Script(_) => NodeType::Script,
             // PubKeys/SecKeys are coercible into Policy
-            _ if node.is_policy_coercible() => NodeType::Policy,
+            _ if node.is_policy_coercible() || node.is_miniscript_like() => NodeType::Miniscript,
             Value::WithProb(_, inner) if inner.is_script() => NodeType::Script,
-            Value::WithProb(_, inner) if inner.is_policy_coercible() => NodeType::Policy,
+            Value::WithProb(_, inner)
+                if inner.is_policy_coercible() || inner.is_miniscript_like() =>
+            {
+                NodeType::Miniscript
+            }
             Value::Array(array) if !array.is_empty() => peek_node_type(&array[0])?,
             _ => bail!(Error::TaprootInvalidScript),
         })
     }
     enum NodeType {
         Script,
-        Policy,
+        Miniscript, // or Policy, to be compiled into Miniscript
     }
 
     Ok(if nodes.is_empty() {
@@ -269,7 +285,7 @@ fn tr_from_array(
         Descriptor::new_tr(internal_key.ok_or(Error::TaprootNoViableKey)?, None)?.into()
     } else {
         match peek_node_type(&nodes[0])? {
-            NodeType::Policy => descriptor_from_array(internal_key, unspendable, nodes)?.into(),
+            NodeType::Miniscript => descriptor_from_array(internal_key, unspendable, nodes)?.into(),
             NodeType::Script => tapinfo_from_array(internal_key, unspendable, nodes)?.into(),
         }
     })
@@ -287,8 +303,9 @@ fn tapinfo_from_array(
         .ok_or(Error::TaprootNoViableKey)?
         .derive_xonly()?;
 
-    if scripts.len() == 2 && (scripts[0].is_array() || scripts[1].is_array()) {
-        // Nested arrays of length 2 are treated as a binary tree of scripts (e.g. [ A, [ [ B, C ], D ] ])
+    if scripts.len() == 2 && !(scripts[0].is_prob() || scripts[1].is_prob()) {
+        // Arrays of length 2 with no execution probabilities are treated as an
+        // explicit nested binary tree of scripts (e.g. [ A, [ [ B, C ], D ] ])
         tapinfo_from_tree_node(dpk, Value::array(scripts))
     } else {
         // Other arrays are expected to be flat and are built into a huffman tree
@@ -383,19 +400,35 @@ fn descriptor_from_policy(
     Ok(policy.compile_tr(unspendable)?)
 }
 
+fn descriptor_from_miniscript(
+    pk: Option<DescriptorPublicKey>,
+    unspendable: Option<DescriptorPublicKey>,
+    ms: Miniscript<Tap>,
+) -> Result<Descriptor> {
+    let internal_key = pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?;
+    let tree = descriptor::TapTree::Leaf(Arc::new(ms));
+    Ok(Descriptor::new_tr(internal_key, Some(tree))?)
+}
+
 fn descriptor_from_array(
     pk: Option<DescriptorPublicKey>,
     unspendable: Option<DescriptorPublicKey>,
-    policies: Vec<Value>,
+    nodes: Vec<Value>, // Miniscript / Policy
 ) -> Result<Descriptor> {
-    if policies.len() == 2 && (policies[0].is_array() || policies[1].is_array()) {
-        // Nested arrays of length 2 are treated as a binary tree of policies (e.g. [ A, [ [ B, C ], D ] ])
+    #[allow(clippy::nonminimal_bool)]
+    if nodes.len() == 2
+        && !nodes[0].is_prob()
+        && !nodes[1].is_prob()
+        && !(nodes[0].is_policy_coercible() && nodes[1].is_policy_coercible())
+    {
+        // Arrays of length 2 are treated as an explicit nested binary tree structure (e.g. [ [ A, B ], C ]),
+        // of Miniscript/Policy, unless either has associated execution probabilities or are both policies.
         let internal_key = pk.or(unspendable).ok_or(Error::TaprootNoViableKey)?;
-        let tree = descriptor::TapTree::try_from(Value::array(policies))?;
+        let tree = descriptor::TapTree::try_from(Value::array(nodes))?;
         Ok(Descriptor::new_tr(internal_key, Some(tree))?)
     } else {
-        // Other arrays are expected to be flat and are compiled into an OR or thresh(1, POLICIES) policy
-        let policy = multi_andor(AndOr::Or, policies)?;
+        // Otherwise it is treated as a flat array of Policy, compiled into an or() or thresh(1, ...) between them
+        let policy = multi_andor(AndOr::Or, nodes)?;
         descriptor_from_policy(pk, unspendable, policy)
     }
 }
@@ -404,15 +437,13 @@ impl TryFrom<Value> for descriptor::TapTree<DescriptorPublicKey> {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value {
-            Value::Policy(_) | Value::PubKey(_) | Value::SecKey(_) => {
-                Self::Leaf(Arc::new(value.into_policy()?.compile_()?))
-            }
             Value::Array(mut nodes) if nodes.len() == 2 => {
                 let a = nodes.remove(0).try_into()?;
                 let b = nodes.remove(0).try_into()?;
                 Self::combine(a, b)
             }
-            _ => bail!(Error::TaprootInvalidScriptBinaryTree),
+            Value::Array(_) => bail!(Error::TaprootInvalidScriptBinaryTree),
+            _ => Self::Leaf(Arc::new(value.try_into()?)),
         })
     }
 }

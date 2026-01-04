@@ -278,7 +278,7 @@ pub enum RuntimeError {
     #[error("Invalid secret key length {0} (expected 32 for single key or 78 for xpub)")]
     InvalidSecKeyLen(usize),
 
-    #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Policy|Array<Policy>), tr(PubKey, Policy|Array<Policy>), tr(Script|Array<Script>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash merkle_root)")]
+    #[error("Invalid tr() use. Valid invocations are tr(PubKey), tr(Miniscript|Policy|Array<Miniscript|Policy>), tr(PubKey, Miniscript|Policy|Array<Miniscript|Policy>), tr(Script|Array<Script>), tr(PubKey, Script|Array<Script>) or tr(PubKey, Hash merkle_root)")]
     TaprootInvalidTrUse,
 
     #[error("Invalid Taproot unspendable key: {}", ValErrFmt(.0))]
@@ -290,7 +290,7 @@ pub enum RuntimeError {
     #[error("Invalid taproot binary script tree structure. Expected a nested array where elements are leaf nodes (with no weights) or a tuple of nodes.")]
     TaprootInvalidScriptBinaryTree,
 
-    #[error("Invalid taproot tree node, expected Policy/Script or an array of them")]
+    #[error("Invalid taproot tree node, expected Script/Miniscript/Policy or an array of them")]
     TaprootInvalidScript,
 
     #[error("Script does not exists in Taproot tree")]
