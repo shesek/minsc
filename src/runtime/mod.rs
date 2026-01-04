@@ -106,7 +106,7 @@ impl Execute for Vec<ast::Stmt> {
 
 impl Evaluate for ast::Call {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
-        let func = self.func.eval(scope)?.into_fn()?;
+        let func = self.func.eval(scope)?;
         let args = eval_exprs(scope, &self.args)?;
 
         match (func.call(args, scope), self.func.as_ident()) {
@@ -299,7 +299,8 @@ impl ast::InfixOp {
     fn apply(&self, lhs: Value, rhs: Value, scope: &ScopeRef) -> Result<Value> {
         use ast::InfixOp::*;
         use Value::{
-            Array, Bytes, Float, Int, Policy, Psbt, PubKey, Script, SecKey, String, WithProb,
+            Array, Bytes, Float, Int, MiniscriptWrapper, Policy, Psbt, PubKey, Script, SecKey,
+            String, WithProb,
         };
 
         Ok(match (self, lhs, rhs) {
@@ -337,6 +338,8 @@ impl ast::InfixOp {
             (Add, Array(a), Array(b)) => [a.0, b.0].concat().into(),
             (Add, Bytes(a), Bytes(b)) => [a, b].concat().into(),
             (Add, String(a), String(b)) => [a, b].concat().into(),
+            // + for miniscript wrappers
+            (Add, MiniscriptWrapper(a), MiniscriptWrapper(b)) => (a + b).into(),
             // + for LHS String and any RHS
             (Add, String(a), b) => [a, b.to_string()].concat().into(),
             // + for LHS Bytes and any Bytes-coercible RHS
@@ -393,7 +396,7 @@ impl Evaluate for ast::SlashOp {
                     .map_err(|e| Error::InfixOpError(InfixOp::Divide, e.into()))
             }
             lhs => {
-                // Any non-number is assumed to be a BIP32-derivable type (PubKey, SecKey, Policy, Descriptor or arrays of them)
+                // Any non-number is assumed to be a BIP32-derivable type (PubKey, SecKey, Policy, Miniscript, Descriptor or arrays of them)
                 stdlib::keys::eval_slash_bip32_derive(lhs, &self.rhs, scope)
                     .box_err(Error::SlashBip32Derive)
             }

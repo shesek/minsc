@@ -318,13 +318,18 @@ fn should_use_colon_syntax(elements: &[Value]) -> bool {
     if elements.len() == 2 {
         match (&elements[0], &elements[1]) {
             // Never if the LHS is one of these (not typically used with colon tuple construction syntax)
-            (Array(_) | Function(_) | Transaction(_) | Psbt(_), _) => false,
+            (Array(_) | Function(_) | Transaction(_) | Psbt(_) | Miniscript(_), _) => false,
 
-            // Always if the LHS is a Symbol
-            (Symbol(_), _) => true,
+            // Always if the LHS is a Symbol/MiniscriptWrapper
+            (Symbol(_) | MiniscriptWrapper(_), _) => true,
 
             // If the LHS is a String, only if its short (used as tagged array keys)
             (String(lhs), _) => lhs.len() < 43,
+
+            // Never for [Script,[Script,..]] tree structure ([Array,Script] already rejected by first match arm)
+            (Script(_), Array(a)) if a.first().is_some_and(|v| v.is_script() || v.is_array()) => {
+                false
+            }
 
             // Otherwise, only if the LHS and RHS are of different types
             (
@@ -350,6 +355,7 @@ fn colon_separator(elements: &[Value]) -> &str {
             | WshInfo(_) | Psbt(_) | Symbol(_),
             _,
         ) => ": ",
+        (MiniscriptWrapper(_), _) => ":",
         (_, Array(_)) => ": ",
         (Int(_), Int(_)) => ":",
         (Int(_), _) => ": ",

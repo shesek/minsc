@@ -17,6 +17,7 @@ use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::{
     eval_exprs, Array, Error, Evaluate, Execute, FieldAccess, Mutable, Result, ScopeRef, Value,
 };
+use crate::stdlib::miniscript::AnyMiniscript;
 use crate::util::{DescriptorExt, ScriptBuilderExt, TapInfoExt, EC};
 use crate::{ast, time, Library};
 
@@ -111,6 +112,10 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
     Ok(match value {
         // As script code
         Value::Script(script) => script,
+        Value::Miniscript(ams) => ams.encode_script()?,
+        _ if value.is_wrapped_miniscript() => AnyMiniscript::try_from(value)?.encode_script()?,
+        // The other is_miniscript_coercible() types are irrelevant here, since they
+        // cannot have a known ScriptContext which is necessary to encode into Script
 
         // As data pushes
         Value::Int(n) => push_int(n),
@@ -246,7 +251,7 @@ pub mod fns {
         Ok(Value::Transaction(tx))
     }
 
-    /// script(Bytes|Script) -> Script
+    /// script(Bytes|Script|Miniscript) -> Script
     pub fn script(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Value::Script(args.arg_into()?))
     }
@@ -383,6 +388,10 @@ impl TryFrom<Value> for ScriptBuf {
         Ok(match val {
             Value::Script(script) => script,
             Value::Bytes(bytes) => bytes.into(),
+            Value::Miniscript(ams) => ams.encode_script()?,
+            _ if val.is_wrapped_miniscript() => AnyMiniscript::try_from(val)?.encode_script()?,
+            // The other is_miniscript_coercible() types are irrelevant here, since they
+            // cannot have a known ScriptContext which is necessary to encode into Script
             other => bail!(Error::NotScriptLike(other.into())),
         })
     }

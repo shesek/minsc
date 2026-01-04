@@ -6,6 +6,7 @@ use miniscript::policy::compiler::CompilerError;
 use miniscript::{descriptor, TranslateErr};
 
 use crate::parser::ast::{Ident, InfixOp};
+use crate::stdlib::miniscript::{AnyMiniscript, CtxType, RawMiniscript};
 use crate::{ast, runtime, stdlib, PrettyDisplay, Value};
 
 #[derive(thiserror::Error, Debug)]
@@ -108,7 +109,7 @@ pub enum RuntimeError {
     #[error("Expected a descriptor, not {}", ValErrFmt(.0))]
     NotDescriptor(Box<Value>),
 
-    #[error("Expected a Script (or script bytes), not {}. Perhaps you meant to use explicitScript()/scriptPubKey()", ValErrFmt(.0))]
+    #[error("Expected a Script, Miniscript or script bytes, not {}", ValErrFmt(.0))]
     NotScriptLike(Box<Value>),
 
     #[error("Expected a Transaction (also accepted as raw bytes, tagged list or PSBT), not {}", ValErrFmt(.0))]
@@ -292,7 +293,7 @@ pub enum RuntimeError {
     #[error("Script does not exists in Taproot tree")]
     TaprootScriptNotFound,
 
-    #[error("Invalid Taproot leaf. Expected a 32 bytes TapLeaf hash or a Policy/Script to compute the TapLeaf hash for, not {}", ValErrFmt(.0))]
+    #[error("Invalid Taproot leaf. Expected a 32 bytes TapLeaf hash or a Policy/Script/Miniscript to compute the TapLeaf hash for, not {}", ValErrFmt(.0))]
     TaprootInvalidLeaf(Box<Value>),
 
     #[error["Miniscript hash pre-images must be exactly 32 bytes long"]]
@@ -340,6 +341,33 @@ pub enum RuntimeError {
 
     #[error("Invalid PSBT signing keys. Expected an Xpriv, array of Xprivs, single SecKey, array of single SecKeys, or a tagged array mapping from single PubKeys to single SecKeys")]
     PsbtInvalidSignKeys,
+
+    // Miniscript
+    #[error("Invalid Miniscript fragment: {}", ValErrFmt(.0))]
+    NotMiniscriptLike(Box<Value>),
+
+    #[error("Expected a MiniscriptWrapper, not {}", ValErrFmt(.0))]
+    NotMiniscriptWrapper(Box<Value>),
+
+    #[error("Expected Miniscript with {0} context or no context, not {1}")]
+    MiniscriptIncompatibleCtx(CtxType, Box<AnyMiniscript>),
+
+    #[error("Expected Miniscript with explicit ScriptContext, not context-less {0}")]
+    MiniscriptUnexpectedRaw(Box<RawMiniscript>),
+
+    #[error("Expected Miniscript with no ScriptContext, not {0}")]
+    MiniscriptUnexpectedCtx(Box<AnyMiniscript>),
+
+    #[error("Cannot mix Miniscripts with different ScriptContext: {0} vs {1}")]
+    MiniscriptMixedBinaryCtx(Box<AnyMiniscript>, Box<AnyMiniscript>),
+
+    #[error("Cannot mix Miniscripts with different ScriptContext: {0} vs {1} vs {2}")]
+    MiniscriptMixedTernaryCtx(Box<AnyMiniscript>, Box<AnyMiniscript>, Box<AnyMiniscript>),
+
+    #[error(
+        "Cannot mix Miniscripts with different ScriptContext: expected all to be {0}, found {1}"
+    )]
+    MiniscriptMixedThreshCtx(CtxType, Box<AnyMiniscript>),
 
     // Generic error raised from user-land Minsc code
     #[error("Exception: {0}")]

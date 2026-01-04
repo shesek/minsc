@@ -94,6 +94,7 @@ impl Call for Value {
     fn call(&self, args: Vec<Value>, caller_scope: &ScopeRef) -> Result<Value> {
         match self {
             Value::Function(func) => func.call(args, caller_scope),
+            Value::MiniscriptWrapper(wrap) => wrap.call(args, caller_scope),
             v => Err(Error::NotFn(v.clone().into())),
         }
     }

@@ -14,10 +14,12 @@ use miniscript::descriptor::{
     Wildcard,
 };
 use miniscript::{
-    DefiniteDescriptorKey, Descriptor, ForEachKey, MiniscriptKey, TranslatePk, Translator,
+    DefiniteDescriptorKey, Descriptor, ForEachKey, Miniscript, MiniscriptKey, ScriptContext,
+    TranslatePk, Translator,
 };
 
 use crate::runtime::{Array, Error, Result, Value};
+use crate::stdlib::miniscript::AnyMiniscript;
 
 lazy_static! {
     pub static ref EC: secp256k1::Secp256k1<secp256k1::All> = secp256k1::Secp256k1::new();
@@ -430,19 +432,35 @@ impl DescriptorSecretKeyExt for DescriptorSecretKey {
 // Miniscript
 //
 
-pub trait MiniscriptExt<T: miniscript::ScriptContext> {
-    fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, T>>;
+pub trait MiniscriptExt<Ctx: ScriptContext> {
+    fn derive_keys(&self) -> Result<Miniscript<PublicKey, Ctx>>;
 }
 
-impl<Ctx: miniscript::ScriptContext> MiniscriptExt<Ctx>
-    for miniscript::Miniscript<DescriptorPublicKey, Ctx>
-{
-    fn derive_keys(self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
+impl<Ctx: ScriptContext> MiniscriptExt<Ctx> for Miniscript<DescriptorPublicKey, Ctx> {
+    fn derive_keys(&self) -> Result<miniscript::Miniscript<PublicKey, Ctx>> {
         Ok(
             self.translate_pk(&mut FnTranslator::new(|xpk: &DescriptorPublicKey| {
                 xpk.clone().derive_definite()
             }))?,
         )
+    }
+}
+
+pub trait PolicyExt<Pk: MiniscriptKey> {
+    fn compile_<Ctx: ScriptContext>(&self) -> Result<Miniscript<Pk, Ctx>>;
+}
+
+impl<Pk: MiniscriptKey> PolicyExt<Pk> for miniscript::policy::concrete::Policy<Pk> {
+    fn compile_<Ctx: ScriptContext>(&self) -> Result<Miniscript<Pk, Ctx>> {
+        // Needed as a temporary workaround to avoid panicking,
+        // pending https://github.com/rust-bitcoin/rust-miniscript/pull/761
+        if Ctx::sig_type() == miniscript::SigType::Ecdsa {
+            ensure!(
+                self.for_each_key(|pk| !pk.is_x_only_key()),
+                Error::InvalidPreTapXonly
+            );
+        }
+        Ok(self.compile()?)
     }
 }
 
@@ -737,7 +755,26 @@ impl DeriveExt for crate::PolicyDpk {
         }))
     }
     fn has_wildcards(&self) -> bool {
-        self.for_any_key(DeriveExt::has_wildcards)
+        self.for_any_key(DescriptorPublicKey::has_wildcards)
+    }
+}
+
+impl DeriveExt for AnyMiniscript {
+    fn derive_path<P: DerivePath>(self, path: P, wildcard: Wildcard) -> Result<Self> {
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
+        let path = path.into_derivation_path()?;
+        self.translate_pk(&|pk: &DescriptorPublicKey| {
+            pk.clone().maybe_derive_path(path.clone(), wildcard)
+        })
+    }
+    fn derive_multi<P: DerivePath>(self, paths: &[P], wildcard: Wildcard) -> Result<Self> {
+        ensure!(self.has_wildcards(), Error::NonDeriveableNoWildcard);
+        self.translate_pk(&|pk: &DescriptorPublicKey| {
+            pk.clone().maybe_derive_multi(paths, wildcard)
+        })
+    }
+    fn has_wildcards(&self) -> bool {
+        self.for_any_key(DescriptorPublicKey::has_wildcards)
     }
 }
 
@@ -771,6 +808,7 @@ impl DeriveExt for Value {
             Value::SecKey(seckey) => seckey.derive_path(path, wildcard)?.into(),
             Value::Descriptor(desc) => desc.derive_path(path, wildcard)?.into(),
             Value::Policy(policy) => policy.derive_path(path, wildcard)?.into(),
+            Value::Miniscript(ams) => ams.derive_path(path, wildcard)?.into(),
             Value::Array(array) => array.derive_path(path, wildcard)?.into(),
             _ => bail!(Error::NonDeriveableType),
         })
@@ -781,6 +819,7 @@ impl DeriveExt for Value {
             Value::SecKey(seckey) => seckey.derive_multi(paths, wildcard)?.into(),
             Value::Descriptor(desc) => desc.derive_multi(paths, wildcard)?.into(),
             Value::Policy(policy) => policy.derive_multi(paths, wildcard)?.into(),
+            Value::Miniscript(ams) => ams.derive_multi(paths, wildcard)?.into(),
             Value::Array(array) => array.derive_multi(paths, wildcard)?.into(),
             _ => bail!(Error::NonDeriveableType),
         })
@@ -791,6 +830,7 @@ impl DeriveExt for Value {
             Value::SecKey(seckey) => seckey.has_wildcards(),
             Value::Descriptor(desc) => desc.has_wildcards(),
             Value::Policy(policy) => policy.has_wildcards(),
+            Value::Miniscript(ams) => ams.has_wildcards(),
             Value::Array(array) => array.has_wildcards(),
             _ => false,
         }
@@ -821,7 +861,7 @@ impl DeriveExt for Array {
 
 // A `Translator` for keys using a closure function, similar to
 // the `TranslatePk2` available in prior rust-miniscript releases
-struct FnTranslator<P: MiniscriptKey, Q: MiniscriptKey, F: Fn(&P) -> Result<Q>> {
+pub struct FnTranslator<P: MiniscriptKey, Q: MiniscriptKey, F: Fn(&P) -> Result<Q>> {
     func: F,
     _marker: PhantomData<(P, Q)>,
 }

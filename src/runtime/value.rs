@@ -15,6 +15,7 @@ use crate::runtime::{Array, Error, Evaluate, FieldAccess, Function, Result, Scop
 use crate::util::EC;
 use crate::{error, stdlib, DescriptorDpk as Descriptor, PolicyDpk as Policy};
 use stdlib::btc::WshInfo;
+use stdlib::miniscript::{AnyMiniscript, MiniscriptWrapper};
 
 /// A runtime value. This is what gets passed around as function arguments, returned from functions,
 /// and assigned to variables.
@@ -35,6 +36,8 @@ pub enum Value {
     Network(Network),
     PubKey(DescriptorPublicKey),
     SecKey(DescriptorSecretKey),
+    Miniscript(AnyMiniscript),
+    MiniscriptWrapper(MiniscriptWrapper),
     Policy(Policy),
     Descriptor(Descriptor),
     TapInfo(TaprootSpendInfo),
@@ -78,6 +81,8 @@ impl_from_variant!(String, Value);
 impl_from_variant!(Vec<u8>, Value, Bytes);
 impl_from_variant!(Symbol, Value);
 impl_from_variant!(Policy, Value);
+impl_from_variant!(AnyMiniscript, Value, Miniscript);
+impl_from_variant!(MiniscriptWrapper, Value);
 impl_from_variant!(Descriptor, Value);
 impl_from_variant!(DescriptorPublicKey, Value, PubKey);
 impl_from_variant!(DescriptorSecretKey, Value, SecKey);
@@ -256,6 +261,8 @@ impl Value {
             Value::Bool(_) => "bool",
             Value::Bytes(_) => "bytes",
             Value::String(_) => "string",
+            Value::Miniscript(_) => "miniscript",
+            Value::MiniscriptWrapper(_) => "miniscript-wrapper",
             Value::Policy(_) => "policy",
             Value::WithProb(_, _) => "withprob",
             Value::Descriptor(_) => "descriptor",
@@ -395,15 +402,15 @@ impl ExprRepr for Value {
             Int(_) | Float(_) | Bool(_) | Bytes(_) | String(_) | Network(_) | Address(_)
             | Symbol(_) | SecKey(_) | PubKey(_) | Policy(_) => write!(f, "{}", self),
 
-            // These also have round-trip-able Display, but can be expressed more compactly/precisely for ExprRepr
+            // These also have (a mostly) round-trip-able Display, but can be expressed more compactly/precisely for ExprRepr
             Transaction(tx) => write!(f, "tx(0x{})", bitcoin::consensus::serialize(tx).as_hex()),
             Script(script) => write!(f, "script(0x{})", script.as_bytes().as_hex()),
             Psbt(psbt) => write!(f, "psbt(0z{})", psbt),
             WshInfo(wsh) => write!(f, "wsh(script(0x{}))", wsh.0.as_bytes().as_hex()),
             TapInfo(tapinfo) => tapinfo.repr_fmt(f),
-
-            // Descriptors require special handling when they have script paths (i.e. not (W)Pkh or script-less Tr)
             Descriptor(desc) => desc.repr_fmt(f),
+            Miniscript(ms) => ms.repr_fmt(f),
+            MiniscriptWrapper(wrap) => wrap.repr_fmt(f),
 
             // Functions cannot be round tripped, as they depend on their lexical scope.
             // Write null instead of erroring so that arrays containing them may otherwise be ExprRepr-serialized.
@@ -435,6 +442,7 @@ impl FieldAccess for Value {
             Value::Psbt(x) => x.get_field(field),
             Value::Transaction(x) => x.get_field(field),
             Value::Script(x) => x.get_field(field),
+            Value::Miniscript(x) => x.get_field(field),
             Value::Policy(x) => x.get_field(field),
             Value::Descriptor(x) => x.get_field(field),
             Value::TapInfo(x) => x.get_field(field),

@@ -7,6 +7,7 @@ use bitcoin::hashes::Hash;
 use bitcoin::hex::DisplayHex;
 use bitcoin::{taproot, ScriptBuf, XOnlyPublicKey};
 use miniscript::descriptor::{self, DescriptorPublicKey};
+use miniscript::Tap;
 use taproot::{ControlBlock, LeafVersion, NodeInfo, TapLeafHash, TapNodeHash, TaprootSpendInfo};
 
 use super::policy::{multi_andor, AndOr};
@@ -14,9 +15,12 @@ use crate::display::{fmt_list, indentation_params, PrettyDisplay};
 use crate::runtime::scope::{Mutable, Scope, ScopeRef};
 use crate::runtime::{Array, Error, FieldAccess, Result, Value};
 use crate::util::{
-    DescriptorExt, DescriptorPubKeyExt, MiniscriptExt, TapInfoExt, TapNode, TapTreeExt, EC,
+    DescriptorExt, DescriptorPubKeyExt, MiniscriptExt, PolicyExt, TapInfoExt, TapNode, TapTreeExt,
+    EC,
 };
-use crate::{DescriptorDpk as Descriptor, ExprRepr, PolicyDpk as Policy};
+use crate::{
+    DescriptorDpk as Descriptor, ExprRepr, MiniscriptDpk as Miniscript, PolicyDpk as Policy,
+};
 
 pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     let mut scope = scope.borrow_mut();
@@ -54,15 +58,19 @@ pub mod fns {
         super::tr(a, b, &scope.borrow())
     }
 
-    /// tr::ctrl(TapInfo|Descriptor|PsbtInput, Script|Policy, Byte version=TapScript) -> Array<Script>
+    /// `tr::ctrl(TapInfo|Descriptor|PsbtInput, Script|Miniscript<Tap>|Policy|Bytes, version: Bytes = TapScript) -> Array<Bytes>`
     ///
-    /// Construct the witness control block for the given Script/Policy
+    /// Construct the witness control block for the given script
     pub fn ctrl(args: Array, _: &ScopeRef) -> Result<Value> {
-        let (tr_or_input, script_or_policy, leaf_ver): (_, _, Option<LeafVersion>) =
+        let (tr_or_input, script_or_policy_or_ms, leaf_ver): (_, _, Option<LeafVersion>) =
             args.args_into()?;
-        let script = match script_or_policy {
+
+        let script = match script_or_policy_or_ms {
             Value::Script(script) => script,
-            Value::Policy(policy) => policy.compile::<miniscript::Tap>()?.derive_keys()?.encode(),
+            Value::Bytes(bytes) => bytes.into(),
+            Value::Policy(policy) => policy.compile_::<Tap>()?.derive_keys()?.encode(),
+            Value::Miniscript(ams) => ams.into_ctx::<Tap>()?.derive_keys()?.encode(),
+            v if v.is_miniscript_like() => v.into_miniscript_ctx::<Tap>()?.derive_keys()?.encode(),
             other => bail!(Error::InvalidValue(other.into())),
         };
         let leaf_ver = leaf_ver.unwrap_or(LeafVersion::TapScript);
@@ -319,13 +327,16 @@ impl TryFrom<Value> for taproot::TapTree {
 impl TryFrom<Value> for TapLeafHash {
     type Error = Error;
     fn try_from(value: Value) -> Result<Self> {
+        fn from_miniscript(cms: Miniscript<Tap>) -> Result<TapLeafHash> {
+            let script = cms.derive_keys()?.encode();
+            Ok(TapLeafHash::from_script(&script, LeafVersion::TapScript))
+        }
         Ok(match value {
             Value::Bytes(bytes) if bytes.len() == 32 => Self::from_slice(&bytes)?,
             Value::Script(script) => TapLeafHash::from_script(&script, LeafVersion::TapScript),
-            Value::Policy(policy) => {
-                let miniscript = policy.compile::<miniscript::Tap>()?.derive_keys()?;
-                TapLeafHash::from_script(&miniscript.encode(), LeafVersion::TapScript)
-            }
+            Value::Policy(policy) => from_miniscript(policy.compile_()?)?,
+            Value::Miniscript(ams) => from_miniscript(ams.into_ctx()?)?,
+            _ if value.is_miniscript_like() => from_miniscript(value.into_miniscript_ctx()?)?,
             v => bail!(Error::TaprootInvalidLeaf(v.into())),
         })
     }
@@ -394,7 +405,7 @@ impl TryFrom<Value> for descriptor::TapTree<DescriptorPublicKey> {
     fn try_from(value: Value) -> Result<Self> {
         Ok(match value {
             Value::Policy(_) | Value::PubKey(_) | Value::SecKey(_) => {
-                Self::Leaf(Arc::new(value.into_policy()?.compile()?))
+                Self::Leaf(Arc::new(value.into_policy()?.compile_()?))
             }
             Value::Array(mut nodes) if nodes.len() == 2 => {
                 let a = nodes.remove(0).try_into()?;

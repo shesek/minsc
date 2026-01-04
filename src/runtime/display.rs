@@ -14,6 +14,8 @@ impl fmt::Display for Value {
             Value::Bytes(x) => write!(f, "0x{}", x.as_hex()),
             Value::String(x) => fmt_quoted_str(f, x),
             Value::Policy(x) => write!(f, "{}", x),
+            Value::Miniscript(x) => write!(f, "{}", x),
+            Value::MiniscriptWrapper(x) => write!(f, "{}", x),
             Value::WithProb(p, x) => write!(f, "{}@{}", p, x),
             Value::Function(x) => write!(f, "{}", x), // not round-trip-able (cannot be)
             Value::Network(x) => write!(f, "{}", x),

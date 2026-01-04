@@ -2,13 +2,12 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 use miniscript::descriptor::{DescriptorType, ShInner, WshInner};
-use miniscript::{ForEachKey, MiniscriptKey};
 
 use crate::runtime::scope::{Mutable, ScopeRef};
-use crate::runtime::{Array, ExprRepr, FieldAccess, PrettyDisplay, Result, Error, Value};
+use crate::runtime::{Array, Error, ExprRepr, FieldAccess, PrettyDisplay, Result, Value};
 use crate::stdlib::{btc::WshInfo, taproot::tap_scripts_to_val};
-use crate::util::{DescriptorExt, TapInfoExt};
-use crate::{DescriptorDpk as Descriptor, PolicyDpk as Policy};
+use crate::util::{DescriptorExt, PolicyExt, TapInfoExt};
+use crate::DescriptorDpk as Descriptor;
 
 pub use crate::runtime::AndOr;
 
@@ -33,19 +32,19 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
 pub mod fns {
     use super::*;
 
-    // wpkh(PubKey) -> Descriptor::Wpkh
+    // wpkh(PubKey) -> Descriptor<Wpkh>
     pub fn wpkh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Descriptor::new_wpkh(args.arg_into()?)?.into())
     }
 
-    /// `wsh(Policy) -> Descriptor`
-    /// `wsh(Array<tagged:sortedmulti>) -> Descriptor` (see `sortedmulti()`)
-    /// `wsh(Script witnessScript) -> WshInfo`
+    /// `wsh(Policy|Miniscript<Segwitv0>) -> Descriptor<Wsh>`
+    /// `wsh(Array<tagged:sortedmulti>) -> Descriptor<WshSortedMulti>` (see sortedmulti())
+    /// `wsh(Script) -> WshInfo`
     pub fn wsh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
-            Value::Policy(policy) => {
-                Descriptor::new_wsh(verify_no_xonly(policy)?.compile()?)?.into()
-            }
+            Value::Policy(policy) => Descriptor::new_wsh(policy.compile_()?)?.into(),
+            Value::Miniscript(ams) => Descriptor::new_wsh(ams.try_into()?)?.into(),
+            val if val.is_miniscript_like() => Descriptor::new_wsh(val.try_into()?)?.into(),
             Value::Array(arr) if arr.is_tagged_with("sortedmulti") => {
                 let (_tag, thresh_k, pks): (String, _, _) = arr.try_into()?;
                 Descriptor::new_wsh_sortedmulti(thresh_k, pks)?.into()
@@ -57,13 +56,16 @@ pub mod fns {
         })
     }
 
-    /// sh(Descriptor::W{sh,pkh}) -> Descriptor::ShW{sh,pkh}
-    /// sh(Policy|Array<tagged:sortedmulti>) -> Descriptor::Sh
+    /// `sh(Policy|Miniscript<Legacy>) -> Descriptor<Sh>`
+    /// `sh(Descriptor<Wsh|Wpkh>) -> Descriptor<ShWsh|ShWpkh>`
+    /// `sh(Array<tagged:sortedmulti>) -> Descriptor<ShSortedMulti>`
     pub fn sh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(match args.arg_into()? {
             Value::Descriptor(Descriptor::Wsh(wsh)) => Descriptor::new_sh_with_wsh(wsh),
             Value::Descriptor(Descriptor::Wpkh(wpkh)) => Descriptor::new_sh_with_wpkh(wpkh),
-            Value::Policy(policy) => Descriptor::new_sh(verify_no_xonly(policy)?.compile()?)?,
+            Value::Policy(policy) => Descriptor::new_sh(policy.compile_()?)?,
+            Value::Miniscript(ams) => Descriptor::new_sh(ams.try_into()?)?,
+            val if val.is_miniscript_like() => Descriptor::new_sh(val.try_into()?)?,
             Value::Array(arr) if arr.is_tagged_with("sortedmulti") => {
                 let (_tag, thresh_k, pks): (String, _, _) = arr.try_into()?;
                 Descriptor::new_sh_sortedmulti(thresh_k, pks)?
@@ -74,15 +76,14 @@ pub mod fns {
         .into())
     }
 
-    /// pkh(PubKey) -> Descriptor::Pkh
+    /// pkh(PubKey) -> Descriptor<Pkh>
     pub fn pkh(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Descriptor::new_pkh(args.arg_into()?)?.into())
     }
 
-    /// bare(Policy) -> Descriptor::Bare
+    /// bare(Policy|Miniscript<Bare>) -> Descriptor<Bare>
     pub fn r#bare(args: Array, _: &ScopeRef) -> Result<Value> {
-        let policy = verify_no_xonly(args.arg_into()?)?;
-        Ok(Descriptor::new_bare(policy.compile()?)?.into())
+        Ok(Descriptor::new_bare(args.arg_into()?)?.into())
     }
 
     /// sortedmulti(Int thresh_k, ...PubKey) -> Array<tagged:sortedmulti>
@@ -109,16 +110,6 @@ pub mod fns {
             Value::String(desc_str) => desc_str.parse()?,
             other => bail!(Error::InvalidValue(other.into())),
         }))
-    }
-
-    fn verify_no_xonly(policy: Policy) -> Result<Policy> {
-        // Temporary workaround to avoid panicking. Can be removed once
-        // https://github.com/rust-bitcoin/rust-miniscript/pull/761 is merged.
-        ensure!(
-            policy.for_each_key(|pk| !pk.is_x_only_key()),
-            Error::InvalidPreTapXonly
-        );
-        Ok(policy)
     }
 }
 
@@ -177,8 +168,8 @@ impl Value {
 impl ExprRepr for Descriptor {
     fn repr_fmt<W: fmt::Write>(&self, f: &mut W) -> fmt::Result {
         match self {
-            // Descriptors with key-based paths only (Pkh, Wpkh, Sh-Wpkh, Wsh-SortedMulti and script-less Tr) are already
-            // round-trip-able using their rust-miniscript's Display as a Minsc expression (:# modifier to exclude checksum)
+            // Encode descriptors with key-based paths only (Pkh, Wpkh, Sh-Wpkh, Wsh-SortedMulti and script-less Tr) using
+            // their rust-miniscript's Display as a Minsc expression, which is round-trip-able. (:# modifier to exclude checksum)
             // (technically Sh-Wsh-SortedMulti and Sh-SortedMulti too, but they're uncommon so just stringify them.)
             Descriptor::Pkh(_) | Descriptor::Wpkh(_) => write!(f, "{:#}", self),
             Descriptor::Tr(tr) if tr.tap_tree().is_none() => write!(f, "{:#}", self),
@@ -189,8 +180,9 @@ impl ExprRepr for Descriptor {
                 write!(f, "{:#}", self)
             }
 
-            // Descriptors with inner Miniscripts for script-based paths must be encoded as string.
-            // (while the Policy syntax can be used as a Minsc expression, Miniscript's cannot.)
+            // Descriptors with inner Miniscripts for script-based paths should also be round-trip-able,
+            // however it is safer and more precise to handle them using rust-miniscript's Display/FromStr
+            // directly, without going through the Minsc parser and runtime.
             _ => write!(f, "descriptor(\"{}\")", self),
         }
     }

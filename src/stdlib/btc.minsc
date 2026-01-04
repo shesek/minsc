@@ -42,8 +42,9 @@ TR_UNSPENDABLE = NUMS;
 TR_ANNEX_BYTE = 0x50;
 
 // Create the witness stack for a Taproot script-path spend
-fn tr::script_witness($tr, $script_or_policy, $stack=[], $annex=null) {
-  $script = if typeof($script_or_policy) == "policy" then tapscript($script_or_policy) else $script_or_policy;
+fn tr::script_witness($tr, $script, $stack=[], $annex=null) {
+  $script = if typeof($script) == "policy" || typeof($script) == "miniscript"
+    then script(tap($script)) else $script;
   $stack + [ $script, tr::ctrl($tr, $script) ]
   + (if $annex != null then [ TR_ANNEX_BYTE + $annex ] else [])
 }
@@ -93,6 +94,23 @@ fn psbt::finalize_witness($psbt, $input_witnesses, $extract_tx=true) {
 
 fn psbt::finalize_extract($psbt) = psbt::extract(psbt::finalize($psbt));
 fn psbt::sign_extract($psbt, $keys) = psbt::extract(psbt::finalize(psbt::sign($psbt, $keys)));
+
+//
+// Miniscript utilities
+//
+
+fn tapscript($policy_or_miniscript) = script(tap($policy_or_miniscript));
+fn sw0script($policy_or_miniscript) = script(segwitv0($policy_or_miniscript));
+
+fn miniscript::safe($ms) {
+  $ms = miniscript($ms);
+  $ms->context? || throw("Contextless Miniscript cannot be analyzed");
+  $ms->is_safe  || throw("Unsafe " + $ms->context + ": " + $ms->analysis_error);
+  $ms
+}
+
+// Some common multi-wrapper combos, so that e.g. `snl:...` can be used in place of `s:n:l:...`
+vc=v+c, ac=a+c, sc=s+c, snl=s+n+l, snj=s+n+j;
 
 //
 // Script utilities

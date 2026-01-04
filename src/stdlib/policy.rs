@@ -1,12 +1,11 @@
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 
-use bitcoin::ScriptBuf;
-use miniscript::{DescriptorPublicKey, ForEachKey, ScriptContext, Threshold};
+use miniscript::{DescriptorPublicKey, ForEachKey, Threshold};
 
-use crate::runtime::{Array, Evaluate, FieldAccess, Mutable, Result, ScopeRef, Value, Error};
-use crate::util::{DeriveExt, DescriptorSecretKeyExt, MiniscriptExt};
-use crate::{ast, MiniscriptDpk as Miniscript, PolicyDpk as Policy};
+use crate::runtime::{Array, Error, Evaluate, FieldAccess, Mutable, Result, ScopeRef, Value};
+use crate::util::{DeriveExt, DescriptorSecretKeyExt};
+use crate::{ast, PolicyDpk as Policy};
 
 pub use crate::runtime::AndOr;
 
@@ -16,7 +15,6 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     // Miniscript Policy functions
     scope.set_fn("or", fns::or).unwrap();
     scope.set_fn("and", fns::and).unwrap();
-    scope.set_fn("thresh", fns::thresh).unwrap();
     scope.set_fn("older", fns::older).unwrap();
     scope.set_fn("after", fns::after).unwrap();
     scope.set_fn("pk", fns::pk).unwrap();
@@ -27,18 +25,17 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     scope.set_fn("any", fns::or).unwrap(); // alias
     scope.set_fn("all", fns::and).unwrap(); // alias
 
+    // thresh() is defined in miniscript.rs, supporting both policies and miniscripts
+
     // Expose TRIVIAL and UNSATISFIABLE policies
     scope.set("TRIVIAL", Policy::Trivial).unwrap();
     scope.set("UNSATISFIABLE", Policy::Unsatisfiable).unwrap();
-
-    // Policy to Script compilation
-    scope.set_fn("tapscript", fns::tapscript).unwrap();
-    scope.set_fn("segwitv0", fns::segwitv0).unwrap();
 
     // likely probability alias, for e.g. `likely@pk(A) || pk(B)`
     scope.set("likely", 10i64).unwrap();
 }
 
+// Threshold between policies (thresh() must be used for miniscripts)
 impl Evaluate for ast::Thresh {
     fn eval(&self, scope: &ScopeRef) -> Result<Value> {
         let thresh_n = self.thresh.eval(scope)?.into_usize()?;
@@ -92,23 +89,6 @@ pub mod fns {
         Ok(multi_andor(AndOr::And, args.into_inner())?.into())
     }
 
-    /// `thresh(Int thresh_n, Policy, Policy, ..) -> Policy`  
-    /// `thresh(Int thresh_n, Array<Policy>) -> Policy`
-    pub fn thresh(args: Array, _: &ScopeRef) -> Result<Value> {
-        let args = args.check_varlen(2, usize::MAX)?;
-        let is_array_call = args.len() == 2 && args[1].is_array();
-        let mut args_iter = args.into_iter();
-        let thresh_n: usize = args_iter.next_into()?;
-
-        let policies = if is_array_call {
-            into_policies(args_iter.next_into()?)?
-        } else {
-            into_policies(args_iter.collect())?
-        };
-
-        Ok(Policy::Thresh(Threshold::new(thresh_n, policies)?).into())
-    }
-
     pub fn older(args: Array, _: &ScopeRef) -> Result<Value> {
         Ok(Policy::Older(args.arg_into()?).into())
     }
@@ -136,27 +116,10 @@ pub mod fns {
     impl_policy_hash_fn!(hash256, Policy::Hash256);
     impl_policy_hash_fn!(ripemd160, Policy::Ripemd160);
     impl_policy_hash_fn!(hash160, Policy::Hash160);
-
-    /// tapscript(Policy) -> Script witnessScript
-    pub fn tapscript(args: Array, _: &ScopeRef) -> Result<Value> {
-        let policy: Policy = args.arg_into()?;
-        let miniscript = policy.compile::<miniscript::Tap>()?;
-        Ok(miniscript.derive_keys()?.encode().into())
-    }
-
-    /// segwitv0(Policy) -> Script witnessScript
-    pub fn segwitv0(args: Array, _: &ScopeRef) -> Result<Value> {
-        let policy: Policy = args.arg_into()?;
-        let miniscript = policy.compile::<miniscript::Segwitv0>()?;
-        Ok(miniscript.derive_keys()?.encode().into())
-    }
 }
 
 impl FieldAccess for Policy {
     fn get_field(self, field: &Value) -> Option<Value> {
-        fn compile<Ctx: miniscript::ScriptContext>(policy: &Policy) -> Result<ScriptBuf> {
-            Ok(policy.compile::<Ctx>()?.derive_keys()?.encode())
-        }
         Some(match field.as_str()? {
             "keys" => self.keys().into_iter().cloned().collect(),
             "is_valid" => self.is_valid().is_ok().into(),
@@ -165,14 +128,7 @@ impl FieldAccess for Policy {
             "is_wildcard" => self.has_wildcards().into(),
             "is_multipath" => policy_is_multipath(&self).into(),
             "is_definite" => (!self.has_wildcards() && !policy_is_multipath(&self)).into(),
-
-            // Script compilation fields are only available for Policies that are `$p->is_valid && $p->is_safe && $p->is_nonmalleable && $p->is_definite`
-            // You can use the tapscript()/segwitv0() functions to get a more useful exception instead of a 'field not found'
-            "tapscript" => compile::<miniscript::Tap>(&self).ok()?.into(),
-            "segwitv0" => compile::<miniscript::Segwitv0>(&self).ok()?.into(),
-            _ => {
-                return None;
-            }
+            _ => return None,
         })
     }
 }
@@ -181,7 +137,7 @@ fn policy_is_multipath(policy: &Policy) -> bool {
     policy.for_any_key(DescriptorPublicKey::is_multipath)
 }
 
-fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
+pub fn into_policies(values: Vec<Value>) -> Result<Vec<Arc<Policy>>> {
     values
         .into_iter()
         .map(|v| match v {
@@ -217,12 +173,6 @@ impl TryFrom<Value> for Policy {
     }
 }
 
-impl<Ctx: ScriptContext> TryFrom<Value> for Miniscript<Ctx> {
-    type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(value.into_policy()?.compile()?)
-    }
-}
 impl TryFrom<Value> for miniscript::RelLockTime {
     type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
