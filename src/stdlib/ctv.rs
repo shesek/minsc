@@ -18,7 +18,6 @@ lazy_static! {
 
         // Verify the CTV hash, then clear it from the stack
         fn ctv::verify($tx, $vin=0) = `ctv::hash($tx, $vin) OP_CHECKTEMPLATEVERIFY OP_DROP`;
-        ctv = ctv::verify;
     "#
     .parse()
     .unwrap();

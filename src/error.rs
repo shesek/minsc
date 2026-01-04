@@ -129,9 +129,6 @@ pub enum RuntimeError {
     #[error("Invalid script fragment: {}", ValErrFmt(.0))]
     InvalidScriptFrag(Box<Value>),
 
-    #[error("Only integers can be interpolated as script fragments, received a float: {0:?}")]
-    InvalidScriptFragIntOnly(f64),
-
     #[error("Array access index out of range")]
     ArrayIndexOutOfRange,
 

@@ -24,7 +24,7 @@ fn isEmpty($arr) = len($arr) == 0;
 fn map($arr, $fn) = fillArray(len($arr), |$i| $fn($arr.$i));
 fn filter($arr, $fn)  = fold($arr, [], |$acc, $el| $acc + (if $fn($el) then [ $el ] else [ ]));
 fn flatMap($arr, $fn) = fold($arr, [], |$acc, $el| $acc + $fn($el));
-each = map; // XXX could be made more efficient by not collecting return values
+fn each($arr, $fn) = fold($arr, null, |_, $el| { $fn($el); null });
 
 fn reduce($arr, $fn) = if !isEmpty($arr) then fold(tail($arr), $arr.0, $fn) else null;
 
@@ -46,7 +46,7 @@ fn flatten($arrays) = if !isEmpty($arrays) then concat($arrays) else [];
 // Tagged Array utilities
 //
 
-fn get($tagged, $tag, $default=null) = $tagged | find(|[$k, _]| $k == $tag) | mapNullable(|[_, $v]| $v, $default);
+fn get($tagged, $tag, $default_val=null) = if $tagged->{$tag}? then $tagged->{$tag} else $default_val;
 fn mget($tagged, $tag) = $tagged | filter(|[$k, _]| $k == $tag) | map(|[_, $v]| $v);
 
 fn keys($tagged) = map($tagged, |[$k, _]| $k);
@@ -79,6 +79,7 @@ fn coalesce($values) = find($values, |$v| $v != null);
 fn join($strs, $sep="") =
   if isEmpty($strs) then ""
   else if len($strs) == 1 then str($strs.0)
+  else if $sep == "" then concat([""] + $strs) // optimization for "" separator
   else concat([ str($strs.0) ] + map(tail($strs), |$str| $sep + $str));
 
 // Rand utilities

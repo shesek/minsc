@@ -44,17 +44,12 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
         scope.set_fn("address", fns::address).unwrap();
         scope.set_fn("tx", fns::tx).unwrap();
         scope.set_fn("txid", fns::txid).unwrap();
-        scope.set_fn("tx::id", fns::txid).unwrap(); // alias
         scope
             .set_fn("tx::with_witness", fns::tx_with_witness)
             .unwrap();
         scope.set_fn("script", fns::script).unwrap();
         scope.set_fn("scriptPubKey", fns::scriptPubKey).unwrap();
         scope.set_fn("explicitScript", fns::explicitScript).unwrap();
-        scope.set_fn("script::spk", fns::scriptPubKey).unwrap(); // alias
-        scope
-            .set_fn("script::explicit", fns::explicitScript)
-            .unwrap(); // alias
         scope
             .set_fn("script::instructions", fns::script_instructions)
             .unwrap();
@@ -137,17 +132,13 @@ fn script_frag(value: Value) -> Result<ScriptBuf> {
 
         // Flatten arrays
         Value::Array(elements) => {
-            let scriptbytes = elements
-                .into_iter()
-                .map(|val| Ok(script_frag(val)?.into_bytes()))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .collect::<Vec<u8>>();
-            ScriptBuf::from(scriptbytes)
+            let mut scriptbytes = Vec::new();
+            for val in elements {
+                scriptbytes.extend(script_frag(val)?.into_bytes());
+            }
+            scriptbytes.into()
         }
 
-        Value::Float(n) => bail!(Error::InvalidScriptFragIntOnly(n)),
         v => bail!(Error::InvalidScriptFrag(v.into())),
     })
     // XXX could reuse a single ScriptBuilder, if writing raw `ScriptBuf`s into it was possible

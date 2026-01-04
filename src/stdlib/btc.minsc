@@ -4,10 +4,10 @@ OP_CHECKSEQUENCEVERIFY = OP_CSV;
 
 // Sighash types, including combinations with ANYONECANPAY
 SIGHASH_DEFAULT=0x00, SIGHASH_ALL=0x01, SIGHASH_NONE=0x02, SIGHASH_SINGLE=0x03,
-SIGHASH_ALL_ANYONECANPAY=0x81, SIGHASH_NONE_ANYONECANPAY=0x82, SIGHASH_SINGLE_ANYONECANPAY=0x83;
+SIGHASH_ANYONECANPAY_ALL=0x81, SIGHASHE_ANYONECANPAY_NONE=0x82, SIGHASHE_ANYONECANPAY_SINGLE=0x83;
 
 // Dust amounts
-DUST_WPKH=294, DUST_WSH=330, DUST_TR=330, DUST_P2A=240, DUST_PRE_SW=546,
+DUST_WPKH=294, DUST_WSH=330, DUST_TR=330, DUST_P2A=240, DUST_LEGACY=546,
 DUST_AMOUNT=DUST_WSH; // also == DUST_TR
 
 // Pay-to-anchor witness program
@@ -40,6 +40,8 @@ ENABLE_RBF = 0xFFFFFFFD;
 TR_UNSPENDABLE = NUMS;
 
 TR_ANNEX_BYTE = 0x50;
+
+TR_TAPSCRIPT = 0xc0;
 
 // Create the witness stack for a Taproot script-path spend
 fn tr::script_witness($tr, $script, $stack=[], $annex=null) {
@@ -77,7 +79,7 @@ fn tx::fee($tx, $utxos) = psbt::fee[
   "utxos": $utxos,
 ];
 
-fn tx::strip_witness($tx) = tx::with_witness($tx, fillArray(len(tx($tx)->input), |$vin| $vin: []));
+fn tx::strip_witness($tx) = tx::with_witness($tx, fillArray(len(tx($tx)->inputs), []));
 
 //
 // PSBT
