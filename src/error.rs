@@ -88,7 +88,7 @@ pub enum RuntimeError {
     #[error("Expected a WshInfo, not {}", ValErrFmt(.0))]
     NotWshInfo(Box<Value>),
 
-    #[error("Expected a Symvol, not {}", ValErrFmt(.0))]
+    #[error("Expected a Symbol, not {}", ValErrFmt(.0))]
     NotSymbol(Box<Value>),
 
     #[error("Expected a single Xpub, not {0}")]
@@ -376,7 +376,7 @@ pub enum RuntimeError {
     MiniscriptMixedThreshCtx(CtxType, Box<AnyMiniscript>),
 
     // Generic error raised from user-land Minsc code
-    #[error("Exception: {0}")]
+    #[error("{0}")]
     ScriptException(String),
 
     //
@@ -464,8 +464,8 @@ pub enum RuntimeError {
     #[error("Parse network error: {0}")]
     ParseNetworkError(#[from] network::ParseNetworkError),
 
-    #[error("Key translation error: {0:?}")]
-    TranslateError(Box<miniscript::TranslateErr<RuntimeError>>),
+    #[error("Key translation error: {}", TranslateErrFmt(.0))]
+    TranslateError(Box<TranslateErr<RuntimeError>>),
 
     #[error("Invalid address: {0}")]
     AddressError(#[from] bitcoin::address::ParseError),
@@ -519,7 +519,7 @@ pub enum RuntimeError {
     Bip39InvalidLanguage(String),
 
     #[cfg(feature = "scriptexec")]
-    #[error("ScriptExec: {0:?}")]
+    #[error("Script Exec error: {}", ScriptExecErrFmt(.0))]
     ScriptExec(bitcoin_scriptexec::Error),
 }
 
@@ -532,16 +532,36 @@ impl From<TranslateErr<RuntimeError>> for RuntimeError {
 // Cannot be implemented using thiserror's #[from] because scriptexec::Error
 // does not implement the necessary traits to be used as a thiserror source
 #[cfg(feature = "scriptexec")]
-impl From<bitcoin_scriptexec::Error> for RuntimeError {
-    fn from(err: bitcoin_scriptexec::Error) -> Self {
-        Self::ScriptExec(err)
-    }
-}
+impl_from_variant!(bitcoin_scriptexec::Error, RuntimeError, ScriptExec);
 
 struct ValErrFmt<'a>(&'a Value);
 impl<'a> fmt::Display for ValErrFmt<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "[{}] {}", self.0.type_of(), self.0)
+    }
+}
+
+struct TranslateErrFmt<'a>(&'a TranslateErr<RuntimeError>);
+impl<'a> fmt::Display for TranslateErrFmt<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0 {
+            TranslateErr::TranslatorErr(e) => write!(f, "{}", e),
+            TranslateErr::OuterError(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+#[cfg(feature = "scriptexec")]
+struct ScriptExecErrFmt<'a>(&'a bitcoin_scriptexec::Error);
+#[cfg(feature = "scriptexec")]
+impl<'a> fmt::Display for ScriptExecErrFmt<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use bitcoin_scriptexec::Error;
+        match self.0 {
+            Error::Exec(e) => write!(f, "{:?}", e),
+            Error::Other(e) => write!(f, "{}", e),
+            Error::InvalidScript(e) => write!(f, "Invalid script: {}", e),
+        }
     }
 }
 
