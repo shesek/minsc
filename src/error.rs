@@ -179,16 +179,22 @@ pub enum RuntimeError {
     #[error("No inner wildcard xpubs to derive")]
     NonDeriveableNoWildcard,
 
-    #[error("Expected a definite pubkey with no underived wildcards, not {0:#}")]
+    #[error("Expected a definite PubKey with no underived wildcards, not {0:#}")]
     UnexpectedWildcardPubKey(Box<miniscript::DescriptorPublicKey>),
 
-    #[error("Expected a definite descriptor with no underived wildcards, not {0:#}")]
+    #[error("Expected a definite SecKey with no underived wildcards, not {0:#}")]
+    UnexpectedWildcardSecKey(Box<miniscript::descriptor::DescriptorSecretKey>),
+
+    #[error("Expected a definite Descriptor with no underived wildcards, not {0:#}")]
     UnexpectedWildcardDescriptor(Box<crate::DescriptorDpk>),
 
-    #[error("Expected a definite pubkey with no multi-path derivations, not {0:#}")]
+    #[error("Expected a definite PubKey with no multi-path derivations, not {0:#}")]
     UnexpectedMultiPathPubKey(Box<miniscript::DescriptorPublicKey>),
 
-    #[error("Expected a definite descriptor with no multi-path derivations, not {0:#}")]
+    #[error("Expected a definite SecKey with no multi-path derivations, not {0:#}")]
+    UnexpectedMultiPathSecKey(Box<miniscript::descriptor::DescriptorSecretKey>),
+
+    #[error("Expected a definite Descriptor with no multi-path derivations, not {0:#}")]
     UnexpectedMultiPathDescriptor(Box<crate::DescriptorDpk>),
 
     #[error("Data type cannot be derived")]

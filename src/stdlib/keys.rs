@@ -366,19 +366,19 @@ impl_simple_to_value!(
 
 // Convert from Value to bitcoin/secp256k1 keys
 
+impl TryFrom<Value> for bitcoin::PublicKey {
+    type Error = Error;
+    fn try_from(val: Value) -> Result<Self> {
+        // Fails if the key is non-definite (has wildcards or multi-path)
+        DescriptorPublicKey::try_from(val)?.derive_definite()
+    }
+}
+
 impl TryFrom<Value> for secp256k1::SecretKey {
     type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(match value.try_into()? {
-            DescriptorSecretKey::Single(single_priv) => single_priv.key.inner,
-            DescriptorSecretKey::XPrv(xprv) => {
-                // TODO ensure no wildcards, similarly to DescriptorPubKeyExt::definite()
-                xprv.xkey
-                    .derive_priv(&EC, &xprv.derivation_path)?
-                    .private_key
-            }
-            DescriptorSecretKey::MultiXPrv(_) => bail!(Error::InvalidMultiXprv),
-        })
+    fn try_from(val: Value) -> Result<Self> {
+        // Fails if the key is non-definite (has wildcards or multi-path)
+        DescriptorSecretKey::try_from(val)?.derive_definite()
     }
 }
 
@@ -391,15 +391,8 @@ impl TryFrom<Value> for secp256k1::PublicKey {
 
 impl TryFrom<Value> for secp256k1::Keypair {
     type Error = Error;
-    fn try_from(value: Value) -> Result<Self> {
-        Ok(secp256k1::SecretKey::try_from(value)?.keypair(&EC))
-    }
-}
-
-impl TryFrom<Value> for bitcoin::PublicKey {
-    type Error = Error;
     fn try_from(val: Value) -> Result<Self> {
-        DescriptorPublicKey::try_from(val)?.derive_definite()
+        Ok(secp256k1::SecretKey::try_from(val)?.keypair(&EC))
     }
 }
 

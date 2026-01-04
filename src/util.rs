@@ -349,6 +349,9 @@ pub trait DescriptorSecretKeyExt {
     /// Return the derivation paths from the key itself, excluding the path from the origin key (unlike full_derivation_paths())
     fn derivation_paths(&self) -> Vec<DerivationPath>;
 
+    /// Convert into a derived pubkey. Errors if the descriptor contains underived wildcards or multi-path derivations.
+    fn derive_definite(self) -> Result<secp256k1::SecretKey>;
+
     // Pending https://github.com/rust-bitcoin/rust-miniscript/pull/757
     fn to_public_(&self) -> Result<DescriptorPublicKey>;
 }
@@ -416,6 +419,24 @@ impl DescriptorSecretKeyExt for DescriptorSecretKey {
             DescriptorSecretKey::XPrv(xprv) => vec![xprv.derivation_path.clone()],
             DescriptorSecretKey::Single(_) => vec![DerivationPath::master()],
         }
+    }
+
+    fn derive_definite(self) -> Result<secp256k1::SecretKey> {
+        Ok(match self {
+            DescriptorSecretKey::Single(single_priv) => single_priv.key.inner,
+            DescriptorSecretKey::XPrv(ref xprv) => {
+                ensure!(
+                    xprv.wildcard == Wildcard::None,
+                    Error::UnexpectedWildcardSecKey(self.into())
+                );
+                xprv.xkey
+                    .derive_priv(&EC, &xprv.derivation_path)?
+                    .private_key
+            }
+            DescriptorSecretKey::MultiXPrv(_) => {
+                bail!(Error::UnexpectedMultiPathSecKey(self.into()))
+            }
+        })
     }
 
     fn to_public_(&self) -> Result<DescriptorPublicKey> {
