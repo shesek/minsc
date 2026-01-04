@@ -299,7 +299,7 @@ MARK_CTX=[];
 // SCRIPT_MARKER_MAGIC available from Rust
 
 dyn fn mark($kind, $body) = if !MARK_SCRIPT then `` else
-  `SCRIPT_MARKER_MAGIC OP_NOTIF $kind str($body) OP_ENDIF`;
+  `SCRIPT_MARKER_MAGIC 0 OP_EQUAL OP_IF $kind str($body) OP_ENDIF`;
 dyn fn mark::comment($comment) = mark("comment", join(MARK_CTX+[str($comment)], " · "));
 dyn fn mark::label($name) = mark("label", join(MARK_CTX+[str($name)], "__"));
 dyn fn mark::ctx($context, $fn) = `

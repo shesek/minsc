@@ -1,11 +1,11 @@
 use std::{iter, str};
 
-use bitcoin::opcodes::all::{OP_ENDIF, OP_NOTIF};
+use bitcoin::opcodes::all::{OP_ENDIF, OP_EQUAL, OP_IF};
 use bitcoin::script::{Instruction, Instructions, Script, ScriptBuf};
 
 pub trait ScriptMarker {
     /// Iterate over Script, detecting and extracting script markers encoded
-    /// as PUSH(magic_bytes) OP_NOTIF PUSH(kind) PUSH(body) OP_ENDIF
+    /// as <MAGIC_BYTES> OP_0 OP_EQUAL OP_IF <KIND> [<BODY>] OP_ENDIF
     fn iter_with_markers<'a, 'b>(&'a self, magic_bytes: &'b [u8]) -> MarkerIterator<'a, 'b>;
 
     /// Strip out script markers
@@ -60,11 +60,19 @@ impl<'a, 'b> Iterator for MarkerIterator<'a, 'b> {
         use Instruction as I;
 
         Some(match self.inner.next()? {
-            // Look for a PUSH for the MAGIC_BYTES, followed by an OP_NOTIF
-            Ok(I::PushBytes(push))
-                if push.as_bytes() == self.magic_bytes
-                    && self.inner.next_if_eq(&Ok(I::Op(OP_NOTIF))).is_some() =>
-            {
+            // Look for a PUSH for the MAGIC_BYTES
+            Ok(I::PushBytes(push)) if push.as_bytes() == self.magic_bytes => {
+                // Ensure it is followed by OP_0 OP_EQUAL OP_IF
+                if !(self
+                    .inner // OP_0 is an empty PushBytes
+                    .next_if(|i| matches!(i, Ok(I::PushBytes(p)) if p.is_empty()))
+                    .is_some()
+                    && self.inner.next_if_eq(&Ok(I::Op(OP_EQUAL))).is_some()
+                    && self.inner.next_if_eq(&Ok(I::Op(OP_IF))).is_some())
+                {
+                    return Some(Err(MarkerError::InvalidFormat));
+                }
+
                 // Extract the `kind` and optional `body` PUSH instructions
                 // Must be valid UTF-8 strings
                 let mut pushes = iter::from_fn(|| {
@@ -101,7 +109,10 @@ impl<'a, 'b> Iterator for MarkerIterator<'a, 'b> {
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum MarkerError {
-    #[error("ScriptMarker: Missing expected PUSH in NOTIF block")]
+    #[error("ScriptMarker: Missing expected OP_0 OP_EQUAL OP_IF following MAGIC")]
+    InvalidFormat,
+
+    #[error("ScriptMarker: Missing expected PUSH in IF block")]
     MissingPush,
 
     #[error("ScriptMarker: Expected ENDIF after 1 or 2 pushes")]
