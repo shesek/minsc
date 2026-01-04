@@ -179,8 +179,10 @@ pub trait PsbtInExt {
 
 impl PsbtInExt for psbt::Input {
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
+        let internal_key = tapinfo.internal_key();
+        self.tap_internal_key = Some(internal_key);
+        self.tap_key_origins.entry(internal_key).or_default();
         self.tap_merkle_root = tapinfo.merkle_root();
-        self.tap_internal_key = Some(tapinfo.internal_key());
         self.tap_scripts
             .extend(tapinfo.script_map().keys().map(|script_ver| {
                 let ctrl = tapinfo.control_block(script_ver).expect("must exists");
@@ -254,7 +256,9 @@ pub trait PsbtOutExt {
 }
 impl PsbtOutExt for psbt::Output {
     fn update_with_taproot(&mut self, tapinfo: &TaprootSpendInfo) -> Result<()> {
-        self.tap_internal_key = Some(tapinfo.internal_key());
+        let internal_key = tapinfo.internal_key();
+        self.tap_internal_key = Some(internal_key);
+        self.tap_key_origins.entry(internal_key).or_default();
 
         if let Some(node_info) = tapinfo.node_info() {
             // Can fail if the TaprootSpendInfo has hidden nodes
