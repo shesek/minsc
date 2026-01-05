@@ -94,8 +94,12 @@ fn psbt::finalize_witness($psbt, $input_witnesses, $extract_tx=true) {
   if $extract_tx then psbt::extract_raw($finalized) else $finalized
 }
 
-fn psbt::finalize_extract($psbt) = psbt::extract(psbt::finalize($psbt));
-fn psbt::sign_extract($psbt, $keys) = psbt::extract(psbt::finalize(psbt::sign($psbt, $keys)));
+fn psbt::sign_finalize($psbt, $keys, $extract_tx=true) =
+  psbt::finalize(psbt::sign($psbt, $keys), $extract_tx);
+
+// For backwards compatibility, to be removed
+psbt::finalize_extract = psbt::finalize;
+psbt::sign_extract = psbt::sign_finalize;
 
 //
 // Miniscript utilities

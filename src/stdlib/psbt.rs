@@ -87,13 +87,17 @@ pub mod fns {
         Ok(Value::Psbt(psbt))
     }
 
-    /// psbt::finalize(Psbt) -> Psbt
+    /// psbt::finalize(psbt: Psbt, extract_tx: Bool = true) -> Transaction|Psbt
     ///
     /// Finalize the PSBT, raising an error if any of the inputs failed to finalize
     pub fn finalize(args: Array, _: &ScopeRef) -> Result<Value> {
-        let mut psbt: Psbt = args.arg_into()?;
+        let (mut psbt, extract_tx): (Psbt, Option<bool>) = args.args_into()?;
         psbt.finalize_mut(&EC).map_err(Error::PsbtFinalize)?;
-        Ok(psbt.into())
+        Ok(if extract_tx.unwrap_or(true) {
+            psbt.extract(&EC)?.into()
+        } else {
+            psbt.into()
+        })
     }
 
     /// psbt::try_finalize(Psbt) -> [Psbt, Array<String>]

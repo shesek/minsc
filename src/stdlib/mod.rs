@@ -87,10 +87,10 @@ pub fn attach_stdlib(scope: &ScopeRef<Mutable>) {
     self::crypto::attach_stdlib(scope);
     self::keys::attach_stdlib(scope);
     self::miniscript::attach_stdlib(scope);
-    self::btc::attach_stdlib(scope); // requires keys & miniscript
+    self::psbt::attach_stdlib(scope);
+    self::btc::attach_stdlib(scope); // requires keys, psbt & miniscript
     self::descriptors::attach_stdlib(scope);
     self::policy::attach_stdlib(scope);
-    self::psbt::attach_stdlib(scope);
     self::taproot::attach_stdlib(scope);
     self::ctv::attach_stdlib(scope); // requires btc
     ELEMENTS_STDLIB.exec(scope).unwrap(); // requires btc

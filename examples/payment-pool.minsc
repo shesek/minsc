@@ -262,7 +262,7 @@ assert::eq($pool_s2->amount, $send_tx->output.1->amount);
 //
 
 // Charlie exits using the others' pre-signed exit signatures, plus a fresh signature by their key
-$charlie_exit_tx = psbt::extract($pool_s2->unilateral_exit($charlie_sk, $pool_s2_exit_sigs));
+$charlie_exit_tx = $pool_s2->unilateral_exit($charlie_sk, $pool_s2_exit_sigs);
 
 // First output is Charlie's exit, second output sends change to a 2-of-2 between the remaining pool members
 assert::eq($charlie_exit_tx->output.0->amount, 20000 sat);
@@ -279,7 +279,7 @@ assert::eq($pool_s3->amount, $charlie_exit_tx->output.1->amount);
 assert::eq($pool_s3->descriptor->script_pubkey, $charlie_exit_tx->output.1->script_pubkey);
     
 // Alice exits too
-$alice_exit_tx = psbt::extract($pool_s3->unilateral_exit($alice_sk, $pool_s3_exit_sigs));
+$alice_exit_tx = $pool_s3->unilateral_exit($alice_sk, $pool_s3_exit_sigs);
 
 // First output is Alice's exit
 assert::eq($alice_exit_tx->output.0->amount, 4600 sat);
