@@ -4,6 +4,7 @@ test("Script Exec", |T| {
     t::eq(script::exec(`1 2`), [ "success": false, "stack": [ 1, 2 ] ]);
     t::eq(script::exec(`1 2 OP_ADD`), [ "success": true, "stack": [ 3 ] ]);
     t::eq(script::exec(`1 2 OP_EQUALVERIFY`), [ "success": false, "error": "EqualVerify", "failed_opcode": OP_EQUALVERIFY, "stack": [] ]);
+    true
   });
 
   test("script::eval()", |T| {
@@ -11,6 +12,7 @@ test("Script Exec", |T| {
     t::eq(script::eval(`1 2`), [ 1, 2 ]);
     t::eq(script::eval(`1 2 OP_ADD`), 3);
     t::eq(script::eval(`1 OP_DROP`), []);
+    true
   });
 
   test("script::verify()", |T| {
@@ -18,13 +20,16 @@ test("Script Exec", |T| {
       t::assert(script::verify(`1`));
       t::assert(script::verify(`2 2 OP_EQUAL`));
       t::assert(script::verify(`2 2 OP_EQUALVERIFY 999`));
+      true
     });
     test("Invalid scripts", |T| {
       t::assert(!script::verify(`0`));
       t::assert(!script::verify(`1 2`));
       t::assert(!script::verify(`1 2 OP_EQUAL`));
       t::assert(!script::verify(`1 2 OP_EQUALVERIFY 1`));
+      true
     });
+    true
   });
 
   test("With stack", |T| {
@@ -34,6 +39,7 @@ test("Script Exec", |T| {
     t::eq(script::eval(`2 OP_ADD`, [ 1 ]), 3);
     // with options array
     t::eq(script::eval(OP_ADD, [ "stack": [ 1, 2 ] ]), 3);
+    true
   });
 
   test("With ctx", |T| {
@@ -42,11 +48,13 @@ test("Script Exec", |T| {
     t::eq(script::exec(`9 OP_IF OP_ENDIF`, ctx::tapscript)->error, "TapscriptMinimalIf");
     // with options array
     t::assert(script::verify(`9 OP_IF 1 OP_ENDIF`, [ "ctx": ctx::legacy ]));
+    true
   });
 
   test("With stack & ctx", |T| {
     t::eq(script::eval(`9 OP_IF 8 OP_ENDIF`, [ 7 ], ctx::legacy), [ 7, 8 ]);
     t::eq(script::eval(`9 OP_IF 8 OP_ENDIF`, [ "stack": [ 7 ], "ctx": ctx::legacy ]), [ 7, 8 ]);
+    true
   });
 
   test("script::trace()", |T| {
@@ -62,6 +70,7 @@ test("Script Exec", |T| {
       "result": [ "success": true, "stack": [ 3 ] ],
       "stats": [ "max_nb_stack_items": 2, "opcode_count": 0, "start_validation_weight": 51, "validation_weight": 51 ]
     ]);
+    true
   });
 
   test("script::ptrace()", |T| {
@@ -79,6 +88,7 @@ test("Script Exec", |T| {
       OP_ADD: [ 3 ],
       "success": true,
     ]);
+    true
   });
 
   test("TX", |T| {
@@ -103,6 +113,7 @@ test("Script Exec", |T| {
       // Invalid
       t::assert(!script::verify($script, [ "tx": $tx_unsigned, "ctx": ctx::segwitv0, "stack": [ 12, $sig ], "utxos": [ $utxo ] ]));
       t::assert(!script::verify($script, [ "tx": $tx_unsigned, "ctx": ctx::segwitv0, "stack": [ 11, 0x010203 ], "utxos": [ $utxo ] ]));
+      true
     });
 
     $tx_final = tx::with_witness($tx_unsigned, [
@@ -110,7 +121,7 @@ test("Script Exec", |T| {
     ]);
 
     test("tx::exec()", |T| {
-      t::eq(tx::exec($tx_final, 0, [$utxo]), [ "success": true, "stack": [1] ]);
+      t::eq(tx::exec($tx_final, 0, [$utxo]), [ "success": true, "stack": [1] ])
     });
 
     test("tx::trace()", |T| {
@@ -118,6 +129,7 @@ test("Script Exec", |T| {
       t::assert($trace->result->success);
       t::eq(len($trace->steps), 4);
       t::eq($trace->steps.2, 35: [ "opcode": OP_PUSHNUM_11, "stack": [ 11, 11 ] ]);
+      true
     });
 
     test("tx::verify()", |T| {
@@ -130,6 +142,7 @@ test("Script Exec", |T| {
       t::assert(!tx::verify(tx::with_witness($tx_unsigned, [
         0: [ 11, $sig+0x01, $script ]
       ]), 0, [$utxo]));
-    });
-  });
+      true
+    })
+  })
 })

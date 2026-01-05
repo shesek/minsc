@@ -114,7 +114,7 @@ dyn fn test($topic, $test) {
   T = T + [ $topic ];
   $indent = if len(T) > 1 then join(fillArray(len(T)-1, "··"), "")+" " else "";
   print("[TEST] " + $indent + join(T, " · "));
-  t::assert(if isFunction($test) then $test(T) else $test);
+  t::assert(if isFunction($test) then $test(T) else $test)
 }
 dyn fn t::assert($bool) = $bool || throw("["+last(T)+"] Assertion failed");
 dyn fn t::eq($a, $b) = ($a == $b) || throw("["+last(T)+"] Not equal: "+$a+" != "+$b);

@@ -21,12 +21,13 @@ test("BIP 39", |T| {
     $entropy = 0xf0de1bc3786f0de1bc3786f0de1bc378;
     t::eq(bip39::to_entropy($mnemonic), $entropy);
     t::eq(bip39::from_entropy($entropy), $mnemonic);
+    true
   });
 
   test("bip39::rand(), bip39::to_entropy(), bip39::from_entropy() round-trips", |T| {
     $mnemonic = bip39::rand();
     $entropy = bip39::to_entropy($mnemonic);
-    t::eq(bip39::from_entropy($entropy), $mnemonic);
+    t::eq(bip39::from_entropy($entropy), $mnemonic)
   });
 
   test("bip39()", |T| {
@@ -35,7 +36,7 @@ test("BIP 39", |T| {
       t::eq(len(bip39::to_entropy($mnemonic_default_size)), 16);
 
       $mnemonic_24 = bip39(24);
-      t::eq(len(bip39::to_entropy($mnemonic_24)), 32);
+      t::eq(len(bip39::to_entropy($mnemonic_24)), 32)
     });
 
     test("as a shorthand for bip39::to_xpriv()", |T| {
@@ -44,6 +45,8 @@ test("BIP 39", |T| {
 
       $xpriv_mainnet = bip39("valid valid valid valid valid valid valid valid valid valid valid valid", mainnet);
       t::eq($xpriv_mainnet, xprv9s21ZrQH143K3bvqvE7nMpt7CAFNhT5JDQBAPhffn5w71k7TCaNBwrEMzBAZrcN4HzSSN6kjStfwigD3ZLxuantcaGdbzCucT9HddRXJNve);
+
+      true
     })
   });
 
@@ -203,6 +206,8 @@ test("BIP 39", |T| {
       t::eq(bip39::from_entropy($entropy), $mnemonic);
       t::eq(bip39::to_seed($mnemonic, $pass), $seed);
       t::eq(bip39::to_xpriv($mnemonic, mainnet, $pass), $xpriv);
+      true
     });
-  });
+    true
+  })
 });

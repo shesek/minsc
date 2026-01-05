@@ -8,6 +8,7 @@ test("CTV", |T| {
         assert::eq(ctv::hash($tx, 1), 0x12f7ab0a282fb9e29c9fd2ada21f950f492bfd5778a94202398c13ae6e97f0b4);
         assert::eq(ctv::hash($tx, 3116999548), 0x0ee9cc212182845d4c32ba6b3ba8859800d5cf423c58fb1444feaf21aa9cf81c);
         assert::eq(ctv::hash($tx, 4294967295), 0xda78ece7c0888725532355018961f58ad471f242e29a60adf84c55007fad608f);
+        true
     });
     test("Test Vector #2", |T| {
         // No scriptSigs
@@ -16,5 +17,6 @@ test("CTV", |T| {
         assert::eq(ctv::hash($tx, 1), 0x0980b070c9b5fea0a87b3b4a148876079cb54dc3db9ca560411c1c8cc3a7f5d9);
         assert::eq(ctv::hash($tx, 1311624179), 0x3871f92f02152b4846c1f00e3100be52b8ec53cff9f496061dcd3ad3f2f48a2a);
         assert::eq(ctv::hash($tx, 4294967295), 0x10b88c130695168a2fc2548e4a6f4fed11388a25f3da39a478ebbce6ac2c8299);
-    });
+        true
+    })
 })
