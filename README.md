@@ -14,6 +14,8 @@ It features built-in support for Descriptors, Miniscript, Script, Transactions, 
 
 The language is dynamically typed, functional and immutable.
 
+VSCode & VSCodium support for autocomplete, syntax highlighting, code snippets, hover messages & comment toggling is available by installing the [Minsc VSCode extension](https://github.com/as1ndu/minsc-vscode-extension)
+
 > [!NOTE]
 > The documentation and playground on the [`min.sc`](https://min.sc/) website are currently outdated.
 >
